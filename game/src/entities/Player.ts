@@ -132,9 +132,9 @@ export class Player extends GameObjects.Sprite {
 
   private isWithinBounds(x: number, y: number) {
     const { width, height, tileSize } = CONFIG;
-    // Strict bounds checking: must be within [0, width) and [tileSize, height)
-    // The tileSize offset for Y is to account for the player starting at (0, tileSize) in some grid systems
-    return x >= 0 && x < width && y >= tileSize && y < height;
+    // Bounds checking: must be within the map [0, width] and [tileSize, height]
+    // origin(0.5, 1) means we check the bottom center of the sprite
+    return x >= 0 && x <= width && y >= tileSize && y <= height;
   }
 
   getGridPosition() {
