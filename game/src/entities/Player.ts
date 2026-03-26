@@ -120,8 +120,11 @@ export class Player extends GameObjects.Sprite {
         x: nextX,
         y: nextY,
         duration: (tileSize / speed) * 1000,
+        ease: "Linear",
         onComplete: () => {
           this.isMoving = false;
+          // Check for continuous input immediately to avoid 1-frame stutter
+          this.handleInput();
         },
       });
     }

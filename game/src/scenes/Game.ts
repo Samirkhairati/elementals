@@ -1,21 +1,20 @@
-import { Scene } from 'phaser';
-import { CONFIG } from '../config';
-import { Player } from '../entities/Player';
-import { DebugHUD } from '../components/DebugHUD';
+import { Scene } from "phaser";
+import { CONFIG } from "../config";
+import { Player } from "../entities/Player";
+import { DebugHUD } from "../components/DebugHUD";
 
 export class Game extends Scene {
   private player!: Player;
   private debugHUD?: DebugHUD;
 
   constructor() {
-    super('Game');
+    super("Game");
   }
 
   create() {
-    this.cameras.main.setBackgroundColor(0x1B3022);
-    
     this.createWorld();
     this.spawnPlayer();
+    this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
     this.initializeDebugTools();
   }
 
@@ -37,8 +36,10 @@ export class Game extends Scene {
     // Optional Grid Overlay
     if (CONFIG.debug.enabled && CONFIG.debug.showGrid) {
       graphics.lineStyle(1, 0xffffff, 0.1);
-      for (let x = 0; x <= width; x += tileSize) graphics.lineBetween(x, 0, x, height);
-      for (let y = 0; y <= height; y += tileSize) graphics.lineBetween(0, y, width, y);
+      for (let x = 0; x <= width; x += tileSize)
+        graphics.lineBetween(x, 0, x, height);
+      for (let y = 0; y <= height; y += tileSize)
+        graphics.lineBetween(0, y, width, y);
     }
   }
 
@@ -46,7 +47,7 @@ export class Game extends Scene {
     const { mapWidth, mapHeight, tileSize } = CONFIG;
     const startX = Math.floor(mapWidth / 2) * tileSize + tileSize / 2;
     const startY = (Math.floor(mapHeight / 2) + 1) * tileSize;
-    
+
     this.player = new Player(this, startX, startY);
   }
 

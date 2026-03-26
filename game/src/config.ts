@@ -14,6 +14,6 @@ export const CONFIG = {
   mapHeight,
   width: mapWidth * tileSize,
   height: mapHeight * tileSize,
-  backgroundColor: "#ffffff",
+  backgroundColor: "#000000",
   playerSpeed: 200,
 };
