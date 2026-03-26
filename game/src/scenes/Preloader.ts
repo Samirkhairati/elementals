@@ -1,28 +1,37 @@
 import { Scene } from 'phaser';
+import { AnimationManager } from '../utils/AnimationManager';
 
 export class Preloader extends Scene {
-    constructor() {
-        super('Preloader');
-    }
+  constructor() {
+    super('Preloader');
+  }
 
-    init() {
-        this.cameras.main.setBackgroundColor(0xffffff);
-    }
+  init() {
+    this.cameras.main.setBackgroundColor(0xffffff);
+  }
 
-    preload() {
-        //  Load the assets for the game - Replace with your own assets
-        this.load.setPath('assets');
+  preload() {
+    this.load.setPath('assets');
 
-        this.load.image('logo', 'logo.png');
-        this.load.image('star', 'star.png');
-        this.load.image('player', 'player/sprite.png');
-    }
+    // UI & Effect Assets
+    this.load.image('logo', 'logo.png');
+    this.load.image('star', 'star.png');
+    
+    // Player Assets
+    // Spritesheet: 4x4 grid (Down, Left, Right, Up)
+    this.load.spritesheet('player', 'player/spritesheet.png', {
+      frameWidth: 32,
+      frameHeight: 48,
+    });
+  }
 
-    create() {
-        //  When all the assets have loaded, it's often worth creating global objects here that the rest of the game can use.
-        //  For example, you could define global animations here, so we can use them in other scenes.
+  create() {
+    this.initializeAnimations();
+    this.scene.start('Game');
+  }
 
-        //  Move to the Game scene
-        this.scene.start('Game');
-    }
+  private initializeAnimations() {
+    const animManager = AnimationManager.getInstance(this);
+    animManager.createCharacterAnimations('player', 'player');
+  }
 }

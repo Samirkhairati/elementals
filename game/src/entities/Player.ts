@@ -1,73 +1,127 @@
 import { Scene, GameObjects, type Types } from "phaser";
 import { CONFIG } from "../config";
+import {
+  AnimationManager,
+  Direction,
+  type MovementType,
+} from "../utils/AnimationManager";
 
 export class Player extends GameObjects.Sprite {
   private cursors: Types.Input.Keyboard.CursorKeys;
-  private isMoving: boolean = false;
+  private isMoving = false;
+  private currentDirection: Direction = Direction.DOWN;
+  private currentMovementType: MovementType = "walk";
+  private animManager: AnimationManager;
+
+  // Custom threshold for "light press" to just change direction
+  private readonly LIGHT_PRESS_THRESHOLD = 50;
 
   constructor(scene: Scene, x: number, y: number) {
     super(scene, x, y, "player");
 
+    this.initializeAppearance(scene);
+    this.cursors = scene.input.keyboard!.createCursorKeys();
+    this.animManager = AnimationManager.getInstance(scene);
+
+    // Initial state
+    this.animManager.stopMovement(this, "player", this.currentDirection);
+  }
+
+  private initializeAppearance(scene: Scene) {
     scene.add.existing(this);
     this.setOrigin(0.5, 1);
-
-    this.cursors = scene.input.keyboard!.createCursorKeys();
   }
 
   update() {
-    // Only handle input if we aren't currently middle-tween
     if (!this.isMoving) {
       this.handleInput();
     }
   }
 
   private handleInput() {
-    const { tileSize, playerSpeed } = CONFIG;
-    let direction = { x: 0, y: 0 };
+    const activeMapping = this.getKeyboardMapping();
 
-    if (this.cursors.left.isDown) {
-      direction.x = -1;
-    } else if (this.cursors.right.isDown) {
-      direction.x = 1;
-    } else if (this.cursors.up.isDown) {
-      direction.y = -1;
-    } else if (this.cursors.down.isDown) {
-      direction.y = 1;
-    }
+    if (activeMapping) {
+      const { direction, key } = activeMapping;
+      this.updateDirection(direction);
 
-    if (direction.x !== 0 || direction.y !== 0) {
-      const nextX = this.x + direction.x * tileSize;
-      const nextY = this.y + direction.y * tileSize;
-
-      // Check if within bounds
-      if (
-        nextX >= 0 &&
-        nextX <= CONFIG.width &&
-        nextY >= CONFIG.tileSize &&
-        nextY <= CONFIG.height
-      ) {
-        this.isMoving = true;
-
-        // Use built-in Tween for movement
-        this.scene.tweens.add({
-          targets: this,
-          x: nextX,
-          y: nextY,
-          duration: (tileSize / playerSpeed) * 1000,
-          onComplete: () => {
-            this.isMoving = false;
-            // Check immediately if another key is held for fluid motion
-            this.handleInput();
-          },
-        });
+      // Only move if key is held past threshold
+      if (key.getDuration() > this.LIGHT_PRESS_THRESHOLD) {
+        this.executeMovement(direction);
       }
+    } else {
+      this.animManager.stopMovement(this, "player", this.currentDirection);
     }
   }
 
-  getGridPosition() {
-    return {
-      x: Math.floor(this.x / CONFIG.tileSize),
-      y: Math.floor((this.y - CONFIG.tileSize) / CONFIG.tileSize),
+  private getKeyboardMapping() {
+    const { left, right, up, down } = this.cursors;
+
+    if (left.isDown) return { direction: Direction.LEFT, key: left };
+    if (right.isDown) return { direction: Direction.RIGHT, key: right };
+    if (up.isDown) return { direction: Direction.UP, key: up };
+    if (down.isDown) return { direction: Direction.DOWN, key: down };
+
+    return null;
+  }
+
+  private updateDirection(newDirection: Direction) {
+    if (this.currentDirection !== newDirection) {
+      this.currentDirection = newDirection;
+      this.animManager.stopMovement(this, "player", this.currentDirection);
+    }
+  }
+
+  private executeMovement(direction: Direction) {
+    const { tileSize, playerSpeed } = CONFIG;
+    const offsets = {
+      [Direction.LEFT]: { dx: -1, dy: 0 },
+      [Direction.RIGHT]: { dx: 1, dy: 0 },
+      [Direction.UP]: { dx: 0, dy: -1 },
+      [Direction.DOWN]: { dx: 0, dy: 1 },
     };
+
+    const { dx, dy } = offsets[direction];
+    const nextX = this.x + dx * tileSize;
+    const nextY = this.y + dy * tileSize;
+
+    if (this.isWithinBounds(nextX, nextY)) {
+      this.isMoving = true;
+      this.animManager.playMovement(
+        this,
+        "player",
+        direction,
+        this.currentMovementType,
+      );
+
+      this.scene.tweens.add({
+        targets: this,
+        x: nextX,
+        y: nextY,
+        duration: (tileSize / playerSpeed) * 1000,
+        onComplete: () => {
+          this.isMoving = false;
+          this.handleInput(); // Re-trigger for fluid movement
+        },
+      });
+    }
+  }
+
+  private isWithinBounds(x: number, y: number) {
+    const { width, height, tileSize } = CONFIG;
+    return x >= 0 && x <= width && y >= tileSize && y <= height;
+  }
+
+  getGridPosition() {
+    const { tileSize } = CONFIG;
+    return {
+      x: Math.floor(this.x / tileSize),
+      y: Math.floor((this.y - tileSize) / tileSize),
+    };
+  }
+
+  // API for future movement modes
+  setMovementType(type: MovementType) {
+    this.currentMovementType = type;
   }
 }
