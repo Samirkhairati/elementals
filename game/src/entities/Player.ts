@@ -1,9 +1,9 @@
-import { Scene, GameObjects, type Types } from "phaser";
+import { Scene, GameObjects, Input, type Types } from "phaser";
 import { CONFIG } from "../config";
 import {
   AnimationManager,
   Direction,
-  type MovementType,
+  MovementType,
 } from "../utils/AnimationManager";
 
 const MOVE_OFFSETS = {
@@ -15,9 +15,10 @@ const MOVE_OFFSETS = {
 
 export class Player extends GameObjects.Sprite {
   private cursors: Types.Input.Keyboard.CursorKeys;
+  private runKey: Input.Keyboard.Key;
   private isMoving = false;
   private currentDirection: Direction = Direction.DOWN;
-  private currentMovementType: MovementType = "walk";
+  private currentMovementType: MovementType = MovementType.WALK;
   private animManager: AnimationManager;
 
   private readonly MOVE_THRESHOLD = 50;
@@ -27,6 +28,7 @@ export class Player extends GameObjects.Sprite {
 
     this.initializeAppearance(scene);
     this.cursors = scene.input.keyboard!.createCursorKeys();
+    this.runKey = scene.input.keyboard!.addKey("X");
     this.animManager = AnimationManager.getInstance(scene);
 
     // Initial state
@@ -49,6 +51,12 @@ export class Player extends GameObjects.Sprite {
 
     if (activeMapping) {
       const { direction, key } = activeMapping;
+
+      // Update movement type based on 'X' key
+      this.currentMovementType = this.runKey.isDown
+        ? MovementType.RUN
+        : MovementType.WALK;
+
       this.updateDirection(direction);
 
       // Trigger movement if held past threshold
@@ -93,6 +101,13 @@ export class Player extends GameObjects.Sprite {
 
     if (this.isWithinBounds(nextX, nextY)) {
       this.isMoving = true;
+
+      // Use faster speed for running
+      const speed =
+        this.currentMovementType === MovementType.RUN
+          ? playerSpeed * 1.5
+          : playerSpeed;
+
       this.animManager.playMovement(
         this,
         "player",
@@ -104,7 +119,7 @@ export class Player extends GameObjects.Sprite {
         targets: this,
         x: nextX,
         y: nextY,
-        duration: (tileSize / playerSpeed) * 1000,
+        duration: (tileSize / speed) * 1000,
         onComplete: () => {
           this.isMoving = false;
         },

@@ -9,7 +9,13 @@ export const Direction = {
 
 export type Direction = (typeof Direction)[keyof typeof Direction];
 
-export type MovementType = "walk" | "run" | "swim";
+export const MovementType = {
+  WALK: "walk",
+  RUN: "run",
+  SWIM: "swim",
+} as const;
+
+export type MovementType = (typeof MovementType)[keyof typeof MovementType];
 
 /**
  * Handles character animations across the game.
@@ -31,36 +37,46 @@ export class AnimationManager {
   }
 
   /**
-   * Initializes animations for a character.
-   * Spritesheet Layout: 4x4 (Down, Left, Right, Up)
+   * Initializes animations for a specific movement type of a character.
+   * Spritesheet Layout: 4x4 grid (Down, Left, Right, Up)
    */
-  public createCharacterAnimations(characterKey: string, spritesheetKey: string) {
-    const directions = [Direction.DOWN, Direction.LEFT, Direction.RIGHT, Direction.UP];
-    const movementTypes: MovementType[] = ["walk"]; // Future: "run", "swim"
+  public createCharacterAnimations(
+    characterKey: string,
+    type: MovementType,
+    spritesheetKey: string
+  ) {
+    const directions = [
+      Direction.DOWN,
+      Direction.LEFT,
+      Direction.RIGHT,
+      Direction.UP,
+    ];
 
-    movementTypes.forEach((type) => {
-      directions.forEach((direction, index) => {
-        const startFrame = index * 4;
-        const endFrame = startFrame + 3;
+    directions.forEach((direction, index) => {
+      const startFrame = index * 4;
+      const endFrame = startFrame + 3;
 
-        // Walking sequence
+      // Movement sequence
+      this.scene.anims.create({
+        key: `${characterKey}-${type}-${direction}`,
+        frames: this.scene.anims.generateFrameNumbers(spritesheetKey, {
+          start: startFrame,
+          end: endFrame,
+        }),
+        frameRate: type === MovementType.RUN ? 15 : 10,
+        repeat: -1,
+      });
+
+      // Facing direction (idle) - only create if it doesn't exist
+      // We generally use the walk spritesheet for idle poses
+      const idleKey = `${characterKey}-idle-${direction}`;
+      if (!this.scene.anims.exists(idleKey)) {
         this.scene.anims.create({
-          key: `${characterKey}-${type}-${direction}`,
-          frames: this.scene.anims.generateFrameNumbers(spritesheetKey, {
-            start: startFrame,
-            end: endFrame,
-          }),
-          frameRate: 10,
-          repeat: -1,
-        });
-
-        // Facing direction (idle)
-        this.scene.anims.create({
-          key: `${characterKey}-idle-${direction}`,
+          key: idleKey,
           frames: [{ key: spritesheetKey, frame: startFrame }],
           frameRate: 1,
         });
-      });
+      }
     });
   }
 
@@ -68,7 +84,7 @@ export class AnimationManager {
     sprite: GameObjects.Sprite,
     characterKey: string,
     direction: Direction,
-    movementType: MovementType = "walk"
+    movementType: MovementType = MovementType.WALK
   ) {
     const animKey = `${characterKey}-${movementType}-${direction}`;
     if (sprite.anims.currentAnim?.key !== animKey) {

@@ -1,9 +1,11 @@
-import { Scene } from 'phaser';
-import { AnimationManager } from '../utils/AnimationManager';
+import { Scene } from "phaser";
+import { AnimationManager, MovementType } from "../utils/AnimationManager";
+
+const PLAYER_KEY = "player";
 
 export class Preloader extends Scene {
   constructor() {
-    super('Preloader');
+    super("Preloader");
   }
 
   init() {
@@ -11,15 +13,19 @@ export class Preloader extends Scene {
   }
 
   preload() {
-    this.load.setPath('assets');
+    this.load.setPath("assets");
 
     // UI & Effect Assets
-    this.load.image('logo', 'logo.png');
-    this.load.image('star', 'star.png');
-    
-    // Player Assets
-    // Spritesheet: 4x4 grid (Down, Left, Right, Up)
-    this.load.spritesheet('player', 'player/spritesheet.png', {
+    this.load.image("logo", "logo.png");
+    this.load.image("star", "star.png");
+
+    // Player Assets (32x48 sprites in 4x4 grids)
+    this.load.spritesheet(`${PLAYER_KEY}-walk`, "player/walk.png", {
+      frameWidth: 32,
+      frameHeight: 48,
+    });
+
+    this.load.spritesheet(`${PLAYER_KEY}-run`, "player/run.png", {
       frameWidth: 32,
       frameHeight: 48,
     });
@@ -27,11 +33,22 @@ export class Preloader extends Scene {
 
   create() {
     this.initializeAnimations();
-    this.scene.start('Game');
+    this.scene.start("Game");
   }
 
   private initializeAnimations() {
     const animManager = AnimationManager.getInstance(this);
-    animManager.createCharacterAnimations('player', 'player');
+
+    // Order matters for idle: WALK spritesheet frames 0/4/8/12 will be used for idle poses
+    animManager.createCharacterAnimations(
+      PLAYER_KEY,
+      MovementType.WALK,
+      `${PLAYER_KEY}-walk`,
+    );
+    animManager.createCharacterAnimations(
+      PLAYER_KEY,
+      MovementType.RUN,
+      `${PLAYER_KEY}-run`,
+    );
   }
 }
