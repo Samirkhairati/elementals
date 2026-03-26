@@ -6,6 +6,13 @@ import {
   type MovementType,
 } from "../utils/AnimationManager";
 
+const MOVE_OFFSETS = {
+  [Direction.LEFT]: { dx: -1, dy: 0 },
+  [Direction.RIGHT]: { dx: 1, dy: 0 },
+  [Direction.UP]: { dx: 0, dy: -1 },
+  [Direction.DOWN]: { dx: 0, dy: 1 },
+} as const;
+
 export class Player extends GameObjects.Sprite {
   private cursors: Types.Input.Keyboard.CursorKeys;
   private isMoving = false;
@@ -13,8 +20,7 @@ export class Player extends GameObjects.Sprite {
   private currentMovementType: MovementType = "walk";
   private animManager: AnimationManager;
 
-  // Custom threshold for "light press" to just change direction
-  private readonly LIGHT_PRESS_THRESHOLD = 50;
+  private readonly MOVE_THRESHOLD = 50;
 
   constructor(scene: Scene, x: number, y: number) {
     super(scene, x, y, "player");
@@ -45,8 +51,8 @@ export class Player extends GameObjects.Sprite {
       const { direction, key } = activeMapping;
       this.updateDirection(direction);
 
-      // Only move if key is held past threshold
-      if (key.getDuration() > this.LIGHT_PRESS_THRESHOLD) {
+      // Trigger movement if held past threshold
+      if (key.getDuration() > this.MOVE_THRESHOLD) {
         this.executeMovement(direction);
       }
     } else {
@@ -56,13 +62,19 @@ export class Player extends GameObjects.Sprite {
 
   private getKeyboardMapping() {
     const { left, right, up, down } = this.cursors;
+    const keys = [
+      { direction: Direction.LEFT, key: left },
+      { direction: Direction.RIGHT, key: right },
+      { direction: Direction.UP, key: up },
+      { direction: Direction.DOWN, key: down },
+    ];
 
-    if (left.isDown) return { direction: Direction.LEFT, key: left };
-    if (right.isDown) return { direction: Direction.RIGHT, key: right };
-    if (up.isDown) return { direction: Direction.UP, key: up };
-    if (down.isDown) return { direction: Direction.DOWN, key: down };
-
-    return null;
+    // Filter for pressed keys and find the most recently pressed one
+    return (
+      keys
+        .filter((k) => k.key.isDown)
+        .sort((a, b) => b.key.timeDown - a.key.timeDown)[0] || null
+    );
   }
 
   private updateDirection(newDirection: Direction) {
@@ -74,14 +86,8 @@ export class Player extends GameObjects.Sprite {
 
   private executeMovement(direction: Direction) {
     const { tileSize, playerSpeed } = CONFIG;
-    const offsets = {
-      [Direction.LEFT]: { dx: -1, dy: 0 },
-      [Direction.RIGHT]: { dx: 1, dy: 0 },
-      [Direction.UP]: { dx: 0, dy: -1 },
-      [Direction.DOWN]: { dx: 0, dy: 1 },
-    };
+    const { dx, dy } = MOVE_OFFSETS[direction];
 
-    const { dx, dy } = offsets[direction];
     const nextX = this.x + dx * tileSize;
     const nextY = this.y + dy * tileSize;
 
@@ -101,7 +107,6 @@ export class Player extends GameObjects.Sprite {
         duration: (tileSize / playerSpeed) * 1000,
         onComplete: () => {
           this.isMoving = false;
-          this.handleInput(); // Re-trigger for fluid movement
         },
       });
     }
@@ -109,7 +114,9 @@ export class Player extends GameObjects.Sprite {
 
   private isWithinBounds(x: number, y: number) {
     const { width, height, tileSize } = CONFIG;
-    return x >= 0 && x <= width && y >= tileSize && y <= height;
+    // Strict bounds checking: must be within [0, width) and [tileSize, height)
+    // The tileSize offset for Y is to account for the player starting at (0, tileSize) in some grid systems
+    return x >= 0 && x < width && y >= tileSize && y < height;
   }
 
   getGridPosition() {
