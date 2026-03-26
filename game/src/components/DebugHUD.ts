@@ -21,16 +21,35 @@ export class DebugHUD {
         });
         this.text.setScrollFactor(0);
 
+        const MODIFIERS = ['Meta', 'Shift', 'Control', 'Alt'];
+
         // Track keys
         this.scene.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
-            this.pressedKeys.add(event.key);
+            if (!MODIFIERS.includes(event.key)) {
+                this.pressedKeys.add(event.key);
+            }
         });
         this.scene.input.keyboard?.on('keyup', (event: KeyboardEvent) => {
             this.pressedKeys.delete(event.key);
         });
 
+        // Clear keys when switching back to the game to prevent "stuck" keys (like Meta)
+        this.scene.game.events.on('focus', () => this.pressedKeys.clear());
+        this.scene.events.on('resume', () => this.pressedKeys.clear());
+
         // Initialize display immediately
         this.update();
+
+        // Fix font loading race condition
+        // Re-apply font once browser has finished loading it
+        if (document.fonts) {
+            document.fonts.ready.then(() => {
+                if (this.text.active) {
+                    this.text.setFontFamily('"Press Start 2P"');
+                    this.update();
+                }
+            });
+        }
     }
 
     update() {

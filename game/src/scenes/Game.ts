@@ -29,9 +29,9 @@ export class Game extends Scene {
         }
     }
 
-    update(_time: number, delta: number) {
+    update(_time: number, _delta: number) {
         if (this.player) {
-            this.player.update(delta);
+            this.player.update();
         }
 
         if (this.debugHUD) {
