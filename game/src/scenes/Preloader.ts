@@ -1,27 +1,54 @@
-import { Scene } from 'phaser';
+import { Scene } from "phaser";
+import { AnimationManager, MovementType } from "../utils/AnimationManager";
+
+const PLAYER_KEY = "player";
 
 export class Preloader extends Scene {
-    constructor() {
-        super('Preloader');
-    }
+  constructor() {
+    super("Preloader");
+  }
 
-    init() {
-        this.cameras.main.setBackgroundColor(0xffffff);
-    }
+  init() {
+    this.cameras.main.setBackgroundColor(0xffffff);
+  }
 
-    preload() {
-        //  Load the assets for the game - Replace with your own assets
-        this.load.setPath('assets');
+  preload() {
+    this.load.setPath("assets");
 
-        this.load.image('logo', 'logo.png');
-        this.load.image('star', 'star.png');
-    }
+    // UI & Effect Assets
+    this.load.image("logo", "logo.png");
+    this.load.image("star", "star.png");
 
-    create() {
-        //  When all the assets have loaded, it's often worth creating global objects here that the rest of the game can use.
-        //  For example, you could define global animations here, so we can use them in other scenes.
+    // Player Assets (32x48 sprites in 4x4 grids)
+    this.load.spritesheet(`${PLAYER_KEY}-walk`, "player/walk.png", {
+      frameWidth: 32,
+      frameHeight: 48,
+    });
 
-        //  Move to the Game scene
-        this.scene.start('Game');
-    }
+    this.load.spritesheet(`${PLAYER_KEY}-run`, "player/run.png", {
+      frameWidth: 32,
+      frameHeight: 48,
+    });
+  }
+
+  create() {
+    this.initializeAnimations();
+    this.scene.start("Game");
+  }
+
+  private initializeAnimations() {
+    const animManager = AnimationManager.getInstance(this);
+
+    // Order matters for idle: WALK spritesheet frames 0/4/8/12 will be used for idle poses
+    animManager.createCharacterAnimations(
+      PLAYER_KEY,
+      MovementType.WALK,
+      `${PLAYER_KEY}-walk`,
+    );
+    animManager.createCharacterAnimations(
+      PLAYER_KEY,
+      MovementType.RUN,
+      `${PLAYER_KEY}-run`,
+    );
+  }
 }

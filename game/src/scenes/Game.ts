@@ -1,43 +1,64 @@
-import { Scene } from 'phaser';
-import { CONFIG } from '../config';
+import { Scene } from "phaser";
+import { CONFIG } from "../config";
+import { Player } from "../entities/Player";
+import { DebugHUD } from "../components/DebugHUD";
 
 export class Game extends Scene {
-    camera: Phaser.Cameras.Scene2D.Camera;
-    debug_text?: Phaser.GameObjects.Text;
+  private player!: Player;
+  private debugHUD?: DebugHUD;
 
-    constructor() {
-        super('Game');
+  constructor() {
+    super("Game");
+  }
+
+  create() {
+    this.createWorld();
+    this.spawnPlayer();
+    this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
+    this.initializeDebugTools();
+  }
+
+  private createWorld() {
+    const graphics = this.add.graphics();
+    const { width, height, tileSize } = CONFIG;
+
+    // Grass pattern (checkered)
+    const colors = { dark: 0x2e8b57, light: 0x3cb371 };
+
+    for (let y = 0; y < height; y += tileSize) {
+      for (let x = 0; x < width; x += tileSize) {
+        const isEven = (x / tileSize + y / tileSize) % 2 === 0;
+        graphics.fillStyle(isEven ? colors.light : colors.dark);
+        graphics.fillRect(x, y, tileSize, tileSize);
+      }
     }
 
-    private pressedKeys: Set<string> = new Set();
-
-    create() {
-        this.camera = this.cameras.main;
-        this.camera.setBackgroundColor(0xffffff);
-
-        if (CONFIG.debug) {
-            this.debug_text = this.add.text(20, 20, 'Keys: ', {
-                fontFamily: 'system-ui, -apple-system, Arial, sans-serif',
-                fontSize: '24px',
-                color: '#333333'
-            });
-        }
-
-        this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
-            this.pressedKeys.add(event.key);
-            this.updateDebugText();
-        });
-
-        this.input.keyboard?.on('keyup', (event: KeyboardEvent) => {
-            this.pressedKeys.delete(event.key);
-            this.updateDebugText();
-        });
+    // Optional Grid Overlay
+    if (CONFIG.debug.enabled && CONFIG.debug.showGrid) {
+      graphics.lineStyle(1, 0xffffff, 0.1);
+      for (let x = 0; x <= width; x += tileSize)
+        graphics.lineBetween(x, 0, x, height);
+      for (let y = 0; y <= height; y += tileSize)
+        graphics.lineBetween(0, y, width, y);
     }
+  }
 
-    private updateDebugText() {
-        if (this.debug_text) {
-            const keysString = Array.from(this.pressedKeys).join(', ');
-            this.debug_text.setText(`Keys: ${keysString}`);
-        }
+  private spawnPlayer() {
+    const { mapWidth, mapHeight, tileSize } = CONFIG;
+    const startX = Math.floor(mapWidth / 2) * tileSize + tileSize / 2;
+    const startY = (Math.floor(mapHeight / 2) + 1) * tileSize;
+
+    this.player = new Player(this, startX, startY);
+  }
+
+  private initializeDebugTools() {
+    if (CONFIG.debug.enabled) {
+      this.debugHUD = new DebugHUD(this, this.player);
     }
+  }
+
+  update(_time: number, _delta: number) {
+    this.player?.update();
+    this.debugHUD?.update();
+  }
 }
