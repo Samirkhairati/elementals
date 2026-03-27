@@ -1,64 +1,63 @@
 import { Scene } from "phaser";
-import { CONFIG } from "../config";
-import { Player } from "../entities/Player";
-import { DebugHUD } from "../components/DebugHUD";
+import { CONFIG } from "@/config";
+import { Player } from "@/entities/Player";
+import { MapSystem } from "@/world/MapSystem";
+import { HUDManager } from "@/components/HUDManager";
+import { MAPS } from "@/constants/assets";
 
 export class Game extends Scene {
   private player!: Player;
-  private debugHUD?: DebugHUD;
+  private mapSystem!: MapSystem;
+  private hudManager!: HUDManager;
 
   constructor() {
     super("Game");
   }
 
   create() {
-    this.createWorld();
-    this.spawnPlayer();
+    this.mapSystem = new MapSystem(this);
+    
+    // Initial map load
+    this.switchMap(MAPS[0].key);
+    
+    this.hudManager = new HUDManager(this, this.player, (key) => this.switchMap(key));
+    this.setupGlobalControls();
+  }
+
+  private switchMap(mapKey: string) {
+    const map = this.mapSystem.loadMap(mapKey);
+    
+    // Position at the center of the map
+    const { tileSize } = CONFIG;
+    const spawnX = Math.floor(map.width / 2) * tileSize + tileSize / 2;
+    const spawnY = (Math.floor(map.height / 2) + 1) * tileSize;
+
+    if (this.player) {
+      this.player.destroy();
+    }
+    
+    this.player = new Player(this, spawnX, spawnY, map.widthInPixels, map.heightInPixels);
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
-    this.initializeDebugTools();
+
+    // If map was switched while menu was open, ensure new player is unlocked
+    this.player.setMovementLocked(false);
+    this.hudManager?.setPlayer(this.player);
   }
 
-  private createWorld() {
-    const graphics = this.add.graphics();
-    const { width, height, tileSize } = CONFIG;
-
-    // Grass pattern (checkered)
-    const colors = { dark: 0x2e8b57, light: 0x3cb371 };
-
-    for (let y = 0; y < height; y += tileSize) {
-      for (let x = 0; x < width; x += tileSize) {
-        const isEven = (x / tileSize + y / tileSize) % 2 === 0;
-        graphics.fillStyle(isEven ? colors.light : colors.dark);
-        graphics.fillRect(x, y, tileSize, tileSize);
+  private setupGlobalControls() {
+    this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
+      const key = event.key.toUpperCase();
+      
+      if (key === CONFIG.controls.menu) {
+        this.hudManager.toggleMapMenu(this.player);
+      } else {
+        this.hudManager.handleInput(event);
       }
-    }
-
-    // Optional Grid Overlay
-    if (CONFIG.debug.enabled && CONFIG.debug.showGrid) {
-      graphics.lineStyle(1, 0xffffff, 0.1);
-      for (let x = 0; x <= width; x += tileSize)
-        graphics.lineBetween(x, 0, x, height);
-      for (let y = 0; y <= height; y += tileSize)
-        graphics.lineBetween(0, y, width, y);
-    }
-  }
-
-  private spawnPlayer() {
-    const { mapWidth, mapHeight, tileSize } = CONFIG;
-    const startX = Math.floor(mapWidth / 2) * tileSize + tileSize / 2;
-    const startY = (Math.floor(mapHeight / 2) + 1) * tileSize;
-
-    this.player = new Player(this, startX, startY);
-  }
-
-  private initializeDebugTools() {
-    if (CONFIG.debug.enabled) {
-      this.debugHUD = new DebugHUD(this, this.player);
-    }
+    });
   }
 
   update(_time: number, _delta: number) {
     this.player?.update();
-    this.debugHUD?.update();
+    this.hudManager?.update();
   }
 }

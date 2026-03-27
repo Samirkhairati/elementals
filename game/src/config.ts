@@ -7,7 +7,7 @@ export const CONFIG = {
     enabled: true,
     showKeys: true,
     showCoords: true,
-    showGrid: false,
+    showGrid: true,
   },
   tileSize,
   mapWidth,
@@ -16,4 +16,10 @@ export const CONFIG = {
   height: mapHeight * tileSize,
   backgroundColor: "#000000",
   playerSpeed: 200,
+  playerDepth: 10,
+  controls: {
+    run: "X",
+    action: "C",
+    menu: "ENTER",
+  },
 };

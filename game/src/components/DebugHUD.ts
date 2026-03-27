@@ -1,6 +1,6 @@
 import { Scene, GameObjects } from 'phaser';
-import { CONFIG } from '../config';
-import { Player } from '../entities/Player';
+import { CONFIG } from '@/config';
+import { Player } from '@/entities/Player';
 
 export class DebugHUD {
     private text: GameObjects.Text;
@@ -20,6 +20,7 @@ export class DebugHUD {
             padding: { x: 10, y: 10 }
         });
         this.text.setScrollFactor(0);
+        this.text.setDepth(1001);
 
         const MODIFIERS = ['Meta', 'Shift', 'Control', 'Alt'];
 
@@ -50,6 +51,10 @@ export class DebugHUD {
                 }
             });
         }
+    }
+
+    setPlayer(player: Player) {
+        this.player = player;
     }
 
     update() {

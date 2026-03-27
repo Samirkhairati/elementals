@@ -1,5 +1,6 @@
 import { Scene } from "phaser";
-import { AnimationManager, MovementType } from "../utils/AnimationManager";
+import { AnimationManager, MovementType } from "@/utils/AnimationManager";
+import { TILESETS, MAPS } from "@/constants/assets";
 
 const PLAYER_KEY = "player";
 
@@ -15,11 +16,7 @@ export class Preloader extends Scene {
   preload() {
     this.load.setPath("assets");
 
-    // UI & Effect Assets
-    this.load.image("logo", "logo.png");
-    this.load.image("star", "star.png");
-
-    // Player Assets (32x48 sprites in 4x4 grids)
+    // Player Assets
     this.load.spritesheet(`${PLAYER_KEY}-walk`, "player/walk.png", {
       frameWidth: 32,
       frameHeight: 48,
@@ -28,6 +25,18 @@ export class Preloader extends Scene {
     this.load.spritesheet(`${PLAYER_KEY}-run`, "player/run.png", {
       frameWidth: 32,
       frameHeight: 48,
+    });
+
+    // Load all Tilesets
+    this.load.setPath("assets/tilesets");
+    TILESETS.forEach((key) => {
+      this.load.image(key, `${key}.png`);
+    });
+
+    // Load all Maps
+    this.load.setPath("data/maps");
+    MAPS.forEach((map) => {
+      this.load.tilemapTiledJSON(map.key, `${map.key}.json`);
     });
   }
 
