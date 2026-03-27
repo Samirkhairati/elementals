@@ -1,5 +1,5 @@
 import { Scene } from "phaser";
-import { AnimationManager, MovementType } from "../utils/AnimationManager";
+import { AnimationManager, MovementType } from "@/utils/AnimationManager";
 
 const PLAYER_KEY = "player";
 

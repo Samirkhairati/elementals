@@ -1,6 +1,6 @@
 import { Scene, GameObjects } from 'phaser';
-import { CONFIG } from '../config';
-import { Player } from '../entities/Player';
+import { CONFIG } from '@/config';
+import { Player } from '@/entities/Player';
 
 export class DebugHUD {
     private text: GameObjects.Text;

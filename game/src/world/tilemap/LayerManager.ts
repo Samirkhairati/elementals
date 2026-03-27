@@ -1,4 +1,4 @@
-import { GameLayer } from "./GameLayer";
+import { GameLayer } from "@/world/tilemap/GameLayer";
 
 export class LayerManager {
   private layers: Map<string, GameLayer> = new Map();

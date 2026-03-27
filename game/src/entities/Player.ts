@@ -1,10 +1,10 @@
 import { Scene, GameObjects, Input, type Types } from "phaser";
-import { CONFIG } from "../config";
+import { CONFIG } from "@/config";
 import {
   AnimationManager,
   Direction,
   MovementType,
-} from "../utils/AnimationManager";
+} from "@/utils/AnimationManager";
 
 const MOVE_OFFSETS = {
   [Direction.LEFT]: { dx: -1, dy: 0 },

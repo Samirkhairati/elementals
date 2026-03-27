@@ -1,4 +1,4 @@
-import type { TilemapData, LayerData, TilesetData } from "./interfaces";
+import type { TilemapData, LayerData, TilesetData } from "@/world/tilemap/interfaces";
 
 export class MapParser {
   /**

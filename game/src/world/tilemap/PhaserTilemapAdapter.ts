@@ -1,8 +1,8 @@
 import { Scene } from "phaser";
-import type { TilemapData } from "./interfaces";
-import { TilesetManager } from "./TilesetManager";
-import { LayerManager } from "./LayerManager";
-import { GameLayer } from "./GameLayer";
+import type { TilemapData } from "@/world/tilemap/interfaces";
+import { TilesetManager } from "@/world/tilemap/TilesetManager";
+import { LayerManager } from "@/world/tilemap/LayerManager";
+import { GameLayer } from "@/world/tilemap/GameLayer";
 
 export class PhaserTilemapAdapter {
   private scene: Scene;

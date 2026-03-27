@@ -1,4 +1,4 @@
-import type { TilesetData } from "./interfaces";
+import type { TilesetData } from "@/world/tilemap/interfaces";
 
 export class TilesetManager {
   private tilesetMapping: Map<string, string> = new Map();

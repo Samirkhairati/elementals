@@ -1,14 +1,14 @@
 import { Scene } from "phaser";
-import { CONFIG } from "../config";
-import { Player } from "../entities/Player";
-import { DebugHUD } from "../components/DebugHUD";
+import { CONFIG } from "@/config";
+import { Player } from "@/entities/Player";
+import { DebugHUD } from "@/components/DebugHUD";
 import {
   MapLoader,
   MapParser,
   TilesetManager,
   LayerManager,
   PhaserTilemapAdapter,
-} from "../world/tilemap";
+} from "@/world/tilemap";
 
 export class Game extends Scene {
   private player!: Player;

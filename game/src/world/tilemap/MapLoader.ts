@@ -1,5 +1,6 @@
 import { Scene } from "phaser";
 
+
 export class MapLoader {
   /**
    * Loads a Tiled JSON map directly using Phaser's loader.
