@@ -22,6 +22,7 @@ export class Player extends GameObjects.Sprite {
   private animManager: AnimationManager;
 
   private readonly MOVE_THRESHOLD = 50;
+  private isMovementLocked = false;
   private worldWidth: number;
   private worldHeight: number;
 
@@ -33,7 +34,7 @@ export class Player extends GameObjects.Sprite {
 
     this.initializeAppearance(scene);
     this.cursors = scene.input.keyboard!.createCursorKeys();
-    this.runKey = scene.input.keyboard!.addKey("X");
+    this.runKey = scene.input.keyboard!.addKey(CONFIG.controls.run);
     this.animManager = AnimationManager.getInstance(scene);
 
     // Initial state
@@ -46,8 +47,15 @@ export class Player extends GameObjects.Sprite {
   }
 
   update() {
-    if (!this.isMoving) {
+    if (!this.isMoving && !this.isMovementLocked) {
       this.handleInput();
+    }
+  }
+
+  setMovementLocked(locked: boolean) {
+    this.isMovementLocked = locked;
+    if (locked) {
+      this.animManager.stopMovement(this, "player", this.currentDirection);
     }
   }
 

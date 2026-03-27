@@ -2,8 +2,9 @@ import { Scene } from "phaser";
 import { CONFIG } from "@/config";
 import { Player } from "@/entities/Player";
 import { DebugHUD } from "@/components/DebugHUD";
+import { MapSwitcherHUD } from "@/components/MapSwitcherHUD";
+import { MAPS, TILESETS } from "@/constants/assets";
 import {
-  MapLoader,
   MapParser,
   TilesetManager,
   LayerManager,
@@ -13,6 +14,7 @@ import {
 export class Game extends Scene {
   private player!: Player;
   private debugHUD?: DebugHUD;
+  private mapSwitcherHUD!: MapSwitcherHUD;
 
   // Tilemap system components
   private map!: Phaser.Tilemaps.Tilemap;
@@ -24,32 +26,29 @@ export class Game extends Scene {
     super("Game");
   }
 
-  preload() {
-    this.load.image("grass-tiles", "/assets/tilesets/grass.png");
-    this.load.image("outside-tiles", "/assets/tilesets/outside.png");
-    this.load.image("house-tiles", "/assets/tilesets/house.png");
-    MapLoader.preloadMap(this, "map-data", "/data/maps/map1.json");
-  }
-
   create() {
-    this.createWorld();
+    // Use the first map as default
+    this.createWorld(MAPS[0].key);
     this.spawnPlayer();
+    
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
     this.initializeDebugTools();
+    this.initializeMapSwitcher();
   }
 
-  private createWorld() {
-    // 1) Initialize managers
+  private createWorld(mapKey: string) {
+    // 1) Initialize managers (if they don't exist)
     this.layerManager = new LayerManager();
     this.tilesetManager = new TilesetManager();
 
-    // 2) Map the Tiled tileset names to the Phaser texture keys
-    this.tilesetManager.registerTileset("grass", "grass-tiles");
-    this.tilesetManager.registerTileset("outside", "outside-tiles");
-    this.tilesetManager.registerTileset("house", "house-tiles");
+    // 2) Register all available tilesets
+    // Here we use our manifest. In a real game, you might only register what's needed for the current map
+    TILESETS.forEach(key => {
+      this.tilesetManager.registerTileset(key, key);
+    });
 
-    // 3) Retrieve raw JSON and parse it via our MapParser
-    const rawData = this.cache.tilemap.get("map-data").data;
+    // 3) Retrieve raw JSON and parse it
+    const rawData = this.cache.tilemap.get(mapKey).data;
     const parsedData = MapParser.parse(rawData);
 
     // 4) Build the Phaser Tilemap through our Adapter
@@ -58,7 +57,7 @@ export class Game extends Scene {
       this.tilesetManager,
       this.layerManager
     );
-    this.map = this.tilemapAdapter.createTilemapFromLoadedJson("map-data", parsedData);
+    this.map = this.tilemapAdapter.createTilemapFromLoadedJson(mapKey, parsedData);
 
     // Adjust camera bounds to match the map dimensions
     this.cameras.main.setBounds(0, 0, this.map.widthInPixels, this.map.heightInPixels);
@@ -87,7 +86,50 @@ export class Game extends Scene {
     const startX = Math.floor(width / 2) * tileSize + tileSize / 2;
     const startY = (Math.floor(height / 2) + 1) * tileSize;
 
+    // Destroy existing player if it exists (for map switching)
+    if (this.player) {
+      this.player.destroy();
+    }
+    
     this.player = new Player(this, startX, startY, widthInPixels, heightInPixels);
+  }
+
+  private initializeMapSwitcher() {
+    this.mapSwitcherHUD = new MapSwitcherHUD(this, (mapKey) => {
+        this.switchMap(mapKey);
+    });
+
+    this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
+        const key = event.key.toUpperCase();
+        if (key === CONFIG.controls.menu) {
+            this.mapSwitcherHUD.toggle();
+            this.player.setMovementLocked(this.mapSwitcherHUD.isVisible);
+        } else if (this.mapSwitcherHUD.isVisible) {
+            if (event.key === 'ArrowUp') this.mapSwitcherHUD.moveSelection(-1);
+            if (event.key === 'ArrowDown') this.mapSwitcherHUD.moveSelection(1);
+            if (key === CONFIG.controls.action) {
+                this.mapSwitcherHUD.confirm();
+                this.player.setMovementLocked(false);
+            }
+        }
+    });
+  }
+
+  private switchMap(mapKey: string) {
+    // 1) Destroy current map and HUDs
+    this.map.destroy();
+    
+    // 2) Re-create world
+    this.createWorld(mapKey);
+    
+    // 3) Respawn player and re-setup camera
+    this.spawnPlayer();
+    this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
+    
+    // 4) Update Debug HUD with new player reference
+    if (this.debugHUD) {
+        this.debugHUD.setPlayer(this.player);
+    }
   }
 
   private initializeDebugTools() {
