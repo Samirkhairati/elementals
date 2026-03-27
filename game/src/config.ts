@@ -7,7 +7,7 @@ export const CONFIG = {
     enabled: true,
     showKeys: true,
     showCoords: true,
-    showGrid: false,
+    showGrid: true,
   },
   tileSize,
   mapWidth,

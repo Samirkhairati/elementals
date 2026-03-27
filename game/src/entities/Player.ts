@@ -22,9 +22,14 @@ export class Player extends GameObjects.Sprite {
   private animManager: AnimationManager;
 
   private readonly MOVE_THRESHOLD = 50;
+  private worldWidth: number;
+  private worldHeight: number;
 
-  constructor(scene: Scene, x: number, y: number) {
+  constructor(scene: Scene, x: number, y: number, worldWidth?: number, worldHeight?: number) {
     super(scene, x, y, "player");
+
+    this.worldWidth = worldWidth ?? CONFIG.width;
+    this.worldHeight = worldHeight ?? CONFIG.height;
 
     this.initializeAppearance(scene);
     this.cursors = scene.input.keyboard!.createCursorKeys();
@@ -131,10 +136,15 @@ export class Player extends GameObjects.Sprite {
   }
 
   private isWithinBounds(x: number, y: number) {
-    const { width, height, tileSize } = CONFIG;
-    // Bounds checking: must be within the map [0, width] and [tileSize, height]
+    const { tileSize } = CONFIG;
+    // Bounds checking: must be within the map [0, worldWidth] and [tileSize, worldHeight]
     // origin(0.5, 1) means we check the bottom center of the sprite
-    return x >= 0 && x <= width && y >= tileSize && y <= height;
+    return x >= 0 && x <= this.worldWidth && y >= tileSize && y <= this.worldHeight;
+  }
+
+  setWorldBounds(width: number, height: number) {
+    this.worldWidth = width;
+    this.worldHeight = height;
   }
 
   getGridPosition() {
