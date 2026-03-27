@@ -26,7 +26,9 @@ export class Game extends Scene {
 
   preload() {
     this.load.image("grass-tiles", "/assets/tilesets/grass.png");
-    MapLoader.preloadMap(this, "map1", "/data/maps/map1.tmj");
+    this.load.image("outside-tiles", "/assets/tilesets/outside.png");
+    this.load.image("house-tiles", "/assets/tilesets/house.png");
+    MapLoader.preloadMap(this, "map-data", "/data/maps/map1.json");
   }
 
   create() {
@@ -41,11 +43,13 @@ export class Game extends Scene {
     this.layerManager = new LayerManager();
     this.tilesetManager = new TilesetManager();
 
-    // 2) Map the Tiled tileset name to the Phaser texture key
+    // 2) Map the Tiled tileset names to the Phaser texture keys
     this.tilesetManager.registerTileset("grass", "grass-tiles");
+    this.tilesetManager.registerTileset("outside", "outside-tiles");
+    this.tilesetManager.registerTileset("house", "house-tiles");
 
     // 3) Retrieve raw JSON and parse it via our MapParser
-    const rawData = this.cache.tilemap.get("map1").data;
+    const rawData = this.cache.tilemap.get("map-data").data;
     const parsedData = MapParser.parse(rawData);
 
     // 4) Build the Phaser Tilemap through our Adapter
@@ -54,7 +58,7 @@ export class Game extends Scene {
       this.tilesetManager,
       this.layerManager
     );
-    this.map = this.tilemapAdapter.createTilemapFromLoadedJson("map1", parsedData);
+    this.map = this.tilemapAdapter.createTilemapFromLoadedJson("map-data", parsedData);
 
     // Adjust camera bounds to match the map dimensions
     this.cameras.main.setBounds(0, 0, this.map.widthInPixels, this.map.heightInPixels);
