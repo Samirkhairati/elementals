@@ -1,0 +1,7 @@
+# Ignore all files inside images and output folders
+images/*
+output/*
+
+# But keep the folders themselves (optional, useful for structure)
+!images/.gitkeep
+!output/.gitkeep
