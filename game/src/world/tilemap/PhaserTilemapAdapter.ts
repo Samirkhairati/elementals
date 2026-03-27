@@ -61,6 +61,12 @@ export class PhaserTilemapAdapter {
           phaserLayer.setAlpha(layerData.opacity ?? 1);
           phaserLayer.setVisible(layerData.visible ?? true);
 
+          // Handle custom z-depth property for layering
+          const zProp = layerData.properties?.find((p: any) => p.name === "z");
+          if (zProp) {
+            phaserLayer.setDepth(zProp.value);
+          }
+
           const gameLayer = new GameLayer(layerData.name, phaserLayer);
           this.layerManager.addLayer(layerData.name, gameLayer);
         } else {

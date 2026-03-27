@@ -16,6 +16,7 @@ export const CONFIG = {
   height: mapHeight * tileSize,
   backgroundColor: "#000000",
   playerSpeed: 200,
+  playerDepth: 10,
   controls: {
     run: "X",
     action: "C",

@@ -44,6 +44,7 @@ export class Player extends GameObjects.Sprite {
   private initializeAppearance(scene: Scene) {
     scene.add.existing(this);
     this.setOrigin(0.5, 1);
+    this.setDepth(CONFIG.playerDepth);
   }
 
   update() {
