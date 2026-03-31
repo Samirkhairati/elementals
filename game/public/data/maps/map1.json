@@ -43,7 +43,7 @@
         {
          "columns":2,
          "firstgid":1,
-         "image":"..\/elementals\/game\/public\/assets\/tilesets\/grass.png",
+         "image":"..\/elementals\/game\/public\/graphics\/tilesets\/grass.png",
          "imageheight":64,
          "imagewidth":64,
          "margin":0,

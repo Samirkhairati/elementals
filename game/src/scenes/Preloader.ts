@@ -14,7 +14,7 @@ export class Preloader extends Scene {
   }
 
   preload() {
-    this.load.setPath("assets");
+    this.load.setPath("graphics");
 
     // Player Assets
     this.load.spritesheet(`${PLAYER_KEY}-walk`, "player/walk.png", {
@@ -28,7 +28,7 @@ export class Preloader extends Scene {
     });
 
     // Load all Tilesets
-    this.load.setPath("assets/tilesets");
+    this.load.setPath("graphics/tilesets");
     TILESETS.forEach((key) => {
       this.load.image(key, `${key}.png`);
     });
