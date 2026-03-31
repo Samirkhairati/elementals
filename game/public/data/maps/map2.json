@@ -123,7 +123,7 @@
         {
          "columns":2,
          "firstgid":1,
-         "image":"..\/..\/assets\/tilesets\/grass.png",
+         "image":"..\/..\/graphics\/tilesets\/grass.png",
          "imageheight":64,
          "imagewidth":64,
          "margin":0,
@@ -136,7 +136,7 @@
         {
          "columns":8,
          "firstgid":5,
-         "image":"..\/..\/assets\/tilesets\/outside.png",
+         "image":"..\/..\/graphics\/tilesets\/outside.png",
          "imageheight":256,
          "imagewidth":256,
          "margin":0,
@@ -149,7 +149,7 @@
         {
          "columns":4,
          "firstgid":69,
-         "image":"..\/..\/assets\/tilesets\/house.png",
+         "image":"..\/..\/graphics\/tilesets\/house.png",
          "imageheight":96,
          "imagewidth":128,
          "margin":0,

@@ -36,7 +36,12 @@ export class Game extends Scene {
       this.player.destroy();
     }
     
-    this.player = new Player(this, spawnX, spawnY, map.widthInPixels, map.heightInPixels);
+    this.player = new Player(
+      this, 
+      spawnX, 
+      spawnY, 
+      (x, y) => this.mapSystem.collisions.isWalkable(x, y)
+    );
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
 
     // If map was switched while menu was open, ensure new player is unlocked

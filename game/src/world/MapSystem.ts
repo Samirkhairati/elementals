@@ -7,12 +7,14 @@ import {
   LayerManager,
   PhaserTilemapAdapter,
 } from "@/world/tilemap";
+import { CollisionSystem } from "@/world/CollisionSystem";
 
 export class MapSystem {
   private scene: Scene;
   private layerManager: LayerManager;
   private tilesetManager: TilesetManager;
   private adapter: PhaserTilemapAdapter;
+  private collisionSystem: CollisionSystem;
   private currentMap: Phaser.Tilemaps.Tilemap | null = null;
   private gridGraphics: Phaser.GameObjects.Graphics | null = null;
 
@@ -20,6 +22,7 @@ export class MapSystem {
     this.scene = scene;
     this.layerManager = new LayerManager();
     this.tilesetManager = new TilesetManager();
+    this.collisionSystem = new CollisionSystem();
     this.adapter = new PhaserTilemapAdapter(this.scene, this.tilesetManager, this.layerManager);
     
     this.registerTilesets();
@@ -42,6 +45,9 @@ export class MapSystem {
 
     this.currentMap = this.adapter.createTilemapFromLoadedJson(mapKey, parsedData);
     
+    // Wire up collision system
+    this.collisionSystem.setMap(this.currentMap);
+
     this.updateWorldBounds();
     this.renderDebugGrid();
 
@@ -77,4 +83,5 @@ export class MapSystem {
   }
 
   get map() { return this.currentMap; }
+  get collisions() { return this.collisionSystem; }
 }

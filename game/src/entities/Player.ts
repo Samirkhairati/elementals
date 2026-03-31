@@ -23,14 +23,17 @@ export class Player extends GameObjects.Sprite {
 
   private readonly MOVE_THRESHOLD = 50;
   private isMovementLocked = false;
-  private worldWidth: number;
-  private worldHeight: number;
+  private isWalkable: (x: number, y: number) => boolean;
 
-  constructor(scene: Scene, x: number, y: number, worldWidth?: number, worldHeight?: number) {
+  constructor(
+    scene: Scene, 
+    x: number, 
+    y: number, 
+    isWalkable: (x: number, y: number) => boolean
+  ) {
     super(scene, x, y, "player");
 
-    this.worldWidth = worldWidth ?? CONFIG.width;
-    this.worldHeight = worldHeight ?? CONFIG.height;
+    this.isWalkable = isWalkable;
 
     this.initializeAppearance(scene);
     this.cursors = scene.input.keyboard!.createCursorKeys();
@@ -113,7 +116,7 @@ export class Player extends GameObjects.Sprite {
     const nextX = this.x + dx * tileSize;
     const nextY = this.y + dy * tileSize;
 
-    if (this.isWithinBounds(nextX, nextY)) {
+    if (this.isWalkable(nextX, nextY)) {
       this.isMoving = true;
 
       // Use faster speed for running
@@ -144,16 +147,8 @@ export class Player extends GameObjects.Sprite {
     }
   }
 
-  private isWithinBounds(x: number, y: number) {
-    const { tileSize } = CONFIG;
-    // Bounds checking: must be within the map [0, worldWidth] and [tileSize, worldHeight]
-    // origin(0.5, 1) means we check the bottom center of the sprite
-    return x >= 0 && x <= this.worldWidth && y >= tileSize && y <= this.worldHeight;
-  }
-
-  setWorldBounds(width: number, height: number) {
-    this.worldWidth = width;
-    this.worldHeight = height;
+  setWalkableCallback(callback: (x: number, y: number) => boolean) {
+    this.isWalkable = callback;
   }
 
   getGridPosition() {
