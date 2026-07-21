@@ -1,0 +1,26 @@
+{
+  "name": "elementals-editor",
+  "version": "1.0.0",
+  "main": "dist-electron/main.js",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build && tsc -p tsconfig.electron.json",
+    "preview": "vite preview",
+    "electron:dev": "tsc -p tsconfig.electron.json && concurrently \"npm run dev\" \"wait-on http://localhost:5174 && electron .\"",
+    "electron:build": "npm run build && electron-builder"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^4.7.0",
+    "concurrently": "^9.1.2",
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "typescript": "^5.9.3",
+    "vite": "^6.4.1",
+    "wait-on": "^8.0.1"
+  }
+}
