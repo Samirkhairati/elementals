@@ -3,12 +3,15 @@ import { CONFIG } from "@/config";
 import { Player } from "@/entities/Player";
 import { MapSystem } from "@/world/MapSystem";
 import { HUDManager } from "@/components/HUDManager";
+import { InputManager } from "@/components/InputManager";
 import { MAPS } from "@/constants/assets";
+import { EventBus, Events } from "@/utils/EventBus";
 
 export class Game extends Scene {
   private player!: Player;
   private mapSystem!: MapSystem;
   private hudManager!: HUDManager;
+  private inputManager!: InputManager;
 
   constructor() {
     super("Game");
@@ -16,12 +19,22 @@ export class Game extends Scene {
 
   create() {
     this.mapSystem = new MapSystem(this);
+    this.inputManager = new InputManager(this);
+    
+    // Wire up events
+    this.switchMap = this.switchMap.bind(this);
+    EventBus.on(Events.MAP_SWITCH_REQUEST, this.switchMap);
     
     // Initial map load
     this.switchMap(MAPS[0].key);
     
-    this.hudManager = new HUDManager(this, this.player, (key) => this.switchMap(key));
-    this.setupGlobalControls();
+    this.hudManager = new HUDManager(this, this.player);
+    
+    this.events.on('destroy', this.cleanup, this);
+  }
+
+  private cleanup() {
+      EventBus.off(Events.MAP_SWITCH_REQUEST, this.switchMap);
   }
 
   private switchMap(mapKey: string) {
@@ -49,19 +62,8 @@ export class Game extends Scene {
     this.hudManager?.setPlayer(this.player);
   }
 
-  private setupGlobalControls() {
-    this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
-      const key = event.key.toUpperCase();
-      
-      if (key === CONFIG.controls.menu) {
-        this.hudManager.toggleMapMenu(this.player);
-      } else {
-        this.hudManager.handleInput(event);
-      }
-    });
-  }
-
   update(_time: number, _delta: number) {
+    this.inputManager?.update();
     this.player?.update();
     this.hudManager?.update();
   }

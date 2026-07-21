@@ -1,10 +1,11 @@
-import { Scene, GameObjects, Input, type Types } from "phaser";
+import { Scene, GameObjects } from "phaser";
 import { CONFIG } from "@/config";
 import {
   AnimationManager,
   Direction,
   MovementType,
 } from "@/utils/AnimationManager";
+import { EventBus, Events } from "@/utils/EventBus";
 
 const MOVE_OFFSETS = {
   [Direction.LEFT]: { dx: -1, dy: 0 },
@@ -14,8 +15,6 @@ const MOVE_OFFSETS = {
 } as const;
 
 export class Player extends GameObjects.Sprite {
-  private cursors: Types.Input.Keyboard.CursorKeys;
-  private runKey: Input.Keyboard.Key;
   private isMoving = false;
   private currentDirection: Direction = Direction.DOWN;
   private currentMovementType: MovementType = MovementType.WALK;
@@ -24,6 +23,10 @@ export class Player extends GameObjects.Sprite {
   private readonly MOVE_THRESHOLD = 50;
   private isMovementLocked = false;
   private isWalkable: (x: number, y: number) => boolean;
+  
+  // Keep track of the latest input for continuous movement
+  private pendingDirection: Direction | null = null;
+  private isRunning: boolean = false;
 
   constructor(
     scene: Scene, 
@@ -36,12 +39,20 @@ export class Player extends GameObjects.Sprite {
     this.isWalkable = isWalkable;
 
     this.initializeAppearance(scene);
-    this.cursors = scene.input.keyboard!.createCursorKeys();
-    this.runKey = scene.input.keyboard!.addKey(CONFIG.controls.run);
     this.animManager = AnimationManager.getInstance(scene);
 
     // Initial state
     this.animManager.stopMovement(this, "player", this.currentDirection);
+    
+    // Bind event listeners
+    this.onInputDirection = this.onInputDirection.bind(this);
+    EventBus.on(Events.INPUT_DIRECTION, this.onInputDirection);
+    
+    this.scene.events.on('destroy', this.cleanup, this);
+  }
+
+  private cleanup() {
+      EventBus.off(Events.INPUT_DIRECTION, this.onInputDirection);
   }
 
   private initializeAppearance(scene: Scene) {
@@ -51,55 +62,33 @@ export class Player extends GameObjects.Sprite {
   }
 
   update() {
-    if (!this.isMoving && !this.isMovementLocked) {
-      this.handleInput();
-    }
+      // Logic for non-input frame-by-frame updates can go here in the future
   }
 
   setMovementLocked(locked: boolean) {
     this.isMovementLocked = locked;
     if (locked) {
+      this.pendingDirection = null;
       this.animManager.stopMovement(this, "player", this.currentDirection);
     }
   }
 
-  private handleInput() {
-    const activeMapping = this.getKeyboardMapping();
-
-    if (activeMapping) {
-      const { direction, key } = activeMapping;
-
-      // Update movement type based on 'X' key
-      this.currentMovementType = this.runKey.isDown
-        ? MovementType.RUN
-        : MovementType.WALK;
-
-      this.updateDirection(direction);
-
-      // Trigger movement if held past threshold
-      if (key.getDuration() > this.MOVE_THRESHOLD) {
-        this.executeMovement(direction);
+  private onInputDirection(direction: Direction | null, isRunning: boolean, duration: number) {
+      this.pendingDirection = direction;
+      this.isRunning = isRunning;
+      
+      if (!this.isMoving && !this.isMovementLocked) {
+          if (direction) {
+              this.currentMovementType = isRunning ? MovementType.RUN : MovementType.WALK;
+              this.updateDirection(direction);
+              
+              if (duration > this.MOVE_THRESHOLD) {
+                  this.executeMovement(direction);
+              }
+          } else {
+              this.animManager.stopMovement(this, "player", this.currentDirection);
+          }
       }
-    } else {
-      this.animManager.stopMovement(this, "player", this.currentDirection);
-    }
-  }
-
-  private getKeyboardMapping() {
-    const { left, right, up, down } = this.cursors;
-    const keys = [
-      { direction: Direction.LEFT, key: left },
-      { direction: Direction.RIGHT, key: right },
-      { direction: Direction.UP, key: up },
-      { direction: Direction.DOWN, key: down },
-    ];
-
-    // Filter for pressed keys and find the most recently pressed one
-    return (
-      keys
-        .filter((k) => k.key.isDown)
-        .sort((a, b) => b.key.timeDown - a.key.timeDown)[0] || null
-    );
   }
 
   private updateDirection(newDirection: Direction) {
@@ -140,8 +129,16 @@ export class Player extends GameObjects.Sprite {
         ease: "Linear",
         onComplete: () => {
           this.isMoving = false;
-          // Check for continuous input immediately to avoid 1-frame stutter
-          this.handleInput();
+          EventBus.emit(Events.PLAYER_MOVED, { x: this.x, y: this.y });
+          
+          // Check if we should keep moving based on pending input
+          if (this.pendingDirection && !this.isMovementLocked) {
+              this.currentMovementType = this.isRunning ? MovementType.RUN : MovementType.WALK;
+              this.updateDirection(this.pendingDirection);
+              this.executeMovement(this.pendingDirection);
+          } else {
+              this.animManager.stopMovement(this, "player", this.currentDirection);
+          }
         },
       });
     }
