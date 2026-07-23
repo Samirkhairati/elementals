@@ -77,8 +77,11 @@
     font-family: var(--font-mono);
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground select-none;
     font-family: var(--font-mono);
+  }
+  input, textarea {
+    @apply select-auto;
   }
   h1, h2, h3, h4, h5, h6, .font-serif, .font-mono {
     font-family: var(--font-mono);

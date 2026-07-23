@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -310,7 +311,7 @@ ipcMain.handle('create-map', async (event, name: string, width: number, height: 
     }
 
     const defaultLayer = {
-      id: require('crypto').randomUUID(),
+      id: crypto.randomUUID(),
       name: 'Background',
       type: 'tile',
       visible: true,
@@ -418,6 +419,28 @@ ipcMain.handle('move-map', async (event, fileName: string, oldFolder: string | n
     const oldJson = path.join(oldDir, fileName);
     const newJson = path.join(newDir, fileName);
     if (fs.existsSync(oldJson)) fs.renameSync(oldJson, newJson);
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('export-map', async (event, jsonData: string, defaultName: string) => {
+  const window = BrowserWindow.fromWebContents(event.sender);
+  if (!window) return { success: false, error: 'No window found' };
+
+  const { canceled, filePath } = await dialog.showSaveDialog(window, {
+    title: 'Export Map',
+    defaultPath: defaultName,
+    filters: [{ name: 'Tiled Map JSON', extensions: ['json', 'tmj'] }]
+  });
+
+  if (canceled || !filePath) {
+    return { success: false, error: 'Canceled' };
+  }
+
+  try {
+    fs.writeFileSync(filePath, jsonData, 'utf8');
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };

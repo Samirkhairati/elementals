@@ -7,9 +7,15 @@ export const TILESETS = [
     "outside"
 ];
 
-export const MAPS = [
-    { name: "Map 1", key: "map1" },
-    { name: "Map 2", key: "map2" },
-    { name: "Map 3", key: "map3" },
-    { name: "Map 4", key: "map4" }
-];
+const mapFiles = import.meta.glob('../../public/data/maps/*.json');
+
+export const MAPS = Object.keys(mapFiles).map(path => {
+    const fileName = path.split('/').pop()!;
+    const key = fileName.replace('.json', '');
+    
+    // Capitalize first letter and add space before numbers (e.g. "map1" -> "Map 1")
+    let name = key.charAt(0).toUpperCase() + key.slice(1);
+    name = name.replace(/(\d+)/g, ' $1').trim();
+    
+    return { name, key };
+}).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
