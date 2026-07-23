@@ -37,15 +37,24 @@ export class CollisionSystem {
     if (tileX === null || tileY === null) return false;
 
     const collisionLayer = this.map.getLayer(this.collisionLayerName);
-    if (!collisionLayer) {
-      // If no collision layer exists, we assume walkable (or handle as per game design)
-      return true;
+    if (collisionLayer) {
+      const tile = this.map.getTileAt(tileX, tileY, true, this.collisionLayerName);
+      // A tile is considered a "collision" if it has an index (GID) > 0
+      return !tile || tile.index <= 0;
     }
 
-    const tile = this.map.getTileAt(tileX, tileY, true, this.collisionLayerName);
-    
-    // A tile is considered a "collision" if it has an index (GID) > 0
-    // In Tiled, 0 usually means empty.
-    return !tile || tile.index <= 0;
+    // Fallback: If no dedicated collision layer exists, check all layers except "ground".
+    // Any non-empty tile on these layers is treated as a collision.
+    let isBlocked = false;
+    this.map.layers.forEach((layerData) => {
+      if (layerData.name.toLowerCase() === "ground" || layerData.name === "interactables") return;
+      
+      const tile = this.map!.getTileAt(tileX, tileY, true, layerData.name);
+      if (tile && tile.index > 0) {
+        isBlocked = true;
+      }
+    });
+
+    return !isBlocked;
   }
 }

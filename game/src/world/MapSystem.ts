@@ -71,6 +71,7 @@ export class MapSystem {
     if (!CONFIG.debug.enabled || !CONFIG.debug.showGrid || !this.currentMap) return;
 
     this.gridGraphics = this.scene.add.graphics();
+    this.gridGraphics.setDepth(100);
     this.gridGraphics.lineStyle(1, 0xffffff, 0.1);
     
     const { widthInPixels, heightInPixels } = this.currentMap;

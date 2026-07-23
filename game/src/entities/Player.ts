@@ -73,6 +73,10 @@ export class Player extends GameObjects.Sprite {
     }
   }
 
+  get movementLocked(): boolean {
+    return this.isMovementLocked;
+  }
+
   private onInputDirection(direction: Direction | null, isRunning: boolean, duration: number) {
       this.pendingDirection = direction;
       this.isRunning = isRunning;
@@ -159,5 +163,9 @@ export class Player extends GameObjects.Sprite {
   // API for future movement modes
   setMovementType(type: MovementType) {
     this.currentMovementType = type;
+  }
+
+  get direction(): Direction {
+    return this.currentDirection;
   }
 }
