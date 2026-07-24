@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { TilesetData, TileSelection, CopiedTile, Pos } from '@/types/editor'
 
 interface TilesetPreviewProps {
@@ -36,9 +37,14 @@ export function TilesetPreview({
   hoverTile,
   setHoverTile,
 }: TilesetPreviewProps) {
+  const [zoom, setZoom] = useState(1)
+  const [pan, setPan] = useState({ x: 0, y: 0 })
+  const [isPanning, setIsPanning] = useState(false)
+  const [lastPanPos, setLastPanPos] = useState({ x: 0, y: 0 })
+
   if (!activeTileset) {
     return (
-      <div className="h-full flex items-center justify-center text-xs text-muted-foreground font-mono">
+      <div className="h-full w-full flex items-center justify-center text-xs text-muted-foreground font-mono">
         Select a tileset to preview
       </div>
     )
@@ -66,70 +72,99 @@ export function TilesetPreview({
   const box = getTilesetSelectionBox(tilesetSelectionStart, tilesetSelectionCurrent)
 
   return (
-    <div className="relative inline-block border shadow-sm cursor-crosshair">
-      <div
-        className="absolute inset-0 opacity-10"
-        style={{
-          backgroundImage: 'linear-gradient(45deg, #808080 25%, transparent 25%), linear-gradient(-45deg, #808080 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #808080 75%), linear-gradient(-45deg, transparent 75%, #808080 75%)',
-          backgroundSize: '10px 10px',
-          backgroundPosition: '0 0, 0 5px, 5px -5px, -5px 0px'
-        }}
-      ></div>
-      <img
-        src={activeTileset.dataUrl}
-        onLoad={(e) => setTilesetDimensions({ width: e.currentTarget.naturalWidth, height: e.currentTarget.naturalHeight })}
-        alt={activeTileset.name}
-        className="relative z-10 block max-w-none"
-        style={{ imageRendering: 'pixelated' }}
-      />
+    <div
+      className="w-full h-full overflow-hidden flex items-center justify-center"
+      onWheel={(e) => {
+        const zoomSensitivity = (e.ctrlKey || e.metaKey) ? 0.005 : 0.001
+        setZoom(prev => Math.min(Math.max(0.1, prev - e.deltaY * zoomSensitivity), 5))
+      }}
+      onMouseDown={(e) => {
+        if (e.button === 1) {
+          setIsPanning(true)
+          setLastPanPos({ x: e.clientX, y: e.clientY })
+        }
+      }}
+      onMouseMove={(e) => {
+        if (isPanning) {
+          setPan(prev => ({
+            x: prev.x + (e.clientX - lastPanPos.x),
+            y: prev.y + (e.clientY - lastPanPos.y)
+          }))
+          setLastPanPos({ x: e.clientX, y: e.clientY })
+        }
+      }}
+      onMouseUp={(e) => {
+        if (e.button === 1) setIsPanning(false)
+      }}
+      onMouseLeave={() => setIsPanning(false)}
+    >
+      <div style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: 'center' }}>
+        <div className="relative inline-block border shadow-sm cursor-crosshair">
+          <div
+            className="absolute inset-0 opacity-10"
+            style={{
+              backgroundImage: 'linear-gradient(45deg, #808080 25%, transparent 25%), linear-gradient(-45deg, #808080 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #808080 75%), linear-gradient(-45deg, transparent 75%, #808080 75%)',
+              backgroundSize: '10px 10px',
+              backgroundPosition: '0 0, 0 5px, 5px -5px, -5px 0px'
+            }}
+          ></div>
+          <img
+            src={activeTileset.dataUrl}
+            onLoad={(e) => setTilesetDimensions({ width: e.currentTarget.naturalWidth, height: e.currentTarget.naturalHeight })}
+            alt={activeTileset.name}
+            className="relative z-10 block max-w-none"
+            style={{ imageRendering: 'pixelated' }}
+          />
 
-      {tilesetDimensions && (
-        <div className="absolute inset-0 z-20 pointer-events-none" style={{ backgroundImage: 'linear-gradient(to right, rgba(255,255,255,0.2) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.2) 1px, transparent 1px)', backgroundSize: '32px 32px' }}></div>
-      )}
+          {tilesetDimensions && (
+            <div className="absolute inset-0 z-20 pointer-events-none" style={{ backgroundImage: 'linear-gradient(to right, rgba(255,255,255,0.2) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.2) 1px, transparent 1px)', backgroundSize: '32px 32px' }}></div>
+          )}
 
-      <div
-        className="absolute inset-0 z-30 select-none"
-        onMouseDown={(e) => {
-          if (e.button !== 0) return
-          const x = Math.floor(e.nativeEvent.offsetX / 32)
-          const y = Math.floor(e.nativeEvent.offsetY / 32)
-          setTilesetSelectionStart({ x, y })
-          setTilesetSelectionCurrent({ x, y })
-        }}
-        onMouseMove={(e) => {
-          if (!tilesetDimensions) return
-          const x = Math.floor(e.nativeEvent.offsetX / 32)
-          const y = Math.floor(e.nativeEvent.offsetY / 32)
-          setHoverTile({ x, y })
-          if (tilesetSelectionStart) {
-            setTilesetSelectionCurrent({ x, y })
-          }
-        }}
-        onMouseUp={commitSelection}
-        onMouseLeave={() => {
-          setHoverTile(null)
-          commitSelection()
-        }}
-      >
-        {hoverTile && !tilesetSelectionStart && (
-          <div className="absolute border border-yellow-400 bg-yellow-400/20 pointer-events-none" style={{ left: hoverTile.x * 32, top: hoverTile.y * 32, width: 32, height: 32 }}></div>
-        )}
-        {(() => {
-          if (box) {
-            return (
-              <div className="absolute border-2 border-primary bg-primary/30 pointer-events-none" style={{ left: box.minX * 32, top: box.minY * 32, width: box.width * 32, height: box.height * 32 }}></div>
-            )
-          }
-          if (tileSelection) {
-            return tileSelection.tiles.map((t, i) => {
-              if (!t || t.tilesetId !== activeTileset.fileName) return null
-              return (
-                <div key={i} className="absolute border border-primary bg-primary/30 pointer-events-none" style={{ left: t.x * 32, top: t.y * 32, width: 32, height: 32 }}></div>
-              )
-            })
-          }
-          return null
-        })()}
+          <div
+            className="absolute inset-0 z-30 select-none"
+            onMouseDown={(e) => {
+              if (e.button !== 0) return
+              const x = Math.floor(e.nativeEvent.offsetX / 32)
+              const y = Math.floor(e.nativeEvent.offsetY / 32)
+              setTilesetSelectionStart({ x, y })
+              setTilesetSelectionCurrent({ x, y })
+            }}
+            onMouseMove={(e) => {
+              if (!tilesetDimensions) return
+              const x = Math.floor(e.nativeEvent.offsetX / 32)
+              const y = Math.floor(e.nativeEvent.offsetY / 32)
+              setHoverTile({ x, y })
+              if (tilesetSelectionStart) {
+                setTilesetSelectionCurrent({ x, y })
+              }
+            }}
+            onMouseUp={commitSelection}
+            onMouseLeave={() => {
+              setHoverTile(null)
+              commitSelection()
+            }}
+          >
+            {hoverTile && !tilesetSelectionStart && (
+              <div className="absolute border border-yellow-400 bg-yellow-400/20 pointer-events-none" style={{ left: hoverTile.x * 32, top: hoverTile.y * 32, width: 32, height: 32 }}></div>
+            )}
+            {(() => {
+              if (box) {
+                return (
+                  <div className="absolute border-2 border-primary bg-primary/30 pointer-events-none" style={{ left: box.minX * 32, top: box.minY * 32, width: box.width * 32, height: box.height * 32 }}></div>
+                )
+              }
+              if (tileSelection) {
+                return tileSelection.tiles.map((t, i) => {
+                  if (!t || t.tilesetId !== activeTileset.fileName) return null
+                  return (
+                    <div key={i} className="absolute border border-primary bg-primary/30 pointer-events-none" style={{ left: t.x * 32, top: t.y * 32, width: 32, height: 32 }}></div>
+                  )
+                })
+              }
+              return null
+            })()}
+          </div>
+        </div>
       </div>
     </div>
   )

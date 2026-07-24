@@ -1,4 +1,4 @@
-import { Plus, FolderPlus, Folder as FolderIcon, ChevronRight, ChevronDown, FileImage, Edit2, Trash2, Download } from 'lucide-react'
+import { Plus, FolderPlus, Folder as FolderIcon, ChevronRight, ChevronDown, Map as MapIcon, Edit2, Trash2, Download } from 'lucide-react'
 import { MapData } from '@/types/editor'
 
 interface MapsPanelProps {
@@ -70,10 +70,10 @@ export function MapsPanel({
               >
                 <div className="flex-1 flex items-center">
                   {isExpanded ? <ChevronDown className="w-4 h-4 mr-1 opacity-70" /> : <ChevronRight className="w-4 h-4 mr-1 opacity-70" />}
-                  <FolderIcon className="w-4 h-4 mr-2 text-blue-500" />
+                  <FolderIcon className="w-4 h-4 mr-2 text-primary" />
                   <span>{folderName}</span>
                 </div>
-                <div className="hidden group-hover:flex items-center gap-1">
+                <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity">
                   <button onClick={(e) => { e.stopPropagation(); setCreateMapData({ name: '', width: 50, height: 50 }); setCreateMapDialog({ open: true, parentPath: folder }); }} className="p-1 hover:bg-black/10 rounded" title="New Map"><Plus className="w-3 h-3" /></button>
                   <button onClick={(e) => { e.stopPropagation(); setCreateMapFolderName(`Folder ${mapFolders.length + 1}`); setCreateMapFolderDialog({ open: true, parentPath: folder }); }} className="p-1 hover:bg-black/10 rounded" title="New Subfolder"><FolderPlus className="w-3 h-3" /></button>
                   <button onClick={(e) => { e.stopPropagation(); setRenameInput(folderName); setRenameDialog({ open: true, type: 'map-folder', oldPath: folder }); }} className="p-1 hover:bg-black/10 rounded" title="Rename"><Edit2 className="w-3 h-3" /></button>
@@ -84,7 +84,11 @@ export function MapsPanel({
                   )}
                 </div>
               </div>
-              {isExpanded && renderMapTree(folder, level + 1)}
+              {isExpanded && (
+                <div className="mt-1">
+                  {renderMapTree(folder, level + 1)}
+                </div>
+              )}
             </div>
           )
         })}
@@ -100,9 +104,9 @@ export function MapsPanel({
             onClick={() => onSelectMap(m)}
             className={`flex items-center group py-1.5 px-2.5 rounded-md cursor-pointer text-sm ml-5 transition-colors ${activeMap?.fileName === m.fileName ? 'bg-primary/30 text-primary-foreground font-medium border border-primary/40' : 'hover:bg-sidebar-accent text-sidebar-foreground'}`}
           >
-            <FileImage className="w-4 h-4 mr-2 opacity-80" />
+            <MapIcon className="w-4 h-4 mr-2 opacity-80" />
             <span className="flex-1 truncate">{m.name}</span>
-            <div className="hidden group-hover:flex items-center gap-1">
+            <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity">
               <button
                 onClick={(e) => { e.stopPropagation(); handleExportMap(m) }}
                 className="p-1 hover:bg-black/10 rounded" title="Export Map"

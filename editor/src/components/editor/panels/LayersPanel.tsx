@@ -1,9 +1,9 @@
-import { Eye, EyeOff, Lock, Unlock, Box, ImageIcon, CheckSquare, Hexagon } from 'lucide-react'
+import { Eye, EyeOff, Lock, Unlock, Box, Layers as Layers2, CheckSquare, Hexagon } from 'lucide-react'
 import { Layer, LayerType } from '@/types/editor'
 
 function getLayerIcon(type: LayerType) {
   switch (type) {
-    case 'tile': return <ImageIcon className="w-4 h-4 text-blue-400" />
+    case 'tile': return <Layers2 className="w-4 h-4 text-blue-400" />
     case 'collision': return <Hexagon className="w-4 h-4 text-red-400" />
     case 'terrain': return <CheckSquare className="w-4 h-4 text-green-400" />
     case 'objects': return <Box className="w-4 h-4 text-orange-400" />
@@ -43,7 +43,7 @@ export function LayersPanel({
         >
           <div className="mr-2 opacity-80">{getLayerIcon(layer.type)}</div>
           <span className="flex-1 truncate">{layer.name}</span>
-          <div className="hidden group-hover:flex items-center gap-1 opacity-70">
+          <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 opacity-70 transition-opacity">
             <button onClick={(e) => { e.stopPropagation(); toggleLayerLock(layer.id) }} className="p-1 hover:bg-black/10 rounded">
               {layer.locked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
             </button>

@@ -2,11 +2,12 @@ import { createRouter, createRoute, createRootRoute, createHashHistory, Outlet }
 import { SidebarProvider } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
 import { useThemeStore } from '@/store/themeStore'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Plus, FolderPlus } from "lucide-react"
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
+import { Plus, FolderPlus, Map as MapIcon, Layers as LayersIcon, LayoutGrid as LayoutGridIcon, ChevronRight, ChevronDown, MousePointer2, Settings2 } from "lucide-react"
+import { ResizableHandle, ResizablePanel as OriginalResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
+const ResizablePanel = OriginalResizablePanel as any;
 
 // Types
 import { Layer, LayerType, TileSelection, ActiveTool, PaintMode, DebugInfo, MapData, TilesetData } from '@/types/editor'
@@ -33,6 +34,7 @@ import { MapCanvas } from '@/components/editor/canvas/MapCanvas'
 import { ImportTilesetDialog } from '@/components/editor/dialogs/ImportTilesetDialog'
 import { CreateFolderDialog } from '@/components/editor/dialogs/CreateFolderDialog'
 import { RenameDialog } from '@/components/editor/dialogs/RenameDialog'
+import { ConfirmDialog } from '@/components/editor/dialogs/ConfirmDialog'
 import { CreateLayerDialog } from '@/components/editor/dialogs/CreateLayerDialog'
 import { CreateMapFolderDialog } from '@/components/editor/dialogs/CreateMapFolderDialog'
 import { CreateMapDialog } from '@/components/editor/dialogs/CreateMapDialog'
@@ -153,7 +155,35 @@ const editorRoute = createRoute({
     const [createMapDialog, setCreateMapDialog] = useState<{ open: boolean; parentPath?: string | null }>({ open: false })
     const [createMapData, setCreateMapData] = useState({ name: '', width: 50, height: 50 })
     const [createMapFolderDialog, setCreateMapFolderDialog] = useState<{ open: boolean; parentPath?: string | null }>({ open: false })
+    const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; title: string; description: string; action: () => void }>({ open: false, title: '', description: '', action: () => {} })
     const [createMapFolderName, setCreateMapFolderName] = useState("")
+
+
+    // ── Panel Refs & Collapse State ──────────────────────────────────────────
+    const mapsPanelRef = useRef<any>(null)
+    const layersPanelRef = useRef<any>(null)
+    const activeSelectionPanelRef = useRef<any>(null)
+    const propertiesPanelRef = useRef<any>(null)
+    const tilesetsPanelRef = useRef<any>(null)
+    const previewPanelRef = useRef<any>(null)
+    
+    const [mapsCollapsed, setMapsCollapsed] = useState(false)
+    const [layersCollapsed, setLayersCollapsed] = useState(false)
+    const [activeSelectionCollapsed, setActiveSelectionCollapsed] = useState(false)
+    const [propertiesCollapsed, setPropertiesCollapsed] = useState(false)
+    const [tilesetsCollapsed, setTilesetsCollapsed] = useState(false)
+    const [previewCollapsed, setPreviewCollapsed] = useState(false)
+
+    const togglePanel = (ref: React.RefObject<any>, setter: React.Dispatch<React.SetStateAction<boolean>>, isCollapsed: boolean) => {
+      if (!ref.current) return
+      if (isCollapsed) {
+        ref.current.expand()
+        setter(false)
+      } else {
+        ref.current.collapse()
+        setter(true)
+      }
+    }
 
     // ── History hook ─────────────────────────────────────────────────────────
     const {
@@ -309,13 +339,20 @@ const editorRoute = createRoute({
       } else { alert(res.error) }
     }
 
-    const handleDeleteFolder = async (folderPath: string) => {
-      if (!window.electronAPI) return
-      const res = await window.electronAPI.deleteFolder(folderPath)
-      if (res.success) {
-        if (selectedFolder === folderPath) setSelectedFolder(null)
-        loadData()
-      } else { alert(res.error) }
+    const handleDeleteFolder = (folderPath: string) => {
+      setConfirmDialog({
+        open: true,
+        title: "Delete Folder",
+        description: `Are you sure you want to delete folder "${folderPath}"?`,
+        action: async () => {
+          if (!window.electronAPI) return
+          const res = await window.electronAPI.deleteFolder(folderPath)
+          if (res.success) {
+            if (selectedFolder === folderPath) setSelectedFolder(null)
+            loadData()
+          } else { alert(res.error) }
+        }
+      })
     }
 
     const handleDrop = async (e: React.DragEvent, targetFolder: string | null) => {
@@ -339,24 +376,38 @@ const editorRoute = createRoute({
     }
 
     // ── Map CRUD ───────────────────────────────────────────────────────────────
-    const handleDeleteMap = async (folderPath: string | null, fileName: string) => {
-      if (!window.electronAPI) return
-      const res = await window.electronAPI.deleteMap(folderPath, fileName)
-      if (res.success) {
-        if (activeMap?.fileName === fileName && activeMap?.folderPath === folderPath) {
-          setActiveMap(null); setLayers([]); setActiveLayerId(null)
+    const handleDeleteMap = (folderPath: string | null, fileName: string) => {
+      setConfirmDialog({
+        open: true,
+        title: "Delete Map",
+        description: `Are you sure you want to delete map "${fileName}"?`,
+        action: async () => {
+          if (!window.electronAPI) return
+          const res = await window.electronAPI.deleteMap(folderPath, fileName)
+          if (res.success) {
+            if (activeMap?.fileName === fileName && activeMap?.folderPath === folderPath) {
+              setActiveMap(null); setLayers([]); setActiveLayerId(null)
+            }
+            loadData()
+          } else { alert(res.error) }
         }
-        loadData()
-      } else { alert(res.error) }
+      })
     }
 
-    const handleDeleteMapFolder = async (folderPath: string) => {
-      if (!window.electronAPI) return
-      const res = await window.electronAPI.deleteMapFolder(folderPath)
-      if (res.success) {
-        if (selectedMapFolder === folderPath) setSelectedMapFolder(null)
-        loadData()
-      } else { alert(res.error) }
+    const handleDeleteMapFolder = (folderPath: string) => {
+      setConfirmDialog({
+        open: true,
+        title: "Delete Map Folder",
+        description: `Are you sure you want to delete map folder "${folderPath}"?`,
+        action: async () => {
+          if (!window.electronAPI) return
+          const res = await window.electronAPI.deleteMapFolder(folderPath)
+          if (res.success) {
+            if (selectedMapFolder === folderPath) setSelectedMapFolder(null)
+            loadData()
+          } else { alert(res.error) }
+        }
+      })
     }
 
     const handleConfirmCreateMapFolder = async () => {
@@ -439,13 +490,13 @@ const editorRoute = createRoute({
         <ResizablePanelGroup orientation="horizontal">
           {/* ── Left Sidebar ────────────────────────────────────────────── */}
           <ResizablePanel defaultSize="20%" minSize="15%" maxSize="30%" className="flex flex-col z-10 shadow-xl bg-sidebar-background border-r border-border min-w-0 min-h-0">
-            <ResizablePanelGroup orientation="vertical">
+            <div className="flex flex-col h-full w-full">
 
               {/* Maps Panel */}
-              <ResizablePanel defaultSize="40%" minSize="20%" className="flex flex-col min-h-0 min-w-0">
-                <div className="h-14 border-b border-sidebar-border flex items-center justify-between px-4 shrink-0 bg-sidebar-background">
-                  <h2 className="text-xs font-semibold font-mono text-sidebar-foreground/70 tracking-wider uppercase">MAPS</h2>
-                  <div className="flex items-center gap-2">
+              <div className={`flex flex-col overflow-hidden transition-all ${mapsCollapsed ? "h-10 shrink-0" : "flex-1 min-h-0"}`}>
+                <div onClick={() => setMapsCollapsed(!mapsCollapsed)} className="h-10 border-b border-sidebar-border flex items-center justify-between px-3 shrink-0 bg-sidebar-background cursor-pointer hover:bg-sidebar-accent/50 transition-colors select-none">
+                  <div className="flex items-center gap-1 text-sidebar-foreground/70">{mapsCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}<MapIcon className="w-4 h-4 ml-0.5" /><h2 className="text-xs font-semibold font-mono tracking-wider uppercase ml-1">MAPS</h2></div>
+                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                     <button onClick={() => { setCreateMapFolderName(`Folder ${mapFolders.length + 1}`); setCreateMapFolderDialog({ open: true, parentPath: null }); }} className="p-1.5 hover:bg-sidebar-accent rounded-md text-sidebar-foreground" title="New Folder">
                       <FolderPlus className="w-4 h-4" />
                     </button>
@@ -454,7 +505,7 @@ const editorRoute = createRoute({
                     </button>
                   </div>
                 </div>
-                <div className="flex-1 overflow-y-auto p-2 font-mono text-xs">
+                {!mapsCollapsed && (<div className="flex-1 overflow-y-auto p-2 font-mono text-xs">
                   <MapsPanel
                     maps={maps}
                     mapFolders={mapFolders}
@@ -475,22 +526,22 @@ const editorRoute = createRoute({
                     handleMapDrop={handleMapDrop}
                     onSelectMap={onSelectMap}
                   />
-                </div>
-              </ResizablePanel>
+                </div>)}
+              </div>
 
-              <ResizableHandle withHandle className="bg-sidebar-border" />
+              
 
               {/* Layers Panel */}
-              <ResizablePanel defaultSize="40%" minSize="20%" className="flex flex-col min-h-0 min-w-0">
-                <div className="h-14 border-b border-sidebar-border flex items-center justify-between px-4 shrink-0 bg-sidebar-background">
-                  <h2 className="text-xs font-semibold font-mono text-sidebar-foreground/70 tracking-wider uppercase">LAYERS</h2>
-                  <div className="flex items-center gap-2">
+              <div className={`flex flex-col overflow-hidden transition-all border-t border-sidebar-border ${layersCollapsed ? "h-10 shrink-0" : "flex-1 min-h-0"}`}>
+                <div onClick={() => setLayersCollapsed(!layersCollapsed)} className="h-10 border-b border-sidebar-border flex items-center justify-between px-3 shrink-0 bg-sidebar-background cursor-pointer hover:bg-sidebar-accent/50 transition-colors select-none">
+                  <div className="flex items-center gap-1 text-sidebar-foreground/70">{layersCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}<LayersIcon className="w-4 h-4 ml-0.5" /><h2 className="text-xs font-semibold font-mono tracking-wider uppercase ml-1">LAYERS</h2></div>
+                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                     <button onClick={() => { if (!activeMap) { alert("Please select a map first"); return; } setCreateLayerDialog(true) }} className="p-1.5 hover:bg-sidebar-accent rounded-md text-sidebar-foreground" title="New Layer">
                       <Plus className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
-                <div className="flex-1 overflow-y-auto p-2 font-mono text-xs">
+                {!layersCollapsed && (<div className="flex-1 overflow-y-auto p-2 font-mono text-xs">
                   <LayersPanel
                     layers={layers}
                     activeLayerId={activeLayerId}
@@ -498,34 +549,34 @@ const editorRoute = createRoute({
                     toggleLayerVisibility={toggleLayerVisibility}
                     toggleLayerLock={toggleLayerLock}
                   />
-                </div>
-              </ResizablePanel>
+                </div>)}
+              </div>
 
-              <ResizableHandle withHandle className="bg-sidebar-border" />
+              
 
               {/* Active Selection Panel */}
-              <ResizablePanel defaultSize="30%" minSize="20%" className="flex flex-col bg-card/40 min-h-0 min-w-0">
-                <div className="h-10 border-b border-sidebar-border flex items-center px-4 shrink-0 bg-sidebar-background">
-                  <span className="text-xs font-semibold font-mono text-sidebar-foreground/70 tracking-wider uppercase">ACTIVE SELECTION</span>
+              <div className={`flex flex-col bg-card/40 overflow-hidden transition-all border-t border-sidebar-border ${activeSelectionCollapsed ? "h-10 shrink-0" : "flex-1 min-h-0"}`}>
+                <div onClick={() => setActiveSelectionCollapsed(!activeSelectionCollapsed)} className="h-10 border-b border-sidebar-border flex items-center justify-between px-3 shrink-0 bg-sidebar-background cursor-pointer hover:bg-sidebar-accent/50 transition-colors select-none">
+                  <div className="flex items-center gap-1 text-sidebar-foreground/70">{activeSelectionCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}<MousePointer2 className="w-4 h-4 ml-0.5" /><span className="text-xs font-semibold font-mono tracking-wider uppercase ml-1">ACTIVE SELECTION</span></div>
                 </div>
                 <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-muted/10">
                   <ActiveSelectionPanel tileSelection={tileSelection} tilesets={tilesets} />
                 </div>
-              </ResizablePanel>
+              </div>
 
-              <ResizableHandle withHandle className="bg-sidebar-border" />
+              
 
               {/* Properties Panel */}
-              <ResizablePanel defaultSize="30%" minSize="20%" className="flex flex-col bg-card/40 min-h-0 min-w-0">
-                <div className="h-10 border-b border-sidebar-border flex items-center px-4 shrink-0 bg-sidebar-background">
-                  <span className="text-xs font-semibold font-mono text-sidebar-foreground/70 tracking-wider uppercase">PROPERTIES</span>
+              <div className={`flex flex-col bg-card/40 overflow-hidden transition-all border-t border-sidebar-border ${propertiesCollapsed ? "h-10 shrink-0" : "flex-1 min-h-0"}`}>
+                <div onClick={() => setPropertiesCollapsed(!propertiesCollapsed)} className="h-10 border-b border-sidebar-border flex items-center justify-between px-3 shrink-0 bg-sidebar-background cursor-pointer hover:bg-sidebar-accent/50 transition-colors select-none">
+                  <div className="flex items-center gap-1 text-sidebar-foreground/70">{propertiesCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}<Settings2 className="w-4 h-4 ml-0.5" /><span className="text-xs font-semibold font-mono tracking-wider uppercase ml-1">PROPERTIES</span></div>
                 </div>
-                <div className="flex-1 overflow-auto p-4 flex flex-col items-center justify-start text-xs text-muted-foreground text-center">
+                {!propertiesCollapsed && (<div className="flex-1 overflow-auto p-4 flex flex-col items-center justify-start text-xs text-muted-foreground text-center">
                   <PropertiesPanel layers={layers} activeLayerId={activeLayerId} updateLayers={updateLayers} />
-                </div>
-              </ResizablePanel>
+                </div>)}
+              </div>
 
-            </ResizablePanelGroup>
+            </div>
           </ResizablePanel>
 
           <ResizableHandle withHandle className="bg-border" />
@@ -569,13 +620,13 @@ const editorRoute = createRoute({
 
           {/* ── Right Sidebar ─────────────────────────────────────────────── */}
           <ResizablePanel defaultSize="25%" minSize="15%" maxSize="40%" className="flex flex-col z-10 shadow-xl bg-sidebar-background border-l border-border min-w-0 min-h-0">
-            <ResizablePanelGroup orientation="vertical">
+            <div className="flex flex-col h-full w-full">
 
               {/* Tilesets Panel */}
-              <ResizablePanel defaultSize="50%" minSize="20%" className="flex flex-col min-h-0 min-w-0">
-                <div className="h-14 border-b border-sidebar-border flex items-center justify-between px-4 shrink-0 bg-sidebar-background">
-                  <h2 className="text-xs font-semibold font-mono text-sidebar-foreground/70 tracking-wider uppercase">TILESETS</h2>
-                  <div className="flex items-center gap-2">
+              <div className={`flex flex-col overflow-hidden transition-all ${tilesetsCollapsed ? "h-10 shrink-0" : "flex-1 min-h-0"}`}>
+                <div onClick={() => setTilesetsCollapsed(!tilesetsCollapsed)} className="h-10 border-b border-sidebar-border flex items-center justify-between px-3 shrink-0 bg-sidebar-background cursor-pointer hover:bg-sidebar-accent/50 transition-colors select-none">
+                  <div className="flex items-center gap-1 text-sidebar-foreground/70">{tilesetsCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}<LayoutGridIcon className="w-4 h-4 ml-0.5" /><h2 className="text-xs font-semibold font-mono tracking-wider uppercase ml-1">TILESETS</h2></div>
+                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                     <button onClick={() => handleOpenCreateFolderDialog(null)} className="p-1.5 hover:bg-sidebar-accent rounded-md text-sidebar-foreground" title="New Folder">
                       <FolderPlus className="w-4 h-4" />
                     </button>
@@ -584,7 +635,7 @@ const editorRoute = createRoute({
                     </button>
                   </div>
                 </div>
-                <div
+                {!tilesetsCollapsed && (<div
                   className="flex-1 overflow-y-auto p-2 font-mono text-xs"
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => handleDrop(e, null)}
@@ -605,15 +656,15 @@ const editorRoute = createRoute({
                     handleDeleteFolder={handleDeleteFolder}
                     handleDrop={handleDrop}
                   />
-                </div>
-              </ResizablePanel>
+                </div>)}
+              </div>
 
-              <ResizableHandle withHandle className="bg-sidebar-border" />
+              
 
               {/* Tileset Preview Panel */}
-              <ResizablePanel defaultSize="50%" minSize="20%" className="flex flex-col bg-card/40 min-h-0 min-w-0">
-                <div className="h-10 border-b border-sidebar-border flex items-center px-4 shrink-0 bg-sidebar-background">
-                  <span className="text-xs font-semibold font-mono text-sidebar-foreground/70 tracking-wider uppercase">PREVIEW</span>
+              <div className={`flex flex-col bg-card/40 overflow-hidden transition-all border-t border-sidebar-border ${previewCollapsed ? "h-10 shrink-0" : "flex-1 min-h-0"}`}>
+                <div onClick={() => setPreviewCollapsed(!previewCollapsed)} className="h-10 border-b border-sidebar-border flex items-center justify-between px-3 shrink-0 bg-sidebar-background cursor-pointer hover:bg-sidebar-accent/50 transition-colors select-none">
+                  <div className="flex items-center gap-1 text-sidebar-foreground/70">{previewCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}<span className="text-xs font-semibold font-mono tracking-wider uppercase ml-1">PREVIEW</span></div>
                 </div>
                 <div className="flex-1 overflow-auto p-4 relative bg-muted/10">
                   <TilesetPreview
@@ -630,9 +681,9 @@ const editorRoute = createRoute({
                     setHoverTile={setHoverTile}
                   />
                 </div>
-              </ResizablePanel>
+              </div>
 
-            </ResizablePanelGroup>
+            </div>
           </ResizablePanel>
         </ResizablePanelGroup>
 
@@ -685,6 +736,13 @@ const editorRoute = createRoute({
           setHeight={(v) => setCreateMapData(d => ({ ...d, height: v }))}
           onClose={() => setCreateMapDialog({ open: false })}
           onConfirm={handleConfirmCreateMap}
+        />
+        <ConfirmDialog 
+          open={confirmDialog.open} 
+          title={confirmDialog.title} 
+          description={confirmDialog.description} 
+          onClose={() => setConfirmDialog(prev => ({ ...prev, open: false }))} 
+          onConfirm={confirmDialog.action} 
         />
       </div>
     )
