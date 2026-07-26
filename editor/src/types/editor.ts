@@ -1,4 +1,4 @@
-export type LayerType = 'tile' | 'collision' | 'terrain' | 'objects'
+export type LayerType = 'tile' | 'collision' | 'terrain' | 'objects' | 'encounters'
 
 export interface Layer {
   id: string

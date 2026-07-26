@@ -13,6 +13,7 @@ interface TilesetPreviewProps {
   setTilesetSelectionCurrent: (v: Pos | null) => void
   hoverTile: Pos | null
   setHoverTile: (v: Pos | null) => void
+  isDisabled?: boolean
 }
 
 function getTilesetSelectionBox(start: Pos | null, current: Pos | null) {
@@ -36,11 +37,20 @@ export function TilesetPreview({
   setTilesetSelectionCurrent,
   hoverTile,
   setHoverTile,
+  isDisabled,
 }: TilesetPreviewProps) {
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [isPanning, setIsPanning] = useState(false)
   const [lastPanPos, setLastPanPos] = useState({ x: 0, y: 0 })
+
+  if (isDisabled) {
+    return (
+      <div className="h-full w-full flex flex-col items-center justify-center text-xs text-muted-foreground font-mono space-y-2">
+        <p>yet to implement</p>
+      </div>
+    )
+  }
 
   if (!activeTileset) {
     return (

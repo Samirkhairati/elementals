@@ -2,7 +2,7 @@ import { createRouter, createRoute, createRootRoute, createHashHistory, Outlet }
 import { SidebarProvider } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
 import { useThemeStore } from '@/store/themeStore'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Plus, FolderPlus, Map as MapIcon, Layers as LayersIcon, LayoutGrid as LayoutGridIcon, ChevronRight, ChevronDown, MousePointer2, Settings2 } from "lucide-react"
@@ -159,31 +159,51 @@ const editorRoute = createRoute({
     const [createMapFolderName, setCreateMapFolderName] = useState("")
 
 
-    // ── Panel Refs & Collapse State ──────────────────────────────────────────
-    const mapsPanelRef = useRef<any>(null)
-    const layersPanelRef = useRef<any>(null)
-    const activeSelectionPanelRef = useRef<any>(null)
-    const propertiesPanelRef = useRef<any>(null)
-    const tilesetsPanelRef = useRef<any>(null)
-    const previewPanelRef = useRef<any>(null)
-    
+    // ── Panel Collapse State ──────────────────────────────────────────────────
+    const HEADER_H = 40
+
+    // Left sidebar panel heights (px). null = use flex-1 (fill remaining).
+    // We track explicit heights so we can resize by dragging.
     const [mapsCollapsed, setMapsCollapsed] = useState(false)
     const [layersCollapsed, setLayersCollapsed] = useState(false)
     const [activeSelectionCollapsed, setActiveSelectionCollapsed] = useState(false)
     const [propertiesCollapsed, setPropertiesCollapsed] = useState(false)
+    const [mapsH, setMapsH] = useState(180)
+    const [layersH, setLayersH] = useState(180)
+    const [activeSelectionH, setActiveSelectionH] = useState(160)
+    // propertiesPanel fills the remaining space — no explicit height needed
+
+    // Right sidebar panel heights
     const [tilesetsCollapsed, setTilesetsCollapsed] = useState(false)
     const [previewCollapsed, setPreviewCollapsed] = useState(false)
+    const [tilesetsH, setTilesetsH] = useState(260)
+    // previewPanel fills the remaining space
 
-    const togglePanel = (ref: React.RefObject<any>, setter: React.Dispatch<React.SetStateAction<boolean>>, isCollapsed: boolean) => {
-      if (!ref.current) return
-      if (isCollapsed) {
-        ref.current.expand()
-        setter(false)
-      } else {
-        ref.current.collapse()
-        setter(true)
-      }
-    }
+    // Drag-resize handle hook
+    const makeDragHandle = useCallback(
+      (setHeight: React.Dispatch<React.SetStateAction<number>>, isTopCollapsed: boolean, isBottomCollapsed: boolean) =>
+        (e: React.PointerEvent<HTMLDivElement>) => {
+          if (isTopCollapsed || isBottomCollapsed) return
+          e.preventDefault()
+          const startY = e.clientY
+          // Capture the height of the section ABOVE the handle at drag start
+          const handle = e.currentTarget as HTMLElement
+          const prevSection = handle.previousElementSibling as HTMLElement | null
+          const startH = prevSection ? prevSection.getBoundingClientRect().height : 0
+
+          const onMove = (ev: PointerEvent) => {
+            const dy = ev.clientY - startY
+            setHeight(Math.max(HEADER_H + 20, startH + dy))
+          }
+          const onUp = () => {
+            window.removeEventListener('pointermove', onMove)
+            window.removeEventListener('pointerup', onUp)
+          }
+          window.addEventListener('pointermove', onMove)
+          window.addEventListener('pointerup', onUp)
+        },
+      []
+    )
 
     // ── History hook ─────────────────────────────────────────────────────────
     const {
@@ -490,10 +510,14 @@ const editorRoute = createRoute({
         <ResizablePanelGroup orientation="horizontal">
           {/* ── Left Sidebar ────────────────────────────────────────────── */}
           <ResizablePanel defaultSize="20%" minSize="15%" maxSize="30%" className="flex flex-col z-10 shadow-xl bg-sidebar-background border-r border-border min-w-0 min-h-0">
-            <div className="flex flex-col h-full w-full">
+            <div className="flex flex-col h-full w-full overflow-hidden">
 
               {/* Maps Panel */}
-              <div className={`flex flex-col overflow-hidden transition-all ${mapsCollapsed ? "h-10 shrink-0" : "flex-1 min-h-0"}`}>
+              <div
+                data-panel-section
+                className="flex flex-col overflow-hidden shrink-0"
+                style={{ height: mapsCollapsed ? HEADER_H : mapsH }}
+              >
                 <div onClick={() => setMapsCollapsed(!mapsCollapsed)} className="h-10 border-b border-sidebar-border flex items-center justify-between px-3 shrink-0 bg-sidebar-background cursor-pointer hover:bg-sidebar-accent/50 transition-colors select-none">
                   <div className="flex items-center gap-1 text-sidebar-foreground/70">{mapsCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}<MapIcon className="w-4 h-4 ml-0.5" /><h2 className="text-xs font-semibold font-mono tracking-wider uppercase ml-1">MAPS</h2></div>
                   <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
@@ -505,7 +529,7 @@ const editorRoute = createRoute({
                     </button>
                   </div>
                 </div>
-                {!mapsCollapsed && (<div className="flex-1 overflow-y-auto p-2 font-mono text-xs">
+                {!mapsCollapsed && (<div className="flex-1 overflow-y-auto p-2 font-mono text-xs min-h-0">
                   <MapsPanel
                     maps={maps}
                     mapFolders={mapFolders}
@@ -529,10 +553,18 @@ const editorRoute = createRoute({
                 </div>)}
               </div>
 
-              
+              {/* Drag handle between Maps and Layers */}
+              <div
+                onPointerDown={makeDragHandle(setMapsH, mapsCollapsed, layersCollapsed)}
+                className="h-[3px] shrink-0 bg-sidebar-border hover:bg-primary/50 cursor-row-resize transition-colors"
+              />
 
               {/* Layers Panel */}
-              <div className={`flex flex-col overflow-hidden transition-all border-t border-sidebar-border ${layersCollapsed ? "h-10 shrink-0" : "flex-1 min-h-0"}`}>
+              <div
+                data-panel-section
+                className="flex flex-col overflow-hidden border-t border-sidebar-border shrink-0"
+                style={{ height: layersCollapsed ? HEADER_H : layersH }}
+              >
                 <div onClick={() => setLayersCollapsed(!layersCollapsed)} className="h-10 border-b border-sidebar-border flex items-center justify-between px-3 shrink-0 bg-sidebar-background cursor-pointer hover:bg-sidebar-accent/50 transition-colors select-none">
                   <div className="flex items-center gap-1 text-sidebar-foreground/70">{layersCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}<LayersIcon className="w-4 h-4 ml-0.5" /><h2 className="text-xs font-semibold font-mono tracking-wider uppercase ml-1">LAYERS</h2></div>
                   <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
@@ -541,7 +573,7 @@ const editorRoute = createRoute({
                     </button>
                   </div>
                 </div>
-                {!layersCollapsed && (<div className="flex-1 overflow-y-auto p-2 font-mono text-xs">
+                {!layersCollapsed && (<div className="flex-1 overflow-y-auto p-2 font-mono text-xs min-h-0">
                   <LayersPanel
                     layers={layers}
                     activeLayerId={activeLayerId}
@@ -552,26 +584,20 @@ const editorRoute = createRoute({
                 </div>)}
               </div>
 
-              
+              {/* Drag handle between Layers and Properties */}
+              <div
+                onPointerDown={makeDragHandle(setLayersH, layersCollapsed, propertiesCollapsed)}
+                className="h-[3px] shrink-0 bg-sidebar-border hover:bg-primary/50 cursor-row-resize transition-colors"
+              />
 
-              {/* Active Selection Panel */}
-              <div className={`flex flex-col bg-card/40 overflow-hidden transition-all border-t border-sidebar-border ${activeSelectionCollapsed ? "h-10 shrink-0" : "flex-1 min-h-0"}`}>
-                <div onClick={() => setActiveSelectionCollapsed(!activeSelectionCollapsed)} className="h-10 border-b border-sidebar-border flex items-center justify-between px-3 shrink-0 bg-sidebar-background cursor-pointer hover:bg-sidebar-accent/50 transition-colors select-none">
-                  <div className="flex items-center gap-1 text-sidebar-foreground/70">{activeSelectionCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}<MousePointer2 className="w-4 h-4 ml-0.5" /><span className="text-xs font-semibold font-mono tracking-wider uppercase ml-1">ACTIVE SELECTION</span></div>
-                </div>
-                <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-muted/10">
-                  <ActiveSelectionPanel tileSelection={tileSelection} tilesets={tilesets} />
-                </div>
-              </div>
-
-              
-
-              {/* Properties Panel */}
-              <div className={`flex flex-col bg-card/40 overflow-hidden transition-all border-t border-sidebar-border ${propertiesCollapsed ? "h-10 shrink-0" : "flex-1 min-h-0"}`}>
+              {/* Properties Panel — fills remaining space */}
+              <div
+                className="flex flex-col bg-card/40 overflow-hidden border-t border-sidebar-border flex-1 min-h-0"
+              >
                 <div onClick={() => setPropertiesCollapsed(!propertiesCollapsed)} className="h-10 border-b border-sidebar-border flex items-center justify-between px-3 shrink-0 bg-sidebar-background cursor-pointer hover:bg-sidebar-accent/50 transition-colors select-none">
                   <div className="flex items-center gap-1 text-sidebar-foreground/70">{propertiesCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}<Settings2 className="w-4 h-4 ml-0.5" /><span className="text-xs font-semibold font-mono tracking-wider uppercase ml-1">PROPERTIES</span></div>
                 </div>
-                {!propertiesCollapsed && (<div className="flex-1 overflow-auto p-4 flex flex-col items-center justify-start text-xs text-muted-foreground text-center">
+                {!propertiesCollapsed && (<div className="flex-1 overflow-auto p-4 flex flex-col items-center justify-start text-xs text-muted-foreground text-center min-h-0">
                   <PropertiesPanel layers={layers} activeLayerId={activeLayerId} updateLayers={updateLayers} />
                 </div>)}
               </div>
@@ -620,10 +646,14 @@ const editorRoute = createRoute({
 
           {/* ── Right Sidebar ─────────────────────────────────────────────── */}
           <ResizablePanel defaultSize="25%" minSize="15%" maxSize="40%" className="flex flex-col z-10 shadow-xl bg-sidebar-background border-l border-border min-w-0 min-h-0">
-            <div className="flex flex-col h-full w-full">
+            <div className="flex flex-col h-full w-full overflow-hidden">
 
               {/* Tilesets Panel */}
-              <div className={`flex flex-col overflow-hidden transition-all ${tilesetsCollapsed ? "h-10 shrink-0" : "flex-1 min-h-0"}`}>
+              <div
+                data-panel-section
+                className="flex flex-col overflow-hidden shrink-0"
+                style={{ height: tilesetsCollapsed ? HEADER_H : tilesetsH }}
+              >
                 <div onClick={() => setTilesetsCollapsed(!tilesetsCollapsed)} className="h-10 border-b border-sidebar-border flex items-center justify-between px-3 shrink-0 bg-sidebar-background cursor-pointer hover:bg-sidebar-accent/50 transition-colors select-none">
                   <div className="flex items-center gap-1 text-sidebar-foreground/70">{tilesetsCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}<LayoutGridIcon className="w-4 h-4 ml-0.5" /><h2 className="text-xs font-semibold font-mono tracking-wider uppercase ml-1">TILESETS</h2></div>
                   <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
@@ -636,7 +666,7 @@ const editorRoute = createRoute({
                   </div>
                 </div>
                 {!tilesetsCollapsed && (<div
-                  className="flex-1 overflow-y-auto p-2 font-mono text-xs"
+                  className="flex-1 overflow-y-auto p-2 font-mono text-xs min-h-0"
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => handleDrop(e, null)}
                 >
@@ -659,28 +689,58 @@ const editorRoute = createRoute({
                 </div>)}
               </div>
 
-              
+              {/* Drag handle between Tilesets and Active Selection */}
+              <div
+                onPointerDown={makeDragHandle(setTilesetsH, tilesetsCollapsed, activeSelectionCollapsed)}
+                className="h-[3px] shrink-0 bg-sidebar-border hover:bg-primary/50 cursor-row-resize transition-colors"
+              />
 
-              {/* Tileset Preview Panel */}
-              <div className={`flex flex-col bg-card/40 overflow-hidden transition-all border-t border-sidebar-border ${previewCollapsed ? "h-10 shrink-0" : "flex-1 min-h-0"}`}>
+              {/* Active Selection Panel */}
+              <div
+                data-panel-section
+                className="flex flex-col bg-card/40 overflow-hidden border-t border-sidebar-border shrink-0"
+                style={{ height: activeSelectionCollapsed ? HEADER_H : activeSelectionH }}
+              >
+                <div onClick={() => setActiveSelectionCollapsed(!activeSelectionCollapsed)} className="h-10 border-b border-sidebar-border flex items-center justify-between px-3 shrink-0 bg-sidebar-background cursor-pointer hover:bg-sidebar-accent/50 transition-colors select-none">
+                  <div className="flex items-center gap-1 text-sidebar-foreground/70">{activeSelectionCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}<MousePointer2 className="w-4 h-4 ml-0.5" /><span className="text-xs font-semibold font-mono tracking-wider uppercase ml-1">ACTIVE SELECTION</span></div>
+                </div>
+                {!activeSelectionCollapsed && (
+                  <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-muted/10 min-h-0">
+                    <ActiveSelectionPanel tileSelection={tileSelection} tilesets={tilesets} />
+                  </div>
+                )}
+              </div>
+
+              {/* Drag handle between Active Selection and Preview */}
+              <div
+                onPointerDown={makeDragHandle(setActiveSelectionH, activeSelectionCollapsed, previewCollapsed)}
+                className="h-[3px] shrink-0 bg-sidebar-border hover:bg-primary/50 cursor-row-resize transition-colors"
+              />
+
+              {/* Tileset Preview Panel — fills remaining space */}
+              <div
+                className="flex flex-col bg-card/40 overflow-hidden border-t border-sidebar-border flex-1 min-h-0"
+              >
                 <div onClick={() => setPreviewCollapsed(!previewCollapsed)} className="h-10 border-b border-sidebar-border flex items-center justify-between px-3 shrink-0 bg-sidebar-background cursor-pointer hover:bg-sidebar-accent/50 transition-colors select-none">
                   <div className="flex items-center gap-1 text-sidebar-foreground/70">{previewCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}<span className="text-xs font-semibold font-mono tracking-wider uppercase ml-1">PREVIEW</span></div>
                 </div>
-                <div className="flex-1 overflow-auto p-4 relative bg-muted/10">
-                  <TilesetPreview
-                    activeTileset={activeTileset}
-                    tilesetDimensions={tilesetDimensions}
-                    setTilesetDimensions={setTilesetDimensions}
-                    tileSelection={tileSelection}
-                    setTileSelection={setTileSelection}
-                    tilesetSelectionStart={tilesetSelectionStart}
-                    setTilesetSelectionStart={setTilesetSelectionStart}
-                    tilesetSelectionCurrent={tilesetSelectionCurrent}
-                    setTilesetSelectionCurrent={setTilesetSelectionCurrent}
-                    hoverTile={hoverTile}
-                    setHoverTile={setHoverTile}
-                  />
-                </div>
+                {!previewCollapsed && (
+                  <div className="flex-1 overflow-auto p-4 relative bg-muted/10 min-h-0">
+                    <TilesetPreview
+                      activeTileset={activeTileset}
+                      tilesetDimensions={tilesetDimensions}
+                      setTilesetDimensions={setTilesetDimensions}
+                      tileSelection={tileSelection}
+                      setTileSelection={setTileSelection}
+                      tilesetSelectionStart={tilesetSelectionStart}
+                      setTilesetSelectionStart={setTilesetSelectionStart}
+                      tilesetSelectionCurrent={tilesetSelectionCurrent}
+                      setTilesetSelectionCurrent={setTilesetSelectionCurrent}
+                      hoverTile={hoverTile}
+                      setHoverTile={setHoverTile}
+                    />
+                  </div>
+                )}
               </div>
 
             </div>

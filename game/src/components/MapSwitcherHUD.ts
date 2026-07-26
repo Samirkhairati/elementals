@@ -3,7 +3,8 @@ import { MAPS } from '@/constants/assets';
 
 export class MapSwitcherHUD {
     private container: GameObjects.Container;
-    private menuText: GameObjects.Text;
+    private menuText: GameObjects.BitmapText;
+    private background: GameObjects.Graphics;
     private isOpen: boolean = false;
     private selectedIndex: number = 0;
     private onSelect: (mapKey: string) => void;
@@ -16,25 +17,11 @@ export class MapSwitcherHUD {
         this.container.setVisible(false);
         this.container.setDepth(1000); // Always on top
 
-        this.menuText = scene.add.text(0, 0, '', {
-            fontFamily: '"Press Start 2P"',
-            fontSize: '10px',
-            color: '#ffffff',
-            backgroundColor: 'rgba(0,0,0,0.8)',
-            padding: { x: 10, y: 10 },
-            lineSpacing: 10
-        });
-        
-        this.container.add(this.menuText);
+        this.background = scene.add.graphics();
+        this.container.add(this.background);
 
-        // Fix font loading race condition
-        if (document.fonts) {
-            document.fonts.ready.then(() => {
-                if (this.menuText.active) {
-                    this.menuText.setFontFamily('"Press Start 2P"');
-                }
-            });
-        }
+        this.menuText = scene.add.bitmapText(10, 10, 'PokemonFont', '', 72);
+        this.container.add(this.menuText);
     }
 
     toggle() {
@@ -63,6 +50,11 @@ export class MapSwitcherHUD {
             return `${prefix}${m.name}`;
         });
         this.menuText.setText(['SELECT MAP:', '----------', ...lines].join('\n'));
+        
+        // Redraw background
+        this.background.clear();
+        this.background.fillStyle(0x000000, 0.8);
+        this.background.fillRect(0, 0, this.menuText.width + 20, this.menuText.height + 20);
     }
 
     get isVisible() {

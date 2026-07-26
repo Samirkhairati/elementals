@@ -5,7 +5,7 @@ import { EventBus, Events } from "@/utils/EventBus";
 export class DialogueHUD {
   private scene: Scene;
   private container: GameObjects.Container;
-  private textObject: GameObjects.Text;
+  private textObject: GameObjects.BitmapText;
   private background: GameObjects.Graphics;
   
   public isVisible: boolean = false;
@@ -23,12 +23,8 @@ export class DialogueHUD {
     this.container.add(this.background);
     
     // Text
-    this.textObject = this.scene.add.text(0, 0, "", {
-        fontFamily: 'monospace',
-        fontSize: '16px',
-        color: '#ffffff',
-        wordWrap: { width: CONFIG.width - 40, useAdvancedWrap: true }
-    });
+    this.textObject = this.scene.add.bitmapText(0, 0, 'PokemonFont', "", 72);
+    this.textObject.setMaxWidth(CONFIG.width - 40);
     this.container.add(this.textObject);
     
     this.container.setVisible(false);
@@ -53,15 +49,15 @@ export class DialogueHUD {
     const { width, height } = this.scene.scale;
     
     const boxWidth = width - 40;
-    const boxHeight = 100;
+    const boxHeight = 160;
     const boxX = 20;
     const boxY = height - boxHeight - 20;
 
     // Redraw background
     this.background.clear();
-    this.background.fillStyle(0x000000, 0.8);
+    this.background.fillStyle(0xffffff, 0.9);
     this.background.fillRoundedRect(boxX, boxY, boxWidth, boxHeight, 8);
-    this.background.lineStyle(2, 0xffffff, 1);
+    this.background.lineStyle(2, 0x000000, 1);
     this.background.strokeRoundedRect(boxX, boxY, boxWidth, boxHeight, 8);
 
     // Position text

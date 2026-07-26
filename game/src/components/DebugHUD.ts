@@ -3,7 +3,8 @@ import { CONFIG } from '@/config';
 import { Player } from '@/entities/Player';
 
 export class DebugHUD {
-    private text: GameObjects.Text;
+    private text: GameObjects.BitmapText;
+    private background: GameObjects.Graphics;
     private scene: Scene;
     private player: Player;
     private pressedKeys: Set<string> = new Set();
@@ -12,15 +13,13 @@ export class DebugHUD {
         this.scene = scene;
         this.player = player;
 
-        this.text = scene.add.text(20, 20, '', {
-            fontFamily: '"Press Start 2P"',
-            fontSize: '12px',
-            color: '#ffffff',
-            backgroundColor: 'rgba(0,0,0,0.5)',
-            padding: { x: 10, y: 10 }
-        });
+        this.background = scene.add.graphics();
+        this.background.setScrollFactor(0);
+        this.background.setDepth(1001);
+
+        this.text = scene.add.bitmapText(30, 30, 'PokemonFont', '', 72);
         this.text.setScrollFactor(0);
-        this.text.setDepth(1001);
+        this.text.setDepth(1002);
 
         const MODIFIERS = ['Meta', 'Shift', 'Control', 'Alt'];
 
@@ -40,17 +39,6 @@ export class DebugHUD {
 
         // Initialize display immediately
         this.update();
-
-        // Fix font loading race condition
-        // Re-apply font once browser has finished loading it
-        if (document.fonts) {
-            document.fonts.ready.then(() => {
-                if (this.text.active) {
-                    this.text.setFontFamily('"Press Start 2P"');
-                    this.update();
-                }
-            });
-        }
     }
 
     setPlayer(player: Player) {
@@ -60,10 +48,12 @@ export class DebugHUD {
     update() {
         if (!CONFIG.debug.enabled) {
             this.text.setVisible(false);
+            this.background.setVisible(false);
             return;
         }
 
         this.text.setVisible(true);
+        this.background.setVisible(true);
         const lines: string[] = [];
 
         if (CONFIG.debug.showKeys) {
@@ -81,5 +71,10 @@ export class DebugHUD {
         }
 
         this.text.setText(lines.join('\n'));
+        
+        // Redraw background
+        this.background.clear();
+        this.background.fillStyle(0xffffff, 0.9);
+        this.background.fillRect(20, 20, this.text.width + 20, this.text.height + 20);
     }
 }

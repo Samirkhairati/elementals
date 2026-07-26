@@ -1,0 +1,56 @@
+{
+  "fileName": "map3.json",
+  "folderPath": null,
+  "name": "map3",
+  "width": 50,
+  "height": 50,
+  "layers": [
+    {
+      "id": "42281c93-bfc7-4e90-aeb5-bfd870d1f371",
+      "name": "fd",
+      "type": "collision",
+      "visible": true,
+      "locked": false,
+      "data": {}
+    },
+    {
+      "id": "ce5084d4-7ed4-45a8-85dc-3d7ec00a333d",
+      "name": "buildings",
+      "type": "tile",
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "df0205c4-7102-452c-9eed-f77cc61cd2eb",
+      "name": "ground",
+      "type": "tile",
+      "visible": true,
+      "locked": false,
+      "data": {}
+    },
+    {
+      "id": "f5217e1d-1ccd-4803-8c7b-3e45188027ef",
+      "name": "collisions",
+      "type": "collision",
+      "visible": true,
+      "locked": false,
+      "data": {}
+    },
+    {
+      "id": "6a898fec-6e7a-4073-894a-56db845f6f4e",
+      "name": "terrain",
+      "type": "terrain",
+      "visible": true,
+      "locked": false,
+      "data": {}
+    },
+    {
+      "id": "056a02d6-a6eb-49ac-9b98-b3dc4a2fbf19",
+      "name": "encounters",
+      "type": "encounters",
+      "visible": true,
+      "locked": false,
+      "data": {}
+    }
+  ]
+}

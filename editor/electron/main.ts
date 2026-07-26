@@ -310,15 +310,60 @@ ipcMain.handle('create-map', async (event, name: string, width: number, height: 
       counter++;
     }
 
-    const defaultLayer = {
-      id: crypto.randomUUID(),
-      name: 'Background',
-      type: 'tile',
-      visible: true,
-      locked: false,
-      data: {}
-    };
-    const mapData = { name, width, height, layers: [defaultLayer] };
+    const defaultLayers = [
+      {
+        id: crypto.randomUUID(),
+        name: 'ground',
+        type: 'tile',
+        visible: true,
+        locked: false,
+        z: 1,
+        data: {}
+      },
+      {
+        id: crypto.randomUUID(),
+        name: 'building',
+        type: 'tile',
+        visible: true,
+        locked: false,
+        z: 10,
+        data: {}
+      },
+      {
+        id: crypto.randomUUID(),
+        name: 'decorations',
+        type: 'tile',
+        visible: true,
+        locked: false,
+        z: 20,
+        data: {}
+      },
+      {
+        id: crypto.randomUUID(),
+        name: 'collisions',
+        type: 'collision',
+        visible: true,
+        locked: false,
+        data: {}
+      },
+      {
+        id: crypto.randomUUID(),
+        name: 'terrain',
+        type: 'terrain',
+        visible: true,
+        locked: false,
+        data: {}
+      },
+      {
+        id: crypto.randomUUID(),
+        name: 'encounters',
+        type: 'encounters',
+        visible: true,
+        locked: false,
+        data: {}
+      }
+    ];
+    const mapData = { name, width, height, layers: defaultLayers };
     fs.writeFileSync(finalDest, JSON.stringify(mapData, null, 2));
 
     return { 
@@ -329,7 +374,7 @@ ipcMain.handle('create-map', async (event, name: string, width: number, height: 
         name,
         width,
         height,
-        layers: [defaultLayer]
+        layers: defaultLayers
       }
     };
   } catch (error: any) {

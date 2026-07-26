@@ -33,6 +33,10 @@ export class Preloader extends Scene {
       this.load.image(key, `${key}.png`);
     });
 
+    // Reset path for fonts
+    this.load.setPath("");
+    this.load.bitmapFont('PokemonFont', 'fonts/PokemonFont2.png', 'fonts/PokemonFont2.xml');
+
     // Load all Maps
     this.load.setPath("data/maps");
     MAPS.forEach((map) => {
