@@ -18,4 +18,5 @@ export const Events = {
     // UI Events
     SHOW_DIALOGUE: 'show-dialogue',
     DIALOGUE_CLOSED: 'dialogue-closed',
+    PLAYER_READY: 'player-ready',
 } as const;

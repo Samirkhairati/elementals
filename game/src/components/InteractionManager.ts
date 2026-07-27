@@ -67,7 +67,8 @@ export class InteractionManager {
     }
   }
 
-  private onPlayerMoved(pos: { x: number, y: number }) {
+
+  private onPlayerMoved() {
     if (!this.player) return;
     
     const gridPos = this.player.getGridPosition();

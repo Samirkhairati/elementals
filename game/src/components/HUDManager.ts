@@ -12,6 +12,7 @@ export class HUDManager {
     private mapSwitcherHUD!: MapSwitcherHUD;
     private dialogueHUD!: DialogueHUD;
     private player?: Player;
+    private onSetPlayer: (player: Player) => void;
 
     constructor(scene: Scene, player?: Player) {
         this.scene = scene;
@@ -24,12 +25,14 @@ export class HUDManager {
         this.onInputAction = this.onInputAction.bind(this);
         this.onShowDialogue = this.onShowDialogue.bind(this);
         this.onHideDialogue = this.onHideDialogue.bind(this);
+        this.onSetPlayer = this.setPlayer.bind(this);
         
         EventBus.on(Events.MENU_TOGGLED, this.onMenuToggled);
         EventBus.on(Events.INPUT_UI_DIRECTION, this.onInputUIDirection);
         EventBus.on(Events.INPUT_ACTION, this.onInputAction);
         EventBus.on(Events.SHOW_DIALOGUE, this.onShowDialogue);
         EventBus.on(Events.DIALOGUE_CLOSED, this.onHideDialogue);
+        EventBus.on(Events.PLAYER_READY, this.onSetPlayer);
         
         this.scene.events.on('destroy', this.cleanup, this);
     }
@@ -40,10 +43,11 @@ export class HUDManager {
         EventBus.off(Events.INPUT_ACTION, this.onInputAction);
         EventBus.off(Events.SHOW_DIALOGUE, this.onShowDialogue);
         EventBus.off(Events.DIALOGUE_CLOSED, this.onHideDialogue);
+        EventBus.off(Events.PLAYER_READY, this.onSetPlayer);
     }
 
     private initializeHUDs() {
-        if (CONFIG.debug.enabled && this.player) {
+        if (CONFIG.debug.enabled) {
             this.debugHUD = new DebugHUD(this.scene, this.player);
         }
 

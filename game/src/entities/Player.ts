@@ -48,7 +48,7 @@ export class Player extends GameObjects.Sprite {
     this.onInputDirection = this.onInputDirection.bind(this);
     EventBus.on(Events.INPUT_DIRECTION, this.onInputDirection);
     
-    this.scene.events.on('destroy', this.cleanup, this);
+    this.on('destroy', this.cleanup, this);
   }
 
   private cleanup() {

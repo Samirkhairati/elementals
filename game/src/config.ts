@@ -12,6 +12,8 @@ export const CONFIG = {
   tileSize,
   mapWidth,
   mapHeight,
+  visibleTilesX: 15,
+  visibleTilesY: 10,
   width: mapWidth * tileSize,
   height: mapHeight * tileSize,
   backgroundColor: "#000000",

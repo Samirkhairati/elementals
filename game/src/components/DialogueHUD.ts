@@ -1,6 +1,5 @@
 import { Scene, GameObjects } from "phaser";
 import { CONFIG } from "@/config";
-import { EventBus, Events } from "@/utils/EventBus";
 
 export class DialogueHUD {
   private scene: Scene;
@@ -48,9 +47,10 @@ export class DialogueHUD {
   private resize() {
     const { width, height } = this.scene.scale;
     
-    const boxWidth = width - 40;
+    // Max width of 1000px so it doesn't stretch infinitely on wide screens
+    const boxWidth = Math.min(1000, width - 40);
     const boxHeight = 160;
-    const boxX = 20;
+    const boxX = (width - boxWidth) / 2;
     const boxY = height - boxHeight - 20;
 
     // Redraw background

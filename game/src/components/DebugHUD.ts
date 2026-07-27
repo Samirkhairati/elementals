@@ -6,10 +6,10 @@ export class DebugHUD {
     private text: GameObjects.BitmapText;
     private background: GameObjects.Graphics;
     private scene: Scene;
-    private player: Player;
+    private player?: Player;
     private pressedKeys: Set<string> = new Set();
 
-    constructor(scene: Scene, player: Player) {
+    constructor(scene: Scene, player?: Player) {
         this.scene = scene;
         this.player = player;
 
@@ -61,7 +61,7 @@ export class DebugHUD {
             lines.push(`DEBUG: Keys: ${keysString}`);
         }
 
-        if (CONFIG.debug.showCoords) {
+        if (CONFIG.debug.showCoords && this.player) {
             const grid = this.player.getGridPosition();
             lines.push(`DEBUG: Pos: (${Math.round(this.player.x)}, ${Math.round(this.player.y)}) [${grid.x}, ${grid.y}]`);
         }
