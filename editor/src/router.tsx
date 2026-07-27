@@ -190,10 +190,17 @@ const editorRoute = createRoute({
           const handle = e.currentTarget as HTMLElement
           const prevSection = handle.previousElementSibling as HTMLElement | null
           const startH = prevSection ? prevSection.getBoundingClientRect().height : 0
+          
+          // Calculate the max allowed height so we don't push the bottom section off-screen
+          const container = handle.parentElement as HTMLElement
+          const lastSection = container.lastElementChild as HTMLElement | null
+          const lastSectionH = lastSection ? lastSection.getBoundingClientRect().height : 0
+          const maxDragDown = Math.max(0, lastSectionH - HEADER_H)
+          const maxH = startH + maxDragDown
 
           const onMove = (ev: PointerEvent) => {
             const dy = ev.clientY - startY
-            setHeight(Math.max(HEADER_H + 20, startH + dy))
+            setHeight(Math.min(maxH, Math.max(HEADER_H + 20, startH + dy)))
           }
           const onUp = () => {
             window.removeEventListener('pointermove', onMove)
@@ -592,7 +599,7 @@ const editorRoute = createRoute({
 
               {/* Properties Panel — fills remaining space */}
               <div
-                className="flex flex-col bg-card/40 overflow-hidden border-t border-sidebar-border flex-1 min-h-0"
+                className="flex flex-col bg-card/40 overflow-hidden border-t border-sidebar-border flex-1 min-h-[40px]"
               >
                 <div onClick={() => setPropertiesCollapsed(!propertiesCollapsed)} className="h-10 border-b border-sidebar-border flex items-center justify-between px-3 shrink-0 bg-sidebar-background cursor-pointer hover:bg-sidebar-accent/50 transition-colors select-none">
                   <div className="flex items-center gap-1 text-sidebar-foreground/70">{propertiesCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}<Settings2 className="w-4 h-4 ml-0.5" /><span className="text-xs font-semibold font-mono tracking-wider uppercase ml-1">PROPERTIES</span></div>
@@ -719,7 +726,7 @@ const editorRoute = createRoute({
 
               {/* Tileset Preview Panel — fills remaining space */}
               <div
-                className="flex flex-col bg-card/40 overflow-hidden border-t border-sidebar-border flex-1 min-h-0"
+                className="flex flex-col bg-card/40 overflow-hidden border-t border-sidebar-border flex-1 min-h-[40px]"
               >
                 <div onClick={() => setPreviewCollapsed(!previewCollapsed)} className="h-10 border-b border-sidebar-border flex items-center justify-between px-3 shrink-0 bg-sidebar-background cursor-pointer hover:bg-sidebar-accent/50 transition-colors select-none">
                   <div className="flex items-center gap-1 text-sidebar-foreground/70">{previewCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}<span className="text-xs font-semibold font-mono tracking-wider uppercase ml-1">PREVIEW</span></div>

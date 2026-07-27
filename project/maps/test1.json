@@ -1,35 +1,39 @@
 {
-  "fileName": "map3.json",
+  "fileName": "test1.json",
   "folderPath": null,
-  "name": "map3",
+  "name": "test1",
   "width": 50,
   "height": 50,
   "layers": [
     {
-      "id": "42281c93-bfc7-4e90-aeb5-bfd870d1f371",
-      "name": "fd",
-      "type": "collision",
-      "visible": true,
-      "locked": false,
-      "data": {}
-    },
-    {
-      "id": "ce5084d4-7ed4-45a8-85dc-3d7ec00a333d",
-      "name": "buildings",
-      "type": "tile",
-      "visible": true,
-      "locked": false
-    },
-    {
-      "id": "df0205c4-7102-452c-9eed-f77cc61cd2eb",
+      "id": "6bcb3cab-8e85-40d1-8f4e-244105b1ef65",
       "name": "ground",
       "type": "tile",
       "visible": true,
       "locked": false,
+      "z": 1,
       "data": {}
     },
     {
-      "id": "f5217e1d-1ccd-4803-8c7b-3e45188027ef",
+      "id": "5f0fe2e0-da90-4b6b-9df4-217c605be44b",
+      "name": "building",
+      "type": "tile",
+      "visible": true,
+      "locked": false,
+      "z": 10,
+      "data": {}
+    },
+    {
+      "id": "39f83bb8-68ee-436c-8868-40f86d3291d3",
+      "name": "decorations",
+      "type": "tile",
+      "visible": true,
+      "locked": false,
+      "z": 20,
+      "data": {}
+    },
+    {
+      "id": "23c19564-8a29-4bd2-94ae-0fbeacb5962c",
       "name": "collisions",
       "type": "collision",
       "visible": true,
@@ -37,7 +41,7 @@
       "data": {}
     },
     {
-      "id": "6a898fec-6e7a-4073-894a-56db845f6f4e",
+      "id": "383dfe97-4090-4a22-af96-37c3a95c9d84",
       "name": "terrain",
       "type": "terrain",
       "visible": true,
@@ -45,7 +49,7 @@
       "data": {}
     },
     {
-      "id": "056a02d6-a6eb-49ac-9b98-b3dc4a2fbf19",
+      "id": "93526d9c-08cf-4146-be2f-3f8de16d419d",
       "name": "encounters",
       "type": "encounters",
       "visible": true,
