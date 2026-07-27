@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { TilesetData, TileSelection, CopiedTile, Pos } from '@/types/editor'
 
 interface TilesetPreviewProps {
@@ -14,6 +14,7 @@ interface TilesetPreviewProps {
   hoverTile: Pos | null
   setHoverTile: (v: Pos | null) => void
   isDisabled?: boolean
+  activeLayerType?: string | null
 }
 
 function getTilesetSelectionBox(start: Pos | null, current: Pos | null) {
@@ -38,11 +39,31 @@ export function TilesetPreview({
   hoverTile,
   setHoverTile,
   isDisabled,
+  activeLayerType,
 }: TilesetPreviewProps) {
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [isPanning, setIsPanning] = useState(false)
   const [lastPanPos, setLastPanPos] = useState({ x: 0, y: 0 })
+
+  const dragStartRef = useRef<Pos | null>(null)
+
+  if (activeLayerType === 'collision') {
+    return (
+      <div className="h-full w-full flex flex-col items-center justify-center space-y-4">
+        <div className="text-xs text-red-400 font-mono uppercase tracking-wider">Collision Block</div>
+        <div 
+          className="relative w-16 h-16 border-2 border-red-500 bg-red-500/20 overflow-hidden ring-4 ring-primary shadow-lg shadow-red-500/20 cursor-pointer hover:bg-red-500/30"
+          onClick={() => {
+            setTileSelection({ width: 1, height: 1, tiles: [{ tilesetId: '__collision__', x: 0, y: 0 }] })
+          }}
+        >
+          <div className="absolute w-[100px] h-[3px] bg-red-500 origin-center left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rotate-45" />
+          <div className="absolute w-[100px] h-[3px] bg-red-500 origin-center left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 -rotate-45" />
+        </div>
+      </div>
+    )
+  }
 
   if (isDisabled) {
     return (
@@ -60,8 +81,10 @@ export function TilesetPreview({
     )
   }
 
-  const commitSelection = () => {
-    const box = getTilesetSelectionBox(tilesetSelectionStart, tilesetSelectionCurrent)
+  const commitSelection = (endPos?: Pos) => {
+    const start = dragStartRef.current || tilesetSelectionStart
+    const current = endPos || tilesetSelectionCurrent
+    const box = getTilesetSelectionBox(start, current)
     if (box) {
       const tiles: (CopiedTile | null)[] = []
       for (let dy = 0; dy < box.height; dy++) {
@@ -76,6 +99,7 @@ export function TilesetPreview({
       setTileSelection({ width: box.width, height: box.height, tiles })
       setTilesetSelectionStart(null)
       setTilesetSelectionCurrent(null)
+      dragStartRef.current = null
     }
   }
 
@@ -136,6 +160,7 @@ export function TilesetPreview({
               if (e.button !== 0) return
               const x = Math.floor(e.nativeEvent.offsetX / 32)
               const y = Math.floor(e.nativeEvent.offsetY / 32)
+              dragStartRef.current = { x, y }
               setTilesetSelectionStart({ x, y })
               setTilesetSelectionCurrent({ x, y })
             }}
@@ -144,14 +169,20 @@ export function TilesetPreview({
               const x = Math.floor(e.nativeEvent.offsetX / 32)
               const y = Math.floor(e.nativeEvent.offsetY / 32)
               setHoverTile({ x, y })
-              if (tilesetSelectionStart) {
+              if (tilesetSelectionStart || dragStartRef.current) {
                 setTilesetSelectionCurrent({ x, y })
               }
             }}
-            onMouseUp={commitSelection}
-            onMouseLeave={() => {
+            onMouseUp={(e) => {
+              const x = Math.floor(e.nativeEvent.offsetX / 32)
+              const y = Math.floor(e.nativeEvent.offsetY / 32)
+              commitSelection({ x, y })
+            }}
+            onMouseLeave={(e) => {
               setHoverTile(null)
-              commitSelection()
+              const x = Math.floor(e.nativeEvent.offsetX / 32)
+              const y = Math.floor(e.nativeEvent.offsetY / 32)
+              commitSelection({ x, y })
             }}
           >
             {hoverTile && !tilesetSelectionStart && (

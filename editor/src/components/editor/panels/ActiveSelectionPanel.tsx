@@ -58,6 +58,24 @@ export function ActiveSelectionPanel({ tileSelection, tilesets }: ActiveSelectio
             if (!t) return null
             const dx = i % tileSelection.width
             const dy = Math.floor(i / tileSelection.width)
+            if (t.tilesetId === '__collision__') {
+              return (
+                <div
+                  key={i}
+                  className="absolute border border-red-500/50 bg-red-500/20 overflow-hidden"
+                  style={{
+                    left: dx * 32,
+                    top: dy * 32,
+                    width: 32,
+                    height: 32,
+                  }}
+                >
+                  <div className="absolute w-[50px] h-[2px] bg-red-500/50 origin-center left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rotate-45" />
+                  <div className="absolute w-[50px] h-[2px] bg-red-500/50 origin-center left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 -rotate-45" />
+                </div>
+              )
+            }
+
             const tileset = tilesets.find(ts => ts.fileName === t.tilesetId)
             if (!tileset) return null
             return (

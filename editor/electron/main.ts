@@ -313,11 +313,11 @@ ipcMain.handle('create-map', async (event, name: string, width: number, height: 
     const defaultLayers = [
       {
         id: crypto.randomUUID(),
-        name: 'ground',
+        name: 'decorations',
         type: 'tile',
         visible: true,
         locked: false,
-        z: 1,
+        z: 20,
         data: {}
       },
       {
@@ -331,11 +331,11 @@ ipcMain.handle('create-map', async (event, name: string, width: number, height: 
       },
       {
         id: crypto.randomUUID(),
-        name: 'decorations',
+        name: 'ground',
         type: 'tile',
         visible: true,
         locked: false,
-        z: 20,
+        z: 1,
         data: {}
       },
       {

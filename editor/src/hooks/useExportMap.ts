@@ -13,7 +13,12 @@ export async function exportMap(
     : mapToExportRaw
 
   const usedTilesets = new Set<string>()
+  let hasCollisionLayer = false
   for (const layer of mapToExport.layers || []) {
+    if (layer.type === 'collision') {
+      hasCollisionLayer = true
+      continue
+    }
     for (const tile of Object.values(layer.data || {}) as any[]) {
       usedTilesets.add(tile.tilesetId)
     }
@@ -54,15 +59,38 @@ export async function exportMap(
     currentGid += tilecount
   }
 
+  let collisionGid = 0
+  if (hasCollisionLayer) {
+    collisionGid = currentGid
+    exportTilesets.push({
+      columns: 1,
+      firstgid: collisionGid,
+      image: "collision_dummy.png",
+      imageheight: 32,
+      imagewidth: 32,
+      margin: 0,
+      name: "collision_dummy",
+      spacing: 0,
+      tilecount: 1,
+      tileheight: 32,
+      tilewidth: 32,
+    })
+    currentGid += 1
+  }
+
   const exportLayers = (mapToExport.layers || []).map((layer: any, index: number) => {
     const data = new Array(mapToExport.width * mapToExport.height).fill(0)
 
     for (const [indexStr, tile] of Object.entries(layer.data || {}) as any[]) {
       const idx = parseInt(indexStr)
-      const tsExport = exportTilesets.find(t => t.name === tilesets.find(ts => ts.fileName === tile.tilesetId)?.name)
-      if (tsExport) {
-        const gid = tsExport.firstgid + (tile.y * tsExport.columns + tile.x)
-        data[idx] = gid
+      if (layer.type === 'collision') {
+        data[idx] = collisionGid
+      } else {
+        const tsExport = exportTilesets.find(t => t.name === tilesets.find(ts => ts.fileName === tile.tilesetId)?.name)
+        if (tsExport) {
+          const gid = tsExport.firstgid + (tile.y * tsExport.columns + tile.x)
+          data[idx] = gid
+        }
       }
     }
 
@@ -70,9 +98,9 @@ export async function exportMap(
       data,
       height: mapToExport.height,
       id: index + 1,
-      name: layer.name,
+      name: layer.type === 'collision' ? 'collision' : layer.name,
       opacity: 1,
-      type: layer.type === 'tile' ? 'tilelayer' : (layer.type === 'objects' ? 'objectgroup' : 'tilelayer'),
+      type: layer.type === 'tile' ? 'tilelayer' : (layer.type === 'collision' ? 'tilelayer' : (layer.type === 'objects' ? 'objectgroup' : 'tilelayer')),
       visible: layer.visible,
       width: mapToExport.width,
       x: 0,

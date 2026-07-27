@@ -1,4 +1,4 @@
-import { Plus, FolderPlus, Folder as FolderIcon, ChevronRight, ChevronDown, LayoutGrid, Edit2, Trash2 } from 'lucide-react'
+import { Plus, FolderPlus, Folder as FolderIcon, ChevronRight, ChevronDown, LayoutGrid, Edit2, Trash2, XSquare } from 'lucide-react'
 import { TilesetData } from '@/types/editor'
 
 interface TilesetsPanelProps {
@@ -16,6 +16,7 @@ interface TilesetsPanelProps {
   setRenameDialog: (v: any) => void
   handleDeleteFolder: (folderPath: string) => void
   handleDrop: (e: React.DragEvent, targetFolder: string | null) => void
+  activeLayerType?: string | null
 }
 
 export function TilesetsPanel({
@@ -33,6 +34,7 @@ export function TilesetsPanel({
   setRenameDialog,
   handleDeleteFolder,
   handleDrop,
+  activeLayerType,
 }: TilesetsPanelProps) {
   const renderTree = (currentPath: string | null, level: number = 0): React.ReactNode => {
     const childrenFolders = folders.filter(f => {
@@ -106,6 +108,16 @@ export function TilesetsPanel({
             </button>
           </div>
         ))}
+      </div>
+    )
+  }
+
+  if (activeLayerType === 'collision') {
+    return (
+      <div className="h-full flex flex-col items-center justify-center text-muted-foreground p-8 text-center space-y-2 font-mono">
+        <XSquare className="w-8 h-8 text-red-500/50 mb-2" />
+        <p className="text-sm text-red-400">Collision Layer</p>
+        <p className="text-xs">Select a tile layer to view tilesets.</p>
       </div>
     )
   }

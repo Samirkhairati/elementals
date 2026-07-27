@@ -150,8 +150,6 @@ const editorRoute = createRoute({
     const [createFolderName, setCreateFolderName] = useState("")
     const [renameDialog, setRenameDialog] = useState<{ open: boolean; type: 'folder' | 'tileset' | 'map-folder' | 'map'; oldPath?: string; oldName?: string; targetFolder?: string | null }>({ open: false, type: 'folder' })
     const [renameInput, setRenameInput] = useState("")
-    const [createLayerDialog, setCreateLayerDialog] = useState(false)
-    const [newLayerData, setNewLayerData] = useState<{ name: string; type: LayerType }>({ name: '', type: 'tile' })
     const [createMapDialog, setCreateMapDialog] = useState<{ open: boolean; parentPath?: string | null }>({ open: false })
     const [createMapData, setCreateMapData] = useState({ name: '', width: 50, height: 50 })
     const [createMapFolderDialog, setCreateMapFolderDialog] = useState<{ open: boolean; parentPath?: string | null }>({ open: false })
@@ -266,6 +264,31 @@ const editorRoute = createRoute({
 
     useEffect(() => { loadData() }, [])
 
+    // ── Collision Virtual Tile Effect ─────────────────────────────────────────
+    const layersRef = useRef(layers)
+    useEffect(() => { layersRef.current = layers }, [layers])
+    
+    const prevTileSelectionRef = useRef<TileSelection | null>(null)
+
+    useEffect(() => {
+      const layer = layersRef.current.find(l => l.id === activeLayerId)
+      if (layer?.type === 'collision') {
+        setTileSelection(current => {
+          if (current?.tiles[0]?.tilesetId !== '__collision__') {
+            prevTileSelectionRef.current = current
+          }
+          return { width: 1, height: 1, tiles: [{ tilesetId: '__collision__', x: 0, y: 0 }] }
+        })
+      } else if (layer?.type === 'tile') {
+        setTileSelection(current => {
+          if (current?.tiles[0]?.tilesetId === '__collision__') {
+            return prevTileSelectionRef.current
+          }
+          return current
+        })
+      }
+    }, [activeLayerId])
+
     // ── Tileset folder keyboard delete ────────────────────────────────────────
     useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
@@ -296,15 +319,27 @@ const editorRoute = createRoute({
     const toggleLayerVisibility = (id: string) => updateLayers(layers.map(l => l.id === id ? { ...l, visible: !l.visible } : l))
     const toggleLayerLock = (id: string) => updateLayers(layers.map(l => l.id === id ? { ...l, locked: !l.locked } : l))
 
-    const handleConfirmCreateLayer = () => {
-      const cleanName = newLayerData.name.trim()
-      if (!cleanName) { alert("Layer name cannot be empty"); return }
-      const newLayer: Layer = { id: crypto.randomUUID(), name: cleanName, type: newLayerData.type, visible: true, locked: false }
+    const handleCreateLayer = () => {
+      let counter = 1
+      while (layers.some(l => l.name === `Layer ${counter}`)) {
+        counter++
+      }
+      const newLayer: Layer = { id: crypto.randomUUID(), name: `Layer ${counter}`, type: 'tile', visible: true, locked: false }
       const newLayers = [newLayer, ...layers]
       updateLayers(newLayers)
       setActiveLayerId(newLayer.id)
-      setCreateLayerDialog(false)
-      setNewLayerData({ name: '', type: 'tile' })
+    }
+
+    const handleDeleteLayer = (id: string) => {
+      const newLayers = layers.filter(l => l.id !== id)
+      updateLayers(newLayers)
+      if (activeLayerId === id) {
+        setActiveLayerId(newLayers.length > 0 ? newLayers[0].id : null)
+      }
+    }
+
+    const handleReorderLayers = (newLayers: Layer[]) => {
+      updateLayers(newLayers)
     }
 
     // ── Map selection helper ───────────────────────────────────────────────────
@@ -575,7 +610,7 @@ const editorRoute = createRoute({
                 <div onClick={() => setLayersCollapsed(!layersCollapsed)} className="h-10 border-b border-sidebar-border flex items-center justify-between px-3 shrink-0 bg-sidebar-background cursor-pointer hover:bg-sidebar-accent/50 transition-colors select-none">
                   <div className="flex items-center gap-1 text-sidebar-foreground/70">{layersCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}<LayersIcon className="w-4 h-4 ml-0.5" /><h2 className="text-xs font-semibold font-mono tracking-wider uppercase ml-1">LAYERS</h2></div>
                   <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                    <button onClick={() => { if (!activeMap) { alert("Please select a map first"); return; } setCreateLayerDialog(true) }} className="p-1.5 hover:bg-sidebar-accent rounded-md text-sidebar-foreground" title="New Layer">
+                    <button onClick={() => { if (!activeMap) { alert("Please select a map first"); return; } handleCreateLayer() }} className="p-1.5 hover:bg-sidebar-accent rounded-md text-sidebar-foreground" title="New Layer">
                       <Plus className="w-4 h-4" />
                     </button>
                   </div>
@@ -587,6 +622,8 @@ const editorRoute = createRoute({
                     setActiveLayerId={setActiveLayerId}
                     toggleLayerVisibility={toggleLayerVisibility}
                     toggleLayerLock={toggleLayerLock}
+                    deleteLayer={handleDeleteLayer}
+                    reorderLayers={handleReorderLayers}
                   />
                 </div>)}
               </div>
@@ -692,6 +729,7 @@ const editorRoute = createRoute({
                     setRenameDialog={setRenameDialog}
                     handleDeleteFolder={handleDeleteFolder}
                     handleDrop={handleDrop}
+                    activeLayerType={layers.find(l => l.id === activeLayerId)?.type || null}
                   />
                 </div>)}
               </div>
@@ -745,6 +783,7 @@ const editorRoute = createRoute({
                       setTilesetSelectionCurrent={setTilesetSelectionCurrent}
                       hoverTile={hoverTile}
                       setHoverTile={setHoverTile}
+                      activeLayerType={layers.find(l => l.id === activeLayerId)?.type || null}
                     />
                   </div>
                 )}
@@ -776,15 +815,6 @@ const editorRoute = createRoute({
           setRenameInput={setRenameInput}
           onClose={() => setRenameDialog({ open: false, type: 'folder' })}
           onConfirm={handleConfirmRename}
-        />
-        <CreateLayerDialog
-          open={createLayerDialog}
-          name={newLayerData.name}
-          type={newLayerData.type}
-          setName={(v) => setNewLayerData(d => ({ ...d, name: v }))}
-          setType={(v) => setNewLayerData(d => ({ ...d, type: v }))}
-          onClose={setCreateLayerDialog}
-          onConfirm={handleConfirmCreateLayer}
         />
         <CreateMapFolderDialog
           open={createMapFolderDialog.open}
