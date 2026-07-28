@@ -94,7 +94,7 @@ export class Game extends Scene {
       (x, y) => this.mapSystem.collisions.isWalkable(x, y)
     );
     if (CONFIG.camera.smoothFollow) {
-      this.cameras.main.startFollow(this.player, false, 0.1, 0.1);
+      this.cameras.main.startFollow(this.player, false, 0.05, 0.05);
     } else {
       this.cameras.main.startFollow(this.player, true, 1, 1);
     }

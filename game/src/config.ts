@@ -4,7 +4,7 @@ const mapHeight = 10;
 
 export const CONFIG = {
   debug: {
-    enabled: true,
+    enabled: false,
     showKeys: true,
     showCoords: true,
     showGrid: true,
