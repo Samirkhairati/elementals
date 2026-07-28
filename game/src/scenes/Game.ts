@@ -93,7 +93,11 @@ export class Game extends Scene {
       spawnY, 
       (x, y) => this.mapSystem.collisions.isWalkable(x, y)
     );
-    this.cameras.main.startFollow(this.player, true, 1, 1);
+    if (CONFIG.camera.smoothFollow) {
+      this.cameras.main.startFollow(this.player, false, 0.1, 0.1);
+    } else {
+      this.cameras.main.startFollow(this.player, true, 1, 1);
+    }
 
     // If map was switched while menu was open, ensure new player is unlocked
     this.player.setMovementLocked(false);
@@ -106,6 +110,9 @@ export class Game extends Scene {
   update(_time: number, _delta: number) {
     this.inputManager?.update();
     this.player?.update();
+    if (this.player) {
+      console.log(`Player: (${this.player.x.toFixed(2)}, ${this.player.y.toFixed(2)}) | Camera: (${this.cameras.main.scrollX.toFixed(2)}, ${this.cameras.main.scrollY.toFixed(2)})`);
+    }
   }
 
   getPlayer(): Player | undefined {

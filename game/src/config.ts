@@ -19,6 +19,9 @@ export const CONFIG = {
   backgroundColor: "#000000",
   playerSpeed: 200,
   playerDepth: 20,
+  camera: {
+    smoothFollow: true,
+  },
   controls: {
     run: "X",
     action: "C",
