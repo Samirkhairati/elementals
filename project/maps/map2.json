@@ -92,16 +92,6 @@
           "tilesetId": "house.png",
           "x": 3,
           "y": 0
-        },
-        "281": {
-          "tilesetId": "outside.png",
-          "x": 1,
-          "y": 0
-        },
-        "282": {
-          "tilesetId": "outside.png",
-          "x": 2,
-          "y": 0
         }
       }
     },
@@ -270,51 +260,6 @@
         },
         "336": {
           "tilesetId": "house.png",
-          "x": 3,
-          "y": 2
-        },
-        "370": {
-          "tilesetId": "outside.png",
-          "x": 1,
-          "y": 0
-        },
-        "371": {
-          "tilesetId": "outside.png",
-          "x": 2,
-          "y": 0
-        },
-        "372": {
-          "tilesetId": "outside.png",
-          "x": 3,
-          "y": 0
-        },
-        "400": {
-          "tilesetId": "outside.png",
-          "x": 1,
-          "y": 1
-        },
-        "401": {
-          "tilesetId": "outside.png",
-          "x": 2,
-          "y": 1
-        },
-        "402": {
-          "tilesetId": "outside.png",
-          "x": 3,
-          "y": 1
-        },
-        "430": {
-          "tilesetId": "outside.png",
-          "x": 1,
-          "y": 2
-        },
-        "431": {
-          "tilesetId": "outside.png",
-          "x": 2,
-          "y": 2
-        },
-        "432": {
-          "tilesetId": "outside.png",
           "x": 3,
           "y": 2
         }
@@ -1890,12 +1835,12 @@
         },
         "312": {
           "tilesetId": "grass.png",
-          "x": 1,
-          "y": 1
+          "x": 0,
+          "y": 0
         },
         "313": {
           "tilesetId": "grass.png",
-          "x": 0,
+          "x": 1,
           "y": 0
         },
         "314": {
@@ -2035,17 +1980,17 @@
         },
         "341": {
           "tilesetId": "grass.png",
-          "x": 1,
-          "y": 0
+          "x": 0,
+          "y": 1
         },
         "342": {
           "tilesetId": "grass.png",
-          "x": 0,
+          "x": 1,
           "y": 1
         },
         "343": {
           "tilesetId": "grass.png",
-          "x": 0,
+          "x": 1,
           "y": 1
         },
         "344": {
@@ -2055,33 +2000,33 @@
         },
         "345": {
           "tilesetId": "grass.png",
-          "x": 0,
+          "x": 1,
           "y": 1
         },
         "346": {
           "tilesetId": "grass.png",
-          "x": 0,
-          "y": 1
+          "x": 1,
+          "y": 0
         },
         "347": {
           "tilesetId": "grass.png",
-          "x": 1,
+          "x": 0,
           "y": 0
         },
         "348": {
           "tilesetId": "grass.png",
           "x": 1,
-          "y": 0
+          "y": 1
         },
         "349": {
           "tilesetId": "grass.png",
-          "x": 0,
+          "x": 1,
           "y": 1
         },
         "350": {
           "tilesetId": "grass.png",
-          "x": 0,
-          "y": 0
+          "x": 1,
+          "y": 1
         },
         "351": {
           "tilesetId": "grass.png",
@@ -2185,13 +2130,13 @@
         },
         "371": {
           "tilesetId": "grass.png",
-          "x": 0,
-          "y": 1
+          "x": 1,
+          "y": 0
         },
         "372": {
           "tilesetId": "grass.png",
-          "x": 0,
-          "y": 0
+          "x": 1,
+          "y": 1
         },
         "373": {
           "tilesetId": "grass.png",
@@ -2210,33 +2155,33 @@
         },
         "376": {
           "tilesetId": "grass.png",
-          "x": 0,
-          "y": 1
+          "x": 1,
+          "y": 0
         },
         "377": {
           "tilesetId": "grass.png",
           "x": 0,
-          "y": 0
+          "y": 1
         },
         "378": {
           "tilesetId": "grass.png",
-          "x": 1,
+          "x": 0,
           "y": 0
         },
         "379": {
           "tilesetId": "grass.png",
-          "x": 0,
+          "x": 1,
           "y": 1
         },
         "380": {
           "tilesetId": "grass.png",
-          "x": 1,
-          "y": 1
+          "x": 0,
+          "y": 0
         },
         "381": {
           "tilesetId": "grass.png",
           "x": 0,
-          "y": 0
+          "y": 1
         },
         "382": {
           "tilesetId": "grass.png",
@@ -2331,16 +2276,16 @@
         "400": {
           "tilesetId": "grass.png",
           "x": 1,
-          "y": 0
+          "y": 1
         },
         "401": {
           "tilesetId": "grass.png",
-          "x": 1,
-          "y": 0
+          "x": 0,
+          "y": 1
         },
         "402": {
           "tilesetId": "grass.png",
-          "x": 1,
+          "x": 0,
           "y": 0
         },
         "403": {
@@ -2350,22 +2295,22 @@
         },
         "404": {
           "tilesetId": "grass.png",
-          "x": 1,
+          "x": 0,
           "y": 0
         },
         "405": {
           "tilesetId": "grass.png",
           "x": 1,
-          "y": 1
+          "y": 0
         },
         "406": {
           "tilesetId": "grass.png",
           "x": 1,
-          "y": 0
+          "y": 1
         },
         "407": {
           "tilesetId": "grass.png",
-          "x": 1,
+          "x": 0,
           "y": 1
         },
         "408": {
@@ -2375,18 +2320,18 @@
         },
         "409": {
           "tilesetId": "grass.png",
-          "x": 1,
+          "x": 0,
           "y": 0
         },
         "410": {
           "tilesetId": "grass.png",
           "x": 0,
-          "y": 1
+          "y": 0
         },
         "411": {
           "tilesetId": "grass.png",
-          "x": 1,
-          "y": 1
+          "x": 0,
+          "y": 0
         },
         "412": {
           "tilesetId": "grass.png",
@@ -2481,7 +2426,7 @@
         "430": {
           "tilesetId": "grass.png",
           "x": 1,
-          "y": 0
+          "y": 1
         },
         "431": {
           "tilesetId": "grass.png",
@@ -2490,38 +2435,38 @@
         },
         "432": {
           "tilesetId": "grass.png",
-          "x": 1,
-          "y": 0
+          "x": 0,
+          "y": 1
         },
         "433": {
           "tilesetId": "grass.png",
-          "x": 0,
+          "x": 1,
           "y": 1
         },
         "434": {
           "tilesetId": "grass.png",
-          "x": 0,
+          "x": 1,
           "y": 0
         },
         "435": {
           "tilesetId": "grass.png",
-          "x": 0,
+          "x": 1,
           "y": 1
         },
         "436": {
           "tilesetId": "grass.png",
-          "x": 0,
+          "x": 1,
           "y": 0
         },
         "437": {
           "tilesetId": "grass.png",
-          "x": 1,
+          "x": 0,
           "y": 0
         },
         "438": {
           "tilesetId": "grass.png",
-          "x": 0,
-          "y": 1
+          "x": 1,
+          "y": 0
         },
         "439": {
           "tilesetId": "grass.png",
@@ -2530,13 +2475,13 @@
         },
         "440": {
           "tilesetId": "grass.png",
-          "x": 1,
-          "y": 0
+          "x": 0,
+          "y": 1
         },
         "441": {
           "tilesetId": "grass.png",
           "x": 0,
-          "y": 1
+          "y": 0
         },
         "442": {
           "tilesetId": "grass.png",
@@ -2625,12 +2570,12 @@
         },
         "459": {
           "tilesetId": "grass.png",
-          "x": 0,
+          "x": 1,
           "y": 0
         },
         "460": {
           "tilesetId": "grass.png",
-          "x": 1,
+          "x": 0,
           "y": 0
         },
         "461": {
@@ -2640,7 +2585,7 @@
         },
         "462": {
           "tilesetId": "grass.png",
-          "x": 1,
+          "x": 0,
           "y": 1
         },
         "463": {
@@ -2655,33 +2600,33 @@
         },
         "465": {
           "tilesetId": "grass.png",
-          "x": 0,
+          "x": 1,
           "y": 1
         },
         "466": {
           "tilesetId": "grass.png",
-          "x": 1,
-          "y": 1
+          "x": 0,
+          "y": 0
         },
         "467": {
           "tilesetId": "grass.png",
-          "x": 0,
+          "x": 1,
           "y": 0
         },
         "468": {
           "tilesetId": "grass.png",
           "x": 0,
-          "y": 1
+          "y": 0
         },
         "469": {
           "tilesetId": "grass.png",
-          "x": 1,
-          "y": 1
+          "x": 0,
+          "y": 0
         },
         "470": {
           "tilesetId": "grass.png",
           "x": 0,
-          "y": 0
+          "y": 1
         },
         "471": {
           "tilesetId": "grass.png",
@@ -2780,33 +2725,33 @@
         },
         "490": {
           "tilesetId": "grass.png",
-          "x": 1,
+          "x": 0,
           "y": 0
         },
         "491": {
           "tilesetId": "grass.png",
-          "x": 1,
-          "y": 0
-        },
-        "492": {
-          "tilesetId": "grass.png",
-          "x": 1,
-          "y": 1
-        },
-        "493": {
-          "tilesetId": "grass.png",
           "x": 0,
           "y": 1
         },
-        "494": {
+        "492": {
+          "tilesetId": "grass.png",
+          "x": 0,
+          "y": 0
+        },
+        "493": {
           "tilesetId": "grass.png",
           "x": 1,
+          "y": 0
+        },
+        "494": {
+          "tilesetId": "grass.png",
+          "x": 0,
           "y": 1
         },
         "495": {
           "tilesetId": "grass.png",
           "x": 1,
-          "y": 0
+          "y": 1
         },
         "496": {
           "tilesetId": "grass.png",
@@ -2816,12 +2761,12 @@
         "497": {
           "tilesetId": "grass.png",
           "x": 0,
-          "y": 1
+          "y": 0
         },
         "498": {
           "tilesetId": "grass.png",
           "x": 1,
-          "y": 1
+          "y": 0
         },
         "499": {
           "tilesetId": "grass.png",
@@ -2925,23 +2870,23 @@
         },
         "519": {
           "tilesetId": "grass.png",
-          "x": 0,
+          "x": 1,
           "y": 0
         },
         "520": {
           "tilesetId": "grass.png",
-          "x": 1,
-          "y": 1
+          "x": 0,
+          "y": 0
         },
         "521": {
           "tilesetId": "grass.png",
-          "x": 1,
-          "y": 1
+          "x": 0,
+          "y": 0
         },
         "522": {
           "tilesetId": "grass.png",
-          "x": 1,
-          "y": 1
+          "x": 0,
+          "y": 0
         },
         "523": {
           "tilesetId": "grass.png",
@@ -2951,26 +2896,26 @@
         "524": {
           "tilesetId": "grass.png",
           "x": 1,
-          "y": 0
+          "y": 1
         },
         "525": {
           "tilesetId": "grass.png",
           "x": 0,
-          "y": 0
+          "y": 1
         },
         "526": {
           "tilesetId": "grass.png",
-          "x": 1,
+          "x": 0,
           "y": 1
         },
         "527": {
           "tilesetId": "grass.png",
-          "x": 0,
-          "y": 0
+          "x": 1,
+          "y": 1
         },
         "528": {
           "tilesetId": "grass.png",
-          "x": 1,
+          "x": 0,
           "y": 0
         },
         "529": {
@@ -3080,18 +3025,18 @@
         },
         "550": {
           "tilesetId": "grass.png",
-          "x": 1,
-          "y": 0
+          "x": 0,
+          "y": 1
         },
         "551": {
           "tilesetId": "grass.png",
           "x": 0,
-          "y": 1
+          "y": 0
         },
         "552": {
           "tilesetId": "grass.png",
           "x": 0,
-          "y": 0
+          "y": 1
         },
         "553": {
           "tilesetId": "grass.png",
@@ -3100,7 +3045,7 @@
         },
         "554": {
           "tilesetId": "grass.png",
-          "x": 1,
+          "x": 0,
           "y": 1
         },
         "555": {
@@ -3116,7 +3061,7 @@
         "557": {
           "tilesetId": "grass.png",
           "x": 1,
-          "y": 0
+          "y": 1
         },
         "558": {
           "tilesetId": "grass.png",
@@ -3230,23 +3175,23 @@
         },
         "580": {
           "tilesetId": "grass.png",
-          "x": 0,
+          "x": 1,
           "y": 1
         },
         "581": {
           "tilesetId": "grass.png",
           "x": 1,
-          "y": 1
+          "y": 0
         },
         "582": {
           "tilesetId": "grass.png",
-          "x": 0,
-          "y": 0
+          "x": 1,
+          "y": 1
         },
         "583": {
           "tilesetId": "grass.png",
-          "x": 1,
-          "y": 1
+          "x": 0,
+          "y": 0
         },
         "584": {
           "tilesetId": "grass.png",
