@@ -110,9 +110,6 @@ export class Game extends Scene {
   update(_time: number, _delta: number) {
     this.inputManager?.update();
     this.player?.update();
-    if (this.player) {
-      console.log(`Player: (${this.player.x.toFixed(2)}, ${this.player.y.toFixed(2)}) | Camera: (${this.cameras.main.scrollX.toFixed(2)}, ${this.cameras.main.scrollY.toFixed(2)})`);
-    }
   }
 
   getPlayer(): Player | undefined {

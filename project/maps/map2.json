@@ -92,6 +92,16 @@
           "tilesetId": "house.png",
           "x": 3,
           "y": 0
+        },
+        "281": {
+          "tilesetId": "outside.png",
+          "x": 1,
+          "y": 0
+        },
+        "282": {
+          "tilesetId": "outside.png",
+          "x": 2,
+          "y": 0
         }
       }
     },
@@ -260,6 +270,51 @@
         },
         "336": {
           "tilesetId": "house.png",
+          "x": 3,
+          "y": 2
+        },
+        "370": {
+          "tilesetId": "outside.png",
+          "x": 1,
+          "y": 0
+        },
+        "371": {
+          "tilesetId": "outside.png",
+          "x": 2,
+          "y": 0
+        },
+        "372": {
+          "tilesetId": "outside.png",
+          "x": 3,
+          "y": 0
+        },
+        "400": {
+          "tilesetId": "outside.png",
+          "x": 1,
+          "y": 1
+        },
+        "401": {
+          "tilesetId": "outside.png",
+          "x": 2,
+          "y": 1
+        },
+        "402": {
+          "tilesetId": "outside.png",
+          "x": 3,
+          "y": 1
+        },
+        "430": {
+          "tilesetId": "outside.png",
+          "x": 1,
+          "y": 2
+        },
+        "431": {
+          "tilesetId": "outside.png",
+          "x": 2,
+          "y": 2
+        },
+        "432": {
+          "tilesetId": "outside.png",
           "x": 3,
           "y": 2
         }
@@ -2415,17 +2470,17 @@
         },
         "428": {
           "tilesetId": "grass.png",
-          "x": 1,
-          "y": 1
+          "x": 0,
+          "y": 0
         },
         "429": {
           "tilesetId": "grass.png",
-          "x": 0,
+          "x": 1,
           "y": 1
         },
         "430": {
           "tilesetId": "grass.png",
-          "x": 0,
+          "x": 1,
           "y": 0
         },
         "431": {
@@ -2446,11 +2501,11 @@
         "434": {
           "tilesetId": "grass.png",
           "x": 0,
-          "y": 1
+          "y": 0
         },
         "435": {
           "tilesetId": "grass.png",
-          "x": 1,
+          "x": 0,
           "y": 1
         },
         "436": {
@@ -2550,7 +2605,7 @@
         },
         "455": {
           "tilesetId": "grass.png",
-          "x": 1,
+          "x": 0,
           "y": 0
         },
         "456": {
@@ -2560,8 +2615,8 @@
         },
         "457": {
           "tilesetId": "grass.png",
-          "x": 0,
-          "y": 1
+          "x": 1,
+          "y": 0
         },
         "458": {
           "tilesetId": "grass.png",
@@ -2570,43 +2625,43 @@
         },
         "459": {
           "tilesetId": "grass.png",
-          "x": 1,
-          "y": 1
+          "x": 0,
+          "y": 0
         },
         "460": {
           "tilesetId": "grass.png",
-          "x": 0,
-          "y": 1
+          "x": 1,
+          "y": 0
         },
         "461": {
           "tilesetId": "grass.png",
-          "x": 0,
-          "y": 1
+          "x": 1,
+          "y": 0
         },
         "462": {
           "tilesetId": "grass.png",
-          "x": 0,
+          "x": 1,
           "y": 1
         },
         "463": {
           "tilesetId": "grass.png",
-          "x": 0,
-          "y": 1
+          "x": 1,
+          "y": 0
         },
         "464": {
           "tilesetId": "grass.png",
-          "x": 1,
+          "x": 0,
           "y": 0
         },
         "465": {
           "tilesetId": "grass.png",
           "x": 0,
-          "y": 0
+          "y": 1
         },
         "466": {
           "tilesetId": "grass.png",
           "x": 1,
-          "y": 0
+          "y": 1
         },
         "467": {
           "tilesetId": "grass.png",
@@ -2700,18 +2755,18 @@
         },
         "485": {
           "tilesetId": "grass.png",
-          "x": 0,
-          "y": 1
+          "x": 1,
+          "y": 0
         },
         "486": {
           "tilesetId": "grass.png",
           "x": 1,
-          "y": 0
+          "y": 1
         },
         "487": {
           "tilesetId": "grass.png",
-          "x": 0,
-          "y": 1
+          "x": 1,
+          "y": 0
         },
         "488": {
           "tilesetId": "grass.png",
@@ -2730,12 +2785,12 @@
         },
         "491": {
           "tilesetId": "grass.png",
-          "x": 0,
+          "x": 1,
           "y": 0
         },
         "492": {
           "tilesetId": "grass.png",
-          "x": 0,
+          "x": 1,
           "y": 1
         },
         "493": {
@@ -2751,12 +2806,12 @@
         "495": {
           "tilesetId": "grass.png",
           "x": 1,
-          "y": 1
+          "y": 0
         },
         "496": {
           "tilesetId": "grass.png",
-          "x": 0,
-          "y": 0
+          "x": 1,
+          "y": 1
         },
         "497": {
           "tilesetId": "grass.png",
@@ -2866,7 +2921,7 @@
         "518": {
           "tilesetId": "grass.png",
           "x": 1,
-          "y": 0
+          "y": 1
         },
         "519": {
           "tilesetId": "grass.png",
@@ -2875,23 +2930,23 @@
         },
         "520": {
           "tilesetId": "grass.png",
-          "x": 0,
+          "x": 1,
           "y": 1
         },
         "521": {
           "tilesetId": "grass.png",
-          "x": 0,
+          "x": 1,
           "y": 1
         },
         "522": {
           "tilesetId": "grass.png",
-          "x": 0,
-          "y": 0
+          "x": 1,
+          "y": 1
         },
         "523": {
           "tilesetId": "grass.png",
-          "x": 1,
-          "y": 1
+          "x": 0,
+          "y": 0
         },
         "524": {
           "tilesetId": "grass.png",
@@ -2901,12 +2956,12 @@
         "525": {
           "tilesetId": "grass.png",
           "x": 0,
-          "y": 1
+          "y": 0
         },
         "526": {
           "tilesetId": "grass.png",
           "x": 1,
-          "y": 0
+          "y": 1
         },
         "527": {
           "tilesetId": "grass.png",
@@ -3036,27 +3091,27 @@
         "552": {
           "tilesetId": "grass.png",
           "x": 0,
-          "y": 1
-        },
-        "553": {
-          "tilesetId": "grass.png",
-          "x": 1,
           "y": 0
         },
-        "554": {
+        "553": {
           "tilesetId": "grass.png",
           "x": 0,
           "y": 0
         },
-        "555": {
+        "554": {
           "tilesetId": "grass.png",
           "x": 1,
           "y": 1
         },
+        "555": {
+          "tilesetId": "grass.png",
+          "x": 0,
+          "y": 0
+        },
         "556": {
           "tilesetId": "grass.png",
-          "x": 1,
-          "y": 0
+          "x": 0,
+          "y": 1
         },
         "557": {
           "tilesetId": "grass.png",
@@ -3195,13 +3250,13 @@
         },
         "584": {
           "tilesetId": "grass.png",
-          "x": 0,
-          "y": 1
+          "x": 1,
+          "y": 0
         },
         "585": {
           "tilesetId": "grass.png",
           "x": 0,
-          "y": 1
+          "y": 0
         },
         "586": {
           "tilesetId": "grass.png",
