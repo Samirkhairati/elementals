@@ -1,5 +1,5 @@
 import React from 'react'
-import { Plus, FolderPlus, LayoutGrid as LayoutGridIcon, MousePointer2 } from "lucide-react"
+import { Plus, FolderPlus, FolderTree, Palette, MousePointer2 } from "lucide-react"
 import { ResizablePanel as OriginalResizablePanel } from "@/components/ui/resizable"
 const ResizablePanel = OriginalResizablePanel as any
 
@@ -8,6 +8,7 @@ import { TilesetsPanel } from '@/components/editor/panels/TilesetsPanel'
 import { ActiveSelectionPanel } from '@/components/editor/panels/ActiveSelectionPanel'
 import { TilesetPreview } from '@/components/editor/panels/TilesetPreview'
 import { CollapsiblePanelHeader } from './CollapsiblePanelHeader'
+import { useDragResize } from '@/hooks/useDragResize'
 
 const HEADER_H = 40
 
@@ -63,7 +64,6 @@ export function RightSidebar({
   setTilesetsH,
   activeSelectionH,
   setActiveSelectionH,
-  makeDragHandle,
   tilesets,
   folders,
   activeTileset,
@@ -90,34 +90,38 @@ export function RightSidebar({
   hoverTile,
   setHoverTile
 }: RightSidebarProps) {
-  // Determine which expanded section is the last one in the vertical stack
+  const { isDragging, makeDragTopHandle, makeDragBottomHandle } = useDragResize()
+
   const expandedSections: string[] = []
-  if (!tilesetsCollapsed) expandedSections.push('tilesets')
+  if (!tilesetsCollapsed) expandedSections.push('tilesetBrowser')
+  if (!previewCollapsed) expandedSections.push('tileset')
   if (!activeSelectionCollapsed) expandedSections.push('activeSelection')
-  if (!previewCollapsed) expandedSections.push('preview')
   const lastExpanded = expandedSections.length > 0 ? expandedSections[expandedSections.length - 1] : null
 
-  const showDragHandle1 = !tilesetsCollapsed && !activeSelectionCollapsed
-  const showDragHandle2 = !activeSelectionCollapsed && !previewCollapsed
+  const tilesetExpanded = !previewCollapsed
+  const showDragHandle1 = !tilesetsCollapsed && !previewCollapsed
+  const showDragHandle2 = !previewCollapsed && !activeSelectionCollapsed
+
+  const transitionClass = isDragging ? 'transition-none' : 'transition-[height,flex] duration-200 ease-in-out'
 
   return (
     <ResizablePanel defaultSize="25%" minSize="15%" maxSize="40%" className="flex flex-col z-10 shadow-xl bg-sidebar-background border-l border-border min-w-0 min-h-0">
       <div className="flex flex-col h-full w-full overflow-hidden">
-        {/* Tilesets Panel */}
+        {/* 1. Tileset Browser Panel */}
         <div
           data-panel-section
-          className="flex flex-col overflow-hidden transition-[height,flex] duration-200 ease-in-out"
+          className={`flex flex-col overflow-hidden ${transitionClass}`}
           style={{
-            height: tilesetsCollapsed ? HEADER_H : (lastExpanded === 'tilesets' ? undefined : tilesetsH),
-            flex: tilesetsCollapsed ? 'none' : (lastExpanded === 'tilesets' ? '1 1 0%' : 'none'),
+            height: tilesetsCollapsed ? HEADER_H : (lastExpanded === 'tilesetBrowser' ? undefined : tilesetsH),
+            flex: tilesetsCollapsed ? 'none' : (lastExpanded === 'tilesetBrowser' ? '1 1 0%' : 'none'),
             minHeight: HEADER_H,
           }}
         >
           <CollapsiblePanelHeader
             collapsed={tilesetsCollapsed}
             onToggle={() => setTilesetsCollapsed(!tilesetsCollapsed)}
-            icon={<LayoutGridIcon className="w-4 h-4 ml-0.5" />}
-            title="TILESETS"
+            icon={<FolderTree className="w-4 h-4 ml-0.5" />}
+            title="TILESET BROWSER"
             actions={
               <>
                 <button onClick={() => handleOpenCreateFolderDialog(null)} className="p-1.5 hover:bg-sidebar-accent rounded-md text-sidebar-foreground" title="New Folder">
@@ -156,64 +160,33 @@ export function RightSidebar({
           )}
         </div>
 
-        {/* Drag handle between Tilesets and Active Selection */}
+        {/* Drag handle between Tileset Browser and Tileset */}
         {showDragHandle1 ? (
           <div
-            onPointerDown={makeDragHandle(setTilesetsH, tilesetsCollapsed, activeSelectionCollapsed)}
-            className="h-[3px] shrink-0 bg-sidebar-border hover:bg-primary/50 cursor-row-resize transition-colors"
-          />
+            onPointerDown={makeDragTopHandle(setTilesetsH, tilesetsCollapsed, previewCollapsed)}
+            className="relative h-px w-full shrink-0 bg-sidebar-border group"
+          >
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-4 cursor-ns-resize z-50" />
+          </div>
         ) : (
-          <div className="h-[1px] shrink-0 bg-sidebar-border" />
+          <div className="h-px shrink-0 bg-sidebar-border" />
         )}
 
-        {/* Active Selection Panel */}
+        {/* 2. Tileset Panel */}
         <div
           data-panel-section
-          className="flex flex-col bg-card/40 overflow-hidden transition-[height,flex] duration-200 ease-in-out"
+          className={`flex flex-col bg-card/40 overflow-hidden border-t border-sidebar-border ${transitionClass}`}
           style={{
-            height: activeSelectionCollapsed ? HEADER_H : (lastExpanded === 'activeSelection' ? undefined : activeSelectionH),
-            flex: activeSelectionCollapsed ? 'none' : (lastExpanded === 'activeSelection' ? '1 1 0%' : 'none'),
-            minHeight: HEADER_H,
-          }}
-        >
-          <CollapsiblePanelHeader
-            collapsed={activeSelectionCollapsed}
-            onToggle={() => setActiveSelectionCollapsed(!activeSelectionCollapsed)}
-            icon={<MousePointer2 className="w-4 h-4 ml-0.5" />}
-            title="ACTIVE SELECTION"
-          />
-          {!activeSelectionCollapsed && (
-            <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-muted/10 min-h-0">
-              <ActiveSelectionPanel tileSelection={tileSelection} tilesets={tilesets} />
-            </div>
-          )}
-        </div>
-
-        {/* Drag handle between Active Selection and Preview */}
-        {showDragHandle2 ? (
-          <div
-            onPointerDown={makeDragHandle(setActiveSelectionH, activeSelectionCollapsed, previewCollapsed)}
-            className="h-[3px] shrink-0 bg-sidebar-border hover:bg-primary/50 cursor-row-resize transition-colors"
-          />
-        ) : (
-          <div className="h-[1px] shrink-0 bg-sidebar-border" />
-        )}
-
-        {/* Tileset Preview Panel */}
-        <div
-          data-panel-section
-          className="flex flex-col bg-card/40 overflow-hidden transition-[height,flex] duration-200 ease-in-out"
-          style={{
-            height: previewCollapsed ? HEADER_H : (lastExpanded === 'preview' ? undefined : undefined),
-            flex: previewCollapsed ? 'none' : (lastExpanded === 'preview' ? '1 1 0%' : 'none'),
+            height: previewCollapsed ? HEADER_H : (tilesetExpanded ? undefined : HEADER_H),
+            flex: previewCollapsed ? 'none' : (tilesetExpanded ? '1 1 0%' : 'none'),
             minHeight: HEADER_H,
           }}
         >
           <CollapsiblePanelHeader
             collapsed={previewCollapsed}
             onToggle={() => setPreviewCollapsed(!previewCollapsed)}
-            icon={null}
-            title="PREVIEW"
+            icon={<Palette className="w-4 h-4 ml-0.5" />}
+            title="TILESET"
           />
           {!previewCollapsed && (
             <div className="flex-1 overflow-auto p-4 relative bg-muted/10 min-h-0">
@@ -231,6 +204,41 @@ export function RightSidebar({
                 setHoverTile={setHoverTile}
                 activeLayerType={activeLayerType}
               />
+            </div>
+          )}
+        </div>
+
+        {/* Drag handle between Tileset and Active Selection */}
+        {showDragHandle2 ? (
+          <div
+            onPointerDown={makeDragBottomHandle(setActiveSelectionH, previewCollapsed, activeSelectionCollapsed)}
+            className="relative h-px w-full shrink-0 bg-sidebar-border group"
+          >
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-4 cursor-ns-resize z-50" />
+          </div>
+        ) : (
+          <div className="h-px shrink-0 bg-sidebar-border" />
+        )}
+
+        {/* 3. Active Selection Panel */}
+        <div
+          data-panel-section
+          className={`flex flex-col bg-card/40 overflow-hidden border-t border-sidebar-border ${transitionClass}`}
+          style={{
+            height: activeSelectionCollapsed ? HEADER_H : (lastExpanded === 'activeSelection' && !tilesetExpanded ? undefined : activeSelectionH),
+            flex: activeSelectionCollapsed ? 'none' : (lastExpanded === 'activeSelection' && !tilesetExpanded ? '1 1 0%' : 'none'),
+            minHeight: HEADER_H,
+          }}
+        >
+          <CollapsiblePanelHeader
+            collapsed={activeSelectionCollapsed}
+            onToggle={() => setActiveSelectionCollapsed(!activeSelectionCollapsed)}
+            icon={<MousePointer2 className="w-4 h-4 ml-0.5" />}
+            title="ACTIVE SELECTION"
+          />
+          {!activeSelectionCollapsed && (
+            <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-muted/10 min-h-0">
+              <ActiveSelectionPanel tileSelection={tileSelection} tilesets={tilesets} />
             </div>
           )}
         </div>

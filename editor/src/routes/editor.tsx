@@ -72,7 +72,7 @@ export function EditorPage() {
   const [propertiesCollapsed, setPropertiesCollapsed] = useState(false)
   const [mapsH, setMapsH] = useState(180)
   const [layersH, setLayersH] = useState(180)
-  const [activeSelectionH, setActiveSelectionH] = useState(160)
+  const [activeSelectionH, setActiveSelectionH] = useState(120)
 
   // Right sidebar panel heights
   const [tilesetsCollapsed, setTilesetsCollapsed] = useState(false)

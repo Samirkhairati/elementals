@@ -8,6 +8,7 @@ import { MapsPanel } from '@/components/editor/panels/MapsPanel'
 import { LayersPanel } from '@/components/editor/panels/LayersPanel'
 import { PropertiesPanel } from '@/components/editor/panels/PropertiesPanel'
 import { CollapsiblePanelHeader } from './CollapsiblePanelHeader'
+import { useDragResize } from '@/hooks/useDragResize'
 
 const HEADER_H = 40
 
@@ -66,7 +67,6 @@ export function LeftSidebar({
   setLayersH,
   propertiesCollapsed,
   setPropertiesCollapsed,
-  makeDragHandle,
   maps,
   mapFolders,
   activeMap,
@@ -95,7 +95,8 @@ export function LeftSidebar({
   handleCreateLayer,
   updateLayers
 }: LeftSidebarProps) {
-  // Determine which expanded section is the last one in the vertical stack
+  const { isDragging, makeDragTopHandle } = useDragResize()
+
   const expandedSections: string[] = []
   if (!mapsCollapsed) expandedSections.push('maps')
   if (!layersCollapsed) expandedSections.push('layers')
@@ -105,13 +106,15 @@ export function LeftSidebar({
   const showDragHandle1 = !mapsCollapsed && !layersCollapsed
   const showDragHandle2 = !layersCollapsed && !propertiesCollapsed
 
+  const transitionClass = isDragging ? 'transition-none' : 'transition-[height,flex] duration-200 ease-in-out'
+
   return (
     <ResizablePanel defaultSize="20%" minSize="15%" maxSize="30%" className="flex flex-col z-10 shadow-xl bg-sidebar-background border-r border-border min-w-0 min-h-0">
       <div className="flex flex-col h-full w-full overflow-hidden">
         {/* Maps Panel */}
         <div
           data-panel-section
-          className="flex flex-col overflow-hidden transition-[height,flex] duration-200 ease-in-out"
+          className={`flex flex-col overflow-hidden ${transitionClass}`}
           style={{
             height: mapsCollapsed ? HEADER_H : (lastExpanded === 'maps' ? undefined : mapsH),
             flex: mapsCollapsed ? 'none' : (lastExpanded === 'maps' ? '1 1 0%' : 'none'),
@@ -177,17 +180,19 @@ export function LeftSidebar({
         {/* Drag handle between Maps and Layers */}
         {showDragHandle1 ? (
           <div
-            onPointerDown={makeDragHandle(setMapsH, mapsCollapsed, layersCollapsed)}
-            className="h-[3px] shrink-0 bg-sidebar-border hover:bg-primary/50 cursor-row-resize transition-colors"
-          />
+            onPointerDown={makeDragTopHandle(setMapsH, mapsCollapsed, layersCollapsed)}
+            className="relative h-px w-full shrink-0 bg-sidebar-border group"
+          >
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-4 cursor-ns-resize z-50" />
+          </div>
         ) : (
-          <div className="h-[1px] shrink-0 bg-sidebar-border" />
+          <div className="h-px shrink-0 bg-sidebar-border" />
         )}
 
         {/* Layers Panel */}
         <div
           data-panel-section
-          className="flex flex-col overflow-hidden transition-[height,flex] duration-200 ease-in-out"
+          className={`flex flex-col overflow-hidden ${transitionClass}`}
           style={{
             height: layersCollapsed ? HEADER_H : (lastExpanded === 'layers' ? undefined : layersH),
             flex: layersCollapsed ? 'none' : (lastExpanded === 'layers' ? '1 1 0%' : 'none'),
@@ -233,20 +238,22 @@ export function LeftSidebar({
         {/* Drag handle between Layers and Properties */}
         {showDragHandle2 ? (
           <div
-            onPointerDown={makeDragHandle(setLayersH, layersCollapsed, propertiesCollapsed)}
-            className="h-[3px] shrink-0 bg-sidebar-border hover:bg-primary/50 cursor-row-resize transition-colors"
-          />
+            onPointerDown={makeDragTopHandle(setLayersH, layersCollapsed, propertiesCollapsed)}
+            className="relative h-px w-full shrink-0 bg-sidebar-border group"
+          >
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-4 cursor-ns-resize z-50" />
+          </div>
         ) : (
-          <div className="h-[1px] shrink-0 bg-sidebar-border" />
+          <div className="h-px shrink-0 bg-sidebar-border" />
         )}
 
         {/* Properties Panel */}
         <div
           data-panel-section
-          className="flex flex-col bg-card/40 overflow-hidden transition-[height,flex] duration-200 ease-in-out"
+          className={`flex flex-col bg-card/40 overflow-hidden ${transitionClass} min-h-[40px]`}
           style={{
-            height: propertiesCollapsed ? HEADER_H : (lastExpanded === 'properties' ? undefined : undefined),
-            flex: propertiesCollapsed ? 'none' : (lastExpanded === 'properties' ? '1 1 0%' : 'none'),
+            height: propertiesCollapsed ? HEADER_H : undefined,
+            flex: propertiesCollapsed ? 'none' : '1 1 0%',
             minHeight: HEADER_H,
           }}
         >
