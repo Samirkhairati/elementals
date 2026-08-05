@@ -10,6 +10,7 @@ export const CONFIG = {
     showGrid: true,
   },
   tileSize,
+  renderScale: 1,
   mapWidth,
   mapHeight,
   visibleTilesX: 15,

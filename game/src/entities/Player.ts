@@ -46,19 +46,36 @@ export class Player extends GameObjects.Sprite {
     
     // Bind event listeners
     this.onInputDirection = this.onInputDirection.bind(this);
+    this.onScaleChanged = this.onScaleChanged.bind(this);
+    
     EventBus.on(Events.INPUT_DIRECTION, this.onInputDirection);
+    EventBus.on(Events.RENDER_SCALE_CHANGED, this.onScaleChanged);
     
     this.on('destroy', this.cleanup, this);
   }
 
   private cleanup() {
       EventBus.off(Events.INPUT_DIRECTION, this.onInputDirection);
+      EventBus.off(Events.RENDER_SCALE_CHANGED, this.onScaleChanged);
   }
 
   private initializeAppearance(scene: Scene) {
     scene.add.existing(this);
     this.setOrigin(0.5, 1);
     this.setDepth(CONFIG.playerDepth);
+    this.setScale(CONFIG.renderScale);
+  }
+
+  private onScaleChanged(newScale: number, oldScale: number) {
+    this.setScale(newScale);
+    if (oldScale > 0) {
+      this.x = (this.x / oldScale) * newScale;
+      this.y = (this.y / oldScale) * newScale;
+    }
+    // Kill any active tween and reset moving state to avoid glitching
+    this.scene.tweens.killTweensOf(this);
+    this.isMoving = false;
+    this.animManager.stopMovement(this, "player", this.currentDirection);
   }
 
   update() {
@@ -103,11 +120,12 @@ export class Player extends GameObjects.Sprite {
   }
 
   private executeMovement(direction: Direction) {
-    const { tileSize, playerSpeed } = CONFIG;
+    const { tileSize, playerSpeed, renderScale } = CONFIG;
+    const scaledTileSize = tileSize * renderScale;
     const { dx, dy } = MOVE_OFFSETS[direction];
 
-    const nextX = this.x + dx * tileSize;
-    const nextY = this.y + dy * tileSize;
+    const nextX = this.x + dx * scaledTileSize;
+    const nextY = this.y + dy * scaledTileSize;
 
     if (this.isWalkable(nextX, nextY)) {
       this.isMoving = true;
@@ -153,10 +171,10 @@ export class Player extends GameObjects.Sprite {
   }
 
   getGridPosition() {
-    const { tileSize } = CONFIG;
+    const scaledTileSize = CONFIG.tileSize * CONFIG.renderScale;
     return {
-      x: Math.floor(this.x / tileSize),
-      y: Math.floor((this.y - tileSize) / tileSize),
+      x: Math.floor(this.x / scaledTileSize),
+      y: Math.floor((this.y - scaledTileSize) / scaledTileSize),
     };
   }
 

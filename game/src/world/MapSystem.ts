@@ -8,6 +8,7 @@ import {
   PhaserTilemapAdapter,
 } from "@/world/tilemap";
 import { CollisionSystem } from "@/world/CollisionSystem";
+import { EventBus, Events } from "@/utils/EventBus";
 
 export class MapSystem {
   private scene: Scene;
@@ -26,6 +27,20 @@ export class MapSystem {
     this.adapter = new PhaserTilemapAdapter(this.scene, this.tilesetManager, this.layerManager);
     
     this.registerTilesets();
+
+    this.onScaleChanged = this.onScaleChanged.bind(this);
+    EventBus.on(Events.RENDER_SCALE_CHANGED, this.onScaleChanged);
+    this.scene.events.on('destroy', this.cleanup, this);
+  }
+
+  private cleanup() {
+    EventBus.off(Events.RENDER_SCALE_CHANGED, this.onScaleChanged);
+  }
+
+  private onScaleChanged() {
+    this.applyScale();
+    this.updateWorldBounds();
+    this.renderDebugGrid();
   }
 
   private registerTilesets() {
@@ -45,6 +60,9 @@ export class MapSystem {
 
     this.currentMap = this.adapter.createTilemapFromLoadedJson(mapKey, parsedData);
     
+    // Apply current render scale to layers
+    this.applyScale();
+
     // Wire up collision system
     this.collisionSystem.setMap(this.currentMap);
 
@@ -54,12 +72,20 @@ export class MapSystem {
     return this.currentMap;
   }
 
+  private applyScale() {
+    const scale = CONFIG.renderScale;
+    this.layerManager.getAllLayers().forEach(layer => {
+      layer.setScale(scale);
+    });
+  }
+
   private updateWorldBounds() {
     if (!this.currentMap) return;
+    const scale = CONFIG.renderScale;
     this.scene.cameras.main.setBounds(
         0, 0, 
-        this.currentMap.widthInPixels, 
-        this.currentMap.heightInPixels
+        this.currentMap.widthInPixels * scale, 
+        this.currentMap.heightInPixels * scale
     );
   }
 
@@ -74,8 +100,10 @@ export class MapSystem {
     this.gridGraphics.setDepth(100);
     this.gridGraphics.lineStyle(1, 0xffffff, 0.1);
     
-    const { widthInPixels, heightInPixels } = this.currentMap;
-    const { tileSize } = CONFIG;
+    const scale = CONFIG.renderScale;
+    const widthInPixels = this.currentMap.widthInPixels * scale;
+    const heightInPixels = this.currentMap.heightInPixels * scale;
+    const tileSize = CONFIG.tileSize * scale;
 
     for (let x = 0; x <= widthInPixels; x += tileSize)
       this.gridGraphics.lineBetween(x, 0, x, heightInPixels);

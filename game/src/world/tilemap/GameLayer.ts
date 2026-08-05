@@ -26,6 +26,15 @@ export class GameLayer {
   }
 
   /**
+   * Sets the rendering scale of the layer.
+   *
+   * @param scale scale factor to apply
+   */
+  setScale(scale: number): void {
+    this.phaserLayer.setScale(scale);
+  }
+
+  /**
    * Enables collision on specific tiles or a range of tiles within this layer.
    * This delegates directly to Phaser's TilemapLayer collision methods.
    *

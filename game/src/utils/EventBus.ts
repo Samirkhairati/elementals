@@ -14,6 +14,7 @@ export const Events = {
     // Game State Events
     MAP_SWITCH_REQUEST: 'map-switch-request',
     PLAYER_MOVED: 'player-moved',
+    RENDER_SCALE_CHANGED: 'render-scale-changed',
     
     // UI Events
     SHOW_DIALOGUE: 'show-dialogue',

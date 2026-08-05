@@ -32,14 +32,14 @@ export class Game extends Scene {
     EventBus.on(Events.MAP_SWITCH_REQUEST, this.switchMap);
     this.scale.on('resize', this.handleResize);
     
+    // Calculate initial scale before loading map and spawning player
+    this.handleResize({ width: this.scale.width, height: this.scale.height });
+
     // Initial map load
     this.switchMap(MAPS[0].key);
     
     // Launch UI Scene
     this.scene.launch("UIScene");
-    
-    // Apply initial zoom
-    this.handleResize({ width: this.scale.width, height: this.scale.height });
     
     this.events.on('destroy', this.cleanup, this);
   }
@@ -48,22 +48,28 @@ export class Game extends Scene {
     const visibleWidth = CONFIG.visibleTilesX * CONFIG.tileSize;
     const visibleHeight = CONFIG.visibleTilesY * CONFIG.tileSize;
 
-    // Calculate integer zoom factor to fit the visible area into the game size
-    const zoomX = Math.max(1, Math.floor(gameSize.width / visibleWidth));
-    const zoomY = Math.max(1, Math.floor(gameSize.height / visibleHeight));
-    const zoom = Math.min(zoomX, zoomY);
+    // Calculate integer scale factor to fit the visible area into the game size
+    const scaleX = Math.max(1, Math.floor(gameSize.width / visibleWidth));
+    const scaleY = Math.max(1, Math.floor(gameSize.height / visibleHeight));
+    const newScale = Math.min(scaleX, scaleY);
     
-    const scaledWidth = visibleWidth * zoom;
-    const scaledHeight = visibleHeight * zoom;
+    const scaledWidth = visibleWidth * newScale;
+    const scaledHeight = visibleHeight * newScale;
 
     this.cameras.main.setSize(scaledWidth, scaledHeight);
-    this.cameras.main.setZoom(zoom);
+    this.cameras.main.setZoom(1); // Assets are scaled directly; camera zoom stays 1
     
     // Center the camera viewport on the screen (letterboxing), avoiding sub-pixel offsets
     this.cameras.main.setPosition(
         Math.floor((gameSize.width - scaledWidth) / 2),
         Math.floor((gameSize.height - scaledHeight) / 2)
     );
+
+    if (CONFIG.renderScale !== newScale) {
+        const oldScale = CONFIG.renderScale;
+        CONFIG.renderScale = newScale;
+        EventBus.emit(Events.RENDER_SCALE_CHANGED, newScale, oldScale);
+    }
   }
 
   private cleanup() {
@@ -78,10 +84,10 @@ export class Game extends Scene {
     // Load interactions for this map
     this.interactionSystem.setMap(map);
     
-    // Position at the center of the map
-    const { tileSize } = CONFIG;
-    const spawnX = Math.floor(map.width / 2) * tileSize + tileSize / 2;
-    const spawnY = (Math.floor(map.height / 2) + 1) * tileSize;
+    // Position at the center of the map using scaled tile size
+    const scaledTileSize = CONFIG.tileSize * CONFIG.renderScale;
+    const spawnX = Math.floor(map.width / 2) * scaledTileSize + scaledTileSize / 2;
+    const spawnY = (Math.floor(map.height / 2) + 1) * scaledTileSize;
 
     if (this.player) {
       this.player.destroy();

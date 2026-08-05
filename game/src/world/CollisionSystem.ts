@@ -14,25 +14,28 @@ export class CollisionSystem {
 
   /**
    * Checks if a world coordinate is walkable.
-   * @param x World X coordinate
-   * @param y World Y coordinate (bottom center of entity)
+   * @param x World X coordinate (scaled)
+   * @param y World Y coordinate (scaled, bottom center of entity)
    * @returns True if walkable, false otherwise
    */
   public isWalkable(x: number, y: number): boolean {
     if (!this.map) return true;
 
-    const { tileSize } = CONFIG;
+    const scale = CONFIG.renderScale;
+    const scaledTileSize = CONFIG.tileSize * scale;
+    const scaledWidth = this.map.widthInPixels * scale;
+    const scaledHeight = this.map.heightInPixels * scale;
 
     // 1. Boundary check
-    if (x < 0 || x > this.map.widthInPixels || y < tileSize || y > this.map.heightInPixels) {
+    if (x < 0 || x > scaledWidth || y < scaledTileSize || y > scaledHeight) {
       return false;
     }
 
     // 2. Tile-based collision check
     // Since player origin is (0.5, 1), y is the bottom edge.
-    // subtract a tiny amount to get the tile the player is actually "in" at their base.
-    const tileX = this.map.worldToTileX(x);
-    const tileY = this.map.worldToTileY(y - 1);
+    // Subtract a tiny amount to get the tile the player is actually "in" at their base.
+    const tileX = this.map.worldToTileX(x, true, undefined, this.collisionLayerName);
+    const tileY = this.map.worldToTileY(y - 1, true, undefined, this.collisionLayerName);
 
     if (tileX === null || tileY === null) return false;
 
