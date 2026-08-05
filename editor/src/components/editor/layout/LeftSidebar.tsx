@@ -95,14 +95,28 @@ export function LeftSidebar({
   handleCreateLayer,
   updateLayers
 }: LeftSidebarProps) {
+  // Determine which expanded section is the last one in the vertical stack
+  const expandedSections: string[] = []
+  if (!mapsCollapsed) expandedSections.push('maps')
+  if (!layersCollapsed) expandedSections.push('layers')
+  if (!propertiesCollapsed) expandedSections.push('properties')
+  const lastExpanded = expandedSections.length > 0 ? expandedSections[expandedSections.length - 1] : null
+
+  const showDragHandle1 = !mapsCollapsed && !layersCollapsed
+  const showDragHandle2 = !layersCollapsed && !propertiesCollapsed
+
   return (
     <ResizablePanel defaultSize="20%" minSize="15%" maxSize="30%" className="flex flex-col z-10 shadow-xl bg-sidebar-background border-r border-border min-w-0 min-h-0">
       <div className="flex flex-col h-full w-full overflow-hidden">
         {/* Maps Panel */}
         <div
           data-panel-section
-          className="flex flex-col overflow-hidden shrink-0"
-          style={{ height: mapsCollapsed ? HEADER_H : mapsH }}
+          className="flex flex-col overflow-hidden transition-[height,flex] duration-200 ease-in-out"
+          style={{
+            height: mapsCollapsed ? HEADER_H : (lastExpanded === 'maps' ? undefined : mapsH),
+            flex: mapsCollapsed ? 'none' : (lastExpanded === 'maps' ? '1 1 0%' : 'none'),
+            minHeight: HEADER_H,
+          }}
         >
           <CollapsiblePanelHeader
             collapsed={mapsCollapsed}
@@ -161,16 +175,24 @@ export function LeftSidebar({
         </div>
 
         {/* Drag handle between Maps and Layers */}
-        <div
-          onPointerDown={makeDragHandle(setMapsH, mapsCollapsed, layersCollapsed)}
-          className="h-[3px] shrink-0 bg-sidebar-border hover:bg-primary/50 cursor-row-resize transition-colors"
-        />
+        {showDragHandle1 ? (
+          <div
+            onPointerDown={makeDragHandle(setMapsH, mapsCollapsed, layersCollapsed)}
+            className="h-[3px] shrink-0 bg-sidebar-border hover:bg-primary/50 cursor-row-resize transition-colors"
+          />
+        ) : (
+          <div className="h-[1px] shrink-0 bg-sidebar-border" />
+        )}
 
         {/* Layers Panel */}
         <div
           data-panel-section
-          className="flex flex-col overflow-hidden border-t border-sidebar-border shrink-0"
-          style={{ height: layersCollapsed ? HEADER_H : layersH }}
+          className="flex flex-col overflow-hidden transition-[height,flex] duration-200 ease-in-out"
+          style={{
+            height: layersCollapsed ? HEADER_H : (lastExpanded === 'layers' ? undefined : layersH),
+            flex: layersCollapsed ? 'none' : (lastExpanded === 'layers' ? '1 1 0%' : 'none'),
+            minHeight: HEADER_H,
+          }}
         >
           <CollapsiblePanelHeader
             collapsed={layersCollapsed}
@@ -209,13 +231,25 @@ export function LeftSidebar({
         </div>
 
         {/* Drag handle between Layers and Properties */}
-        <div
-          onPointerDown={makeDragHandle(setLayersH, layersCollapsed, propertiesCollapsed)}
-          className="h-[3px] shrink-0 bg-sidebar-border hover:bg-primary/50 cursor-row-resize transition-colors"
-        />
+        {showDragHandle2 ? (
+          <div
+            onPointerDown={makeDragHandle(setLayersH, layersCollapsed, propertiesCollapsed)}
+            className="h-[3px] shrink-0 bg-sidebar-border hover:bg-primary/50 cursor-row-resize transition-colors"
+          />
+        ) : (
+          <div className="h-[1px] shrink-0 bg-sidebar-border" />
+        )}
 
-        {/* Properties Panel — fills remaining space */}
-        <div className="flex flex-col bg-card/40 overflow-hidden border-t border-sidebar-border flex-1 min-h-[40px]">
+        {/* Properties Panel */}
+        <div
+          data-panel-section
+          className="flex flex-col bg-card/40 overflow-hidden transition-[height,flex] duration-200 ease-in-out"
+          style={{
+            height: propertiesCollapsed ? HEADER_H : (lastExpanded === 'properties' ? undefined : undefined),
+            flex: propertiesCollapsed ? 'none' : (lastExpanded === 'properties' ? '1 1 0%' : 'none'),
+            minHeight: HEADER_H,
+          }}
+        >
           <CollapsiblePanelHeader
             collapsed={propertiesCollapsed}
             onToggle={() => setPropertiesCollapsed(!propertiesCollapsed)}

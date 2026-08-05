@@ -90,14 +90,28 @@ export function RightSidebar({
   hoverTile,
   setHoverTile
 }: RightSidebarProps) {
+  // Determine which expanded section is the last one in the vertical stack
+  const expandedSections: string[] = []
+  if (!tilesetsCollapsed) expandedSections.push('tilesets')
+  if (!activeSelectionCollapsed) expandedSections.push('activeSelection')
+  if (!previewCollapsed) expandedSections.push('preview')
+  const lastExpanded = expandedSections.length > 0 ? expandedSections[expandedSections.length - 1] : null
+
+  const showDragHandle1 = !tilesetsCollapsed && !activeSelectionCollapsed
+  const showDragHandle2 = !activeSelectionCollapsed && !previewCollapsed
+
   return (
     <ResizablePanel defaultSize="25%" minSize="15%" maxSize="40%" className="flex flex-col z-10 shadow-xl bg-sidebar-background border-l border-border min-w-0 min-h-0">
       <div className="flex flex-col h-full w-full overflow-hidden">
         {/* Tilesets Panel */}
         <div
           data-panel-section
-          className="flex flex-col overflow-hidden shrink-0"
-          style={{ height: tilesetsCollapsed ? HEADER_H : tilesetsH }}
+          className="flex flex-col overflow-hidden transition-[height,flex] duration-200 ease-in-out"
+          style={{
+            height: tilesetsCollapsed ? HEADER_H : (lastExpanded === 'tilesets' ? undefined : tilesetsH),
+            flex: tilesetsCollapsed ? 'none' : (lastExpanded === 'tilesets' ? '1 1 0%' : 'none'),
+            minHeight: HEADER_H,
+          }}
         >
           <CollapsiblePanelHeader
             collapsed={tilesetsCollapsed}
@@ -143,16 +157,24 @@ export function RightSidebar({
         </div>
 
         {/* Drag handle between Tilesets and Active Selection */}
-        <div
-          onPointerDown={makeDragHandle(setTilesetsH, tilesetsCollapsed, activeSelectionCollapsed)}
-          className="h-[3px] shrink-0 bg-sidebar-border hover:bg-primary/50 cursor-row-resize transition-colors"
-        />
+        {showDragHandle1 ? (
+          <div
+            onPointerDown={makeDragHandle(setTilesetsH, tilesetsCollapsed, activeSelectionCollapsed)}
+            className="h-[3px] shrink-0 bg-sidebar-border hover:bg-primary/50 cursor-row-resize transition-colors"
+          />
+        ) : (
+          <div className="h-[1px] shrink-0 bg-sidebar-border" />
+        )}
 
         {/* Active Selection Panel */}
         <div
           data-panel-section
-          className="flex flex-col bg-card/40 overflow-hidden border-t border-sidebar-border shrink-0"
-          style={{ height: activeSelectionCollapsed ? HEADER_H : activeSelectionH }}
+          className="flex flex-col bg-card/40 overflow-hidden transition-[height,flex] duration-200 ease-in-out"
+          style={{
+            height: activeSelectionCollapsed ? HEADER_H : (lastExpanded === 'activeSelection' ? undefined : activeSelectionH),
+            flex: activeSelectionCollapsed ? 'none' : (lastExpanded === 'activeSelection' ? '1 1 0%' : 'none'),
+            minHeight: HEADER_H,
+          }}
         >
           <CollapsiblePanelHeader
             collapsed={activeSelectionCollapsed}
@@ -168,13 +190,25 @@ export function RightSidebar({
         </div>
 
         {/* Drag handle between Active Selection and Preview */}
-        <div
-          onPointerDown={makeDragHandle(setActiveSelectionH, activeSelectionCollapsed, previewCollapsed)}
-          className="h-[3px] shrink-0 bg-sidebar-border hover:bg-primary/50 cursor-row-resize transition-colors"
-        />
+        {showDragHandle2 ? (
+          <div
+            onPointerDown={makeDragHandle(setActiveSelectionH, activeSelectionCollapsed, previewCollapsed)}
+            className="h-[3px] shrink-0 bg-sidebar-border hover:bg-primary/50 cursor-row-resize transition-colors"
+          />
+        ) : (
+          <div className="h-[1px] shrink-0 bg-sidebar-border" />
+        )}
 
-        {/* Tileset Preview Panel — fills remaining space */}
-        <div className="flex flex-col bg-card/40 overflow-hidden border-t border-sidebar-border flex-1 min-h-[40px]">
+        {/* Tileset Preview Panel */}
+        <div
+          data-panel-section
+          className="flex flex-col bg-card/40 overflow-hidden transition-[height,flex] duration-200 ease-in-out"
+          style={{
+            height: previewCollapsed ? HEADER_H : (lastExpanded === 'preview' ? undefined : undefined),
+            flex: previewCollapsed ? 'none' : (lastExpanded === 'preview' ? '1 1 0%' : 'none'),
+            minHeight: HEADER_H,
+          }}
+        >
           <CollapsiblePanelHeader
             collapsed={previewCollapsed}
             onToggle={() => setPreviewCollapsed(!previewCollapsed)}
