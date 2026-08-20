@@ -39,6 +39,8 @@
     "@tanstack/react-router": "^1.170.18",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "dockview": "^7.0.4",
+    "dockview-react": "^7.0.4",
     "lucide-react": "^1.25.0",
     "react-resizable-panels": "^4.12.2",
     "tailwind-merge": "^3.6.0",
