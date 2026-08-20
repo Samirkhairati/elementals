@@ -1,6 +1,4 @@
 import React from 'react'
-import { ResizablePanel as OriginalResizablePanel } from "@/components/ui/resizable"
-const ResizablePanel = OriginalResizablePanel as any
 
 import { ActiveTool, PaintMode, MapData, Layer, TilesetData, TileSelection, DebugInfo } from '@/types/editor'
 import { Toolbar } from '@/components/editor/canvas/Toolbar'
@@ -58,7 +56,6 @@ export function CenterCanvas({
   handleCommit
 }: CenterCanvasProps) {
   return (
-    <ResizablePanel defaultSize="55%" minSize="30%" className="flex flex-col min-w-0 min-h-0">
       <div className="flex-1 bg-muted/10 relative overflow-hidden flex flex-col min-w-0 min-h-0">
         <Toolbar
           historyIndex={historyIndex}
@@ -90,6 +87,5 @@ export function CenterCanvas({
           handleCommit={handleCommit}
         />
       </div>
-    </ResizablePanel>
   )
 }

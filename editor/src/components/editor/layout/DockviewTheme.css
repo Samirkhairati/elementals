@@ -1,0 +1,31 @@
+.dockview-theme-elementals {
+  --dv-background-color: transparent;
+  --dv-pane-background-color: transparent;
+  --dv-tabs-and-actions-container-background-color: hsl(var(--sidebar-background));
+  --dv-tabs-and-actions-container-font-size: 11px;
+  --dv-tabs-and-actions-container-height: 40px;
+  --dv-activegroup-visiblepanel-tab-background-color: hsl(var(--sidebar-background));
+  --dv-activegroup-hiddenpanel-tab-background-color: hsl(var(--sidebar-background));
+  --dv-inactivegroup-visiblepanel-tab-background-color: hsl(var(--sidebar-background));
+  --dv-inactivegroup-hiddenpanel-tab-background-color: hsl(var(--sidebar-background));
+  --dv-activegroup-visiblepanel-tab-color: hsl(var(--sidebar-foreground));
+  --dv-activegroup-hiddenpanel-tab-color: hsl(var(--muted-foreground));
+  --dv-inactivegroup-visiblepanel-tab-color: hsl(var(--sidebar-foreground));
+  --dv-inactivegroup-hiddenpanel-tab-color: hsl(var(--muted-foreground));
+  --dv-tab-divider-color: hsl(var(--sidebar-border));
+  --dv-group-view-background-color: hsl(var(--sidebar-background));
+  --dv-separator-border: hsl(var(--border));
+  --dv-tabs-and-actions-container-border-bottom-color: hsl(var(--sidebar-border));
+  font-family: inherit;
+}
+
+.dockview-theme-elementals .dv-tab {
+  border-right: 1px solid var(--dv-tab-divider-color) !important;
+  text-transform: uppercase;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+}
+
+.dockview-theme-elementals .dv-tabs-and-actions-container {
+  border-bottom: 1px solid var(--dv-tab-divider-color);
+}

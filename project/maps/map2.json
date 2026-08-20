@@ -92,6 +92,96 @@
           "tilesetId": "house.png",
           "x": 3,
           "y": 0
+        },
+        "310": {
+          "tilesetId": "outside.png",
+          "x": 1,
+          "y": 0
+        },
+        "311": {
+          "tilesetId": "outside.png",
+          "x": 2,
+          "y": 0
+        },
+        "313": {
+          "tilesetId": "outside.png",
+          "x": 1,
+          "y": 0
+        },
+        "314": {
+          "tilesetId": "outside.png",
+          "x": 2,
+          "y": 0
+        },
+        "316": {
+          "tilesetId": "outside.png",
+          "x": 1,
+          "y": 0
+        },
+        "317": {
+          "tilesetId": "outside.png",
+          "x": 2,
+          "y": 0
+        },
+        "400": {
+          "tilesetId": "outside.png",
+          "x": 1,
+          "y": 0
+        },
+        "401": {
+          "tilesetId": "outside.png",
+          "x": 2,
+          "y": 0
+        },
+        "403": {
+          "tilesetId": "outside.png",
+          "x": 1,
+          "y": 0
+        },
+        "404": {
+          "tilesetId": "outside.png",
+          "x": 2,
+          "y": 0
+        },
+        "406": {
+          "tilesetId": "outside.png",
+          "x": 1,
+          "y": 0
+        },
+        "407": {
+          "tilesetId": "outside.png",
+          "x": 2,
+          "y": 0
+        },
+        "460": {
+          "tilesetId": "outside.png",
+          "x": 1,
+          "y": 0
+        },
+        "461": {
+          "tilesetId": "outside.png",
+          "x": 2,
+          "y": 0
+        },
+        "463": {
+          "tilesetId": "outside.png",
+          "x": 1,
+          "y": 0
+        },
+        "464": {
+          "tilesetId": "outside.png",
+          "x": 2,
+          "y": 0
+        },
+        "466": {
+          "tilesetId": "outside.png",
+          "x": 1,
+          "y": 0
+        },
+        "467": {
+          "tilesetId": "outside.png",
+          "x": 2,
+          "y": 0
         }
       }
     },
@@ -262,6 +352,96 @@
           "tilesetId": "house.png",
           "x": 3,
           "y": 2
+        },
+        "340": {
+          "tilesetId": "outside.png",
+          "x": 1,
+          "y": 1
+        },
+        "341": {
+          "tilesetId": "outside.png",
+          "x": 2,
+          "y": 1
+        },
+        "343": {
+          "tilesetId": "outside.png",
+          "x": 1,
+          "y": 1
+        },
+        "344": {
+          "tilesetId": "outside.png",
+          "x": 2,
+          "y": 1
+        },
+        "346": {
+          "tilesetId": "outside.png",
+          "x": 1,
+          "y": 1
+        },
+        "347": {
+          "tilesetId": "outside.png",
+          "x": 2,
+          "y": 1
+        },
+        "430": {
+          "tilesetId": "outside.png",
+          "x": 1,
+          "y": 1
+        },
+        "431": {
+          "tilesetId": "outside.png",
+          "x": 2,
+          "y": 1
+        },
+        "433": {
+          "tilesetId": "outside.png",
+          "x": 1,
+          "y": 1
+        },
+        "434": {
+          "tilesetId": "outside.png",
+          "x": 2,
+          "y": 1
+        },
+        "436": {
+          "tilesetId": "outside.png",
+          "x": 1,
+          "y": 1
+        },
+        "437": {
+          "tilesetId": "outside.png",
+          "x": 2,
+          "y": 1
+        },
+        "490": {
+          "tilesetId": "outside.png",
+          "x": 1,
+          "y": 1
+        },
+        "491": {
+          "tilesetId": "outside.png",
+          "x": 2,
+          "y": 1
+        },
+        "493": {
+          "tilesetId": "outside.png",
+          "x": 1,
+          "y": 1
+        },
+        "494": {
+          "tilesetId": "outside.png",
+          "x": 2,
+          "y": 1
+        },
+        "496": {
+          "tilesetId": "outside.png",
+          "x": 1,
+          "y": 1
+        },
+        "497": {
+          "tilesetId": "outside.png",
+          "x": 2,
+          "y": 1
         }
       }
     },

@@ -12,9 +12,8 @@ import { useDragResize } from '@/hooks/useDragResize'
 import { exportMap } from '@/hooks/useExportMap'
 
 // Layout
-import { LeftSidebar } from '@/components/editor/layout/LeftSidebar'
-import { CenterCanvas } from '@/components/editor/layout/CenterCanvas'
-import { RightSidebar } from '@/components/editor/layout/RightSidebar'
+import { EditorContext } from '@/components/editor/layout/EditorContext'
+import { EditorDockview } from '@/components/editor/layout/EditorDockview'
 import { EditorDialogs } from '@/components/editor/layout/EditorDialogs'
 
 export function EditorPage() {
@@ -65,22 +64,7 @@ export function EditorPage() {
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; title: string; description: string; action: () => void }>({ open: false, title: '', description: '', action: () => {} })
   const [createMapFolderName, setCreateMapFolderName] = useState("")
 
-  // ── Panel Collapse State ──────────────────────────────────────────────────
-  const [mapsCollapsed, setMapsCollapsed] = useState(false)
-  const [layersCollapsed, setLayersCollapsed] = useState(false)
-  const [activeSelectionCollapsed, setActiveSelectionCollapsed] = useState(false)
-  const [propertiesCollapsed, setPropertiesCollapsed] = useState(false)
-  const [mapsH, setMapsH] = useState(180)
-  const [layersH, setLayersH] = useState(180)
-  const [activeSelectionH, setActiveSelectionH] = useState(120)
-
-  // Right sidebar panel heights
-  const [tilesetsCollapsed, setTilesetsCollapsed] = useState(false)
-  const [previewCollapsed, setPreviewCollapsed] = useState(false)
-  const [tilesetsH, setTilesetsH] = useState(260)
-
-  // Drag handle hook
-  const { makeDragHandle } = useDragResize()
+  // Drag handle hook removed for dockview
 
   // ── History hook ─────────────────────────────────────────────────────────
   const {
@@ -418,119 +402,18 @@ export function EditorPage() {
 
   const activeLayerType = layers.find(l => l.id === activeLayerId)?.type || null
 
+  const contextValue = {
+    maps, mapFolders, activeMap, expandedMapFolders, selectedMapFolder, setSelectedMapFolder, toggleMapFolder, setCreateMapData, setCreateMapDialog, setCreateMapFolderName, setCreateMapFolderDialog, setRenameInput, setRenameDialog, handleDeleteMapFolder, handleDeleteMap, handleExportMap, handleMapDrop, onSelectMap,
+    layers, activeLayerId, setActiveLayerId, toggleLayerVisibility, toggleLayerLock, handleDeleteLayer, handleReorderLayers, handleCreateLayer, updateLayers,
+    historyIndex, historyLength: history.length, activeTool, paintMode, handleUndo: boundHandleUndo, handleRedo: boundHandleRedo, setActiveTool, setPaintMode, tilesets, tileSelection, setTileSelection, isPainting, setIsPainting, paintStartPos, setPaintStartPos, debugInfo, handlePaint, handlePaintBucket, handleRectangleFill, handleCommit,
+    folders, activeTileset, setActiveTileset, expandedFolders, selectedFolder, setSelectedFolder, toggleFolder, handlePickFile, handleOpenCreateFolderDialog, handleDeleteFolder, handleDrop, activeLayerType,
+    tilesetDimensions, setTilesetDimensions, tilesetSelectionStart, setTilesetSelectionStart, tilesetSelectionCurrent, setTilesetSelectionCurrent, hoverTile, setHoverTile
+  }
+
   return (
-    <div className="flex flex-1 overflow-hidden h-full w-full">
-      <ResizablePanelGroup orientation="horizontal">
-        <LeftSidebar
-          mapsCollapsed={mapsCollapsed}
-          setMapsCollapsed={setMapsCollapsed}
-          mapsH={mapsH}
-          setMapsH={setMapsH}
-          layersCollapsed={layersCollapsed}
-          setLayersCollapsed={setLayersCollapsed}
-          layersH={layersH}
-          setLayersH={setLayersH}
-          propertiesCollapsed={propertiesCollapsed}
-          setPropertiesCollapsed={setPropertiesCollapsed}
-          makeDragHandle={makeDragHandle}
-          maps={maps}
-          mapFolders={mapFolders}
-          activeMap={activeMap}
-          expandedMapFolders={expandedMapFolders}
-          selectedMapFolder={selectedMapFolder}
-          setSelectedMapFolder={setSelectedMapFolder}
-          toggleMapFolder={toggleMapFolder}
-          setCreateMapData={setCreateMapData}
-          setCreateMapDialog={setCreateMapDialog}
-          setCreateMapFolderName={setCreateMapFolderName}
-          setCreateMapFolderDialog={setCreateMapFolderDialog}
-          setRenameInput={setRenameInput}
-          setRenameDialog={setRenameDialog}
-          handleDeleteMapFolder={handleDeleteMapFolder}
-          handleDeleteMap={handleDeleteMap}
-          handleExportMap={handleExportMap}
-          handleMapDrop={handleMapDrop}
-          onSelectMap={onSelectMap}
-          layers={layers}
-          activeLayerId={activeLayerId}
-          setActiveLayerId={setActiveLayerId}
-          toggleLayerVisibility={toggleLayerVisibility}
-          toggleLayerLock={toggleLayerLock}
-          handleDeleteLayer={handleDeleteLayer}
-          handleReorderLayers={handleReorderLayers}
-          handleCreateLayer={handleCreateLayer}
-          updateLayers={updateLayers}
-        />
-
-        <ResizableHandle withHandle className="bg-border" />
-
-        <CenterCanvas
-          historyIndex={historyIndex}
-          historyLength={history.length}
-          activeTool={activeTool}
-          paintMode={paintMode}
-          handleUndo={boundHandleUndo}
-          handleRedo={boundHandleRedo}
-          setActiveTool={setActiveTool}
-          setPaintMode={setPaintMode}
-          activeMap={activeMap}
-          layers={layers}
-          tilesets={tilesets}
-          tileSelection={tileSelection}
-          setTileSelection={setTileSelection}
-          activeLayerId={activeLayerId}
-          isPainting={isPainting}
-          setIsPainting={setIsPainting}
-          paintStartPos={paintStartPos}
-          setPaintStartPos={setPaintStartPos}
-          debugInfo={debugInfo}
-          handlePaint={handlePaint}
-          handlePaintBucket={handlePaintBucket}
-          handleRectangleFill={handleRectangleFill}
-          handleCommit={handleCommit}
-        />
-
-        <ResizableHandle withHandle className="bg-border" />
-
-        <RightSidebar
-          tilesetsCollapsed={tilesetsCollapsed}
-          setTilesetsCollapsed={setTilesetsCollapsed}
-          activeSelectionCollapsed={activeSelectionCollapsed}
-          setActiveSelectionCollapsed={setActiveSelectionCollapsed}
-          previewCollapsed={previewCollapsed}
-          setPreviewCollapsed={setPreviewCollapsed}
-          tilesetsH={tilesetsH}
-          setTilesetsH={setTilesetsH}
-          activeSelectionH={activeSelectionH}
-          setActiveSelectionH={setActiveSelectionH}
-          makeDragHandle={makeDragHandle}
-          tilesets={tilesets}
-          folders={folders}
-          activeTileset={activeTileset}
-          setActiveTileset={setActiveTileset}
-          expandedFolders={expandedFolders}
-          selectedFolder={selectedFolder}
-          setSelectedFolder={setSelectedFolder}
-          toggleFolder={toggleFolder}
-          handlePickFile={handlePickFile}
-          handleOpenCreateFolderDialog={handleOpenCreateFolderDialog}
-          setRenameInput={setRenameInput}
-          setRenameDialog={setRenameDialog}
-          handleDeleteFolder={handleDeleteFolder}
-          handleDrop={handleDrop}
-          activeLayerType={activeLayerType}
-          tileSelection={tileSelection}
-          setTileSelection={setTileSelection}
-          tilesetDimensions={tilesetDimensions}
-          setTilesetDimensions={setTilesetDimensions}
-          tilesetSelectionStart={tilesetSelectionStart}
-          setTilesetSelectionStart={setTilesetSelectionStart}
-          tilesetSelectionCurrent={tilesetSelectionCurrent}
-          setTilesetSelectionCurrent={setTilesetSelectionCurrent}
-          hoverTile={hoverTile}
-          setHoverTile={setHoverTile}
-        />
-      </ResizablePanelGroup>
+    <EditorContext.Provider value={contextValue}>
+      <div className="flex flex-1 overflow-hidden h-full w-full">
+        <EditorDockview />
 
       <EditorDialogs
         importDialog={importDialog}
@@ -562,5 +445,6 @@ export function EditorPage() {
         setConfirmDialog={setConfirmDialog}
       />
     </div>
+    </EditorContext.Provider>
   )
 }
