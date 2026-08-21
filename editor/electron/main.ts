@@ -17,12 +17,26 @@ function ensureDirectories() {
   if (!fs.existsSync(TILESETS_DIR)) fs.mkdirSync(TILESETS_DIR, { recursive: true });
 }
 
+function getWorktreeName(): string {
+  if (process.env.WORKTREE_NAME) return process.env.WORKTREE_NAME;
+  try {
+    const gitPath = path.join(__dirname, '../../.git');
+    if (fs.existsSync(gitPath) && fs.statSync(gitPath).isFile()) {
+      const gitContent = fs.readFileSync(gitPath, 'utf-8');
+      const match = gitContent.match(/worktrees[/\\]([^/\r\n]+)/);
+      if (match) return match[1];
+    }
+  } catch {}
+  return 'main';
+}
+
 function createWindow() {
   const port = process.env.PORT || '5174';
+  const worktree = getWorktreeName();
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
-    title: `Elementals Editor (Port: ${port})`,
+    title: `Elementals Editor — [${worktree}] (Port: ${port})`,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
     },
