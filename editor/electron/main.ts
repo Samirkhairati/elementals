@@ -18,16 +18,18 @@ function ensureDirectories() {
 }
 
 function createWindow() {
+  const port = process.env.PORT || '5174';
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
+    title: `Elementals Editor (Port: ${port})`,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
     },
   });
 
   if (!app.isPackaged) {
-    win.loadURL('http://localhost:5174');
+    win.loadURL(`http://localhost:${port}`);
   } else {
     win.loadFile(path.join(__dirname, '../dist/index.html'));
   }
