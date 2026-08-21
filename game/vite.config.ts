@@ -1,6 +1,8 @@
 import { defineConfig } from 'vite';
 import { fileURLToPath, URL } from 'node:url';
 
+const PORT = process.env.PORT ? parseInt(process.env.PORT) : 5175;
+
 export default defineConfig({
   resolve: {
     alias: {
@@ -8,6 +10,6 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5175,
+    port: PORT,
   }
 });
