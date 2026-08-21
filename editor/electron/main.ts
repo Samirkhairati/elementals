@@ -33,14 +33,21 @@ function getWorktreeName(): string {
 function createWindow() {
   const port = process.env.PORT || '5174';
   const worktree = getWorktreeName();
+  const title = `Elementals Editor — [${worktree}] (Port: ${port})`;
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
-    title: `Elementals Editor — [${worktree}] (Port: ${port})`,
+    title: title,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
     },
   });
+
+  win.on('page-title-updated', (e) => {
+    e.preventDefault();
+  });
+
+  win.setTitle(title);
 
   if (!app.isPackaged) {
     win.loadURL(`http://localhost:${port}`);
