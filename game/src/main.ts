@@ -29,4 +29,11 @@ const config: Types.Core.GameConfig = {
     ]
 };
 
+// Set document title with worktree and port
+const worktree = (import.meta.env as any).VITE_WORKTREE_NAME || (typeof window !== 'undefined' && window.location.port && window.location.port !== '5175' ? `port ${window.location.port}` : 'main');
+const port = (import.meta.env as any).VITE_PORT || (typeof window !== 'undefined' ? window.location.port || '5175' : '5175');
+if (typeof document !== 'undefined') {
+  document.title = `Elementals — [${worktree}] (Port: ${port})`;
+}
+
 export default new Game(config);
