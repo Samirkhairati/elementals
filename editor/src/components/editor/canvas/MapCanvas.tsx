@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Settings2, ChevronDown, ChevronRight } from 'lucide-react'
 import { Layer, TilesetData, MapData, TileSelection, ActiveTool, PaintMode, DebugInfo, CopiedTile, Pos } from '@/types/editor'
 import { CanvasLayers } from './CanvasLayers'
@@ -55,28 +55,81 @@ export function MapCanvas({
   const [rectCurrent, setRectCurrent] = useState<Pos | null>(null)
 
   const [debugExpanded, setDebugExpanded] = useState(false)
+  const mapRef = useRef<HTMLDivElement | null>(null)
 
-  const getCanvasCopyBox = () => {
-    if (!canvasCopyStart || !canvasCopyCurrent) return null
-    const minX = Math.min(canvasCopyStart.x, canvasCopyCurrent.x)
-    const minY = Math.min(canvasCopyStart.y, canvasCopyCurrent.y)
-    const maxX = Math.max(canvasCopyStart.x, canvasCopyCurrent.x)
-    const maxY = Math.max(canvasCopyStart.y, canvasCopyCurrent.y)
+  // ── Stable Refs for Global Window Listeners ──────────────────────────────
+  const isPaintingRef = useRef(isPainting)
+  useEffect(() => { isPaintingRef.current = isPainting }, [isPainting])
+
+  const isPanningRef = useRef(isPanning)
+  useEffect(() => { isPanningRef.current = isPanning }, [isPanning])
+
+  const lastPanPosRef = useRef(lastPanPos)
+  useEffect(() => { lastPanPosRef.current = lastPanPos }, [lastPanPos])
+
+  const rectStartRef = useRef(rectStart)
+  useEffect(() => { rectStartRef.current = rectStart }, [rectStart])
+
+  const rectCurrentRef = useRef(rectCurrent)
+  useEffect(() => { rectCurrentRef.current = rectCurrent }, [rectCurrent])
+
+  const canvasCopyStartRef = useRef(canvasCopyStart)
+  useEffect(() => { canvasCopyStartRef.current = canvasCopyStart }, [canvasCopyStart])
+
+  const canvasCopyCurrentRef = useRef(canvasCopyCurrent)
+  useEffect(() => { canvasCopyCurrentRef.current = canvasCopyCurrent }, [canvasCopyCurrent])
+
+  const activeToolRef = useRef(activeTool)
+  useEffect(() => { activeToolRef.current = activeTool }, [activeTool])
+
+  const layersRef = useRef(layers)
+  useEffect(() => { layersRef.current = layers }, [layers])
+
+  const activeLayerIdRef = useRef(activeLayerId)
+  useEffect(() => { activeLayerIdRef.current = activeLayerId }, [activeLayerId])
+
+  const activeMapRef = useRef(activeMap)
+  useEffect(() => { activeMapRef.current = activeMap }, [activeMap])
+
+  // ── Coordinate Calculation Helper ────────────────────────────────────────
+  const getTileCoords = useCallback((clientX: number, clientY: number) => {
+    if (!mapRef.current || !activeMapRef.current) return null
+    const rect = mapRef.current.getBoundingClientRect()
+    const relX = (clientX - rect.left) / rect.width
+    const relY = (clientY - rect.top) / rect.height
+    const rawX = Math.floor(relX * activeMapRef.current.width)
+    const rawY = Math.floor(relY * activeMapRef.current.height)
+    const clampedX = Math.max(0, Math.min(activeMapRef.current.width - 1, rawX))
+    const clampedY = Math.max(0, Math.min(activeMapRef.current.height - 1, rawY))
+    const isInside =
+      rawX >= 0 &&
+      rawX < activeMapRef.current.width &&
+      rawY >= 0 &&
+      rawY < activeMapRef.current.height
+    return { x: clampedX, y: clampedY, rawX, rawY, isInside }
+  }, [])
+
+  const getCanvasCopyBox = useCallback(() => {
+    if (!canvasCopyStartRef.current || !canvasCopyCurrentRef.current) return null
+    const minX = Math.min(canvasCopyStartRef.current.x, canvasCopyCurrentRef.current.x)
+    const minY = Math.min(canvasCopyStartRef.current.y, canvasCopyCurrentRef.current.y)
+    const maxX = Math.max(canvasCopyStartRef.current.x, canvasCopyCurrentRef.current.x)
+    const maxY = Math.max(canvasCopyStartRef.current.y, canvasCopyCurrentRef.current.y)
     return { minX, minY, maxX, maxY, width: maxX - minX + 1, height: maxY - minY + 1 }
-  }
+  }, [])
 
-  const commitCanvasCopy = () => {
-    if (!activeMap || !activeLayerId) return
+  const commitCanvasCopy = useCallback(() => {
+    if (!activeMapRef.current || !activeLayerIdRef.current) return
     const box = getCanvasCopyBox()
     if (box) {
-      const layer = layers.find(l => l.id === activeLayerId)
+      const layer = layersRef.current.find(l => l.id === activeLayerIdRef.current)
       const currentData = layer?.data || {}
       const tiles: (CopiedTile | null)[] = []
       for (let dy = 0; dy < box.height; dy++) {
         for (let dx = 0; dx < box.width; dx++) {
           const targetX = box.minX + dx
           const targetY = box.minY + dy
-          const tileIndex = targetY * activeMap.width + targetX
+          const tileIndex = targetY * activeMapRef.current.width + targetX
           const existing = currentData[tileIndex]
           if (existing) {
             tiles.push({ tilesetId: existing.tilesetId, x: existing.x, y: existing.y })
@@ -89,42 +142,86 @@ export function MapCanvas({
     }
     setCanvasCopyStart(null)
     setCanvasCopyCurrent(null)
-  }
+  }, [getCanvasCopyBox, setTileSelection])
 
-  const handleMouseUp = (e: React.MouseEvent) => {
-    if (e.button === 2 && canvasCopyStart) {
-      commitCanvasCopy()
+  // ── Global Window Drag Listeners ─────────────────────────────────────────
+  useEffect(() => {
+    const handleWindowMouseMove = (e: MouseEvent) => {
+      // 1. Panning
+      if (isPanningRef.current) {
+        setPan(prev => ({
+          x: prev.x + (e.clientX - lastPanPosRef.current.x),
+          y: prev.y + (e.clientY - lastPanPosRef.current.y),
+        }))
+        setLastPanPos({ x: e.clientX, y: e.clientY })
+        return
+      }
+
+      const coords = getTileCoords(e.clientX, e.clientY)
+      if (!coords) return
+
+      // Update hover state
+      if (coords.isInside) {
+        setCanvasHover({ x: coords.x, y: coords.y })
+      } else if (!isPaintingRef.current && !rectStartRef.current && !canvasCopyStartRef.current) {
+        setCanvasHover(null)
+      }
+
+      // 2. Canvas Copy
+      if (canvasCopyStartRef.current) {
+        setCanvasCopyCurrent({ x: coords.x, y: coords.y })
+        return
+      }
+
+      // 3. Rectangle Fill Drag
+      if (activeToolRef.current === 'rectangle' && rectStartRef.current) {
+        setRectCurrent({ x: coords.x, y: coords.y })
+        return
+      }
+
+      // 4. Brush / Eraser Painting Drag
+      if (isPaintingRef.current) {
+        if (coords.isInside) {
+          handlePaint(coords.x, coords.y)
+        }
+      }
     }
 
-    if (activeTool === 'rectangle' && rectStart && rectCurrent) {
-      handleRectangleFill(rectStart, rectCurrent)
-      setRectStart(null)
-      setRectCurrent(null)
+    const handleWindowMouseUp = (e: MouseEvent) => {
+      if (e.button === 1 && isPanningRef.current) {
+        setIsPanning(false)
+      }
+
+      if (e.button === 2 && canvasCopyStartRef.current) {
+        commitCanvasCopy()
+      }
+
+      if (e.button === 0) {
+        if (
+          activeToolRef.current === 'rectangle' &&
+          rectStartRef.current &&
+          rectCurrentRef.current
+        ) {
+          handleRectangleFill(rectStartRef.current, rectCurrentRef.current)
+          setRectStart(null)
+          setRectCurrent(null)
+        }
+
+        if (isPaintingRef.current) {
+          handleCommit()
+          setIsPainting(false)
+        }
+      }
     }
 
-    if (isPainting) {
-      handleCommit()
-    }
-    setIsPainting(false)
-  }
+    window.addEventListener('mousemove', handleWindowMouseMove)
+    window.addEventListener('mouseup', handleWindowMouseUp)
 
-  const handleMouseLeave = () => {
-    setCanvasHover(null)
-    if (canvasCopyStart) {
-      commitCanvasCopy()
+    return () => {
+      window.removeEventListener('mousemove', handleWindowMouseMove)
+      window.removeEventListener('mouseup', handleWindowMouseUp)
     }
-
-    if (activeTool === 'rectangle' && rectStart && rectCurrent) {
-      handleRectangleFill(rectStart, rectCurrent)
-      setRectStart(null)
-      setRectCurrent(null)
-    }
-
-    if (isPainting) {
-      handleCommit()
-    }
-    setIsPainting(false)
-  }
+  }, [getTileCoords, commitCanvasCopy, handleCommit, handlePaint, handleRectangleFill, setIsPainting])
 
   return (
     <div
@@ -139,24 +236,12 @@ export function MapCanvas({
           setLastPanPos({ x: e.clientX, y: e.clientY })
         }
       }}
-      onMouseMove={(e) => {
-        if (isPanning) {
-          setPan(prev => ({
-            x: prev.x + (e.clientX - lastPanPos.x),
-            y: prev.y + (e.clientY - lastPanPos.y)
-          }))
-          setLastPanPos({ x: e.clientX, y: e.clientY })
-        }
-      }}
-      onMouseUp={(e) => {
-        if (e.button === 1) setIsPanning(false)
-      }}
-      onMouseLeave={() => setIsPanning(false)}
       onContextMenu={(e) => e.preventDefault()}
     >
       {activeMap ? (
         <div style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: 'center' }}>
           <div
+            ref={mapRef}
             className="bg-card shadow-sm relative overflow-hidden"
             style={{
               width: activeMap.width * 32,
@@ -164,8 +249,10 @@ export function MapCanvas({
             }}
             onMouseDown={(e) => {
               if (e.button === 1) return
-              const x = Math.floor(e.nativeEvent.offsetX / 32)
-              const y = Math.floor(e.nativeEvent.offsetY / 32)
+              const coords = getTileCoords(e.clientX, e.clientY)
+              if (!coords) return
+              const { x, y } = coords
+
               if (e.button === 2) {
                 setCanvasCopyStart({ x, y })
                 setCanvasCopyCurrent({ x, y })
@@ -180,33 +267,22 @@ export function MapCanvas({
               if (activeTool === 'rectangle') {
                 setRectStart({ x, y })
                 setRectCurrent({ x, y })
-                if (paintMode === 'continuous' || paintMode === 'discontinuous') setPaintStartPos({ x, y })
+                if (paintMode === 'continuous' || paintMode === 'discontinuous') {
+                  setPaintStartPos({ x, y })
+                }
                 return
               }
 
               setIsPainting(true)
-              if (paintMode === 'continuous' || paintMode === 'discontinuous') setPaintStartPos({ x, y })
+              if (paintMode === 'continuous' || paintMode === 'discontinuous') {
+                setPaintStartPos({ x, y })
+              }
               handlePaint(x, y)
             }}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseLeave}
-            onMouseMove={(e) => {
-              const x = Math.floor(e.nativeEvent.offsetX / 32)
-              const y = Math.floor(e.nativeEvent.offsetY / 32)
-              setCanvasHover({ x, y })
-
-              if (canvasCopyStart) {
-                setCanvasCopyCurrent({ x, y })
-                return
+            onMouseLeave={() => {
+              if (!isPainting && !rectStart && !canvasCopyStart) {
+                setCanvasHover(null)
               }
-
-              if (activeTool === 'rectangle' && rectStart) {
-                setRectCurrent({ x, y })
-                return
-              }
-
-              if (!isPainting || isPanning) return
-              handlePaint(x, y)
             }}
           >
             <CanvasLayers layers={layers} tilesets={tilesets} activeMap={activeMap} />
