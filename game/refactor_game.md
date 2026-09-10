@@ -110,15 +110,15 @@ graph TD
 
 ---
 
-### Phase 2: Decouple Input & Scene Communication
+### Phase 2: Decouple Input & Scene Communication (Completed)
 *Objective: Stop 60 FPS EventBus flooding and eliminate direct object references across scene boundaries.*
 
-- [ ] **State-Polled Input Architecture:**
+- [x] **State-Polled Input Architecture:**
   - Refactor `InputManager`:
     - Instead of emitting `Events.INPUT_DIRECTION` over `EventBus` 60 times per second, `InputManager` maintains an internal `InputSnapshot` (`{ vector: Vector2, run: boolean, action: boolean, menu: boolean }`).
     - Expose `inputManager.getSnapshot()` for controllers to query on tick.
     - Reserve `EventBus` purely for discrete events (`Events.ACTION_PRESSED`, `Events.MENU_TOGGLED`).
-- [ ] **Decouple UI from Game Entities:**
+- [x] **Decouple UI from Game Entities:**
   - Remove `EventBus.emit(Events.PLAYER_READY, this.player)`.
   - UI scenes (e.g. `UIScene`, `HUDManager`) must not hold a reference to `Player`.
   - When dialogue or menu opens, UI emits `Events.SET_INPUT_LOCKED, { locked: true }`.

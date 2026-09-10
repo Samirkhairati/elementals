@@ -1,6 +1,7 @@
 import { Scene } from "phaser";
 import { GAME_CONSTANTS } from "@/constants/game";
 import { settingsStore } from "@/core/SettingsStore";
+import { gameState } from "@/core/GameState";
 import { Player } from "@/entities/Player";
 import { MapSystem } from "@/world/MapSystem";
 import { InteractionSystem } from "@/world/InteractionSystem";
@@ -99,19 +100,12 @@ export class Game extends Scene {
     }
 
     // If map was switched while menu was open, ensure new player is unlocked
-    this.player.setMovementLocked(false);
-    this.interactionManager.setPlayer(this.player);
-    
-    // Notify UIScene of the new player
-    EventBus.emit(Events.PLAYER_READY, this.player);
+    gameState.setInputLocked(false);
   }
 
   update(_time: number, delta: number) {
     this.inputManager?.update();
-    this.player?.update(delta);
-  }
-
-  getPlayer(): Player | undefined {
-    return this.player;
+    const input = this.inputManager?.getSnapshot();
+    this.player?.update(delta, input);
   }
 }

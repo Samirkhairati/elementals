@@ -2,11 +2,18 @@ import { Scene, Input, type Types } from 'phaser';
 import { EventBus, Events } from '@/utils/EventBus';
 import { settingsStore } from '@/core/SettingsStore';
 import { Direction } from '@/utils/AnimationManager';
+import type { InputSnapshot } from '@/input/InputSnapshot';
 
 export class InputManager {
     private scene: Scene;
     private cursors: Types.Input.Keyboard.CursorKeys;
     private runKey: Input.Keyboard.Key;
+    private currentSnapshot: InputSnapshot = {
+        direction: null,
+        vector: { x: 0, y: 0 },
+        isRunning: false,
+        holdDuration: 0,
+    };
 
     constructor(scene: Scene) {
         this.scene = scene;
@@ -42,11 +49,16 @@ export class InputManager {
             y: (down.isDown ? 1 : 0) - (up.isDown ? 1 : 0),
         };
 
-        if (activeMapping) {
-            EventBus.emit(Events.INPUT_DIRECTION, activeMapping.direction, this.runKey.isDown, activeMapping.key.getDuration(), vector);
-        } else {
-            EventBus.emit(Events.INPUT_DIRECTION, null, false, 0, vector);
-        }
+        this.currentSnapshot = {
+            direction: activeMapping ? activeMapping.direction : null,
+            vector,
+            isRunning: this.runKey.isDown,
+            holdDuration: activeMapping ? activeMapping.key.getDuration() : 0,
+        };
+    }
+
+    public getSnapshot(): InputSnapshot {
+        return this.currentSnapshot;
     }
 
     private getKeyboardMapping() {

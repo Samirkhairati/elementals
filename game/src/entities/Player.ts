@@ -1,12 +1,14 @@
 import { Scene, GameObjects } from "phaser";
 import { GAME_CONSTANTS } from "@/constants/game";
 import { settingsStore } from "@/core/SettingsStore";
+import { gameState } from "@/core/GameState";
 import {
   AnimationManager,
   Direction,
   MovementType,
 } from "@/utils/AnimationManager";
 import { EventBus, Events } from "@/utils/EventBus";
+import type { InputSnapshot } from "@/input/InputSnapshot";
 
 const MOVE_OFFSETS = {
   [Direction.LEFT]: { dx: -1, dy: 0 },
@@ -50,26 +52,31 @@ export class Player extends GameObjects.Sprite {
     const initialGrid = this.getGridPosition();
     this.lastGridX = initialGrid.x;
     this.lastGridY = initialGrid.y;
+    this.syncGameState();
     
     // Bind event listeners
-    this.onInputDirection = this.onInputDirection.bind(this);
     this.onMovementModeChanged = this.onMovementModeChanged.bind(this);
+    this.onInputLockChanged = this.onInputLockChanged.bind(this);
     
-    EventBus.on(Events.INPUT_DIRECTION, this.onInputDirection);
     EventBus.on(Events.MOVEMENT_MODE_CHANGED, this.onMovementModeChanged);
+    EventBus.on(Events.INPUT_LOCK_CHANGED, this.onInputLockChanged);
     
     this.on('destroy', this.cleanup, this);
   }
 
   private cleanup() {
-    EventBus.off(Events.INPUT_DIRECTION, this.onInputDirection);
     EventBus.off(Events.MOVEMENT_MODE_CHANGED, this.onMovementModeChanged);
+    EventBus.off(Events.INPUT_LOCK_CHANGED, this.onInputLockChanged);
   }
 
   private initializeAppearance(scene: Scene) {
     scene.add.existing(this);
     this.setOrigin(0.5, 1);
     this.setDepth(GAME_CONSTANTS.PLAYER_DEPTH);
+  }
+
+  private onInputLockChanged(locked: boolean) {
+    this.setMovementLocked(locked);
   }
 
   private onMovementModeChanged(isTileBased: boolean) {
@@ -121,9 +128,44 @@ export class Player extends GameObjects.Sprite {
     const finalGrid = this.getGridPosition();
     this.lastGridX = finalGrid.x;
     this.lastGridY = finalGrid.y;
+    this.syncGameState();
   }
 
-  update(delta: number = 16.67) {
+  public update(delta: number = 16.67, input?: InputSnapshot) {
+    if (input) {
+      this.pendingDirection = input.direction;
+      this.isRunning = input.isRunning;
+      this.inputVector = input.vector;
+
+      if (this.isMovementLocked) {
+        if (this.isMoving && !settingsStore.tileBasedMovement) {
+          this.animManager.stopMovement(this, "player", this.currentDirection);
+          this.isMoving = false;
+        }
+        return;
+      }
+
+      if (settingsStore.tileBasedMovement) {
+        if (!this.isMoving) {
+          if (input.direction) {
+            this.currentMovementType = input.isRunning ? MovementType.RUN : MovementType.WALK;
+            this.updateDirection(input.direction);
+            
+            if (input.holdDuration > this.MOVE_THRESHOLD) {
+              this.executeMovement(input.direction);
+            }
+          } else {
+            this.animManager.stopMovement(this, "player", this.currentDirection);
+          }
+        }
+      } else {
+        if (input.direction) {
+          this.currentMovementType = input.isRunning ? MovementType.RUN : MovementType.WALK;
+          this.updateDirection(input.direction);
+        }
+      }
+    }
+
     if (!settingsStore.tileBasedMovement) {
       this.updateContinuousMovement(delta);
     }
@@ -192,6 +234,7 @@ export class Player extends GameObjects.Sprite {
         this.lastGridY = currentGrid.y;
         EventBus.emit(Events.PLAYER_MOVED, { x: this.x, y: this.y });
       }
+      this.syncGameState();
     }
   }
 
@@ -222,43 +265,11 @@ export class Player extends GameObjects.Sprite {
     return this.isMovementLocked;
   }
 
-  private onInputDirection(
-    direction: Direction | null, 
-    isRunning: boolean, 
-    duration: number,
-    vector?: { x: number; y: number }
-  ) {
-    this.pendingDirection = direction;
-    this.isRunning = isRunning;
-    this.inputVector = vector || (direction ? { x: MOVE_OFFSETS[direction].dx, y: MOVE_OFFSETS[direction].dy } : { x: 0, y: 0 });
-
-    if (this.isMovementLocked) return;
-
-    if (settingsStore.tileBasedMovement) {
-      if (!this.isMoving) {
-        if (direction) {
-          this.currentMovementType = isRunning ? MovementType.RUN : MovementType.WALK;
-          this.updateDirection(direction);
-          
-          if (duration > this.MOVE_THRESHOLD) {
-            this.executeMovement(direction);
-          }
-        } else {
-          this.animManager.stopMovement(this, "player", this.currentDirection);
-        }
-      }
-    } else {
-      if (direction) {
-        this.currentMovementType = isRunning ? MovementType.RUN : MovementType.WALK;
-        this.updateDirection(direction);
-      }
-    }
-  }
-
   private updateDirection(newDirection: Direction) {
     if (this.currentDirection !== newDirection) {
       this.currentDirection = newDirection;
       this.animManager.stopMovement(this, "player", this.currentDirection);
+      this.syncGameState();
     }
   }
 
@@ -296,6 +307,7 @@ export class Player extends GameObjects.Sprite {
         ease: "Linear",
         onComplete: () => {
           this.isMoving = false;
+          this.syncGameState();
           EventBus.emit(Events.PLAYER_MOVED, { x: this.x, y: this.y });
           
           // Check if we should keep moving based on pending input
@@ -314,6 +326,11 @@ export class Player extends GameObjects.Sprite {
     }
   }
 
+  private syncGameState() {
+    const grid = this.getGridPosition();
+    gameState.updatePlayerPosition(this.x, this.y, grid.x, grid.y, this.currentDirection);
+  }
+
   setWalkableCallback(callback: (x: number, y: number) => boolean) {
     this.isWalkable = callback;
   }
@@ -325,7 +342,6 @@ export class Player extends GameObjects.Sprite {
     };
   }
 
-  // API for future movement modes
   setMovementType(type: MovementType) {
     this.currentMovementType = type;
   }
