@@ -2,13 +2,14 @@ import React, { useMemo } from 'react';
 import {
   DockviewReact,
   DockviewReadyEvent,
+  DockviewApi,
   IDockviewPanelProps,
   IDockviewHeaderActionsProps
 } from 'dockview-react';
 import 'dockview/dist/styles/dockview.css';
 import './DockviewTheme.css';
 
-import { useEditorContext } from './EditorContext';
+import { EditorContext, useEditorContext } from './EditorContext';
 
 import { MapsPanel } from '@/components/editor/panels/MapsPanel';
 import { LayersPanel } from '@/components/editor/panels/LayersPanel';
@@ -239,21 +240,25 @@ const components = {
 
 // Main Component
 export function EditorDockview() {
-  const onReady = (event: DockviewReadyEvent) => {
-    const api = event.api;
+  const apiRef = React.useRef<DockviewApi | null>(null);
+  const [openPanels, setOpenPanels] = React.useState<string[]>([
+    'maps', 'layers', 'properties', 'tilesets', 'preview', 'activeSelection', 'canvas'
+  ]);
+  const parentCtx = useEditorContext();
 
-    // Create a 3 column layout
-    // Left: Maps, Layers, Properties
-    // Center: Canvas
-    // Right: Tilesets, Preview, ActiveSelection
-    
+  const updateOpenPanels = React.useCallback(() => {
+    if (!apiRef.current) return;
+    const ids = apiRef.current.panels.map(p => p.id);
+    setOpenPanels(ids);
+  }, []);
+
+  const buildDefaultLayout = React.useCallback((api: DockviewApi) => {
     // Add Center Canvas
     const canvasPanel = api.addPanel({
       id: 'canvas',
       component: 'canvas',
       title: 'CANVAS',
     });
-    // Canvas doesn't need a visible tab header
     canvasPanel.group.header.hidden = true;
 
     // Add Left Sidebar panels
@@ -300,20 +305,256 @@ export function EditorDockview() {
       position: { referencePanel: previewPanel, direction: 'below' },
     });
 
-    // Layout resizing
-    api.layout(api.width, api.height); // Force layout recalculation
-    // Adjust group sizes relative to each other (optional sizing logic can go here)
+    api.layout(api.width, api.height);
+  }, []);
+
+  const onReady = (event: DockviewReadyEvent) => {
+    const api = event.api;
+    apiRef.current = api;
+
+    buildDefaultLayout(api);
+
+    api.onDidAddPanel(updateOpenPanels);
+    api.onDidRemovePanel(updateOpenPanels);
+    updateOpenPanels();
   };
 
+  const openPanel = React.useCallback((id: string) => {
+    if (!apiRef.current) return;
+    const api = apiRef.current;
+    const existing = api.getPanel(id);
+    if (existing) {
+      existing.api.setActive();
+      return;
+    }
+
+    const canvas = api.getPanel('canvas');
+
+    switch (id) {
+      case 'maps': {
+        const ref = api.getPanel('layers') || api.getPanel('properties');
+        if (ref) {
+          api.addPanel({
+            id: 'maps',
+            component: 'maps',
+            title: 'MAPS',
+            position: { referencePanel: ref, direction: 'above' }
+          });
+        } else if (canvas) {
+          api.addPanel({
+            id: 'maps',
+            component: 'maps',
+            title: 'MAPS',
+            position: { referencePanel: canvas, direction: 'left' }
+          });
+        } else {
+          api.addPanel({ id: 'maps', component: 'maps', title: 'MAPS' });
+        }
+        break;
+      }
+      case 'layers': {
+        const ref = api.getPanel('maps');
+        const refBelow = api.getPanel('properties');
+        if (ref) {
+          api.addPanel({
+            id: 'layers',
+            component: 'layers',
+            title: 'LAYERS',
+            position: { referencePanel: ref, direction: 'below' }
+          });
+        } else if (refBelow) {
+          api.addPanel({
+            id: 'layers',
+            component: 'layers',
+            title: 'LAYERS',
+            position: { referencePanel: refBelow, direction: 'above' }
+          });
+        } else if (canvas) {
+          api.addPanel({
+            id: 'layers',
+            component: 'layers',
+            title: 'LAYERS',
+            position: { referencePanel: canvas, direction: 'left' }
+          });
+        } else {
+          api.addPanel({ id: 'layers', component: 'layers', title: 'LAYERS' });
+        }
+        break;
+      }
+      case 'properties': {
+        const ref = api.getPanel('layers') || api.getPanel('maps');
+        if (ref) {
+          api.addPanel({
+            id: 'properties',
+            component: 'properties',
+            title: 'PROPERTIES',
+            position: { referencePanel: ref, direction: 'below' }
+          });
+        } else if (canvas) {
+          api.addPanel({
+            id: 'properties',
+            component: 'properties',
+            title: 'PROPERTIES',
+            position: { referencePanel: canvas, direction: 'left' }
+          });
+        } else {
+          api.addPanel({ id: 'properties', component: 'properties', title: 'PROPERTIES' });
+        }
+        break;
+      }
+      case 'tilesets': {
+        const refBelow = api.getPanel('preview') || api.getPanel('activeSelection');
+        if (refBelow) {
+          api.addPanel({
+            id: 'tilesets',
+            component: 'tilesets',
+            title: 'TILESET BROWSER',
+            position: { referencePanel: refBelow, direction: 'above' }
+          });
+        } else if (canvas) {
+          api.addPanel({
+            id: 'tilesets',
+            component: 'tilesets',
+            title: 'TILESET BROWSER',
+            position: { referencePanel: canvas, direction: 'right' }
+          });
+        } else {
+          api.addPanel({ id: 'tilesets', component: 'tilesets', title: 'TILESET BROWSER' });
+        }
+        break;
+      }
+      case 'preview': {
+        const refAbove = api.getPanel('tilesets');
+        const refBelow = api.getPanel('activeSelection');
+        if (refAbove) {
+          api.addPanel({
+            id: 'preview',
+            component: 'preview',
+            title: 'TILESET',
+            position: { referencePanel: refAbove, direction: 'below' }
+          });
+        } else if (refBelow) {
+          api.addPanel({
+            id: 'preview',
+            component: 'preview',
+            title: 'TILESET',
+            position: { referencePanel: refBelow, direction: 'above' }
+          });
+        } else if (canvas) {
+          api.addPanel({
+            id: 'preview',
+            component: 'preview',
+            title: 'TILESET',
+            position: { referencePanel: canvas, direction: 'right' }
+          });
+        } else {
+          api.addPanel({ id: 'preview', component: 'preview', title: 'TILESET' });
+        }
+        break;
+      }
+      case 'activeSelection': {
+        const refAbove = api.getPanel('preview') || api.getPanel('tilesets');
+        if (refAbove) {
+          api.addPanel({
+            id: 'activeSelection',
+            component: 'activeSelection',
+            title: 'ACTIVE SELECTION',
+            position: { referencePanel: refAbove, direction: 'below' }
+          });
+        } else if (canvas) {
+          api.addPanel({
+            id: 'activeSelection',
+            component: 'activeSelection',
+            title: 'ACTIVE SELECTION',
+            position: { referencePanel: canvas, direction: 'right' }
+          });
+        } else {
+          api.addPanel({ id: 'activeSelection', component: 'activeSelection', title: 'ACTIVE SELECTION' });
+        }
+        break;
+      }
+    }
+
+    api.layout(api.width, api.height);
+    updateOpenPanels();
+  }, [updateOpenPanels]);
+
+  const closePanel = React.useCallback((id: string) => {
+    if (!apiRef.current) return;
+    const panel = apiRef.current.getPanel(id);
+    if (panel) {
+      panel.api.close();
+      updateOpenPanels();
+    }
+  }, [updateOpenPanels]);
+
+  const togglePanel = React.useCallback((id: string) => {
+    if (!apiRef.current) return;
+    const panel = apiRef.current.getPanel(id);
+    if (panel) {
+      panel.api.close();
+      updateOpenPanels();
+    } else {
+      openPanel(id);
+    }
+  }, [openPanel, updateOpenPanels]);
+
+  const resetLayout = React.useCallback(() => {
+    if (!apiRef.current) return;
+    apiRef.current.clear();
+    buildDefaultLayout(apiRef.current);
+    updateOpenPanels();
+  }, [buildDefaultLayout, updateOpenPanels]);
+
+  // IPC and Custom Window Events
+  React.useEffect(() => {
+    const unsubToggle = window.electronAPI?.onTogglePanel?.((panelId: string) => {
+      togglePanel(panelId);
+    });
+    const unsubReset = window.electronAPI?.onResetLayout?.(() => {
+      resetLayout();
+    });
+
+    const handleCustomToggle = (e: any) => {
+      if (e.detail) togglePanel(e.detail);
+    };
+    const handleCustomReset = () => {
+      resetLayout();
+    };
+
+    window.addEventListener('editor:toggle-panel', handleCustomToggle);
+    window.addEventListener('editor:reset-layout', handleCustomReset);
+
+    return () => {
+      unsubToggle?.();
+      unsubReset?.();
+      window.removeEventListener('editor:toggle-panel', handleCustomToggle);
+      window.removeEventListener('editor:reset-layout', handleCustomReset);
+    };
+  }, [togglePanel, resetLayout]);
+
+  const contextValue = React.useMemo(() => ({
+    ...parentCtx,
+    openPanels,
+    openPanel,
+    closePanel,
+    togglePanel,
+    resetLayout,
+    isPanelOpen: (id: string) => openPanels.includes(id),
+  }), [parentCtx, openPanels, openPanel, closePanel, togglePanel, resetLayout]);
+
   return (
-    <div className="flex-1 w-full h-full overflow-hidden">
-      <DockviewReact
-        components={components}
-        onReady={onReady}
-        className="dockview-theme-elementals"
-        defaultTabComponent={undefined}
-        rightHeaderActionsComponent={DefaultHeaderActions}
-      />
-    </div>
+    <EditorContext.Provider value={contextValue}>
+      <div className="flex-1 w-full h-full overflow-hidden">
+        <DockviewReact
+          components={components}
+          onReady={onReady}
+          className="dockview-theme-elementals"
+          defaultTabComponent={undefined}
+          rightHeaderActionsComponent={DefaultHeaderActions}
+        />
+      </div>
+    </EditorContext.Provider>
   );
 }
+

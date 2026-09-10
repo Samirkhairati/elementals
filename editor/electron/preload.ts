@@ -19,5 +19,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   renameMapFolder: (oldPath: string, newName: string) => ipcRenderer.invoke('rename-map-folder', oldPath, newName),
   renameMap: (folderPath: string | null, fileName: string, newName: string) => ipcRenderer.invoke('rename-map', folderPath, fileName, newName),
   moveMap: (fileName: string, oldFolder: string | null, newFolder: string | null) => ipcRenderer.invoke('move-map', fileName, oldFolder, newFolder),
-  exportMap: (jsonData: string, defaultName: string) => ipcRenderer.invoke('export-map', jsonData, defaultName)
+  exportMap: (jsonData: string, defaultName: string) => ipcRenderer.invoke('export-map', jsonData, defaultName),
+  onTogglePanel: (callback: (panelId: string) => void) => {
+    const handler = (_: any, panelId: string) => callback(panelId);
+    ipcRenderer.on('dockview-toggle-panel', handler);
+    return () => ipcRenderer.removeListener('dockview-toggle-panel', handler);
+  },
+  onResetLayout: (callback: () => void) => {
+    const handler = () => callback();
+    ipcRenderer.on('dockview-reset-layout', handler);
+    return () => ipcRenderer.removeListener('dockview-reset-layout', handler);
+  }
 });
+
