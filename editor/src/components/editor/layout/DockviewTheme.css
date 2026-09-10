@@ -29,3 +29,64 @@
 .dockview-theme-elementals .dv-tabs-and-actions-container {
   border-bottom: 1px solid var(--dv-tab-divider-color);
 }
+
+/* ==========================================================================
+   Sash / Splitter Resize Handles (Generous Hit Area & Visual Feedback)
+   ========================================================================== */
+
+/* Ensure the sash container is on top of content views but clicks elsewhere pass through */
+.dockview-theme-elementals .dv-sash-container {
+  pointer-events: none !important;
+  z-index: 50 !important;
+}
+
+.dockview-theme-elementals .dv-sash {
+  pointer-events: auto !important;
+  z-index: 51 !important;
+}
+
+/* Horizontal sash: Resizing Left Sidebar and Right Sidebar */
+.dockview-theme-elementals .dv-split-view-container.dv-horizontal > .dv-sash-container > .dv-sash {
+  cursor: ew-resize !important;
+}
+
+/* Generous invisible hit zone around the vertical divider lines (Left & Right side panels) */
+.dockview-theme-elementals .dv-split-view-container.dv-horizontal > .dv-sash-container > .dv-sash:not(.dv-disabled)::before {
+  content: "" !important;
+  position: absolute !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  left: -12px !important;
+  right: -12px !important;
+  background: transparent !important;
+  cursor: ew-resize !important;
+  pointer-events: auto !important;
+  z-index: 52 !important;
+}
+
+/* Vertical sash: Resizing stacked panels (e.g., Maps / Layers / Properties) */
+.dockview-theme-elementals .dv-split-view-container.dv-vertical > .dv-sash-container > .dv-sash {
+  cursor: ns-resize !important;
+}
+
+/* Generous invisible hit zone around the horizontal divider lines */
+.dockview-theme-elementals .dv-split-view-container.dv-vertical > .dv-sash-container > .dv-sash:not(.dv-disabled)::before {
+  content: "" !important;
+  position: absolute !important;
+  left: 0 !important;
+  right: 0 !important;
+  top: -8px !important;
+  bottom: -8px !important;
+  background: transparent !important;
+  cursor: ns-resize !important;
+  pointer-events: auto !important;
+  z-index: 52 !important;
+}
+
+/* Visual indication on hover / active resize */
+.dockview-theme-elementals .dv-split-view-container > .dv-sash-container > .dv-sash:not(.dv-disabled):hover,
+.dockview-theme-elementals .dv-split-view-container > .dv-sash-container > .dv-sash:not(.dv-disabled):active {
+  background-color: hsl(var(--primary) / 0.8) !important;
+  transition: background-color 0.15s ease !important;
+}
+
