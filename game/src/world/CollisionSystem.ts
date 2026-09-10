@@ -1,5 +1,4 @@
 import { GAME_CONSTANTS } from "@/constants/game";
-import { settingsStore } from "@/core/SettingsStore";
 
 export class CollisionSystem {
   private map: Phaser.Tilemaps.Tilemap | null = null;
@@ -15,20 +14,19 @@ export class CollisionSystem {
 
   /**
    * Checks if a world coordinate is walkable.
-   * @param x World X coordinate (scaled)
-   * @param y World Y coordinate (scaled, bottom center of entity)
+   * @param x World X coordinate (logical)
+   * @param y World Y coordinate (logical, bottom center of entity)
    * @returns True if walkable, false otherwise
    */
   public isWalkable(x: number, y: number): boolean {
     if (!this.map) return true;
 
-    const scale = settingsStore.renderScale;
-    const scaledTileSize = GAME_CONSTANTS.TILE_SIZE * scale;
-    const scaledWidth = this.map.widthInPixels * scale;
-    const scaledHeight = this.map.heightInPixels * scale;
+    const tileSize = GAME_CONSTANTS.TILE_SIZE;
+    const width = this.map.widthInPixels;
+    const height = this.map.heightInPixels;
 
     // 1. Boundary check
-    if (x < 0 || x > scaledWidth || y < scaledTileSize || y > scaledHeight) {
+    if (x < 0 || x > width || y < tileSize || y > height) {
       return false;
     }
 

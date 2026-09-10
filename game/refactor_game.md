@@ -92,12 +92,12 @@ graph TD
 
 ---
 
-### Phase 1: Logical Coordinates & Viewport Normalization
+### Phase 1: Logical Coordinates & Viewport Normalization (Completed)
 *Objective: Decouple game coordinates from screen scaling so entities never need to re-scale or re-project on window resize.*
 
-- [ ] **Simulation Space Standardization:**
+- [x] **Simulation Space Standardization:**
   - Standardize all gameplay logic (positions, velocities, collision checks) to **1x Logical Coordinates** ($1\text{ tile} = 32\text{px}$).
-- [ ] **Camera-Driven Integer Zoom:**
+- [x] **Camera-Driven Integer Zoom:**
   - In `src/scenes/Game.ts`, refactor `handleResize()`:
     - Camera viewport size is locked to logical dimensions ($15 \times 32 = 480\text{px}$ by $10 \times 32 = 320\text{px}$).
     - Apply integer zoom via `this.cameras.main.setZoom(renderScale)` with letterboxing.

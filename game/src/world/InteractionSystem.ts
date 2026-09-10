@@ -88,16 +88,16 @@ export class InteractionSystem {
     this.debugGraphics = this.scene.add.graphics();
     this.debugGraphics.setDepth(101); // Above the debug grid
 
-    const scaledTileSize = GAME_CONSTANTS.TILE_SIZE * settingsStore.renderScale;
+    const tileSize = GAME_CONSTANTS.TILE_SIZE;
 
     this.interactables.forEach((interactable) => {
-      const px = interactable.x * scaledTileSize;
-      const py = interactable.y * scaledTileSize;
+      const px = interactable.x * tileSize;
+      const py = interactable.y * tileSize;
       
       this.debugGraphics!.lineStyle(2, interactable.type === "on_interact" ? 0xffff00 : 0xff00ff, 0.8);
-      this.debugGraphics!.strokeRect(px, py, scaledTileSize, scaledTileSize);
+      this.debugGraphics!.strokeRect(px, py, tileSize, tileSize);
       this.debugGraphics!.fillStyle(interactable.type === "on_interact" ? 0xffff00 : 0xff00ff, 0.2);
-      this.debugGraphics!.fillRect(px, py, scaledTileSize, scaledTileSize);
+      this.debugGraphics!.fillRect(px, py, tileSize, tileSize);
     });
   }
 }

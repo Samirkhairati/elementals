@@ -53,11 +53,9 @@ export class Player extends GameObjects.Sprite {
     
     // Bind event listeners
     this.onInputDirection = this.onInputDirection.bind(this);
-    this.onScaleChanged = this.onScaleChanged.bind(this);
     this.onMovementModeChanged = this.onMovementModeChanged.bind(this);
     
     EventBus.on(Events.INPUT_DIRECTION, this.onInputDirection);
-    EventBus.on(Events.RENDER_SCALE_CHANGED, this.onScaleChanged);
     EventBus.on(Events.MOVEMENT_MODE_CHANGED, this.onMovementModeChanged);
     
     this.on('destroy', this.cleanup, this);
@@ -65,7 +63,6 @@ export class Player extends GameObjects.Sprite {
 
   private cleanup() {
     EventBus.off(Events.INPUT_DIRECTION, this.onInputDirection);
-    EventBus.off(Events.RENDER_SCALE_CHANGED, this.onScaleChanged);
     EventBus.off(Events.MOVEMENT_MODE_CHANGED, this.onMovementModeChanged);
   }
 
@@ -73,19 +70,6 @@ export class Player extends GameObjects.Sprite {
     scene.add.existing(this);
     this.setOrigin(0.5, 1);
     this.setDepth(GAME_CONSTANTS.PLAYER_DEPTH);
-    this.setScale(settingsStore.renderScale);
-  }
-
-  private onScaleChanged(newScale: number, oldScale: number) {
-    this.setScale(newScale);
-    if (oldScale > 0) {
-      this.x = (this.x / oldScale) * newScale;
-      this.y = (this.y / oldScale) * newScale;
-    }
-    // Kill any active tween and reset moving state to avoid glitching
-    this.scene.tweens.killTweensOf(this);
-    this.isMoving = false;
-    this.animManager.stopMovement(this, "player", this.currentDirection);
   }
 
   private onMovementModeChanged(isTileBased: boolean) {
@@ -111,14 +95,14 @@ export class Player extends GameObjects.Sprite {
   }
 
   public snapToGrid() {
-    const scaledTileSize = GAME_CONSTANTS.TILE_SIZE * settingsStore.renderScale;
+    const tileSize = GAME_CONSTANTS.TILE_SIZE;
     
     // Find nearest tile center on X axis
-    const gridX = Math.round((this.x - scaledTileSize / 2) / scaledTileSize);
-    const targetX = gridX * scaledTileSize + scaledTileSize / 2;
+    const gridX = Math.round((this.x - tileSize / 2) / tileSize);
+    const targetX = gridX * tileSize + tileSize / 2;
 
     // Find nearest tile bottom on Y axis
-    const targetY = Math.round(this.y / scaledTileSize) * scaledTileSize;
+    const targetY = Math.round(this.y / tileSize) * tileSize;
 
     // Check if target position is walkable; if so snap there, else fallback to current tile
     if (this.isWalkable(targetX, targetY)) {
@@ -126,8 +110,8 @@ export class Player extends GameObjects.Sprite {
       this.y = targetY;
     } else {
       const currentGrid = this.getGridPosition();
-      const fallbackX = currentGrid.x * scaledTileSize + scaledTileSize / 2;
-      const fallbackY = (currentGrid.y + 1) * scaledTileSize;
+      const fallbackX = currentGrid.x * tileSize + tileSize / 2;
+      const fallbackY = (currentGrid.y + 1) * tileSize;
       if (this.isWalkable(fallbackX, fallbackY)) {
         this.x = fallbackX;
         this.y = fallbackY;
@@ -175,7 +159,7 @@ export class Player extends GameObjects.Sprite {
     this.isMoving = true;
 
     const speed = this.isRunning ? GAME_CONSTANTS.PLAYER_SPEED * 1.5 : GAME_CONSTANTS.PLAYER_SPEED;
-    const dist = (speed * settingsStore.renderScale) * (delta / 1000);
+    const dist = speed * (delta / 1000);
 
     let normX = vx;
     let normY = vy;
@@ -212,9 +196,8 @@ export class Player extends GameObjects.Sprite {
   }
 
   private canMoveTo(targetX: number, targetY: number): boolean {
-    const scale = settingsStore.renderScale;
-    const halfW = 8 * scale;
-    const feetH = 4 * scale;
+    const halfW = 8;
+    const feetH = 4;
 
     return (
       this.isWalkable(targetX, targetY) &&
@@ -281,14 +264,13 @@ export class Player extends GameObjects.Sprite {
 
   private executeMovement(direction: Direction) {
     const { TILE_SIZE, PLAYER_SPEED } = GAME_CONSTANTS;
-    const scaledTileSize = TILE_SIZE * settingsStore.renderScale;
     const { dx, dy } = MOVE_OFFSETS[direction];
 
     // Ensure player is aligned to grid before tweening to the next grid cell
     this.snapToGrid();
 
-    const nextX = this.x + dx * scaledTileSize;
-    const nextY = this.y + dy * scaledTileSize;
+    const nextX = this.x + dx * TILE_SIZE;
+    const nextY = this.y + dy * TILE_SIZE;
 
     if (this.isWalkable(nextX, nextY)) {
       this.isMoving = true;
@@ -337,10 +319,9 @@ export class Player extends GameObjects.Sprite {
   }
 
   getGridPosition() {
-    const scaledTileSize = GAME_CONSTANTS.TILE_SIZE * settingsStore.renderScale;
     return {
-      x: Math.floor(this.x / scaledTileSize),
-      y: Math.floor((this.y - 1) / scaledTileSize),
+      x: Math.floor(this.x / GAME_CONSTANTS.TILE_SIZE),
+      y: Math.floor((this.y - 1) / GAME_CONSTANTS.TILE_SIZE),
     };
   }
 
