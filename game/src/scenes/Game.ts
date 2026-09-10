@@ -45,26 +45,22 @@ export class Game extends Scene {
     this.events.on('destroy', this.cleanup, this);
   }
 
-  private handleResize(gameSize: { width: number, height: number }) {
-    const visibleWidth = GAME_CONSTANTS.VISIBLE_TILES_X * GAME_CONSTANTS.TILE_SIZE;
-    const visibleHeight = GAME_CONSTANTS.VISIBLE_TILES_Y * GAME_CONSTANTS.TILE_SIZE;
+  private handleResize(gameSize: { width: number; height: number }) {
+    const visibleWidth = GAME_CONSTANTS.LOGICAL_WIDTH;
+    const visibleHeight = GAME_CONSTANTS.LOGICAL_HEIGHT;
 
     // Calculate integer scale factor to fit the visible area into the game size
     const scaleX = Math.max(1, Math.floor(gameSize.width / visibleWidth));
     const scaleY = Math.max(1, Math.floor(gameSize.height / visibleHeight));
     const newScale = Math.min(scaleX, scaleY);
     
-    const scaledWidth = visibleWidth * newScale;
-    const scaledHeight = visibleHeight * newScale;
+    const viewportWidth = visibleWidth * newScale;
+    const viewportHeight = visibleHeight * newScale;
+    const viewportX = Math.floor((gameSize.width - viewportWidth) / 2);
+    const viewportY = Math.floor((gameSize.height - viewportHeight) / 2);
 
-    this.cameras.main.setSize(scaledWidth, scaledHeight);
-    this.cameras.main.setZoom(1); // Assets are scaled directly; camera zoom stays 1
-    
-    // Center the camera viewport on the screen (letterboxing), avoiding sub-pixel offsets
-    this.cameras.main.setPosition(
-        Math.floor((gameSize.width - scaledWidth) / 2),
-        Math.floor((gameSize.height - scaledHeight) / 2)
-    );
+    this.cameras.main.setViewport(viewportX, viewportY, viewportWidth, viewportHeight);
+    this.cameras.main.setZoom(newScale);
 
     settingsStore.setRenderScale(newScale);
   }
@@ -81,10 +77,10 @@ export class Game extends Scene {
     // Load interactions for this map
     this.interactionSystem.setMap(map);
     
-    // Position at the center of the map using scaled tile size
-    const scaledTileSize = GAME_CONSTANTS.TILE_SIZE * settingsStore.renderScale;
-    const spawnX = Math.floor(map.width / 2) * scaledTileSize + scaledTileSize / 2;
-    const spawnY = (Math.floor(map.height / 2) + 1) * scaledTileSize;
+    // Position at the center of the map using logical tile size (32px)
+    const tileSize = GAME_CONSTANTS.TILE_SIZE;
+    const spawnX = Math.floor(map.width / 2) * tileSize + tileSize / 2;
+    const spawnY = (Math.floor(map.height / 2) + 1) * tileSize;
 
     if (this.player) {
       this.player.destroy();
