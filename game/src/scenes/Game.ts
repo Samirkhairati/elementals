@@ -1,5 +1,6 @@
 import { Scene } from "phaser";
-import { CONFIG } from "@/config";
+import { GAME_CONSTANTS } from "@/constants/game";
+import { settingsStore } from "@/core/SettingsStore";
 import { Player } from "@/entities/Player";
 import { MapSystem } from "@/world/MapSystem";
 import { InteractionSystem } from "@/world/InteractionSystem";
@@ -45,8 +46,8 @@ export class Game extends Scene {
   }
 
   private handleResize(gameSize: { width: number, height: number }) {
-    const visibleWidth = CONFIG.visibleTilesX * CONFIG.tileSize;
-    const visibleHeight = CONFIG.visibleTilesY * CONFIG.tileSize;
+    const visibleWidth = GAME_CONSTANTS.VISIBLE_TILES_X * GAME_CONSTANTS.TILE_SIZE;
+    const visibleHeight = GAME_CONSTANTS.VISIBLE_TILES_Y * GAME_CONSTANTS.TILE_SIZE;
 
     // Calculate integer scale factor to fit the visible area into the game size
     const scaleX = Math.max(1, Math.floor(gameSize.width / visibleWidth));
@@ -65,11 +66,7 @@ export class Game extends Scene {
         Math.floor((gameSize.height - scaledHeight) / 2)
     );
 
-    if (CONFIG.renderScale !== newScale) {
-        const oldScale = CONFIG.renderScale;
-        CONFIG.renderScale = newScale;
-        EventBus.emit(Events.RENDER_SCALE_CHANGED, newScale, oldScale);
-    }
+    settingsStore.setRenderScale(newScale);
   }
 
   private cleanup() {
@@ -85,7 +82,7 @@ export class Game extends Scene {
     this.interactionSystem.setMap(map);
     
     // Position at the center of the map using scaled tile size
-    const scaledTileSize = CONFIG.tileSize * CONFIG.renderScale;
+    const scaledTileSize = GAME_CONSTANTS.TILE_SIZE * settingsStore.renderScale;
     const spawnX = Math.floor(map.width / 2) * scaledTileSize + scaledTileSize / 2;
     const spawnY = (Math.floor(map.height / 2) + 1) * scaledTileSize;
 
@@ -99,7 +96,7 @@ export class Game extends Scene {
       spawnY, 
       (x, y) => this.mapSystem.collisions.isWalkable(x, y)
     );
-    if (CONFIG.camera.smoothFollow) {
+    if (settingsStore.camera.smoothFollow) {
       this.cameras.main.startFollow(this.player, false, 0.05, 0.05);
     } else {
       this.cameras.main.startFollow(this.player, true, 1, 1);
@@ -113,9 +110,9 @@ export class Game extends Scene {
     EventBus.emit(Events.PLAYER_READY, this.player);
   }
 
-  update(_time: number, _delta: number) {
+  update(_time: number, delta: number) {
     this.inputManager?.update();
-    this.player?.update();
+    this.player?.update(delta);
   }
 
   getPlayer(): Player | undefined {

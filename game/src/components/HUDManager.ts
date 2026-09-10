@@ -3,7 +3,7 @@ import { Player } from '@/entities/Player';
 import { DebugHUD } from '@/components/DebugHUD';
 import { MapSwitcherHUD } from '@/components/MapSwitcherHUD';
 import { DialogueHUD } from '@/components/DialogueHUD';
-import { CONFIG } from '@/config';
+import { settingsStore } from '@/core/SettingsStore';
 import { EventBus, Events } from '@/utils/EventBus';
 
 export class HUDManager {
@@ -47,7 +47,7 @@ export class HUDManager {
     }
 
     private initializeHUDs() {
-        if (CONFIG.debug.enabled) {
+        if (settingsStore.debug.enabled) {
             this.debugHUD = new DebugHUD(this.scene, this.player);
         }
 

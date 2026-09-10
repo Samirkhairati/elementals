@@ -1,5 +1,5 @@
 import { Scene, GameObjects } from 'phaser';
-import { CONFIG } from '@/config';
+import { settingsStore } from '@/core/SettingsStore';
 import { Player } from '@/entities/Player';
 
 export class DebugHUD {
@@ -46,7 +46,7 @@ export class DebugHUD {
     }
 
     update() {
-        if (!CONFIG.debug.enabled) {
+        if (!settingsStore.debug.enabled) {
             this.text.setVisible(false);
             this.background.setVisible(false);
             return;
@@ -56,19 +56,21 @@ export class DebugHUD {
         this.background.setVisible(true);
         const lines: string[] = [];
 
-        if (CONFIG.debug.showKeys) {
+        if (settingsStore.debug.showKeys) {
             const keysString = Array.from(this.pressedKeys).join(', ') || 'None';
             lines.push(`DEBUG: Keys: ${keysString}`);
         }
 
-        if (CONFIG.debug.showCoords && this.player) {
+        if (settingsStore.debug.showCoords && this.player) {
             const grid = this.player.getGridPosition();
             lines.push(`DEBUG: Pos: (${Math.round(this.player.x)}, ${Math.round(this.player.y)}) [${grid.x}, ${grid.y}]`);
         }
 
-        if (CONFIG.debug.showGrid) {
+        if (settingsStore.debug.showGrid) {
             lines.push(`DEBUG: Grid: ON`);
         }
+
+        lines.push(`DEBUG: Movement: ${settingsStore.tileBasedMovement ? 'Tile-Based' : 'Continuous'} (Press 'T' to toggle)`);
 
         this.text.setText(lines.join('\n'));
         

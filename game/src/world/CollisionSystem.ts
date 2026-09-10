@@ -1,4 +1,5 @@
-import { CONFIG } from "@/config";
+import { GAME_CONSTANTS } from "@/constants/game";
+import { settingsStore } from "@/core/SettingsStore";
 
 export class CollisionSystem {
   private map: Phaser.Tilemaps.Tilemap | null = null;
@@ -21,8 +22,8 @@ export class CollisionSystem {
   public isWalkable(x: number, y: number): boolean {
     if (!this.map) return true;
 
-    const scale = CONFIG.renderScale;
-    const scaledTileSize = CONFIG.tileSize * scale;
+    const scale = settingsStore.renderScale;
+    const scaledTileSize = GAME_CONSTANTS.TILE_SIZE * scale;
     const scaledWidth = this.map.widthInPixels * scale;
     const scaledHeight = this.map.heightInPixels * scale;
 

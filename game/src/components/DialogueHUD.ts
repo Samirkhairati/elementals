@@ -1,5 +1,5 @@
 import { Scene, GameObjects } from "phaser";
-import { CONFIG } from "@/config";
+import { GAME_CONSTANTS } from "@/constants/game";
 
 export class DialogueHUD {
   private scene: Scene;
@@ -23,7 +23,7 @@ export class DialogueHUD {
     
     // Text
     this.textObject = this.scene.add.bitmapText(0, 0, 'PokemonFont', "", 72);
-    this.textObject.setMaxWidth(CONFIG.width - 40);
+    this.textObject.setMaxWidth(GAME_CONSTANTS.LOGICAL_WIDTH - 40);
     this.container.add(this.textObject);
     
     this.container.setVisible(false);
