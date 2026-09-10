@@ -1,5 +1,6 @@
 import { Scene, GameObjects } from "phaser";
-import { CONFIG } from "@/config";
+import { GAME_CONSTANTS } from "@/constants/game";
+import { settingsStore } from "@/core/SettingsStore";
 import {
   AnimationManager,
   Direction,
@@ -71,8 +72,8 @@ export class Player extends GameObjects.Sprite {
   private initializeAppearance(scene: Scene) {
     scene.add.existing(this);
     this.setOrigin(0.5, 1);
-    this.setDepth(CONFIG.playerDepth);
-    this.setScale(CONFIG.renderScale);
+    this.setDepth(GAME_CONSTANTS.PLAYER_DEPTH);
+    this.setScale(settingsStore.renderScale);
   }
 
   private onScaleChanged(newScale: number, oldScale: number) {
@@ -110,7 +111,7 @@ export class Player extends GameObjects.Sprite {
   }
 
   public snapToGrid() {
-    const scaledTileSize = CONFIG.tileSize * CONFIG.renderScale;
+    const scaledTileSize = GAME_CONSTANTS.TILE_SIZE * settingsStore.renderScale;
     
     // Find nearest tile center on X axis
     const gridX = Math.round((this.x - scaledTileSize / 2) / scaledTileSize);
@@ -139,7 +140,7 @@ export class Player extends GameObjects.Sprite {
   }
 
   update(delta: number = 16.67) {
-    if (!CONFIG.tileBasedMovement) {
+    if (!settingsStore.tileBasedMovement) {
       this.updateContinuousMovement(delta);
     }
   }
@@ -173,8 +174,8 @@ export class Player extends GameObjects.Sprite {
     );
     this.isMoving = true;
 
-    const speed = this.isRunning ? CONFIG.playerSpeed * 1.5 : CONFIG.playerSpeed;
-    const dist = (speed * CONFIG.renderScale) * (delta / 1000);
+    const speed = this.isRunning ? GAME_CONSTANTS.PLAYER_SPEED * 1.5 : GAME_CONSTANTS.PLAYER_SPEED;
+    const dist = (speed * settingsStore.renderScale) * (delta / 1000);
 
     let normX = vx;
     let normY = vy;
@@ -211,7 +212,7 @@ export class Player extends GameObjects.Sprite {
   }
 
   private canMoveTo(targetX: number, targetY: number): boolean {
-    const scale = CONFIG.renderScale;
+    const scale = settingsStore.renderScale;
     const halfW = 8 * scale;
     const feetH = 4 * scale;
 
@@ -250,7 +251,7 @@ export class Player extends GameObjects.Sprite {
 
     if (this.isMovementLocked) return;
 
-    if (CONFIG.tileBasedMovement) {
+    if (settingsStore.tileBasedMovement) {
       if (!this.isMoving) {
         if (direction) {
           this.currentMovementType = isRunning ? MovementType.RUN : MovementType.WALK;
@@ -279,8 +280,8 @@ export class Player extends GameObjects.Sprite {
   }
 
   private executeMovement(direction: Direction) {
-    const { tileSize, playerSpeed, renderScale } = CONFIG;
-    const scaledTileSize = tileSize * renderScale;
+    const { TILE_SIZE, PLAYER_SPEED } = GAME_CONSTANTS;
+    const scaledTileSize = TILE_SIZE * settingsStore.renderScale;
     const { dx, dy } = MOVE_OFFSETS[direction];
 
     // Ensure player is aligned to grid before tweening to the next grid cell
@@ -295,8 +296,8 @@ export class Player extends GameObjects.Sprite {
       // Use faster speed for running
       const speed =
         this.currentMovementType === MovementType.RUN
-          ? playerSpeed * 1.5
-          : playerSpeed;
+          ? PLAYER_SPEED * 1.5
+          : PLAYER_SPEED;
 
       this.animManager.playMovement(
         this,
@@ -309,7 +310,7 @@ export class Player extends GameObjects.Sprite {
         targets: this,
         x: nextX,
         y: nextY,
-        duration: (tileSize / speed) * 1000,
+        duration: (TILE_SIZE / speed) * 1000,
         ease: "Linear",
         onComplete: () => {
           this.isMoving = false;
@@ -336,7 +337,7 @@ export class Player extends GameObjects.Sprite {
   }
 
   getGridPosition() {
-    const scaledTileSize = CONFIG.tileSize * CONFIG.renderScale;
+    const scaledTileSize = GAME_CONSTANTS.TILE_SIZE * settingsStore.renderScale;
     return {
       x: Math.floor(this.x / scaledTileSize),
       y: Math.floor((this.y - 1) / scaledTileSize),

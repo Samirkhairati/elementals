@@ -1,5 +1,6 @@
 import { Scene } from "phaser";
-import { CONFIG } from "@/config";
+import { GAME_CONSTANTS } from "@/constants/game";
+import { settingsStore } from "@/core/SettingsStore";
 import { TILESETS } from "@/constants/assets";
 import {
   MapParser,
@@ -73,7 +74,7 @@ export class MapSystem {
   }
 
   private applyScale() {
-    const scale = CONFIG.renderScale;
+    const scale = settingsStore.renderScale;
     this.layerManager.getAllLayers().forEach(layer => {
       layer.setScale(scale);
     });
@@ -81,7 +82,7 @@ export class MapSystem {
 
   private updateWorldBounds() {
     if (!this.currentMap) return;
-    const scale = CONFIG.renderScale;
+    const scale = settingsStore.renderScale;
     this.scene.cameras.main.setBounds(
         0, 0, 
         this.currentMap.widthInPixels * scale, 
@@ -94,16 +95,16 @@ export class MapSystem {
       this.gridGraphics.destroy();
     }
 
-    if (!CONFIG.debug.enabled || !CONFIG.debug.showGrid || !this.currentMap) return;
+    if (!settingsStore.debug.enabled || !settingsStore.debug.showGrid || !this.currentMap) return;
 
     this.gridGraphics = this.scene.add.graphics();
     this.gridGraphics.setDepth(100);
     this.gridGraphics.lineStyle(1, 0xffffff, 0.1);
     
-    const scale = CONFIG.renderScale;
+    const scale = settingsStore.renderScale;
     const widthInPixels = this.currentMap.widthInPixels * scale;
     const heightInPixels = this.currentMap.heightInPixels * scale;
-    const tileSize = CONFIG.tileSize * scale;
+    const tileSize = GAME_CONSTANTS.TILE_SIZE * scale;
 
     for (let x = 0; x <= widthInPixels; x += tileSize)
       this.gridGraphics.lineBetween(x, 0, x, heightInPixels);
