@@ -129,17 +129,17 @@ graph TD
 
 ---
 
-### Phase 3: Core ECS Foundation & Render Bridge
+### Phase 3: Core ECS Foundation & Render Bridge (Completed)
 *Objective: Implement a lightweight, fast TypeScript ECS and a bridge that synchronizes ECS transforms with Phaser display objects.*
 
-- [ ] **Lightweight ECS Engine (`src/ecs/`):**
+- [x] **Lightweight ECS Engine (`src/ecs/`):**
   - `World`: Container managing entities, component pools, and system update loops.
   - `Entity`: Lightweight numeric ID (`number`).
   - `Component`: Simple data classes or factory functions (`TransformComponent`, `SpriteComponent`, `TagComponent`).
   - `System`: Abstract base class with `update(world: World, delta: number)`.
-- [ ] **Declarative Prefab System (`src/ecs/prefabs/`):**
+- [x] **Declarative Prefab System (`src/ecs/prefabs/`):**
   - Implement `definePrefab({ name, components })` and `world.spawnPrefab(prefabName, overrides)`.
-- [ ] **Phaser Render Bridge System (`RenderBridgeSystem`):**
+- [x] **Phaser Render Bridge System (`RenderBridgeSystem`):**
   - Listens for entities with `TransformComponent` + `SpriteComponent`.
   - Instantiates or updates a corresponding `Phaser.GameObjects.Sprite` inside the Phaser scene.
   - Automatically updates sprite `x`, `y`, `depth`, and frame when components change.

@@ -9,6 +9,7 @@ import { InputManager } from "@/components/InputManager";
 import { InteractionManager } from "@/components/InteractionManager";
 import { MAPS } from "@/constants/assets";
 import { EventBus, Events } from "@/utils/EventBus";
+import { World, RenderBridgeSystem, DecorationPrefab } from "@/ecs";
 
 export class Game extends Scene {
   private player!: Player;
@@ -16,6 +17,8 @@ export class Game extends Scene {
   private interactionSystem!: InteractionSystem;
   private inputManager!: InputManager;
   private interactionManager!: InteractionManager;
+  private world!: World;
+  private renderBridgeSystem!: RenderBridgeSystem;
 
   constructor() {
     super("Game");
@@ -26,6 +29,11 @@ export class Game extends Scene {
     this.interactionSystem = new InteractionSystem(this);
     this.inputManager = new InputManager(this);
     this.interactionManager = new InteractionManager(this.interactionSystem);
+    
+    // Initialize ECS World and Systems
+    this.world = new World();
+    this.renderBridgeSystem = new RenderBridgeSystem(this);
+    this.world.addSystem(this.renderBridgeSystem);
     
     // Wire up events
     this.switchMap = this.switchMap.bind(this);
@@ -70,6 +78,7 @@ export class Game extends Scene {
       EventBus.off(Events.MAP_SWITCH_REQUEST, this.switchMap);
       this.scale.off('resize', this.handleResize);
       this.interactionManager.destroy();
+      this.world?.destroy();
   }
 
   private switchMap(mapKey: string) {
@@ -99,6 +108,16 @@ export class Game extends Scene {
       this.cameras.main.startFollow(this.player, true, 1, 1);
     }
 
+    // Spawn test decorative entity via ECS to verify RenderBridge
+    this.world?.clear();
+    this.world?.spawnPrefab(DecorationPrefab, {
+      x: spawnX + tileSize * 2,
+      y: spawnY,
+      texture: "bush",
+      depth: GAME_CONSTANTS.PLAYER_DEPTH - 1,
+      tag: "test-bush",
+    });
+
     // If map was switched while menu was open, ensure new player is unlocked
     gameState.setInputLocked(false);
   }
@@ -107,5 +126,6 @@ export class Game extends Scene {
     this.inputManager?.update();
     const input = this.inputManager?.getSnapshot();
     this.player?.update(delta, input);
+    this.world?.update(delta);
   }
 }
