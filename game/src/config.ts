@@ -20,6 +20,7 @@ export const CONFIG = {
   backgroundColor: "#000000",
   playerSpeed: 200,
   playerDepth: 20,
+  tileBasedMovement: true, // Toggle tile-based movement on (true) or off (false for continuous free movement)
   camera: {
     smoothFollow: true,
   },

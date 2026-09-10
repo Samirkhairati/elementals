@@ -70,6 +70,8 @@ export class DebugHUD {
             lines.push(`DEBUG: Grid: ON`);
         }
 
+        lines.push(`DEBUG: Movement: ${CONFIG.tileBasedMovement ? 'Tile-Based' : 'Continuous'} (Press 'T' to toggle)`);
+
         this.text.setText(lines.join('\n'));
         
         // Redraw background

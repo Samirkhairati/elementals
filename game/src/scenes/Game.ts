@@ -113,9 +113,9 @@ export class Game extends Scene {
     EventBus.emit(Events.PLAYER_READY, this.player);
   }
 
-  update(_time: number, _delta: number) {
+  update(_time: number, delta: number) {
     this.inputManager?.update();
-    this.player?.update();
+    this.player?.update(delta);
   }
 
   getPlayer(): Player | undefined {
