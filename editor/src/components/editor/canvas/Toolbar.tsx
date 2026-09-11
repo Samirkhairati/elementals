@@ -2,7 +2,6 @@ import { Undo, Redo, Brush, Eraser, Square, PaintBucket, Grid, Shuffle, Stamp, I
 import { ActiveTool, PaintMode } from '@/types/editor'
 import { useState } from 'react'
 import { ShortcutsDialog } from '../dialogs/ShortcutsDialog'
-import { ViewMenu } from '../layout/ViewMenu'
 
 interface ToolbarProps {
   historyIndex: number
@@ -29,10 +28,6 @@ export function Toolbar({
 
   return (
     <div className="h-14 border-b border-border bg-background flex items-center px-4 shrink-0 shadow-sm z-10 justify-between">
-      <div className="flex items-center gap-2">
-        <ViewMenu />
-      </div>
-      
       <div className="flex items-center gap-4">
         {/* History Group */}
         <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-md border">
