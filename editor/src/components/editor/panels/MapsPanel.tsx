@@ -1,8 +1,26 @@
-import { Plus, FolderPlus, Folder as FolderIcon, ChevronRight, ChevronDown, Map as MapIcon, Edit2, Trash2, Download } from 'lucide-react'
+import React from 'react'
+import {
+  Folder as FolderIcon,
+  ChevronRight,
+  ChevronDown,
+  Map as MapIcon,
+  Plus,
+  FolderPlus,
+  Edit2,
+  Trash2,
+  Download,
+} from 'lucide-react'
 import { MapData } from '@/types/editor'
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu'
 
 interface MapsPanelProps {
-  maps: any[]
+  maps: MapData[]
   mapFolders: string[]
   activeMap: MapData | null
   expandedMapFolders: Set<string>
@@ -19,7 +37,7 @@ interface MapsPanelProps {
   handleDeleteMap: (folderPath: string | null, fileName: string) => void
   handleExportMap: (m: any) => void
   handleMapDrop: (e: React.DragEvent, targetFolder: string | null) => void
-  onSelectMap: (m: any) => void
+  onSelectMap: (m: MapData) => void
 }
 
 export function MapsPanel({
@@ -42,50 +60,93 @@ export function MapsPanel({
   handleMapDrop,
   onSelectMap,
 }: MapsPanelProps) {
+  const openCreateMap = (parentPath: string | null = null) => {
+    setCreateMapData({ name: '', width: 50, height: 50 })
+    setCreateMapDialog({ open: true, parentPath })
+  }
+
+  const openCreateFolder = (parentPath: string | null = null) => {
+    const depthFolders = mapFolders.filter((f) =>
+      parentPath ? f.startsWith(parentPath + '/') : !f.includes('/')
+    )
+    setCreateMapFolderName(`Folder ${depthFolders.length + 1}`)
+    setCreateMapFolderDialog({ open: true, parentPath })
+  }
+
   const renderMapTree = (currentPath: string | null, level: number = 0): React.ReactNode => {
-    const childrenFolders = mapFolders.filter(f => {
+    const childrenFolders = mapFolders.filter((f) => {
       if (currentPath === null) return !f.includes('/')
       return f.startsWith(currentPath + '/') && f.substring(currentPath.length + 1).indexOf('/') === -1
     })
 
-    const childrenMaps = maps.filter(m => m.folderPath === currentPath)
+    const childrenMaps = maps.filter((m) => m.folderPath === currentPath)
 
     return (
-      <div className="space-y-1" style={{ paddingLeft: level === 0 ? 0 : 16 }}>
-        {childrenFolders.map(folder => {
+      <div className="space-y-0.5">
+        {childrenFolders.map((folder) => {
           const folderName = folder.split('/').pop() || folder
           const isExpanded = expandedMapFolders.has(folder)
-          const hasSubfolders = mapFolders.some(sub => sub.startsWith(folder + '/'))
-          const hasMaps = maps.some(m => m.folderPath === folder || (m.folderPath && m.folderPath.startsWith(folder + '/')))
-          const isEmpty = !hasSubfolders && !hasMaps
           const isSelected = selectedMapFolder === folder
 
           return (
-            <div key={folder}>
-              <div
-                className={`flex items-center group py-1 px-2 rounded-md cursor-pointer text-sm transition-colors ${isSelected ? 'bg-sidebar-accent font-medium text-sidebar-foreground ring-1 ring-sidebar-ring' : 'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => handleMapDrop(e, folder)}
-                onClick={() => { setSelectedMapFolder(folder); toggleMapFolder(folder); }}
-              >
-                <div className="flex-1 flex items-center">
-                  {isExpanded ? <ChevronDown className="w-4 h-4 mr-1 opacity-70" /> : <ChevronRight className="w-4 h-4 mr-1 opacity-70" />}
-                  <FolderIcon className="w-4 h-4 mr-2 text-primary" />
-                  <span>{folderName}</span>
-                </div>
-                <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity">
-                  <button onClick={(e) => { e.stopPropagation(); setCreateMapData({ name: '', width: 50, height: 50 }); setCreateMapDialog({ open: true, parentPath: folder }); }} className="p-1 hover:bg-black/10 rounded" title="New Map"><Plus className="w-3 h-3" /></button>
-                  <button onClick={(e) => { e.stopPropagation(); setCreateMapFolderName(`Folder ${mapFolders.length + 1}`); setCreateMapFolderDialog({ open: true, parentPath: folder }); }} className="p-1 hover:bg-black/10 rounded" title="New Subfolder"><FolderPlus className="w-3 h-3" /></button>
-                  <button onClick={(e) => { e.stopPropagation(); setRenameInput(folderName); setRenameDialog({ open: true, type: 'map-folder', oldPath: folder }); }} className="p-1 hover:bg-black/10 rounded" title="Rename"><Edit2 className="w-3 h-3" /></button>
-                  {isEmpty && (
-                    <button onClick={(e) => { e.stopPropagation(); handleDeleteMapFolder(folder); }} className="p-1 hover:bg-red-500/20 hover:text-red-400 rounded text-red-400" title="Delete Empty Folder">
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
-              </div>
+            <div key={folder} className="group/folder">
+              <ContextMenu>
+                <ContextMenuTrigger>
+                  <div
+                    className={`flex items-center py-1.5 px-2 rounded-md cursor-pointer text-sm transition-colors select-none ${
+                      isSelected
+                        ? 'bg-sidebar-accent font-medium text-sidebar-foreground ring-1 ring-sidebar-ring'
+                        : 'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-sidebar-foreground'
+                    }`}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => handleMapDrop(e, folder)}
+                    onClick={() => {
+                      setSelectedMapFolder(folder)
+                      toggleMapFolder(folder)
+                    }}
+                  >
+                    <div className="flex items-center flex-1 min-w-0">
+                      {isExpanded ? (
+                        <ChevronDown className="w-4 h-4 mr-1 shrink-0 opacity-70" />
+                      ) : (
+                        <ChevronRight className="w-4 h-4 mr-1 shrink-0 opacity-70" />
+                      )}
+                      <FolderIcon className="w-4 h-4 mr-2 shrink-0 text-primary" />
+                      <span className="truncate">{folderName}</span>
+                    </div>
+                  </div>
+                </ContextMenuTrigger>
+                <ContextMenuContent className="w-48">
+                  <ContextMenuItem onClick={() => openCreateMap(folder)}>
+                    <Plus className="w-3.5 h-3.5 mr-2" />
+                    New Map
+                  </ContextMenuItem>
+                  <ContextMenuItem onClick={() => openCreateFolder(folder)}>
+                    <FolderPlus className="w-3.5 h-3.5 mr-2" />
+                    New Subfolder
+                  </ContextMenuItem>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem
+                    onClick={() => {
+                      setRenameInput(folderName)
+                      setRenameDialog({ open: true, type: 'map-folder', oldPath: folder })
+                    }}
+                  >
+                    <Edit2 className="w-3.5 h-3.5 mr-2" />
+                    Rename
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    onClick={() => handleDeleteMapFolder(folder)}
+                    className="text-red-400 focus:text-red-400 focus:bg-red-500/10"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 mr-2" />
+                    Delete Folder
+                  </ContextMenuItem>
+                </ContextMenuContent>
+              </ContextMenu>
+
               {isExpanded && (
-                <div className="mt-1">
+                <div className="relative pl-3 ml-2.5 border-l border-white/0 hover:border-white/30 group-hover/folder:border-white/20 transition-colors mt-0.5 space-y-0.5">
                   {renderMapTree(folder, level + 1)}
                 </div>
               )}
@@ -93,44 +154,88 @@ export function MapsPanel({
           )
         })}
 
-        {childrenMaps.map(m => (
-          <div
-            key={m.fileName}
-            draggable
-            onDragStart={(e) => {
-              e.dataTransfer.setData('mapFileName', m.fileName)
-              e.dataTransfer.setData('mapSourceFolder', String(m.folderPath))
-            }}
-            onClick={() => onSelectMap(m)}
-            className={`flex items-center group py-1.5 px-2.5 rounded-md cursor-pointer text-sm ml-5 transition-colors ${activeMap?.fileName === m.fileName ? 'bg-primary/30 text-primary-foreground font-medium border border-primary/40' : 'hover:bg-sidebar-accent text-sidebar-foreground'}`}
-          >
-            <MapIcon className="w-4 h-4 mr-2 opacity-80" />
-            <span className="flex-1 truncate">{m.name}</span>
-            <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity">
-              <button
-                onClick={(e) => { e.stopPropagation(); handleExportMap(m) }}
-                className="p-1 hover:bg-black/10 rounded" title="Export Map"
+        {childrenMaps.map((m) => (
+          <ContextMenu key={m.fileName}>
+            <ContextMenuTrigger>
+              <div
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('mapFileName', m.fileName)
+                  e.dataTransfer.setData('mapSourceFolder', String(m.folderPath))
+                }}
+                onClick={() => onSelectMap(m)}
+                className={`flex items-center py-1.5 px-2 rounded-md cursor-pointer text-sm transition-colors select-none ${
+                  activeMap?.fileName === m.fileName
+                    ? 'bg-primary/30 text-primary-foreground font-medium border border-primary/40'
+                    : 'hover:bg-sidebar-accent text-sidebar-foreground'
+                }`}
               >
-                <Download className="w-3 h-3" />
-              </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); setRenameInput(m.name); setRenameDialog({ open: true, type: 'map', oldName: m.name, oldPath: m.fileName, targetFolder: m.folderPath }) }}
-                className="p-1 hover:bg-black/10 rounded" title="Rename Map"
+                <div className="w-4 h-4 mr-1 shrink-0 opacity-0" />
+                <MapIcon className="w-4 h-4 mr-2 shrink-0 opacity-80" />
+                <span className="flex-1 truncate">{m.name}</span>
+              </div>
+            </ContextMenuTrigger>
+            <ContextMenuContent className="w-44">
+              <ContextMenuItem
+                onClick={() => {
+                  setRenameInput(m.name)
+                  setRenameDialog({
+                    open: true,
+                    type: 'map',
+                    oldName: m.name,
+                    oldPath: m.fileName,
+                    targetFolder: m.folderPath,
+                  })
+                }}
               >
-                <Edit2 className="w-3 h-3" />
-              </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); handleDeleteMap(m.folderPath, m.fileName) }}
-                className="p-1 hover:bg-red-500/20 hover:text-red-400 rounded text-red-400" title="Delete Map"
+                <Edit2 className="w-3.5 h-3.5 mr-2" />
+                Rename
+              </ContextMenuItem>
+              <ContextMenuItem onClick={() => handleExportMap(m)}>
+                <Download className="w-3.5 h-3.5 mr-2" />
+                Export Map
+              </ContextMenuItem>
+              <ContextMenuSeparator />
+              <ContextMenuItem
+                onClick={() => handleDeleteMap(m.folderPath, m.fileName)}
+                className="text-red-400 focus:text-red-400 focus:bg-red-500/10"
               >
-                <Trash2 className="w-3 h-3" />
-              </button>
-            </div>
-          </div>
+                <Trash2 className="w-3.5 h-3.5 mr-2" />
+                Delete Map
+              </ContextMenuItem>
+            </ContextMenuContent>
+          </ContextMenu>
         ))}
       </div>
     )
   }
 
-  return <>{renderMapTree(null)}</>
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger className="block min-h-full h-full w-full">
+        <div
+          className="min-h-full h-full w-full space-y-1"
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => handleMapDrop(e, null)}
+        >
+          {renderMapTree(null, 0)}
+          {maps.length === 0 && mapFolders.length === 0 && (
+            <div className="h-40 flex items-center justify-center text-muted-foreground p-4 text-center">
+              <p className="text-xs">Right-click here to create a map or folder.</p>
+            </div>
+          )}
+        </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent className="w-44">
+        <ContextMenuItem onClick={() => openCreateMap(null)}>
+          <Plus className="w-3.5 h-3.5 mr-2" />
+          New Map
+        </ContextMenuItem>
+        <ContextMenuItem onClick={() => openCreateFolder(null)}>
+          <FolderPlus className="w-3.5 h-3.5 mr-2" />
+          New Folder
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
+  )
 }
