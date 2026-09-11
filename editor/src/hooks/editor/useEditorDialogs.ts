@@ -182,6 +182,7 @@ export function useEditorDialogs(options: UseEditorDialogsOptions) {
         setExpandedMapFolders(prev => new Set(prev).add(createMapFolderDialog.parentPath!))
       }
       setCreateMapFolderDialog({ open: false })
+      document.body.style.pointerEvents = ''
       loadData()
     } else {
       alert(res.error)
@@ -207,6 +208,7 @@ export function useEditorDialogs(options: UseEditorDialogsOptions) {
         setExpandedMapFolders(prev => new Set(prev).add(createMapDialog.parentPath!))
       }
       setCreateMapDialog({ open: false })
+      document.body.style.pointerEvents = ''
       loadData()
       onMapCreated?.(res.map)
     } else {

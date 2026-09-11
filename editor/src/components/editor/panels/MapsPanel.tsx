@@ -45,8 +45,6 @@ export function MapsPanel({
   mapFolders,
   activeMap,
   expandedMapFolders,
-  selectedMapFolder,
-  setSelectedMapFolder,
   toggleMapFolder,
   setCreateMapData,
   setCreateMapDialog,
@@ -61,16 +59,20 @@ export function MapsPanel({
   onSelectMap,
 }: MapsPanelProps) {
   const openCreateMap = (parentPath: string | null = null) => {
-    setCreateMapData({ name: '', width: 50, height: 50 })
-    setCreateMapDialog({ open: true, parentPath })
+    setTimeout(() => {
+      setCreateMapData({ name: '', width: 50, height: 50 })
+      setCreateMapDialog({ open: true, parentPath })
+    }, 0)
   }
 
   const openCreateFolder = (parentPath: string | null = null) => {
-    const depthFolders = mapFolders.filter((f) =>
-      parentPath ? f.startsWith(parentPath + '/') : !f.includes('/')
-    )
-    setCreateMapFolderName(`Folder ${depthFolders.length + 1}`)
-    setCreateMapFolderDialog({ open: true, parentPath })
+    setTimeout(() => {
+      const depthFolders = mapFolders.filter((f) =>
+        parentPath ? f.startsWith(parentPath + '/') : !f.includes('/')
+      )
+      setCreateMapFolderName(`Folder ${depthFolders.length + 1}`)
+      setCreateMapFolderDialog({ open: true, parentPath })
+    }, 0)
   }
 
   const renderMapTree = (currentPath: string | null, level: number = 0): React.ReactNode => {
@@ -86,22 +88,16 @@ export function MapsPanel({
         {childrenFolders.map((folder) => {
           const folderName = folder.split('/').pop() || folder
           const isExpanded = expandedMapFolders.has(folder)
-          const isSelected = selectedMapFolder === folder
 
           return (
             <div key={folder} className="group/folder">
               <ContextMenu>
                 <ContextMenuTrigger>
                   <div
-                    className={`flex items-center py-1.5 px-2 rounded-md cursor-pointer text-sm transition-colors select-none ${
-                      isSelected
-                        ? 'bg-sidebar-accent font-medium text-sidebar-foreground ring-1 ring-sidebar-ring'
-                        : 'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-sidebar-foreground'
-                    }`}
+                    className="flex items-center py-1.5 px-2 rounded-md cursor-pointer text-sm transition-colors select-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-sidebar-foreground"
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={(e) => handleMapDrop(e, folder)}
                     onClick={() => {
-                      setSelectedMapFolder(folder)
                       toggleMapFolder(folder)
                     }}
                   >
@@ -128,15 +124,21 @@ export function MapsPanel({
                   <ContextMenuSeparator />
                   <ContextMenuItem
                     onClick={() => {
-                      setRenameInput(folderName)
-                      setRenameDialog({ open: true, type: 'map-folder', oldPath: folder })
+                      setTimeout(() => {
+                        setRenameInput(folderName)
+                        setRenameDialog({ open: true, type: 'map-folder', oldPath: folder })
+                      }, 0)
                     }}
                   >
                     <Edit2 className="w-3.5 h-3.5 mr-2" />
                     Rename
                   </ContextMenuItem>
                   <ContextMenuItem
-                    onClick={() => handleDeleteMapFolder(folder)}
+                    onClick={() => {
+                      setTimeout(() => {
+                        handleDeleteMapFolder(folder)
+                      }, 0)
+                    }}
                     className="text-red-400 focus:text-red-400 focus:bg-red-500/10"
                   >
                     <Trash2 className="w-3.5 h-3.5 mr-2" />
@@ -154,58 +156,70 @@ export function MapsPanel({
           )
         })}
 
-        {childrenMaps.map((m) => (
-          <ContextMenu key={m.fileName}>
-            <ContextMenuTrigger>
-              <div
-                draggable
-                onDragStart={(e) => {
-                  e.dataTransfer.setData('mapFileName', m.fileName)
-                  e.dataTransfer.setData('mapSourceFolder', String(m.folderPath))
-                }}
-                onClick={() => onSelectMap(m)}
-                className={`flex items-center py-1.5 px-2 rounded-md cursor-pointer text-sm transition-colors select-none ${
-                  activeMap?.fileName === m.fileName
-                    ? 'bg-primary/30 text-primary-foreground font-medium border border-primary/40'
-                    : 'hover:bg-sidebar-accent text-sidebar-foreground'
-                }`}
-              >
-                <div className="w-4 h-4 mr-1 shrink-0 opacity-0" />
-                <MapIcon className="w-4 h-4 mr-2 shrink-0 opacity-80" />
-                <span className="flex-1 truncate">{m.name}</span>
-              </div>
-            </ContextMenuTrigger>
-            <ContextMenuContent className="w-44">
-              <ContextMenuItem
-                onClick={() => {
-                  setRenameInput(m.name)
-                  setRenameDialog({
-                    open: true,
-                    type: 'map',
-                    oldName: m.name,
-                    oldPath: m.fileName,
-                    targetFolder: m.folderPath,
-                  })
-                }}
-              >
-                <Edit2 className="w-3.5 h-3.5 mr-2" />
-                Rename
-              </ContextMenuItem>
-              <ContextMenuItem onClick={() => handleExportMap(m)}>
-                <Download className="w-3.5 h-3.5 mr-2" />
-                Export Map
-              </ContextMenuItem>
-              <ContextMenuSeparator />
-              <ContextMenuItem
-                onClick={() => handleDeleteMap(m.folderPath, m.fileName)}
-                className="text-red-400 focus:text-red-400 focus:bg-red-500/10"
-              >
-                <Trash2 className="w-3.5 h-3.5 mr-2" />
-                Delete Map
-              </ContextMenuItem>
-            </ContextMenuContent>
-          </ContextMenu>
-        ))}
+        {childrenMaps.map((m) => {
+          const isSelected =
+            activeMap?.fileName === m.fileName &&
+            (activeMap?.folderPath || null) === (m.folderPath || null)
+
+          return (
+            <ContextMenu key={m.fileName}>
+              <ContextMenuTrigger>
+                <div
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData('mapFileName', m.fileName)
+                    e.dataTransfer.setData('mapSourceFolder', String(m.folderPath))
+                  }}
+                  onClick={() => onSelectMap(m)}
+                  className={`flex items-center py-1.5 px-2 rounded-md cursor-pointer text-sm transition-colors select-none ${
+                    isSelected
+                      ? 'bg-primary/30 text-primary-foreground font-medium border border-primary/40'
+                      : 'hover:bg-sidebar-accent text-sidebar-foreground'
+                  }`}
+                >
+                  <div className="w-4 h-4 mr-1 shrink-0 opacity-0" />
+                  <MapIcon className="w-4 h-4 mr-2 shrink-0 opacity-80" />
+                  <span className="flex-1 truncate">{m.name}</span>
+                </div>
+              </ContextMenuTrigger>
+              <ContextMenuContent className="w-44">
+                <ContextMenuItem
+                  onClick={() => {
+                    setTimeout(() => {
+                      setRenameInput(m.name)
+                      setRenameDialog({
+                        open: true,
+                        type: 'map',
+                        oldName: m.name,
+                        oldPath: m.fileName,
+                        targetFolder: m.folderPath,
+                      })
+                    }, 0)
+                  }}
+                >
+                  <Edit2 className="w-3.5 h-3.5 mr-2" />
+                  Rename
+                </ContextMenuItem>
+                <ContextMenuItem onClick={() => handleExportMap(m)}>
+                  <Download className="w-3.5 h-3.5 mr-2" />
+                  Export Map
+                </ContextMenuItem>
+                <ContextMenuSeparator />
+                <ContextMenuItem
+                  onClick={() => {
+                    setTimeout(() => {
+                      handleDeleteMap(m.folderPath, m.fileName)
+                    }, 0)
+                  }}
+                  className="text-red-400 focus:text-red-400 focus:bg-red-500/10"
+                >
+                  <Trash2 className="w-3.5 h-3.5 mr-2" />
+                  Delete Map
+                </ContextMenuItem>
+              </ContextMenuContent>
+            </ContextMenu>
+          )
+        })}
       </div>
     )
   }

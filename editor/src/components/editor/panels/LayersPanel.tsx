@@ -128,12 +128,14 @@ export function LayersPanel({
   }
 
   const confirmDeleteLayer = (layer: Layer) => {
-    setConfirmDialog({
-      open: true,
-      title: 'Delete Layer',
-      description: `Are you sure you want to delete layer "${layer.name}"?`,
-      action: () => deleteLayer(layer.id),
-    })
+    setTimeout(() => {
+      setConfirmDialog({
+        open: true,
+        title: 'Delete Layer',
+        description: `Are you sure you want to delete layer "${layer.name}"?`,
+        action: () => deleteLayer(layer.id),
+      })
+    }, 0)
   }
 
   const hasCollision = layers.some((l) => l.type === 'collision')
