@@ -2,55 +2,6 @@ import React from 'react';
 import { Plus, FolderPlus } from 'lucide-react';
 import { useEditorContext } from '../EditorContext';
 
-export function MapsActions() {
-  const ctx = useEditorContext();
-  return (
-    <div className="flex items-center space-x-1 px-2">
-      <button
-        onClick={() => {
-          ctx.setCreateMapFolderName(`Folder ${ctx.mapFolders.length + 1}`);
-          ctx.setCreateMapFolderDialog({ open: true, parentPath: null });
-        }}
-        className="p-1.5 hover:bg-sidebar-accent rounded-md text-sidebar-foreground transition-colors"
-        title="New Folder"
-      >
-        <FolderPlus className="w-4 h-4" />
-      </button>
-      <button
-        onClick={() => {
-          ctx.setCreateMapData({ name: '', width: 50, height: 50 });
-          ctx.setCreateMapDialog({ open: true, parentPath: null });
-        }}
-        className="p-1.5 hover:bg-sidebar-accent rounded-md text-sidebar-foreground transition-colors"
-        title="New Map"
-      >
-        <Plus className="w-4 h-4" />
-      </button>
-    </div>
-  );
-}
-
-export function LayersActions() {
-  const ctx = useEditorContext();
-  return (
-    <div className="flex items-center space-x-1 px-2">
-      <button
-        onClick={() => {
-          if (!ctx.activeMap) {
-            alert('Please select a map first');
-            return;
-          }
-          ctx.handleCreateLayer();
-        }}
-        className="p-1.5 hover:bg-sidebar-accent rounded-md text-sidebar-foreground transition-colors"
-        title="New Layer"
-      >
-        <Plus className="w-4 h-4" />
-      </button>
-    </div>
-  );
-}
-
 export function TilesetsActions() {
   const ctx = useEditorContext();
   return (
@@ -74,8 +25,7 @@ export function TilesetsActions() {
 
 export const DefaultHeaderActions = (props: any) => {
   const panelId = props.group?.activePanel?.id || props.panel?.id;
-  if (panelId === 'maps') return <MapsActions />;
-  if (panelId === 'layers') return <LayersActions />;
   if (panelId === 'tilesets') return <TilesetsActions />;
   return null;
 };
+

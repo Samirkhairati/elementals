@@ -1,0 +1,58 @@
+{
+  "name": "town",
+  "width": 50,
+  "height": 50,
+  "layers": [
+    {
+      "id": "5bd2da47-b2d8-4309-a8fd-f32dda0d2c5a",
+      "name": "decorations",
+      "type": "tile",
+      "visible": true,
+      "locked": false,
+      "z": 20,
+      "data": {}
+    },
+    {
+      "id": "3c77442f-37af-4571-b7a9-87a26387d5f6",
+      "name": "building",
+      "type": "tile",
+      "visible": true,
+      "locked": false,
+      "z": 10,
+      "data": {}
+    },
+    {
+      "id": "00e86d04-c862-41b8-81b5-9d63b0f533dc",
+      "name": "ground",
+      "type": "tile",
+      "visible": true,
+      "locked": false,
+      "z": 1,
+      "data": {}
+    },
+    {
+      "id": "6df98213-e35f-4328-8a1e-33db76564676",
+      "name": "collisions",
+      "type": "collision",
+      "visible": true,
+      "locked": false,
+      "data": {}
+    },
+    {
+      "id": "a4ea22f8-963b-4f0e-a056-ce07aec368de",
+      "name": "terrain",
+      "type": "terrain",
+      "visible": true,
+      "locked": false,
+      "data": {}
+    },
+    {
+      "id": "b5cb8c9f-6d37-4bf9-b18d-cd28c426b837",
+      "name": "encounters",
+      "type": "encounters",
+      "visible": true,
+      "locked": false,
+      "data": {}
+    }
+  ]
+}

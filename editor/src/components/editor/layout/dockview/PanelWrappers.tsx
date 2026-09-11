@@ -13,14 +13,15 @@ import { CenterCanvas } from '../CenterCanvas';
 export function MapsWrapper(_props: IDockviewPanelProps) {
   const ctx = useEditorContext();
   return (
-    <div className="flex-1 overflow-y-auto p-2 font-mono text-xs min-h-0 bg-sidebar-background h-full">
+    <div
+      onClick={() => ctx.setFocusedDomain?.('maps')}
+      className="flex-1 overflow-y-auto p-2 font-mono text-xs min-h-0 bg-sidebar-background h-full"
+    >
       <MapsPanel
         maps={ctx.maps}
         mapFolders={ctx.mapFolders}
         activeMap={ctx.activeMap}
         expandedMapFolders={ctx.expandedMapFolders}
-        selectedMapFolder={ctx.selectedMapFolder}
-        setSelectedMapFolder={ctx.setSelectedMapFolder}
         toggleMapFolder={ctx.toggleMapFolder}
         setCreateMapData={ctx.setCreateMapData}
         setCreateMapDialog={ctx.setCreateMapDialog}
@@ -41,8 +42,12 @@ export function MapsWrapper(_props: IDockviewPanelProps) {
 export function LayersWrapper(_props: IDockviewPanelProps) {
   const ctx = useEditorContext();
   return (
-    <div className="flex-1 overflow-y-auto p-2 font-mono text-xs min-h-0 bg-sidebar-background h-full">
+    <div
+      onClick={() => ctx.setFocusedDomain?.('layers')}
+      className="flex-1 overflow-y-auto p-2 font-mono text-xs min-h-0 bg-sidebar-background h-full"
+    >
       <LayersPanel
+        activeMap={ctx.activeMap}
         layers={ctx.layers}
         activeLayerId={ctx.activeLayerId}
         setActiveLayerId={ctx.setActiveLayerId}
@@ -50,6 +55,10 @@ export function LayersWrapper(_props: IDockviewPanelProps) {
         toggleLayerLock={ctx.toggleLayerLock}
         deleteLayer={ctx.handleDeleteLayer}
         reorderLayers={ctx.handleReorderLayers}
+        createLayerOfType={ctx.handleCreateLayerOfType}
+        renameLayer={ctx.handleRenameLayer}
+        duplicateLayer={ctx.handleDuplicateLayer}
+        setConfirmDialog={ctx.setConfirmDialog}
       />
     </div>
   );

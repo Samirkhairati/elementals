@@ -66,6 +66,30 @@ export function registerMapHandlers(mapsDir: string) {
         const defaultLayers = [
           {
             id: crypto.randomUUID(),
+            name: 'collisions',
+            type: 'collision',
+            visible: true,
+            locked: false,
+            data: {},
+          },
+          {
+            id: crypto.randomUUID(),
+            name: 'terrain',
+            type: 'terrain',
+            visible: true,
+            locked: false,
+            data: {},
+          },
+          {
+            id: crypto.randomUUID(),
+            name: 'encounters',
+            type: 'encounters',
+            visible: true,
+            locked: false,
+            data: {},
+          },
+          {
+            id: crypto.randomUUID(),
             name: 'decorations',
             type: 'tile',
             visible: true,
@@ -89,30 +113,6 @@ export function registerMapHandlers(mapsDir: string) {
             visible: true,
             locked: false,
             z: 1,
-            data: {},
-          },
-          {
-            id: crypto.randomUUID(),
-            name: 'collisions',
-            type: 'collision',
-            visible: true,
-            locked: false,
-            data: {},
-          },
-          {
-            id: crypto.randomUUID(),
-            name: 'terrain',
-            type: 'terrain',
-            visible: true,
-            locked: false,
-            data: {},
-          },
-          {
-            id: crypto.randomUUID(),
-            name: 'encounters',
-            type: 'encounters',
-            visible: true,
-            locked: false,
             data: {},
           },
         ];
@@ -182,13 +182,11 @@ export function registerMapHandlers(mapsDir: string) {
     try {
       const targetPath = path.join(mapsDir, folderPath);
       if (fs.existsSync(targetPath)) {
-        fs.rmdirSync(targetPath);
+        fs.rmSync(targetPath, { recursive: true, force: true });
         return { success: true };
       }
       return { success: false, error: 'Folder does not exist.' };
     } catch (error: any) {
-      if (error.code === 'ENOTEMPTY')
-        return { success: false, error: 'Cannot delete folder because it is not empty.' };
       return { success: false, error: error.message };
     }
   });

@@ -8,6 +8,7 @@ interface UseEditorDialogsOptions {
   setExpandedMapFolders: React.Dispatch<React.SetStateAction<Set<string>>>
   loadData: () => Promise<void>
   onMapCreated?: (map: MapData) => void
+  onRenameLayer?: (id: string, newName: string) => void
 }
 
 export function useEditorDialogs(options: UseEditorDialogsOptions) {
@@ -18,6 +19,7 @@ export function useEditorDialogs(options: UseEditorDialogsOptions) {
     setExpandedMapFolders,
     loadData,
     onMapCreated,
+    onRenameLayer,
   } = options
 
   // Dialog open/data states
@@ -37,7 +39,7 @@ export function useEditorDialogs(options: UseEditorDialogsOptions) {
 
   const [renameDialog, setRenameDialog] = useState<{
     open: boolean
-    type: 'folder' | 'tileset' | 'map-folder' | 'map'
+    type: 'folder' | 'tileset' | 'map-folder' | 'map' | 'layer'
     oldPath?: string
     oldName?: string
     targetFolder?: string | null
@@ -124,6 +126,11 @@ export function useEditorDialogs(options: UseEditorDialogsOptions) {
       alert('Name cannot be empty')
       return
     }
+    if (renameDialog.type === 'layer' && renameDialog.oldPath) {
+      onRenameLayer?.(renameDialog.oldPath, cleanName)
+      setRenameDialog({ open: false, type: 'folder' })
+      return
+    }
     if (!window.electronAPI) return
     let res
     if (renameDialog.type === 'folder' && renameDialog.oldPath) {
@@ -149,7 +156,7 @@ export function useEditorDialogs(options: UseEditorDialogsOptions) {
     } else {
       alert(res?.error)
     }
-  }, [renameInput, renameDialog, loadData])
+  }, [renameInput, renameDialog, loadData, onRenameLayer])
 
   // ── Create Map Folder Confirmation ────────────────────────────────────────
   const handleConfirmCreateMapFolder = useCallback(async () => {
@@ -175,6 +182,7 @@ export function useEditorDialogs(options: UseEditorDialogsOptions) {
         setExpandedMapFolders(prev => new Set(prev).add(createMapFolderDialog.parentPath!))
       }
       setCreateMapFolderDialog({ open: false })
+      document.body.style.pointerEvents = ''
       loadData()
     } else {
       alert(res.error)
@@ -200,6 +208,7 @@ export function useEditorDialogs(options: UseEditorDialogsOptions) {
         setExpandedMapFolders(prev => new Set(prev).add(createMapDialog.parentPath!))
       }
       setCreateMapDialog({ open: false })
+      document.body.style.pointerEvents = ''
       loadData()
       onMapCreated?.(res.map)
     } else {

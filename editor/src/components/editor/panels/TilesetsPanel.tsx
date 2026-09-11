@@ -78,7 +78,7 @@ export function TilesetsPanel({
                   )}
                 </div>
               </div>
-              {isExpanded && (
+              {isExpanded && !isEmpty && (
                 <div className="mt-1">
                   {renderTree(folder, level + 1)}
                 </div>
@@ -96,7 +96,7 @@ export function TilesetsPanel({
               e.dataTransfer.setData('sourceFolder', String(t.folderPath))
             }}
             onClick={() => setActiveTileset(t)}
-            className={`flex items-center group py-1.5 px-2.5 rounded-md cursor-pointer text-sm ml-5 transition-colors ${activeTileset?.fileName === t.fileName ? 'bg-primary/30 text-primary-foreground font-medium border border-primary/40' : 'hover:bg-sidebar-accent text-sidebar-foreground'}`}
+            className={`flex items-center group py-1.5 px-2.5 rounded-md cursor-pointer text-sm ml-5 border ${activeTileset?.fileName === t.fileName ? 'bg-primary/30 text-primary-foreground font-medium border-primary/40' : 'border-transparent hover:bg-sidebar-accent text-sidebar-foreground'}`}
           >
             <LayoutGrid className="w-4 h-4 mr-2 opacity-80" />
             <span className="flex-1 truncate">{t.name}</span>

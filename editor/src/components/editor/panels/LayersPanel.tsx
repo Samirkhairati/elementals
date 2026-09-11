@@ -1,29 +1,104 @@
-import { useState } from 'react'
-import { Eye, EyeOff, Lock, Unlock, Box, Layers as Layers2, Hexagon, XSquare, Droplet, Leaf, Trash2 } from 'lucide-react'
-import { Layer, LayerType } from '@/types/editor'
+import React, { useState, useRef, useEffect } from 'react'
+import {
+  Layers as LayersIcon,
+  XSquare,
+  Droplet,
+  Leaf,
+  Box,
+  Lock,
+  Unlock,
+  Eye,
+  EyeOff,
+  Edit2,
+  Trash2,
+  Copy,
+  Plus,
+} from 'lucide-react'
+import { Layer, LayerType, MapData } from '@/types/editor'
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu'
 
 function getLayerIcon(type: LayerType) {
   switch (type) {
-    case 'tile': return <Layers2 className="w-4 h-4 text-gray-400" />
-    case 'collision': return <XSquare className="w-4 h-4 text-red-400" />
-    case 'terrain': return <Droplet className="w-4 h-4 text-blue-400" />
-    case 'objects': return <Box className="w-4 h-4 text-gray-400" />
-    case 'encounters': return <Leaf className="w-4 h-4 text-green-400" />
-    default: return <Layers2 className="w-4 h-4 text-gray-400" />
+    case 'tile':
+      return <LayersIcon className="w-4 h-4 text-gray-400" />
+    case 'collision':
+      return <XSquare className="w-4 h-4 text-red-400" />
+    case 'terrain':
+      return <Droplet className="w-4 h-4 text-blue-400" />
+    case 'objects':
+      return <Box className="w-4 h-4 text-amber-400" />
+    case 'encounters':
+      return <Leaf className="w-4 h-4 text-green-400" />
+    default:
+      return <LayersIcon className="w-4 h-4 text-gray-400" />
   }
 }
 
+function NewLayerSubmenu({
+  createLayerOfType,
+  hasCollision,
+  hasTerrain,
+  hasEncounters,
+}: {
+  createLayerOfType: (type: LayerType) => void
+  hasCollision: boolean
+  hasTerrain: boolean
+  hasEncounters: boolean
+}) {
+  return (
+    <ContextMenuSub>
+      <ContextMenuSubTrigger>
+        <Plus className="w-3.5 h-3.5 mr-2" />
+        New Layer
+      </ContextMenuSubTrigger>
+      <ContextMenuSubContent className="w-44">
+        <ContextMenuItem onClick={() => createLayerOfType('tile')}>Tile Layer</ContextMenuItem>
+        <ContextMenuItem disabled={hasCollision} onClick={() => createLayerOfType('collision')}>
+          Collision Layer
+        </ContextMenuItem>
+        <ContextMenuItem disabled={hasTerrain} onClick={() => createLayerOfType('terrain')}>
+          Terrain Layer
+        </ContextMenuItem>
+        <ContextMenuItem disabled={hasEncounters} onClick={() => createLayerOfType('encounters')}>
+          Encounters Layer
+        </ContextMenuItem>
+        <ContextMenuItem onClick={() => createLayerOfType('objects')}>Objects Layer</ContextMenuItem>
+      </ContextMenuSubContent>
+    </ContextMenuSub>
+  )
+}
+
 interface LayersPanelProps {
+  activeMap: MapData | null
   layers: Layer[]
   activeLayerId: string | null
   setActiveLayerId: (id: string) => void
-  toggleLayerVisibility: (id: string, shiftKey: boolean) => void
+  toggleLayerVisibility: (id: string) => void
   toggleLayerLock: (id: string) => void
   deleteLayer: (id: string) => void
   reorderLayers: (newLayers: Layer[]) => void
+  createLayerOfType: (type: LayerType) => void
+  renameLayer: (id: string, newName: string) => void
+  duplicateLayer: (id: string) => void
+  setConfirmDialog: (config: {
+    open: boolean
+    title: string
+    description: string
+    action: () => void
+  }) => void
 }
 
 export function LayersPanel({
+  activeMap,
   layers,
   activeLayerId,
   setActiveLayerId,
@@ -31,83 +106,286 @@ export function LayersPanel({
   toggleLayerLock,
   deleteLayer,
   reorderLayers,
+  createLayerOfType,
+  renameLayer,
+  duplicateLayer,
+  setConfirmDialog,
 }: LayersPanelProps) {
   const [draggedLayerId, setDraggedLayerId] = useState<string | null>(null)
-  if (layers.length === 0) {
-    return (
-      <div className="h-full flex items-center justify-center text-muted-foreground p-8 text-center">
-        <p className="text-xs">No layers yet.</p>
-      </div>
-    )
+  const [dragOverTarget, setDragOverTarget] = useState<{
+    id: string
+    position: 'top' | 'bottom'
+  } | null>(null)
+  const [editingLayerId, setEditingLayerId] = useState<string | null>(null)
+  const [editingName, setEditingName] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (editingLayerId && inputRef.current) {
+      inputRef.current.focus()
+      inputRef.current.select()
+    }
+  }, [editingLayerId])
+
+  const startEditing = (layer: Layer) => {
+    setEditingLayerId(layer.id)
+    setEditingName(layer.name)
   }
 
-  const specialTypes = ['collision', 'terrain', 'encounters']
-  const normalLayers = layers.filter(l => !specialTypes.includes(l.type))
-  const specialLayers = layers.filter(l => specialTypes.includes(l.type))
+  const commitEditing = (id: string) => {
+    if (editingName.trim()) {
+      renameLayer(id, editingName.trim())
+    }
+    setEditingLayerId(null)
+  }
 
   const handleDragStart = (e: React.DragEvent, id: string) => {
     setDraggedLayerId(id)
     e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', id)
   }
 
   const handleDragOver = (e: React.DragEvent, targetId: string) => {
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
+    if (!draggedLayerId || draggedLayerId === targetId) {
+      setDragOverTarget(null)
+      return
+    }
+    const rect = e.currentTarget.getBoundingClientRect()
+    const isTop = e.clientY - rect.top < rect.height / 2
+    setDragOverTarget({ id: targetId, position: isTop ? 'top' : 'bottom' })
+  }
+
+  const handleDragEnd = () => {
+    setDraggedLayerId(null)
+    setDragOverTarget(null)
   }
 
   const handleDrop = (e: React.DragEvent, targetId: string) => {
     e.preventDefault()
-    if (!draggedLayerId || draggedLayerId === targetId) return
-    
-    const oldIndex = normalLayers.findIndex(l => l.id === draggedLayerId)
-    const newIndex = normalLayers.findIndex(l => l.id === targetId)
-    
-    if (oldIndex !== -1 && newIndex !== -1) {
-      const newNormalLayers = [...normalLayers]
-      const [removed] = newNormalLayers.splice(oldIndex, 1)
-      newNormalLayers.splice(newIndex, 0, removed)
-      reorderLayers([...newNormalLayers, ...specialLayers])
+    if (!draggedLayerId || draggedLayerId === targetId) {
+      setDraggedLayerId(null)
+      setDragOverTarget(null)
+      return
+    }
+
+    const oldIndex = layers.findIndex((l) => l.id === draggedLayerId)
+    const baseTargetIndex = layers.findIndex((l) => l.id === targetId)
+
+    if (oldIndex !== -1 && baseTargetIndex !== -1) {
+      let insertIndex = dragOverTarget?.position === 'bottom' ? baseTargetIndex + 1 : baseTargetIndex
+      if (oldIndex < insertIndex) insertIndex--
+
+      if (oldIndex !== insertIndex) {
+        const next = [...layers]
+        const [removed] = next.splice(oldIndex, 1)
+        next.splice(insertIndex, 0, removed)
+        reorderLayers(next)
+      }
     }
     setDraggedLayerId(null)
+    setDragOverTarget(null)
   }
 
-  const renderLayer = (layer: Layer, isNormal: boolean) => (
-    <div
-      key={layer.id}
-      onClick={() => setActiveLayerId(layer.id)}
-      draggable={isNormal}
-      onDragStart={(e) => isNormal && handleDragStart(e, layer.id)}
-      onDragOver={(e) => isNormal && handleDragOver(e, layer.id)}
-      onDrop={(e) => isNormal && handleDrop(e, layer.id)}
-      className={`flex items-center group py-1.5 px-2 rounded-md cursor-pointer transition-colors ${activeLayerId === layer.id ? 'bg-primary/30 text-primary-foreground font-medium border border-primary/40' : 'hover:bg-sidebar-accent text-sidebar-foreground'} ${isNormal ? 'text-gray-400' : ''}`}
-    >
-      <div className={`mr-2 opacity-80 ${isNormal ? 'cursor-grab active:cursor-grabbing' : ''}`}>{getLayerIcon(layer.type)}</div>
-      <span className="flex-1 truncate">{layer.name}</span>
-      <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 opacity-70 transition-opacity">
-        {isNormal && (
-          <button onClick={(e) => { e.stopPropagation(); deleteLayer(layer.id) }} className="p-1 hover:bg-red-500/20 hover:text-red-400 rounded">
-            <Trash2 className="w-3 h-3" />
-          </button>
-        )}
-        <button onClick={(e) => { e.stopPropagation(); toggleLayerLock(layer.id) }} className="p-1 hover:bg-black/10 rounded">
-          {layer.locked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
-        </button>
-        <button onClick={(e) => { e.stopPropagation(); toggleLayerVisibility(layer.id, e.shiftKey) }} className="p-1 hover:bg-black/10 rounded">
-          {layer.visible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-        </button>
+  const confirmDeleteLayer = (layer: Layer) => {
+    setTimeout(() => {
+      setConfirmDialog({
+        open: true,
+        title: 'Delete Layer',
+        description: `Are you sure you want to delete layer "${layer.name}"?`,
+        action: () => deleteLayer(layer.id),
+      })
+    }, 0)
+  }
+
+  const hasCollision = layers.some((l) => l.type === 'collision')
+  const hasTerrain = layers.some((l) => l.type === 'terrain')
+  const hasEncounters = layers.some((l) => l.type === 'encounters')
+
+  if (!activeMap) {
+    return (
+      <div className="h-full flex items-center justify-center text-muted-foreground p-8 text-center select-none">
+        <p className="text-xs">Select a map to view layers</p>
       </div>
-    </div>
-  )
+    )
+  }
+
+  if (layers.length === 0) {
+    return (
+      <ContextMenu>
+        <ContextMenuTrigger className="block h-full w-full">
+          <div className="h-full flex flex-col items-center justify-center text-muted-foreground p-8 text-center select-none">
+            <p className="text-xs">
+              No layers yet.
+              <br />
+              <span className="text-[11px] opacity-70">Right-click here to create a layer.</span>
+            </p>
+          </div>
+        </ContextMenuTrigger>
+
+        <ContextMenuContent className="w-48">
+          <NewLayerSubmenu
+            createLayerOfType={createLayerOfType}
+            hasCollision={hasCollision}
+            hasTerrain={hasTerrain}
+            hasEncounters={hasEncounters}
+          />
+        </ContextMenuContent>
+      </ContextMenu>
+    )
+  }
 
   return (
-    <div className="space-y-1">
-      {normalLayers.map(l => renderLayer(l, true))}
-      
-      {normalLayers.length > 0 && specialLayers.length > 0 && (
-        <div className="h-px bg-sidebar-border my-2" />
-      )}
-      
-      {specialLayers.map(l => renderLayer(l, false))}
-    </div>
+    <ContextMenu>
+      <ContextMenuTrigger className="block min-h-full h-full w-full">
+        <div className="min-h-full h-full w-full space-y-1">
+          {layers.map((layer) => {
+            const isEditing = editingLayerId === layer.id
+            const isSelected = activeLayerId === layer.id
+            const isDropTarget = dragOverTarget?.id === layer.id && draggedLayerId !== layer.id
+
+            return (
+              <ContextMenu key={layer.id}>
+                <ContextMenuTrigger>
+                  <div
+                    draggable={!layer.locked && !isEditing}
+                    onDragStart={(e) => handleDragStart(e, layer.id)}
+                    onDragOver={(e) => handleDragOver(e, layer.id)}
+                    onDragEnd={handleDragEnd}
+                    onDrop={(e) => handleDrop(e, layer.id)}
+                    onClick={() => setActiveLayerId(layer.id)}
+                    onDoubleClick={() => {
+                      if (!layer.locked) startEditing(layer)
+                    }}
+                    className={`relative flex items-center py-1.5 px-2.5 rounded-md cursor-pointer text-sm select-none border ${
+                      isSelected
+                        ? 'bg-primary/30 text-primary-foreground font-medium border-primary/40'
+                        : 'border-transparent hover:bg-sidebar-accent text-sidebar-foreground'
+                    }`}
+                  >
+                    {/* Horizontal drag indicator line */}
+                    {isDropTarget && (
+                      <div
+                        className={`absolute left-0 right-0 h-[2px] bg-primary shadow-[0_0_8px_rgba(59,130,246,1)] z-30 pointer-events-none rounded-full ${
+                          dragOverTarget.position === 'top' ? '-top-[2px]' : '-bottom-[2px]'
+                        }`}
+                      />
+                    )}
+
+                    <div className="mr-2 shrink-0 opacity-80 cursor-grab active:cursor-grabbing">
+                      {getLayerIcon(layer.type)}
+                    </div>
+
+                    {isEditing ? (
+                      <input
+                        ref={inputRef}
+                        type="text"
+                        value={editingName}
+                        onChange={(e) => setEditingName(e.target.value)}
+                        onBlur={() => commitEditing(layer.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') commitEditing(layer.id)
+                          if (e.key === 'Escape') setEditingLayerId(null)
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex-1 bg-black/40 border border-primary/60 rounded px-1 py-0.5 text-xs text-foreground outline-none font-mono"
+                      />
+                    ) : (
+                      <span className="flex-1 truncate">{layer.name}</span>
+                    )}
+
+                    {/* Compact status & inline visibility toggle */}
+                    <div
+                      className="flex items-center gap-1 ml-2 shrink-0"
+                      onDoubleClick={(e) => e.stopPropagation()}
+                    >
+                      {layer.locked && (
+                        <div title="Layer locked" className="p-0.5 opacity-70">
+                          <Lock className="w-3.5 h-3.5 text-amber-400" />
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          toggleLayerVisibility(layer.id)
+                        }}
+                        onDoubleClick={(e) => {
+                          e.stopPropagation()
+                        }}
+                        className="p-1 rounded hover:bg-black/20 text-sidebar-foreground opacity-60 hover:opacity-100 transition-none"
+                        title={layer.visible ? 'Hide Layer' : 'Show Layer'}
+                      >
+                        {layer.visible ? (
+                          <Eye className="w-3.5 h-3.5" />
+                        ) : (
+                          <EyeOff className="w-3.5 h-3.5 text-muted-foreground" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </ContextMenuTrigger>
+
+                <ContextMenuContent className="w-48">
+                  <ContextMenuItem onClick={() => startEditing(layer)}>
+                    <Edit2 className="w-3.5 h-3.5 mr-2" />
+                    Rename
+                  </ContextMenuItem>
+                  <ContextMenuItem onClick={() => duplicateLayer(layer.id)}>
+                    <Copy className="w-3.5 h-3.5 mr-2" />
+                    Duplicate
+                  </ContextMenuItem>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem onClick={() => toggleLayerVisibility(layer.id)}>
+                    {layer.visible ? (
+                      <>
+                        <EyeOff className="w-3.5 h-3.5 mr-2" />
+                        Hide Layer
+                      </>
+                    ) : (
+                      <>
+                        <Eye className="w-3.5 h-3.5 mr-2" />
+                        Show Layer
+                      </>
+                    )}
+                  </ContextMenuItem>
+                  <ContextMenuItem onClick={() => toggleLayerLock(layer.id)}>
+                    {layer.locked ? (
+                      <>
+                        <Unlock className="w-3.5 h-3.5 mr-2" />
+                        Unlock Layer
+                      </>
+                    ) : (
+                      <>
+                        <Lock className="w-3.5 h-3.5 mr-2" />
+                        Lock Layer
+                      </>
+                    )}
+                  </ContextMenuItem>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem
+                    onClick={() => confirmDeleteLayer(layer)}
+                    className="text-red-400 focus:text-red-400 focus:bg-red-500/10"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 mr-2" />
+                    Delete Layer
+                  </ContextMenuItem>
+                </ContextMenuContent>
+              </ContextMenu>
+            )
+          })}
+        </div>
+      </ContextMenuTrigger>
+
+      <ContextMenuContent className="w-48">
+        <NewLayerSubmenu
+          createLayerOfType={createLayerOfType}
+          hasCollision={hasCollision}
+          hasTerrain={hasTerrain}
+          hasEncounters={hasEncounters}
+        />
+      </ContextMenuContent>
+    </ContextMenu>
   )
 }

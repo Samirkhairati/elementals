@@ -196,14 +196,11 @@ export function registerTilesetHandlers(tilesetsDir: string) {
     try {
       const targetPath = path.join(tilesetsDir, folderPath);
       if (fs.existsSync(targetPath)) {
-        fs.rmdirSync(targetPath);
+        fs.rmSync(targetPath, { recursive: true, force: true });
         return { success: true };
       }
       return { success: false, error: 'Folder does not exist.' };
     } catch (error: any) {
-      if (error.code === 'ENOTEMPTY') {
-        return { success: false, error: 'Cannot delete folder because it is not empty.' };
-      }
       return { success: false, error: error.message };
     }
   });

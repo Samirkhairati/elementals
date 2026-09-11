@@ -9,13 +9,7 @@ interface CanvasLayersProps {
 export function CanvasLayers({ layers, tilesets, activeMap }: CanvasLayersProps) {
   return (
     <>
-      {layers.slice().reverse().filter(l => l.visible).sort((a, b) => {
-        const isSpecialA = ['collision', 'terrain', 'encounters'].includes(a.type)
-        const isSpecialB = ['collision', 'terrain', 'encounters'].includes(b.type)
-        if (isSpecialA && !isSpecialB) return 1
-        if (!isSpecialA && isSpecialB) return -1
-        return 0
-      }).map(layer => (
+      {layers.slice().reverse().filter(l => l.visible).map(layer => (
         <div key={layer.id} className="absolute inset-0 pointer-events-none z-10">
           {Object.entries(layer.data || {}).map(([indexStr, tile]) => {
             const index = parseInt(indexStr)

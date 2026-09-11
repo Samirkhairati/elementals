@@ -19,8 +19,8 @@ interface EditorDialogsProps {
   setCreateFolderName: (v: string) => void
   handleConfirmCreateFolder: () => void
 
-  renameDialog: { open: boolean; type: 'folder' | 'tileset' | 'map-folder' | 'map'; oldPath?: string; oldName?: string; targetFolder?: string | null }
-  setRenameDialog: React.Dispatch<React.SetStateAction<{ open: boolean; type: 'folder' | 'tileset' | 'map-folder' | 'map'; oldPath?: string; oldName?: string; targetFolder?: string | null }>>
+  renameDialog: { open: boolean; type: 'folder' | 'tileset' | 'map-folder' | 'map' | 'layer'; oldPath?: string; oldName?: string; targetFolder?: string | null }
+  setRenameDialog: React.Dispatch<React.SetStateAction<{ open: boolean; type: 'folder' | 'tileset' | 'map-folder' | 'map' | 'layer'; oldPath?: string; oldName?: string; targetFolder?: string | null }>>
   renameInput: string
   setRenameInput: (v: string) => void
   handleConfirmRename: () => void

@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
 // Hooks
 import { useHistory } from '@/hooks/useHistory'
@@ -15,15 +15,23 @@ import { EditorDockview } from '@/components/editor/layout/EditorDockview'
 import { EditorDialogs } from '@/components/editor/layout/EditorDialogs'
 
 export function EditorPage() {
+  // ── History Hook ─────────────────────────────────────────────────────────
+  const [layersState, setLayersState] = useState<any[]>([])
+  const historyState = useHistory(setLayersState)
+
   // ── Layer Manager ────────────────────────────────────────────────────────
-  // We initialize layer manager first with activeMap synced from mapManager
   const layerManager = useLayerManager({
     activeMap: null, // connected dynamically in handlers
     setActiveMap: () => {},
+    onCommitHistory: (layers) => historyState.commitHistory(layers),
   })
 
-  // ── History Hook ─────────────────────────────────────────────────────────
-  const historyState = useHistory(layerManager.setLayers)
+  // Keep historyState in sync with layerManager.setLayers
+  useEffect(() => {
+    if (layersState.length > 0) {
+      layerManager.setLayers(layersState)
+    }
+  }, [layersState])
 
   // ── Tileset Manager ──────────────────────────────────────────────────────
   const tilesetManager = useTilesetManager({
@@ -83,37 +91,80 @@ export function EditorPage() {
       historyState.setHistory([{ layers: JSON.parse(JSON.stringify(initLayers)) }])
       historyState.setHistoryIndex(0)
     },
+    onRenameLayer: layerManager.handleRenameLayer,
   })
 
   // ── Undo / Redo Bounding ─────────────────────────────────────────────────
-  const boundHandleUndo = useCallback(
-    () =>
+  const boundHandleUndo = useCallback(() => {
+    if (historyState.historyIndex > 0) {
       historyState.handleUndo(
         layerManager.layers,
         layerManager.setLayers,
         mapManager.activeMap,
         mapManager.setActiveMap
-      ),
-    [historyState, layerManager.layers, layerManager.setLayers, mapManager.activeMap, mapManager.setActiveMap]
-  )
+      )
+    } else if (mapManager.deletedMapsHistory.length > 0) {
+      mapManager.undoDeleteMap()
+    }
+  }, [historyState, layerManager.layers, layerManager.setLayers, mapManager])
 
-  const boundHandleRedo = useCallback(
-    () =>
+  const boundHandleRedo = useCallback(() => {
+    if (historyState.historyIndex < historyState.history.length - 1) {
       historyState.handleRedo(
         layerManager.layers,
         layerManager.setLayers,
         mapManager.activeMap,
         mapManager.setActiveMap
-      ),
-    [historyState, layerManager.layers, layerManager.setLayers, mapManager.activeMap, mapManager.setActiveMap]
-  )
+      )
+    } else if (mapManager.restoredMapsHistory.length > 0) {
+      mapManager.redoDeleteMap()
+    }
+  }, [historyState, layerManager.layers, layerManager.setLayers, mapManager])
+
+  // ── Focus Domain Tracking ───────────────────────────────────────────────
+  const [focusedDomain, setFocusedDomain] = useState<'maps' | 'layers' | 'tilesets' | null>(null)
+
+  const handleDeleteSelected = useCallback(() => {
+    const isLayersDomain = focusedDomain === 'layers' || (!focusedDomain && layerManager.activeLayerId)
+    const isMapsDomain = focusedDomain === 'maps' || (!focusedDomain && mapManager.activeMap)
+
+    if (isLayersDomain && layerManager.activeLayerId) {
+      const layer = layerManager.layers.find(l => l.id === layerManager.activeLayerId)
+      if (layer) {
+        dialogs.setConfirmDialog({
+          open: true,
+          title: 'Delete Layer',
+          description: `Are you sure you want to delete layer "${layer.name}"?`,
+          action: () => layerManager.handleDeleteLayer(layer.id),
+        })
+      }
+    } else if (isMapsDomain && mapManager.activeMap) {
+      mapManager.handleDeleteMap(mapManager.activeMap.folderPath, mapManager.activeMap.fileName)
+    }
+  }, [
+    focusedDomain,
+    layerManager.activeLayerId,
+    layerManager.layers,
+    layerManager.handleDeleteLayer,
+    mapManager.activeMap,
+    mapManager.handleDeleteMap,
+    dialogs.setConfirmDialog,
+  ])
 
   // ── Keyboard Shortcuts ───────────────────────────────────────────────────
   useKeyboardShortcuts({
     handleUndo: boundHandleUndo,
     handleRedo: boundHandleRedo,
     setActiveTool: layerManager.setActiveTool,
-    deps: [historyState.history, historyState.historyIndex, mapManager.activeMap],
+    handleDelete: handleDeleteSelected,
+    deps: [
+      historyState.history,
+      historyState.historyIndex,
+      mapManager.activeMap,
+      layerManager.activeLayerId,
+      focusedDomain,
+      handleDeleteSelected,
+    ],
   })
 
   // ── Paint Tools Hook ─────────────────────────────────────────────────────
@@ -132,13 +183,13 @@ export function EditorPage() {
 
   // ── Context Value for all panels ─────────────────────────────────────────
   const contextValue = {
+    focusedDomain,
+    setFocusedDomain,
     // Maps domain
     maps: mapManager.maps,
     mapFolders: mapManager.mapFolders,
     activeMap: mapManager.activeMap,
     expandedMapFolders: mapManager.expandedMapFolders,
-    selectedMapFolder: mapManager.selectedMapFolder,
-    setSelectedMapFolder: mapManager.setSelectedMapFolder,
     toggleMapFolder: mapManager.toggleMapFolder,
     setCreateMapData: dialogs.setCreateMapData,
     setCreateMapDialog: dialogs.setCreateMapDialog,
@@ -151,6 +202,7 @@ export function EditorPage() {
     handleExportMap: mapManager.handleExportMap,
     handleMapDrop: mapManager.handleMapDrop,
     onSelectMap: mapManager.onSelectMap,
+    setConfirmDialog: dialogs.setConfirmDialog,
 
     // Layers domain
     layers: layerManager.layers,
@@ -161,6 +213,9 @@ export function EditorPage() {
     handleDeleteLayer: layerManager.handleDeleteLayer,
     handleReorderLayers: layerManager.handleReorderLayers,
     handleCreateLayer: layerManager.handleCreateLayer,
+    handleCreateLayerOfType: layerManager.handleCreateLayerOfType,
+    handleRenameLayer: layerManager.handleRenameLayer,
+    handleDuplicateLayer: layerManager.handleDuplicateLayer,
     updateLayers: layerManager.updateLayers,
     activeLayerType: layerManager.activeLayerType,
 

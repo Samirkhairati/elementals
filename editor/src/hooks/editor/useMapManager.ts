@@ -17,7 +17,6 @@ export function useMapManager(options: UseMapManagerOptions) {
   const [mapFolders, setMapFolders] = useState<string[]>([])
   const [activeMap, setActiveMap] = useState<MapData | null>(null)
   const [expandedMapFolders, setExpandedMapFolders] = useState<Set<string>>(new Set())
-  const [selectedMapFolder, setSelectedMapFolder] = useState<string | null>(null)
 
   const loadMaps = useCallback(async () => {
     if (!window.electronAPI) return
@@ -37,6 +36,13 @@ export function useMapManager(options: UseMapManagerOptions) {
     })
   }, [])
 
+  const [deletedMapsHistory, setDeletedMapsHistory] = useState<
+    { mapData: MapData; folderPath: string | null; fileName: string }[]
+  >([])
+  const [restoredMapsHistory, setRestoredMapsHistory] = useState<
+    { mapData: MapData; folderPath: string | null; fileName: string }[]
+  >([])
+
   const onSelectMap = useCallback((m: MapData) => {
     setActiveMap(m)
     const initLayers = m.layers || []
@@ -44,11 +50,19 @@ export function useMapManager(options: UseMapManagerOptions) {
   }, [onMapSelected])
 
   const handleDeleteMap = useCallback((folderPath: string | null, fileName: string) => {
+    const targetMap =
+      maps.find(m => m.fileName === fileName && m.folderPath === folderPath) ||
+      (activeMap?.fileName === fileName && activeMap?.folderPath === folderPath ? activeMap : null)
+
     onOpenConfirmDialog?.({
       title: 'Delete Map',
       description: `Are you sure you want to delete map "${fileName}"?`,
       action: async () => {
         if (!window.electronAPI) return
+        if (targetMap) {
+          setDeletedMapsHistory(prev => [...prev, { mapData: targetMap, folderPath, fileName }])
+          setRestoredMapsHistory([])
+        }
         const res = await window.electronAPI.deleteMap(folderPath, fileName)
         if (res.success) {
           if (activeMap?.fileName === fileName && activeMap?.folderPath === folderPath) {
@@ -61,24 +75,52 @@ export function useMapManager(options: UseMapManagerOptions) {
         }
       },
     })
-  }, [activeMap, onClearActiveMap, onOpenConfirmDialog, loadMaps])
+  }, [maps, activeMap, onClearActiveMap, onOpenConfirmDialog, loadMaps])
+
+  const undoDeleteMap = useCallback(async () => {
+    if (deletedMapsHistory.length === 0 || !window.electronAPI) return false
+    const lastDeleted = deletedMapsHistory[deletedMapsHistory.length - 1]
+    setDeletedMapsHistory(prev => prev.slice(0, -1))
+    setRestoredMapsHistory(prev => [...prev, lastDeleted])
+    await window.electronAPI.saveMap(lastDeleted.folderPath, lastDeleted.fileName, lastDeleted.mapData)
+    await loadMaps()
+    onSelectMap(lastDeleted.mapData)
+    return true
+  }, [deletedMapsHistory, loadMaps, onSelectMap])
+
+  const redoDeleteMap = useCallback(async () => {
+    if (restoredMapsHistory.length === 0 || !window.electronAPI) return false
+    const lastRestored = restoredMapsHistory[restoredMapsHistory.length - 1]
+    setRestoredMapsHistory(prev => prev.slice(0, -1))
+    setDeletedMapsHistory(prev => [...prev, lastRestored])
+    await window.electronAPI.deleteMap(lastRestored.folderPath, lastRestored.fileName)
+    if (activeMap?.fileName === lastRestored.fileName && activeMap?.folderPath === lastRestored.folderPath) {
+      setActiveMap(null)
+      onClearActiveMap?.()
+    }
+    await loadMaps()
+    return true
+  }, [restoredMapsHistory, activeMap, onClearActiveMap, loadMaps])
 
   const handleDeleteMapFolder = useCallback((folderPath: string) => {
     onOpenConfirmDialog?.({
       title: 'Delete Map Folder',
-      description: `Are you sure you want to delete map folder "${folderPath}"?`,
+      description: `Are you sure you want to delete folder "${folderPath}" and all its contents?`,
       action: async () => {
         if (!window.electronAPI) return
         const res = await window.electronAPI.deleteMapFolder(folderPath)
         if (res.success) {
-          if (selectedMapFolder === folderPath) setSelectedMapFolder(null)
+          if (activeMap?.folderPath === folderPath || activeMap?.folderPath?.startsWith(folderPath + '/')) {
+            setActiveMap(null)
+            onClearActiveMap?.()
+          }
           loadMaps()
         } else {
           alert(res.error)
         }
       },
     })
-  }, [selectedMapFolder, onOpenConfirmDialog, loadMaps])
+  }, [activeMap, onClearActiveMap, onOpenConfirmDialog, loadMaps])
 
   const handleMapDrop = useCallback(async (e: React.DragEvent, targetFolder: string | null) => {
     e.preventDefault()
@@ -108,8 +150,6 @@ export function useMapManager(options: UseMapManagerOptions) {
     setActiveMap,
     expandedMapFolders,
     setExpandedMapFolders,
-    selectedMapFolder,
-    setSelectedMapFolder,
     loadMaps,
     toggleMapFolder,
     onSelectMap,
@@ -117,5 +157,9 @@ export function useMapManager(options: UseMapManagerOptions) {
     handleDeleteMapFolder,
     handleMapDrop,
     handleExportMap,
+    undoDeleteMap,
+    redoDeleteMap,
+    deletedMapsHistory,
+    restoredMapsHistory,
   }
 }
