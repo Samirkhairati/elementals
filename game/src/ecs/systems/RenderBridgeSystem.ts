@@ -4,6 +4,7 @@ import type { World } from "../World";
 import type { Entity } from "../Entity";
 import { TransformComponent } from "../components/TransformComponent";
 import { SpriteComponent } from "../components/SpriteComponent";
+import { AnimationComponent } from "../components/AnimationComponent";
 
 export class RenderBridgeSystem extends System {
   public priority = 1000; // Run after simulation/physics systems
@@ -13,6 +14,10 @@ export class RenderBridgeSystem extends System {
   constructor(scene: Scene) {
     super();
     this.scene = scene;
+  }
+
+  public getSprite(entity: Entity): GameObjects.Sprite | undefined {
+    return this.spriteMap.get(entity);
   }
 
   public update(world: World, _delta: number): void {
@@ -62,6 +67,14 @@ export class RenderBridgeSystem extends System {
         }
         if (sprite.texture.key !== spriteComp.texture) {
           sprite.setTexture(spriteComp.texture, spriteComp.frame);
+        }
+      }
+
+      // Sync character animation if present
+      const anim = world.getComponent(entity, AnimationComponent);
+      if (anim && anim.currentAnimKey && sprite) {
+        if (sprite.anims.currentAnim?.key !== anim.currentAnimKey) {
+          sprite.play(anim.currentAnimKey, true);
         }
       }
     }

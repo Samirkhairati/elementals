@@ -2,23 +2,36 @@ import { Scene } from "phaser";
 import { GAME_CONSTANTS } from "@/constants/game";
 import { settingsStore } from "@/core/SettingsStore";
 import { gameState } from "@/core/GameState";
-import { Player } from "@/entities/Player";
 import { MapSystem } from "@/world/MapSystem";
 import { InteractionSystem } from "@/world/InteractionSystem";
 import { InputManager } from "@/components/InputManager";
 import { InteractionManager } from "@/components/InteractionManager";
 import { MAPS } from "@/constants/assets";
 import { EventBus, Events } from "@/utils/EventBus";
-import { World, RenderBridgeSystem } from "@/ecs";
+import { Direction } from "@/utils/AnimationManager";
+import {
+  World,
+  SpatialSystem,
+  InputSystem,
+  MovementSystem,
+  AnimationSystem,
+  RenderBridgeSystem,
+  PlayerPrefab,
+  type Entity,
+} from "@/ecs";
 
 export class Game extends Scene {
-  private player!: Player;
   private mapSystem!: MapSystem;
   private interactionSystem!: InteractionSystem;
   private inputManager!: InputManager;
   private interactionManager!: InteractionManager;
   private world!: World;
+  private spatialSystem!: SpatialSystem;
+  private inputSystem!: InputSystem;
+  private movementSystem!: MovementSystem;
+  private animationSystem!: AnimationSystem;
   private renderBridgeSystem!: RenderBridgeSystem;
+  private playerEntity?: Entity;
 
   constructor() {
     super("Game");
@@ -32,7 +45,16 @@ export class Game extends Scene {
     
     // Initialize ECS World and Systems
     this.world = new World();
+    this.spatialSystem = new SpatialSystem(this.mapSystem.collisions);
+    this.inputSystem = new InputSystem();
+    this.movementSystem = new MovementSystem(this.spatialSystem);
+    this.animationSystem = new AnimationSystem();
     this.renderBridgeSystem = new RenderBridgeSystem(this);
+
+    this.world.addSystem(this.spatialSystem);
+    this.world.addSystem(this.inputSystem);
+    this.world.addSystem(this.movementSystem);
+    this.world.addSystem(this.animationSystem);
     this.world.addSystem(this.renderBridgeSystem);
     
     // Wire up events
@@ -86,30 +108,42 @@ export class Game extends Scene {
     
     // Load interactions for this map
     this.interactionSystem.setMap(map);
+    this.spatialSystem.setMap(map);
     
     // Position at the center of the map using logical tile size (32px)
     const tileSize = GAME_CONSTANTS.TILE_SIZE;
     const spawnX = Math.floor(map.width / 2) * tileSize + tileSize / 2;
     const spawnY = (Math.floor(map.height / 2) + 1) * tileSize;
 
-    if (this.player) {
-      this.player.destroy();
-    }
-    
-    this.player = new Player(
-      this, 
-      spawnX, 
-      spawnY, 
-      (x, y) => this.mapSystem.collisions.isWalkable(x, y)
-    );
-    if (settingsStore.camera.smoothFollow) {
-      this.cameras.main.startFollow(this.player, false, 0.05, 0.05);
-    } else {
-      this.cameras.main.startFollow(this.player, true, 1, 1);
+    // Clear ECS world on map transition
+    this.world.clear();
+
+    // Spawn player entity declaratively via ECS
+    this.playerEntity = this.world.spawnPrefab(PlayerPrefab, {
+      x: spawnX,
+      y: spawnY,
+    });
+
+    // Tick world with 0 delta to instantiate sprites on the render bridge immediately
+    this.world.update(0);
+
+    const playerSprite = this.renderBridgeSystem.getSprite(this.playerEntity);
+    if (playerSprite) {
+      if (settingsStore.camera.smoothFollow) {
+        this.cameras.main.startFollow(playerSprite, false, 0.05, 0.05);
+      } else {
+        this.cameras.main.startFollow(playerSprite, true, 1, 1);
+      }
     }
 
-    // Clear ECS world on map transition
-    this.world?.clear();
+    // Ensure player position is synced to GameState on spawn
+    gameState.updatePlayerPosition(
+      spawnX,
+      spawnY,
+      Math.floor(spawnX / tileSize),
+      Math.floor((spawnY - 1) / tileSize),
+      Direction.DOWN
+    );
 
     // If map was switched while menu was open, ensure new player is unlocked
     gameState.setInputLocked(false);
@@ -118,7 +152,9 @@ export class Game extends Scene {
   update(_time: number, delta: number) {
     this.inputManager?.update();
     const input = this.inputManager?.getSnapshot();
-    this.player?.update(delta, input);
+    if (input) {
+      this.inputSystem?.setSnapshot(input);
+    }
     this.world?.update(delta);
   }
 }

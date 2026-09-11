@@ -149,30 +149,32 @@ graph TD
 
 ---
 
-### Phase 4: Componentizing Movement, Animation & Spatial Collision
+### Phase 4: Componentizing Movement, Animation & Spatial Collision (Completed)
 *Objective: Dismantle the 355-line `Player.ts` god object into reusable ECS components and systems.*
 
-- [ ] **Unified Spatial Collision System (`SpatialSystem`):**
+- [x] **Unified Spatial Collision System (`SpatialSystem`):**
   - Combines static tile collision with dynamic entity bounding boxes.
   - Stores a 2D spatial grid:
     - Tilemap solid tiles.
     - Dynamic entity colliders (`ColliderComponent`).
   - Provides `isWalkable(logicalX, logicalY, ignoreEntityId?)`.
-- [ ] **Movement Components & Systems:**
+- [x] **Movement Components & Systems:**
   - `GridMovementComponent`: Encapsulates 32px step tweens, direction, and step progress.
   - `FreeMovementComponent`: Encapsulates velocity, acceleration, and sliding collision.
   - `MovementSystem`: Executes movement updates based on active movement component.
-- [ ] **Animation System (`AnimationSystem`):**
+- [x] **Animation System (`AnimationSystem`):**
   - Manages 4-directional walk/run/idle animation states based on entity movement velocity and direction.
-- [ ] **Player Prefab Migration:**
+- [x] **Player Prefab Migration:**
   - Replace `Player.ts` class with a declarative `PlayerPrefab`:
     ```typescript
     components: [
       Transform({ x: spawnX, y: spawnY }),
-      PlayerInput(),
+      PlayerControl(),
       Collider({ width: 16, height: 8 }),
       GridMovement(),
-      SpriteView({ texture: "player", frame: "walk" })
+      FreeMovement(),
+      CharacterAnimation({ characterKey: "player" }),
+      SpriteView({ texture: "player-walk", frame: 0 })
     ]
     ```
   - The camera simply follows the entity tagged with `PlayerTag`.
