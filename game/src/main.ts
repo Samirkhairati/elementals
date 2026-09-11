@@ -1,7 +1,7 @@
 import { Boot } from '@/scenes/Boot';
 import { Game as MainGame } from '@/scenes/Game';
 import { Preloader } from '@/scenes/Preloader';
-import { CONFIG } from '@/config';
+import { GAME_CONSTANTS } from '@/constants/game';
 
 import { Game, type Types } from "phaser";
 
@@ -12,7 +12,7 @@ import { UIScene } from '@/scenes/UIScene';
 const config: Types.Core.GameConfig = {
     type: Phaser.AUTO,
     parent: 'game-container',
-    backgroundColor: CONFIG.backgroundColor,
+    backgroundColor: GAME_CONSTANTS.DEFAULT_BG_COLOR,
     pixelArt: true,
     roundPixels: true,
     scale: {

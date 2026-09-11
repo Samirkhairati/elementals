@@ -1,31 +1,60 @@
-const tileSize = 32;
-const mapWidth = 15;
-const mapHeight = 10;
+import { GAME_CONSTANTS } from "@/constants/game";
+import { settingsStore } from "@/core/SettingsStore";
 
+/**
+ * Backward-compatibility proxy for legacy CONFIG references.
+ * @deprecated Prefer importing GAME_CONSTANTS or settingsStore directly.
+ */
 export const CONFIG = {
-  debug: {
-    enabled: false,
-    showKeys: true,
-    showCoords: true,
-    showGrid: true,
+  get tileSize() {
+    return GAME_CONSTANTS.TILE_SIZE;
   },
-  tileSize,
-  renderScale: 1,
-  mapWidth,
-  mapHeight,
-  visibleTilesX: 15,
-  visibleTilesY: 10,
-  width: mapWidth * tileSize,
-  height: mapHeight * tileSize,
-  backgroundColor: "#000000",
-  playerSpeed: 200,
-  playerDepth: 20,
-  camera: {
-    smoothFollow: true,
+  get visibleTilesX() {
+    return GAME_CONSTANTS.VISIBLE_TILES_X;
   },
-  controls: {
-    run: "X",
-    action: "C",
-    menu: "ENTER",
+  get visibleTilesY() {
+    return GAME_CONSTANTS.VISIBLE_TILES_Y;
+  },
+  get mapWidth() {
+    return GAME_CONSTANTS.VISIBLE_TILES_X;
+  },
+  get mapHeight() {
+    return GAME_CONSTANTS.VISIBLE_TILES_Y;
+  },
+  get width() {
+    return GAME_CONSTANTS.LOGICAL_WIDTH;
+  },
+  get height() {
+    return GAME_CONSTANTS.LOGICAL_HEIGHT;
+  },
+  get backgroundColor() {
+    return GAME_CONSTANTS.DEFAULT_BG_COLOR;
+  },
+  get playerSpeed() {
+    return GAME_CONSTANTS.PLAYER_SPEED;
+  },
+  get playerDepth() {
+    return GAME_CONSTANTS.PLAYER_DEPTH;
+  },
+  get tileBasedMovement() {
+    return settingsStore.tileBasedMovement;
+  },
+  set tileBasedMovement(val: boolean) {
+    settingsStore.tileBasedMovement = val;
+  },
+  get renderScale() {
+    return settingsStore.renderScale;
+  },
+  set renderScale(val: number) {
+    settingsStore.setRenderScale(val);
+  },
+  get debug() {
+    return settingsStore.debug;
+  },
+  get camera() {
+    return settingsStore.camera;
+  },
+  get controls() {
+    return settingsStore.controls;
   },
 };

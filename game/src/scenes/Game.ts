@@ -1,19 +1,37 @@
 import { Scene } from "phaser";
-import { CONFIG } from "@/config";
-import { Player } from "@/entities/Player";
+import { GAME_CONSTANTS } from "@/constants/game";
+import { settingsStore } from "@/core/SettingsStore";
+import { gameState } from "@/core/GameState";
 import { MapSystem } from "@/world/MapSystem";
 import { InteractionSystem } from "@/world/InteractionSystem";
 import { InputManager } from "@/components/InputManager";
 import { InteractionManager } from "@/components/InteractionManager";
 import { MAPS } from "@/constants/assets";
 import { EventBus, Events } from "@/utils/EventBus";
+import { Direction } from "@/utils/AnimationManager";
+import {
+  World,
+  SpatialSystem,
+  InputSystem,
+  MovementSystem,
+  AnimationSystem,
+  RenderBridgeSystem,
+  PlayerPrefab,
+  type Entity,
+} from "@/ecs";
 
 export class Game extends Scene {
-  private player!: Player;
   private mapSystem!: MapSystem;
   private interactionSystem!: InteractionSystem;
   private inputManager!: InputManager;
   private interactionManager!: InteractionManager;
+  private world!: World;
+  private spatialSystem!: SpatialSystem;
+  private inputSystem!: InputSystem;
+  private movementSystem!: MovementSystem;
+  private animationSystem!: AnimationSystem;
+  private renderBridgeSystem!: RenderBridgeSystem;
+  private playerEntity?: Entity;
 
   constructor() {
     super("Game");
@@ -24,6 +42,20 @@ export class Game extends Scene {
     this.interactionSystem = new InteractionSystem(this);
     this.inputManager = new InputManager(this);
     this.interactionManager = new InteractionManager(this.interactionSystem);
+    
+    // Initialize ECS World and Systems
+    this.world = new World();
+    this.spatialSystem = new SpatialSystem(this.mapSystem.collisions);
+    this.inputSystem = new InputSystem();
+    this.movementSystem = new MovementSystem(this.spatialSystem);
+    this.animationSystem = new AnimationSystem();
+    this.renderBridgeSystem = new RenderBridgeSystem(this);
+
+    this.world.addSystem(this.spatialSystem);
+    this.world.addSystem(this.inputSystem);
+    this.world.addSystem(this.movementSystem);
+    this.world.addSystem(this.animationSystem);
+    this.world.addSystem(this.renderBridgeSystem);
     
     // Wire up events
     this.switchMap = this.switchMap.bind(this);
@@ -44,38 +76,31 @@ export class Game extends Scene {
     this.events.on('destroy', this.cleanup, this);
   }
 
-  private handleResize(gameSize: { width: number, height: number }) {
-    const visibleWidth = CONFIG.visibleTilesX * CONFIG.tileSize;
-    const visibleHeight = CONFIG.visibleTilesY * CONFIG.tileSize;
+  private handleResize(gameSize: { width: number; height: number }) {
+    const visibleWidth = GAME_CONSTANTS.LOGICAL_WIDTH;
+    const visibleHeight = GAME_CONSTANTS.LOGICAL_HEIGHT;
 
     // Calculate integer scale factor to fit the visible area into the game size
     const scaleX = Math.max(1, Math.floor(gameSize.width / visibleWidth));
     const scaleY = Math.max(1, Math.floor(gameSize.height / visibleHeight));
     const newScale = Math.min(scaleX, scaleY);
     
-    const scaledWidth = visibleWidth * newScale;
-    const scaledHeight = visibleHeight * newScale;
+    const viewportWidth = visibleWidth * newScale;
+    const viewportHeight = visibleHeight * newScale;
+    const viewportX = Math.floor((gameSize.width - viewportWidth) / 2);
+    const viewportY = Math.floor((gameSize.height - viewportHeight) / 2);
 
-    this.cameras.main.setSize(scaledWidth, scaledHeight);
-    this.cameras.main.setZoom(1); // Assets are scaled directly; camera zoom stays 1
-    
-    // Center the camera viewport on the screen (letterboxing), avoiding sub-pixel offsets
-    this.cameras.main.setPosition(
-        Math.floor((gameSize.width - scaledWidth) / 2),
-        Math.floor((gameSize.height - scaledHeight) / 2)
-    );
+    this.cameras.main.setViewport(viewportX, viewportY, viewportWidth, viewportHeight);
+    this.cameras.main.setZoom(newScale);
 
-    if (CONFIG.renderScale !== newScale) {
-        const oldScale = CONFIG.renderScale;
-        CONFIG.renderScale = newScale;
-        EventBus.emit(Events.RENDER_SCALE_CHANGED, newScale, oldScale);
-    }
+    settingsStore.setRenderScale(newScale);
   }
 
   private cleanup() {
       EventBus.off(Events.MAP_SWITCH_REQUEST, this.switchMap);
       this.scale.off('resize', this.handleResize);
       this.interactionManager.destroy();
+      this.world?.destroy();
   }
 
   private switchMap(mapKey: string) {
@@ -83,42 +108,53 @@ export class Game extends Scene {
     
     // Load interactions for this map
     this.interactionSystem.setMap(map);
+    this.spatialSystem.setMap(map);
     
-    // Position at the center of the map using scaled tile size
-    const scaledTileSize = CONFIG.tileSize * CONFIG.renderScale;
-    const spawnX = Math.floor(map.width / 2) * scaledTileSize + scaledTileSize / 2;
-    const spawnY = (Math.floor(map.height / 2) + 1) * scaledTileSize;
+    // Position at the center of the map using logical tile size (32px)
+    const tileSize = GAME_CONSTANTS.TILE_SIZE;
+    const spawnX = Math.floor(map.width / 2) * tileSize + tileSize / 2;
+    const spawnY = (Math.floor(map.height / 2) + 1) * tileSize;
 
-    if (this.player) {
-      this.player.destroy();
+    // Clear ECS world on map transition
+    this.world.clear();
+
+    // Spawn player entity declaratively via ECS
+    this.playerEntity = this.world.spawnPrefab(PlayerPrefab, {
+      x: spawnX,
+      y: spawnY,
+    });
+
+    // Tick world with 0 delta to instantiate sprites on the render bridge immediately
+    this.world.update(0);
+
+    const playerSprite = this.renderBridgeSystem.getSprite(this.playerEntity);
+    if (playerSprite) {
+      if (settingsStore.camera.smoothFollow) {
+        this.cameras.main.startFollow(playerSprite, false, 0.05, 0.05);
+      } else {
+        this.cameras.main.startFollow(playerSprite, true, 1, 1);
+      }
     }
-    
-    this.player = new Player(
-      this, 
-      spawnX, 
-      spawnY, 
-      (x, y) => this.mapSystem.collisions.isWalkable(x, y)
+
+    // Ensure player position is synced to GameState on spawn
+    gameState.updatePlayerPosition(
+      spawnX,
+      spawnY,
+      Math.floor(spawnX / tileSize),
+      Math.floor((spawnY - 1) / tileSize),
+      Direction.DOWN
     );
-    if (CONFIG.camera.smoothFollow) {
-      this.cameras.main.startFollow(this.player, false, 0.05, 0.05);
-    } else {
-      this.cameras.main.startFollow(this.player, true, 1, 1);
-    }
 
     // If map was switched while menu was open, ensure new player is unlocked
-    this.player.setMovementLocked(false);
-    this.interactionManager.setPlayer(this.player);
-    
-    // Notify UIScene of the new player
-    EventBus.emit(Events.PLAYER_READY, this.player);
+    gameState.setInputLocked(false);
   }
 
-  update(_time: number, _delta: number) {
+  update(_time: number, delta: number) {
     this.inputManager?.update();
-    this.player?.update();
-  }
-
-  getPlayer(): Player | undefined {
-    return this.player;
+    const input = this.inputManager?.getSnapshot();
+    if (input) {
+      this.inputSystem?.setSnapshot(input);
+    }
+    this.world?.update(delta);
   }
 }

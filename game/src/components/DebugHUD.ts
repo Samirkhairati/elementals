@@ -1,17 +1,15 @@
 import { Scene, GameObjects } from 'phaser';
-import { CONFIG } from '@/config';
-import { Player } from '@/entities/Player';
+import { settingsStore } from '@/core/SettingsStore';
+import { gameState } from '@/core/GameState';
 
 export class DebugHUD {
     private text: GameObjects.BitmapText;
     private background: GameObjects.Graphics;
     private scene: Scene;
-    private player?: Player;
     private pressedKeys: Set<string> = new Set();
 
-    constructor(scene: Scene, player?: Player) {
+    constructor(scene: Scene) {
         this.scene = scene;
-        this.player = player;
 
         this.background = scene.add.graphics();
         this.background.setScrollFactor(0);
@@ -41,12 +39,8 @@ export class DebugHUD {
         this.update();
     }
 
-    setPlayer(player: Player) {
-        this.player = player;
-    }
-
     update() {
-        if (!CONFIG.debug.enabled) {
+        if (!settingsStore.debug.enabled) {
             this.text.setVisible(false);
             this.background.setVisible(false);
             return;
@@ -56,19 +50,21 @@ export class DebugHUD {
         this.background.setVisible(true);
         const lines: string[] = [];
 
-        if (CONFIG.debug.showKeys) {
+        if (settingsStore.debug.showKeys) {
             const keysString = Array.from(this.pressedKeys).join(', ') || 'None';
             lines.push(`DEBUG: Keys: ${keysString}`);
         }
 
-        if (CONFIG.debug.showCoords && this.player) {
-            const grid = this.player.getGridPosition();
-            lines.push(`DEBUG: Pos: (${Math.round(this.player.x)}, ${Math.round(this.player.y)}) [${grid.x}, ${grid.y}]`);
+        if (settingsStore.debug.showCoords) {
+            const pos = gameState.playerPosition;
+            lines.push(`DEBUG: Pos: (${Math.round(pos.worldX)}, ${Math.round(pos.worldY)}) [${pos.gridX}, ${pos.gridY}]`);
         }
 
-        if (CONFIG.debug.showGrid) {
+        if (settingsStore.debug.showGrid) {
             lines.push(`DEBUG: Grid: ON`);
         }
+
+        lines.push(`DEBUG: Movement: ${settingsStore.tileBasedMovement ? 'Tile-Based' : 'Continuous'} (Press 'T' to toggle)`);
 
         this.text.setText(lines.join('\n'));
         

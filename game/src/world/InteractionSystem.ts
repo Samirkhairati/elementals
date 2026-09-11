@@ -1,4 +1,5 @@
-import { CONFIG } from "@/config";
+import { GAME_CONSTANTS } from "@/constants/game";
+import { settingsStore } from "@/core/SettingsStore";
 
 export interface Interactable {
   x: number; // Tile X
@@ -27,8 +28,8 @@ export class InteractionSystem {
         // Tiled objects coordinates are usually based on bottom-left or top-left depending on type.
         // For tile-aligned objects (e.g., standard rectangles placed on grid), x/y are top-left in pixels.
         if (obj.x !== undefined && obj.y !== undefined) {
-          const tileX = Math.floor(obj.x / CONFIG.tileSize);
-          const tileY = Math.floor(obj.y / CONFIG.tileSize);
+          const tileX = Math.floor(obj.x / GAME_CONSTANTS.TILE_SIZE);
+          const tileY = Math.floor(obj.y / GAME_CONSTANTS.TILE_SIZE);
           
           let message = "";
           let type: "on_interact" | "on_step" = "on_interact";
@@ -36,22 +37,22 @@ export class InteractionSystem {
           
           if (obj.properties) {
             if (Array.isArray(obj.properties)) {
-                obj.properties.forEach((prop: any) => {
-                  if (prop.name === "message") message = prop.value;
-                  if (prop.name === "type") type = prop.value as any;
-                  if (prop.name === "eventKey") eventKey = prop.value;
-                });
+              obj.properties.forEach((prop: any) => {
+                if (prop.name === "message") message = prop.value;
+                if (prop.name === "type") type = prop.value as any;
+                if (prop.name === "eventKey") eventKey = prop.value;
+              });
             } else {
-                // Phaser sometimes parses it as a dictionary
-                if (obj.properties.message !== undefined) message = obj.properties.message;
-                if (obj.properties.type !== undefined) type = obj.properties.type;
-                if (obj.properties.eventKey !== undefined) eventKey = obj.properties.eventKey;
+              // Phaser sometimes parses it as a dictionary
+              if (obj.properties.message !== undefined) message = obj.properties.message;
+              if (obj.properties.type !== undefined) type = obj.properties.type;
+              if (obj.properties.eventKey !== undefined) eventKey = obj.properties.eventKey;
             }
           }
 
           // If no message or event is set, we can just use the object name as a fallback message
           if (!message && !eventKey && obj.name) {
-              message = obj.name;
+            message = obj.name;
           }
 
           this.registerInteractable({
@@ -82,21 +83,21 @@ export class InteractionSystem {
       this.debugGraphics.destroy();
     }
 
-    if (!CONFIG.debug.enabled) return;
+    if (!settingsStore.debug.enabled) return;
 
     this.debugGraphics = this.scene.add.graphics();
     this.debugGraphics.setDepth(101); // Above the debug grid
 
-    const scaledTileSize = CONFIG.tileSize * CONFIG.renderScale;
+    const tileSize = GAME_CONSTANTS.TILE_SIZE;
 
     this.interactables.forEach((interactable) => {
-      const px = interactable.x * scaledTileSize;
-      const py = interactable.y * scaledTileSize;
+      const px = interactable.x * tileSize;
+      const py = interactable.y * tileSize;
       
       this.debugGraphics!.lineStyle(2, interactable.type === "on_interact" ? 0xffff00 : 0xff00ff, 0.8);
-      this.debugGraphics!.strokeRect(px, py, scaledTileSize, scaledTileSize);
+      this.debugGraphics!.strokeRect(px, py, tileSize, tileSize);
       this.debugGraphics!.fillStyle(interactable.type === "on_interact" ? 0xffff00 : 0xff00ff, 0.2);
-      this.debugGraphics!.fillRect(px, py, scaledTileSize, scaledTileSize);
+      this.debugGraphics!.fillRect(px, py, tileSize, tileSize);
     });
   }
 }
