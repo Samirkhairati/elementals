@@ -6,5 +6,4 @@ export * from "./components/TransformComponent";
 export * from "./components/SpriteComponent";
 export * from "./components/TagComponent";
 export * from "./prefabs/Prefab";
-export * from "./prefabs/DecorationPrefab";
 export * from "./systems/RenderBridgeSystem";
