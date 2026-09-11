@@ -6,6 +6,191 @@
   "height": 20,
   "layers": [
     {
+      "id": "0fd82bfa-f69f-4a6b-86a9-13d959b50285",
+      "name": "collisions",
+      "type": "collision",
+      "visible": true,
+      "locked": false,
+      "data": {
+        "153": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "154": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "155": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "156": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "159": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "160": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "161": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "162": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "165": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "166": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "167": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "168": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "183": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "184": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "185": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "186": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "189": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "190": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "191": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "192": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "195": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "196": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "197": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "198": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "303": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "304": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "305": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "306": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "333": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "334": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "335": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "336": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": "0dccc9a4-4708-4296-a99a-fe4c4fbea1e7",
+      "name": "terrain",
+      "type": "terrain",
+      "visible": true,
+      "locked": false,
+      "data": {}
+    },
+    {
+      "id": "67f64c4c-e9df-4a93-96e8-0c9e725c49cd",
+      "name": "encounters",
+      "type": "encounters",
+      "visible": true,
+      "locked": false,
+      "data": {}
+    },
+    {
       "id": "6d70e5f7-2ccb-4154-9c6a-0567923bf291",
       "name": "decorations",
       "type": "tile",
@@ -3454,191 +3639,6 @@
           "y": 1
         }
       }
-    },
-    {
-      "id": "0fd82bfa-f69f-4a6b-86a9-13d959b50285",
-      "name": "collisions",
-      "type": "collision",
-      "visible": true,
-      "locked": false,
-      "data": {
-        "153": {
-          "tilesetId": "__collision__",
-          "x": 0,
-          "y": 0
-        },
-        "154": {
-          "tilesetId": "__collision__",
-          "x": 0,
-          "y": 0
-        },
-        "155": {
-          "tilesetId": "__collision__",
-          "x": 0,
-          "y": 0
-        },
-        "156": {
-          "tilesetId": "__collision__",
-          "x": 0,
-          "y": 0
-        },
-        "159": {
-          "tilesetId": "__collision__",
-          "x": 0,
-          "y": 0
-        },
-        "160": {
-          "tilesetId": "__collision__",
-          "x": 0,
-          "y": 0
-        },
-        "161": {
-          "tilesetId": "__collision__",
-          "x": 0,
-          "y": 0
-        },
-        "162": {
-          "tilesetId": "__collision__",
-          "x": 0,
-          "y": 0
-        },
-        "165": {
-          "tilesetId": "__collision__",
-          "x": 0,
-          "y": 0
-        },
-        "166": {
-          "tilesetId": "__collision__",
-          "x": 0,
-          "y": 0
-        },
-        "167": {
-          "tilesetId": "__collision__",
-          "x": 0,
-          "y": 0
-        },
-        "168": {
-          "tilesetId": "__collision__",
-          "x": 0,
-          "y": 0
-        },
-        "183": {
-          "tilesetId": "__collision__",
-          "x": 0,
-          "y": 0
-        },
-        "184": {
-          "tilesetId": "__collision__",
-          "x": 0,
-          "y": 0
-        },
-        "185": {
-          "tilesetId": "__collision__",
-          "x": 0,
-          "y": 0
-        },
-        "186": {
-          "tilesetId": "__collision__",
-          "x": 0,
-          "y": 0
-        },
-        "189": {
-          "tilesetId": "__collision__",
-          "x": 0,
-          "y": 0
-        },
-        "190": {
-          "tilesetId": "__collision__",
-          "x": 0,
-          "y": 0
-        },
-        "191": {
-          "tilesetId": "__collision__",
-          "x": 0,
-          "y": 0
-        },
-        "192": {
-          "tilesetId": "__collision__",
-          "x": 0,
-          "y": 0
-        },
-        "195": {
-          "tilesetId": "__collision__",
-          "x": 0,
-          "y": 0
-        },
-        "196": {
-          "tilesetId": "__collision__",
-          "x": 0,
-          "y": 0
-        },
-        "197": {
-          "tilesetId": "__collision__",
-          "x": 0,
-          "y": 0
-        },
-        "198": {
-          "tilesetId": "__collision__",
-          "x": 0,
-          "y": 0
-        },
-        "303": {
-          "tilesetId": "__collision__",
-          "x": 0,
-          "y": 0
-        },
-        "304": {
-          "tilesetId": "__collision__",
-          "x": 0,
-          "y": 0
-        },
-        "305": {
-          "tilesetId": "__collision__",
-          "x": 0,
-          "y": 0
-        },
-        "306": {
-          "tilesetId": "__collision__",
-          "x": 0,
-          "y": 0
-        },
-        "333": {
-          "tilesetId": "__collision__",
-          "x": 0,
-          "y": 0
-        },
-        "334": {
-          "tilesetId": "__collision__",
-          "x": 0,
-          "y": 0
-        },
-        "335": {
-          "tilesetId": "__collision__",
-          "x": 0,
-          "y": 0
-        },
-        "336": {
-          "tilesetId": "__collision__",
-          "x": 0,
-          "y": 0
-        }
-      }
-    },
-    {
-      "id": "0dccc9a4-4708-4296-a99a-fe4c4fbea1e7",
-      "name": "terrain",
-      "type": "terrain",
-      "visible": true,
-      "locked": false,
-      "data": {}
-    },
-    {
-      "id": "67f64c4c-e9df-4a93-96e8-0c9e725c49cd",
-      "name": "encounters",
-      "type": "encounters",
-      "visible": true,
-      "locked": false,
-      "data": {}
     }
   ]
 }

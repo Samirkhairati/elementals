@@ -116,7 +116,18 @@ export function useLayerManager(options: UseLayerManagerOptions) {
         visible: true,
         locked: false,
       }
-      const newLayers = [newLayer, ...prev]
+      let insertIndex = 0
+      if (type === 'tile') {
+        // Keep special layers on top of tile layers by default: insert tile layer below special layers at the top
+        while (
+          insertIndex < prev.length &&
+          ['collision', 'terrain', 'encounters'].includes(prev[insertIndex].type)
+        ) {
+          insertIndex++
+        }
+      }
+      const newLayers = [...prev]
+      newLayers.splice(insertIndex, 0, newLayer)
       if (activeMap) {
         const updatedMap = { ...activeMap, layers: newLayers }
         setActiveMap(updatedMap)
