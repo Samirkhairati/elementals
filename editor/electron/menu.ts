@@ -71,38 +71,7 @@ export function setupMenu(win: BrowserWindow) {
                   label: 'Active Selection',
                   click: () => win.webContents.send('dockview-toggle-panel', 'activeSelection'),
                 },
-                { type: 'separator' },
-                {
-                  label: 'Reset Layout',
-                  click: () => win.webContents.send('dockview-reset-layout'),
-                },
               ],
-            },
-            { type: 'separator' },
-            {
-              label: 'Maps Panel',
-              click: () => win.webContents.send('dockview-toggle-panel', 'maps'),
-            },
-            {
-              label: 'Layers Panel',
-              click: () => win.webContents.send('dockview-toggle-panel', 'layers'),
-            },
-            {
-              label: 'Properties Panel',
-              click: () => win.webContents.send('dockview-toggle-panel', 'properties'),
-            },
-            { type: 'separator' },
-            {
-              label: 'Tileset Browser',
-              click: () => win.webContents.send('dockview-toggle-panel', 'tilesets'),
-            },
-            {
-              label: 'Tileset Preview',
-              click: () => win.webContents.send('dockview-toggle-panel', 'preview'),
-            },
-            {
-              label: 'Active Selection',
-              click: () => win.webContents.send('dockview-toggle-panel', 'activeSelection'),
             },
             { type: 'separator' },
             {
