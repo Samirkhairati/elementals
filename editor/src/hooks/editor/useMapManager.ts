@@ -17,7 +17,6 @@ export function useMapManager(options: UseMapManagerOptions) {
   const [mapFolders, setMapFolders] = useState<string[]>([])
   const [activeMap, setActiveMap] = useState<MapData | null>(null)
   const [expandedMapFolders, setExpandedMapFolders] = useState<Set<string>>(new Set())
-  const [selectedMapFolder, setSelectedMapFolder] = useState<string | null>(null)
 
   const loadMaps = useCallback(async () => {
     if (!window.electronAPI) return
@@ -111,7 +110,6 @@ export function useMapManager(options: UseMapManagerOptions) {
         if (!window.electronAPI) return
         const res = await window.electronAPI.deleteMapFolder(folderPath)
         if (res.success) {
-          if (selectedMapFolder === folderPath) setSelectedMapFolder(null)
           if (activeMap?.folderPath === folderPath || activeMap?.folderPath?.startsWith(folderPath + '/')) {
             setActiveMap(null)
             onClearActiveMap?.()
@@ -122,7 +120,7 @@ export function useMapManager(options: UseMapManagerOptions) {
         }
       },
     })
-  }, [activeMap, selectedMapFolder, onClearActiveMap, onOpenConfirmDialog, loadMaps])
+  }, [activeMap, onClearActiveMap, onOpenConfirmDialog, loadMaps])
 
   const handleMapDrop = useCallback(async (e: React.DragEvent, targetFolder: string | null) => {
     e.preventDefault()
@@ -152,8 +150,6 @@ export function useMapManager(options: UseMapManagerOptions) {
     setActiveMap,
     expandedMapFolders,
     setExpandedMapFolders,
-    selectedMapFolder,
-    setSelectedMapFolder,
     loadMaps,
     toggleMapFolder,
     onSelectMap,

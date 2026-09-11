@@ -47,160 +47,167 @@ export function useLayerManager(options: UseLayerManagerOptions) {
   }, [activeLayerId])
 
   // ── Layer helpers ─────────────────────────────────────────────────────────
-  const updateLayers = useCallback((newLayers: Layer[]) => {
-    setLayers(newLayers)
-    if (activeMap) {
-      const updatedMap = { ...activeMap, layers: newLayers }
-      setActiveMap(updatedMap)
-      window.electronAPI?.saveMap(activeMap.folderPath, activeMap.fileName, updatedMap)
-    }
-    onCommitHistory?.(newLayers)
-  }, [activeMap, setActiveMap, onCommitHistory])
-
-  const toggleLayerVisibility = useCallback((id: string) => {
-    setLayers(prev => {
-      const newLayers = prev.map(l => (l.id === id ? { ...l, visible: !l.visible } : l))
-      if (activeMap) {
-        const updatedMap = { ...activeMap, layers: newLayers }
-        setActiveMap(updatedMap)
-        window.electronAPI?.saveMap(activeMap.folderPath, activeMap.fileName, updatedMap)
-      }
-      return newLayers
-    })
-  }, [activeMap, setActiveMap])
-
-  const toggleLayerLock = useCallback((id: string) => {
-    setLayers(prev => {
-      const newLayers = prev.map(l => (l.id === id ? { ...l, locked: !l.locked } : l))
-      if (activeMap) {
-        const updatedMap = { ...activeMap, layers: newLayers }
-        setActiveMap(updatedMap)
-        window.electronAPI?.saveMap(activeMap.folderPath, activeMap.fileName, updatedMap)
-      }
-      return newLayers
-    })
-  }, [activeMap, setActiveMap])
-
-  const handleCreateLayerOfType = useCallback((type: LayerType) => {
-    setLayers(prev => {
-      // Special layer singleton check
-      if (['collision', 'terrain', 'encounters'].includes(type) && prev.some(l => l.type === type)) {
-        return prev
-      }
-
-      let name = ''
-      if (type === 'tile') {
-        let counter = 1
-        while (prev.some(l => l.name === `Layer ${counter}`)) {
-          counter++
+  const commitNewLayers = useCallback(
+    (updater: (prev: Layer[]) => Layer[], onAfter?: (next: Layer[]) => void) => {
+      setLayers(prev => {
+        const next = updater(prev)
+        if (next === prev) return prev
+        if (activeMap) {
+          const updatedMap = { ...activeMap, layers: next }
+          setActiveMap(updatedMap)
+          window.electronAPI?.saveMap(activeMap.folderPath, activeMap.fileName, updatedMap)
         }
-        name = `Layer ${counter}`
-      } else if (type === 'collision') {
-        name = 'Collision'
-      } else if (type === 'terrain') {
-        name = 'Terrain'
-      } else if (type === 'encounters') {
-        name = 'Encounters'
-      } else if (type === 'objects') {
-        let counter = 1
-        while (prev.some(l => l.name === (counter === 1 ? 'Objects' : `Objects ${counter}`))) {
-          counter++
-        }
-        name = counter === 1 ? 'Objects' : `Objects ${counter}`
-      }
+        onCommitHistory?.(next)
+        onAfter?.(next)
+        return next
+      })
+    },
+    [activeMap, setActiveMap, onCommitHistory]
+  )
 
-      const newLayer: Layer = {
-        id: crypto.randomUUID(),
-        name,
-        type,
-        visible: true,
-        locked: false,
-      }
-      let insertIndex = 0
-      if (type === 'tile') {
-        // Keep special layers on top of tile layers by default: insert tile layer below special layers at the top
-        while (
-          insertIndex < prev.length &&
-          ['collision', 'terrain', 'encounters'].includes(prev[insertIndex].type)
-        ) {
-          insertIndex++
+  const updateLayers = useCallback(
+    (newLayers: Layer[]) => {
+      commitNewLayers(() => newLayers)
+    },
+    [commitNewLayers]
+  )
+
+  const toggleLayerVisibility = useCallback(
+    (id: string) => {
+      commitNewLayers(prev => prev.map(l => (l.id === id ? { ...l, visible: !l.visible } : l)))
+    },
+    [commitNewLayers]
+  )
+
+  const toggleLayerLock = useCallback(
+    (id: string) => {
+      commitNewLayers(prev => prev.map(l => (l.id === id ? { ...l, locked: !l.locked } : l)))
+    },
+    [commitNewLayers]
+  )
+
+  const handleCreateLayerOfType = useCallback(
+    (type: LayerType) => {
+      let createdId: string | null = null
+      commitNewLayers(
+        prev => {
+          // Special layer singleton check
+          if (['collision', 'terrain', 'encounters'].includes(type) && prev.some(l => l.type === type)) {
+            return prev
+          }
+
+          let name = ''
+          if (type === 'tile') {
+            let counter = 1
+            while (prev.some(l => l.name === `Layer ${counter}`)) {
+              counter++
+            }
+            name = `Layer ${counter}`
+          } else if (type === 'collision') {
+            name = 'Collision'
+          } else if (type === 'terrain') {
+            name = 'Terrain'
+          } else if (type === 'encounters') {
+            name = 'Encounters'
+          } else if (type === 'objects') {
+            let counter = 1
+            while (prev.some(l => l.name === (counter === 1 ? 'Objects' : `Objects ${counter}`))) {
+              counter++
+            }
+            name = counter === 1 ? 'Objects' : `Objects ${counter}`
+          }
+
+          const newLayer: Layer = {
+            id: crypto.randomUUID(),
+            name,
+            type,
+            visible: true,
+            locked: false,
+          }
+          createdId = newLayer.id
+
+          let insertIndex = 0
+          if (type === 'tile') {
+            // Keep special layers on top of tile layers by default: insert tile layer below special layers at the top
+            while (
+              insertIndex < prev.length &&
+              ['collision', 'terrain', 'encounters'].includes(prev[insertIndex].type)
+            ) {
+              insertIndex++
+            }
+          }
+          const next = [...prev]
+          next.splice(insertIndex, 0, newLayer)
+          return next
+        },
+        () => {
+          if (createdId) setActiveLayerId(createdId)
         }
-      }
-      const newLayers = [...prev]
-      newLayers.splice(insertIndex, 0, newLayer)
-      if (activeMap) {
-        const updatedMap = { ...activeMap, layers: newLayers }
-        setActiveMap(updatedMap)
-        window.electronAPI?.saveMap(activeMap.folderPath, activeMap.fileName, updatedMap)
-      }
-      setActiveLayerId(newLayer.id)
-      onCommitHistory?.(newLayers)
-      return newLayers
-    })
-  }, [activeMap, setActiveMap, onCommitHistory])
+      )
+    },
+    [commitNewLayers]
+  )
 
   const handleCreateLayer = useCallback(() => {
     handleCreateLayerOfType('tile')
   }, [handleCreateLayerOfType])
 
-  const handleRenameLayer = useCallback((id: string, newName: string) => {
-    const cleanName = newName.trim()
-    if (!cleanName) return
-    setLayers(prev => {
-      const newLayers = prev.map(l => (l.id === id ? { ...l, name: cleanName } : l))
-      if (activeMap) {
-        const updatedMap = { ...activeMap, layers: newLayers }
-        setActiveMap(updatedMap)
-        window.electronAPI?.saveMap(activeMap.folderPath, activeMap.fileName, updatedMap)
-      }
-      onCommitHistory?.(newLayers)
-      return newLayers
-    })
-  }, [activeMap, setActiveMap, onCommitHistory])
+  const handleRenameLayer = useCallback(
+    (id: string, newName: string) => {
+      const cleanName = newName.trim()
+      if (!cleanName) return
+      commitNewLayers(prev => prev.map(l => (l.id === id ? { ...l, name: cleanName } : l)))
+    },
+    [commitNewLayers]
+  )
 
-  const handleDuplicateLayer = useCallback((id: string) => {
-    setLayers(prev => {
-      const targetIndex = prev.findIndex(l => l.id === id)
-      if (targetIndex === -1) return prev
-      const targetLayer = prev[targetIndex]
-      const newLayer: Layer = {
-        ...targetLayer,
-        id: crypto.randomUUID(),
-        name: `${targetLayer.name} Copy`,
-        data: targetLayer.data ? JSON.parse(JSON.stringify(targetLayer.data)) : undefined,
-      }
-      const newLayers = [...prev]
-      newLayers.splice(targetIndex + 1, 0, newLayer)
-      if (activeMap) {
-        const updatedMap = { ...activeMap, layers: newLayers }
-        setActiveMap(updatedMap)
-        window.electronAPI?.saveMap(activeMap.folderPath, activeMap.fileName, updatedMap)
-      }
-      setActiveLayerId(newLayer.id)
-      onCommitHistory?.(newLayers)
-      return newLayers
-    })
-  }, [activeMap, setActiveMap, onCommitHistory])
+  const handleDuplicateLayer = useCallback(
+    (id: string) => {
+      let createdId: string | null = null
+      commitNewLayers(
+        prev => {
+          const targetIndex = prev.findIndex(l => l.id === id)
+          if (targetIndex === -1) return prev
+          const targetLayer = prev[targetIndex]
+          const newLayer: Layer = {
+            ...targetLayer,
+            id: crypto.randomUUID(),
+            name: `${targetLayer.name} Copy`,
+            data: targetLayer.data ? JSON.parse(JSON.stringify(targetLayer.data)) : undefined,
+          }
+          createdId = newLayer.id
+          const next = [...prev]
+          next.splice(targetIndex + 1, 0, newLayer)
+          return next
+        },
+        () => {
+          if (createdId) setActiveLayerId(createdId)
+        }
+      )
+    },
+    [commitNewLayers]
+  )
 
-  const handleDeleteLayer = useCallback((id: string) => {
-    setLayers(prev => {
-      const newLayers = prev.filter(l => l.id !== id)
-      if (activeMap) {
-        const updatedMap = { ...activeMap, layers: newLayers }
-        setActiveMap(updatedMap)
-        window.electronAPI?.saveMap(activeMap.folderPath, activeMap.fileName, updatedMap)
-      }
-      if (activeLayerId === id) {
-        setActiveLayerId(newLayers.length > 0 ? newLayers[0].id : null)
-      }
-      onCommitHistory?.(newLayers)
-      return newLayers
-    })
-  }, [activeMap, setActiveMap, activeLayerId, onCommitHistory])
+  const handleDeleteLayer = useCallback(
+    (id: string) => {
+      commitNewLayers(
+        prev => prev.filter(l => l.id !== id),
+        next => {
+          if (activeLayerId === id) {
+            setActiveLayerId(next.length > 0 ? next[0].id : null)
+          }
+        }
+      )
+    },
+    [commitNewLayers, activeLayerId]
+  )
 
-  const handleReorderLayers = useCallback((newLayers: Layer[]) => {
-    updateLayers(newLayers)
-  }, [updateLayers])
+  const handleReorderLayers = useCallback(
+    (newLayers: Layer[]) => {
+      updateLayers(newLayers)
+    },
+    [updateLayers]
+  )
 
   const activeLayerType = useMemo(
     () => layers.find(l => l.id === activeLayerId)?.type || null,

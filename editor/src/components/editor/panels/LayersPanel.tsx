@@ -43,6 +43,40 @@ function getLayerIcon(type: LayerType) {
   }
 }
 
+function NewLayerSubmenu({
+  createLayerOfType,
+  hasCollision,
+  hasTerrain,
+  hasEncounters,
+}: {
+  createLayerOfType: (type: LayerType) => void
+  hasCollision: boolean
+  hasTerrain: boolean
+  hasEncounters: boolean
+}) {
+  return (
+    <ContextMenuSub>
+      <ContextMenuSubTrigger>
+        <Plus className="w-3.5 h-3.5 mr-2" />
+        New Layer
+      </ContextMenuSubTrigger>
+      <ContextMenuSubContent className="w-44">
+        <ContextMenuItem onClick={() => createLayerOfType('tile')}>Tile Layer</ContextMenuItem>
+        <ContextMenuItem disabled={hasCollision} onClick={() => createLayerOfType('collision')}>
+          Collision Layer
+        </ContextMenuItem>
+        <ContextMenuItem disabled={hasTerrain} onClick={() => createLayerOfType('terrain')}>
+          Terrain Layer
+        </ContextMenuItem>
+        <ContextMenuItem disabled={hasEncounters} onClick={() => createLayerOfType('encounters')}>
+          Encounters Layer
+        </ContextMenuItem>
+        <ContextMenuItem onClick={() => createLayerOfType('objects')}>Objects Layer</ContextMenuItem>
+      </ContextMenuSubContent>
+    </ContextMenuSub>
+  )
+}
+
 interface LayersPanelProps {
   activeMap: MapData | null
   layers: Layer[]
@@ -191,38 +225,12 @@ export function LayersPanel({
         </ContextMenuTrigger>
 
         <ContextMenuContent className="w-48">
-          <ContextMenuSub>
-            <ContextMenuSubTrigger>
-              <Plus className="w-3.5 h-3.5 mr-2" />
-              New Layer
-            </ContextMenuSubTrigger>
-            <ContextMenuSubContent className="w-44">
-              <ContextMenuItem onClick={() => createLayerOfType('tile')}>
-                Tile Layer
-              </ContextMenuItem>
-              <ContextMenuItem
-                disabled={hasCollision}
-                onClick={() => createLayerOfType('collision')}
-              >
-                Collision Layer
-              </ContextMenuItem>
-              <ContextMenuItem
-                disabled={hasTerrain}
-                onClick={() => createLayerOfType('terrain')}
-              >
-                Terrain Layer
-              </ContextMenuItem>
-              <ContextMenuItem
-                disabled={hasEncounters}
-                onClick={() => createLayerOfType('encounters')}
-              >
-                Encounters Layer
-              </ContextMenuItem>
-              <ContextMenuItem onClick={() => createLayerOfType('objects')}>
-                Objects Layer
-              </ContextMenuItem>
-            </ContextMenuSubContent>
-          </ContextMenuSub>
+          <NewLayerSubmenu
+            createLayerOfType={createLayerOfType}
+            hasCollision={hasCollision}
+            hasTerrain={hasTerrain}
+            hasEncounters={hasEncounters}
+          />
         </ContextMenuContent>
       </ContextMenu>
     )
@@ -371,38 +379,12 @@ export function LayersPanel({
       </ContextMenuTrigger>
 
       <ContextMenuContent className="w-48">
-        <ContextMenuSub>
-          <ContextMenuSubTrigger>
-            <Plus className="w-3.5 h-3.5 mr-2" />
-            New Layer
-          </ContextMenuSubTrigger>
-          <ContextMenuSubContent className="w-44">
-            <ContextMenuItem onClick={() => createLayerOfType('tile')}>
-              Tile Layer
-            </ContextMenuItem>
-            <ContextMenuItem
-              disabled={hasCollision}
-              onClick={() => createLayerOfType('collision')}
-            >
-              Collision Layer
-            </ContextMenuItem>
-            <ContextMenuItem
-              disabled={hasTerrain}
-              onClick={() => createLayerOfType('terrain')}
-            >
-              Terrain Layer
-            </ContextMenuItem>
-            <ContextMenuItem
-              disabled={hasEncounters}
-              onClick={() => createLayerOfType('encounters')}
-            >
-              Encounters Layer
-            </ContextMenuItem>
-            <ContextMenuItem onClick={() => createLayerOfType('objects')}>
-              Objects Layer
-            </ContextMenuItem>
-          </ContextMenuSubContent>
-        </ContextMenuSub>
+        <NewLayerSubmenu
+          createLayerOfType={createLayerOfType}
+          hasCollision={hasCollision}
+          hasTerrain={hasTerrain}
+          hasEncounters={hasEncounters}
+        />
       </ContextMenuContent>
     </ContextMenu>
   )

@@ -19,13 +19,32 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
 
+function RootContextMenuContent({
+  onOpenCreateMap,
+  onOpenCreateFolder,
+}: {
+  onOpenCreateMap: () => void
+  onOpenCreateFolder: () => void
+}) {
+  return (
+    <ContextMenuContent className="w-44">
+      <ContextMenuItem onClick={onOpenCreateMap}>
+        <Plus className="w-3.5 h-3.5 mr-2" />
+        New Map
+      </ContextMenuItem>
+      <ContextMenuItem onClick={onOpenCreateFolder}>
+        <FolderPlus className="w-3.5 h-3.5 mr-2" />
+        New Folder
+      </ContextMenuItem>
+    </ContextMenuContent>
+  )
+}
+
 interface MapsPanelProps {
   maps: MapData[]
   mapFolders: string[]
   activeMap: MapData | null
   expandedMapFolders: Set<string>
-  selectedMapFolder: string | null
-  setSelectedMapFolder: (v: string | null) => void
   toggleMapFolder: (folder: string) => void
   setCreateMapData: (v: { name: string; width: number; height: number }) => void
   setCreateMapDialog: (v: { open: boolean; parentPath?: string | null }) => void
@@ -306,16 +325,10 @@ export function MapsPanel({
             <p className="text-xs">Right-click here to create a map or folder.</p>
           </div>
         </ContextMenuTrigger>
-        <ContextMenuContent className="w-44">
-          <ContextMenuItem onClick={() => openCreateMap(null)}>
-            <Plus className="w-3.5 h-3.5 mr-2" />
-            New Map
-          </ContextMenuItem>
-          <ContextMenuItem onClick={() => openCreateFolder(null)}>
-            <FolderPlus className="w-3.5 h-3.5 mr-2" />
-            New Folder
-          </ContextMenuItem>
-        </ContextMenuContent>
+        <RootContextMenuContent
+          onOpenCreateMap={() => openCreateMap(null)}
+          onOpenCreateFolder={() => openCreateFolder(null)}
+        />
       </ContextMenu>
     )
   }
@@ -335,16 +348,10 @@ export function MapsPanel({
           {renderMapTree(null, 0)}
         </div>
       </ContextMenuTrigger>
-      <ContextMenuContent className="w-44">
-        <ContextMenuItem onClick={() => openCreateMap(null)}>
-          <Plus className="w-3.5 h-3.5 mr-2" />
-          New Map
-        </ContextMenuItem>
-        <ContextMenuItem onClick={() => openCreateFolder(null)}>
-          <FolderPlus className="w-3.5 h-3.5 mr-2" />
-          New Folder
-        </ContextMenuItem>
-      </ContextMenuContent>
+      <RootContextMenuContent
+        onOpenCreateMap={() => openCreateMap(null)}
+        onOpenCreateFolder={() => openCreateFolder(null)}
+      />
     </ContextMenu>
   )
 }

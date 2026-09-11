@@ -62,7 +62,7 @@ export function ConfirmDialog({ open, title, description, onClose, onConfirm }: 
           >
             <span>Delete</span>
             <kbd className="pointer-events-none inline-flex h-6 select-none items-center gap-1 rounded bg-black/60 px-2 font-mono text-xs font-bold text-white border border-white/30 tracking-wider">
-              {isMac ? '⌘⌫' : 'Ctrl+Del'}
+              {shortcutLabel}
             </kbd>
           </button>
         </DialogFooter>

@@ -22,8 +22,6 @@ export function MapsWrapper(_props: IDockviewPanelProps) {
         mapFolders={ctx.mapFolders}
         activeMap={ctx.activeMap}
         expandedMapFolders={ctx.expandedMapFolders}
-        selectedMapFolder={ctx.selectedMapFolder}
-        setSelectedMapFolder={ctx.setSelectedMapFolder}
         toggleMapFolder={ctx.toggleMapFolder}
         setCreateMapData={ctx.setCreateMapData}
         setCreateMapDialog={ctx.setCreateMapDialog}

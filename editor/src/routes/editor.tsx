@@ -125,7 +125,10 @@ export function EditorPage() {
   const [focusedDomain, setFocusedDomain] = useState<'maps' | 'layers' | 'tilesets' | null>(null)
 
   const handleDeleteSelected = useCallback(() => {
-    if (focusedDomain === 'layers' && layerManager.activeLayerId) {
+    const isLayersDomain = focusedDomain === 'layers' || (!focusedDomain && layerManager.activeLayerId)
+    const isMapsDomain = focusedDomain === 'maps' || (!focusedDomain && mapManager.activeMap)
+
+    if (isLayersDomain && layerManager.activeLayerId) {
       const layer = layerManager.layers.find(l => l.id === layerManager.activeLayerId)
       if (layer) {
         dialogs.setConfirmDialog({
@@ -135,19 +138,7 @@ export function EditorPage() {
           action: () => layerManager.handleDeleteLayer(layer.id),
         })
       }
-    } else if (focusedDomain === 'maps' && mapManager.activeMap) {
-      mapManager.handleDeleteMap(mapManager.activeMap.folderPath, mapManager.activeMap.fileName)
-    } else if (layerManager.activeLayerId) {
-      const layer = layerManager.layers.find(l => l.id === layerManager.activeLayerId)
-      if (layer) {
-        dialogs.setConfirmDialog({
-          open: true,
-          title: 'Delete Layer',
-          description: `Are you sure you want to delete layer "${layer.name}"?`,
-          action: () => layerManager.handleDeleteLayer(layer.id),
-        })
-      }
-    } else if (mapManager.activeMap) {
+    } else if (isMapsDomain && mapManager.activeMap) {
       mapManager.handleDeleteMap(mapManager.activeMap.folderPath, mapManager.activeMap.fileName)
     }
   }, [
@@ -199,8 +190,6 @@ export function EditorPage() {
     mapFolders: mapManager.mapFolders,
     activeMap: mapManager.activeMap,
     expandedMapFolders: mapManager.expandedMapFolders,
-    selectedMapFolder: mapManager.selectedMapFolder,
-    setSelectedMapFolder: mapManager.setSelectedMapFolder,
     toggleMapFolder: mapManager.toggleMapFolder,
     setCreateMapData: dialogs.setCreateMapData,
     setCreateMapDialog: dialogs.setCreateMapDialog,
