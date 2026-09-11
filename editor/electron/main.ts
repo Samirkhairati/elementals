@@ -22,12 +22,25 @@ function ensureDirectories() {
 function getWorktreeName(): string {
   if (process.env.WORKTREE_NAME) return process.env.WORKTREE_NAME;
   try {
-    const gitPath = path.join(__dirname, '../../.git');
-    if (fs.existsSync(gitPath) && fs.statSync(gitPath).isFile()) {
-      const gitContent = fs.readFileSync(gitPath, 'utf-8');
-      const match = gitContent.match(/worktrees[/\\]([^/\r\n]+)/);
-      if (match) return match[1];
+    const rootDir = path.resolve(__dirname, '../..');
+    const gitPath = path.join(rootDir, '.git');
+    if (fs.existsSync(gitPath)) {
+      if (fs.statSync(gitPath).isFile()) {
+        const gitContent = fs.readFileSync(gitPath, 'utf-8');
+        const gitDirMatch = gitContent.match(/gitdir:\s*(.+)/i);
+        if (gitDirMatch) {
+          const gitDir = gitDirMatch[1].trim();
+          const headPath = path.join(gitDir, 'HEAD');
+          if (fs.existsSync(headPath)) {
+            const headContent = fs.readFileSync(headPath, 'utf-8').trim();
+            const branchMatch = headContent.match(/ref:\s*refs\/heads\/(.+)/);
+            if (branchMatch) return branchMatch[1];
+          }
+        }
+        return path.basename(rootDir);
+      }
     }
+    return path.basename(rootDir);
   } catch {}
   return 'main';
 }
