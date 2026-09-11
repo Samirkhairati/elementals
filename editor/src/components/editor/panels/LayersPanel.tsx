@@ -287,10 +287,28 @@ export function LayersPanel({
                       <span className="flex-1 truncate">{layer.name}</span>
                     )}
 
-                    {/* Compact status indicators */}
-                    <div className="flex items-center gap-1.5 ml-2 shrink-0 opacity-60">
-                      {layer.locked && <Lock className="w-3.5 h-3.5 text-amber-400" />}
-                      {!layer.visible && <EyeOff className="w-3.5 h-3.5 text-muted-foreground" />}
+                    {/* Compact status & inline visibility toggle */}
+                    <div className="flex items-center gap-1 ml-2 shrink-0">
+                      {layer.locked && (
+                        <div title="Layer locked" className="p-0.5 opacity-70">
+                          <Lock className="w-3.5 h-3.5 text-amber-400" />
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          toggleLayerVisibility(layer.id)
+                        }}
+                        className="p-1 rounded hover:bg-black/20 text-sidebar-foreground opacity-60 hover:opacity-100 transition-none"
+                        title={layer.visible ? 'Hide Layer' : 'Show Layer'}
+                      >
+                        {layer.visible ? (
+                          <Eye className="w-3.5 h-3.5" />
+                        ) : (
+                          <EyeOff className="w-3.5 h-3.5 text-muted-foreground" />
+                        )}
+                      </button>
                     </div>
                   </div>
                 </ContextMenuTrigger>
