@@ -45,6 +45,12 @@ export class RenderBridgeSystem extends System {
           sprite.setTint(spriteComp.tint);
         }
         this.spriteMap.set(entity, sprite);
+
+        // Play initial animation if present
+        const anim = world.getComponent(entity, AnimationComponent);
+        if (anim && anim.currentAnimKey) {
+          sprite.play(anim.currentAnimKey, true);
+        }
       } else {
         // Value-checked synchronization to avoid dirtying Phaser transform when unchanged
         if (sprite.x !== transform.x || sprite.y !== transform.y) {
@@ -62,19 +68,20 @@ export class RenderBridgeSystem extends System {
         if (sprite.flipX !== spriteComp.flipX) {
           sprite.setFlipX(spriteComp.flipX);
         }
-        if (spriteComp.frame !== undefined && sprite.frame.name !== String(spriteComp.frame)) {
-          sprite.setFrame(spriteComp.frame);
-        }
-        if (sprite.texture.key !== spriteComp.texture) {
-          sprite.setTexture(spriteComp.texture, spriteComp.frame);
-        }
-      }
 
-      // Sync character animation if present
-      const anim = world.getComponent(entity, AnimationComponent);
-      if (anim && anim.currentAnimKey && sprite) {
-        if (sprite.anims.currentAnim?.key !== anim.currentAnimKey) {
-          sprite.play(anim.currentAnimKey, true);
+        // Only manage static frame/texture if entity is NOT driven by character animations
+        const anim = world.getComponent(entity, AnimationComponent);
+        if (!anim) {
+          if (spriteComp.frame !== undefined && sprite.frame.name !== String(spriteComp.frame)) {
+            sprite.setFrame(spriteComp.frame);
+          }
+          if (sprite.texture.key !== spriteComp.texture) {
+            sprite.setTexture(spriteComp.texture, spriteComp.frame);
+          }
+        } else if (anim.currentAnimKey) {
+          if (sprite.anims.currentAnim?.key !== anim.currentAnimKey) {
+            sprite.play(anim.currentAnimKey, true);
+          }
         }
       }
     }
