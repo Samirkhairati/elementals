@@ -78,6 +78,10 @@ export function LayersPanel({
   setConfirmDialog,
 }: LayersPanelProps) {
   const [draggedLayerId, setDraggedLayerId] = useState<string | null>(null)
+  const [dragOverTarget, setDragOverTarget] = useState<{
+    id: string
+    position: 'top' | 'bottom'
+  } | null>(null)
   const [editingLayerId, setEditingLayerId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -104,27 +108,50 @@ export function LayersPanel({
   const handleDragStart = (e: React.DragEvent, id: string) => {
     setDraggedLayerId(id)
     e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', id)
   }
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDragOver = (e: React.DragEvent, targetId: string) => {
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
+    if (!draggedLayerId || draggedLayerId === targetId) {
+      setDragOverTarget(null)
+      return
+    }
+    const rect = e.currentTarget.getBoundingClientRect()
+    const isTop = e.clientY - rect.top < rect.height / 2
+    setDragOverTarget({ id: targetId, position: isTop ? 'top' : 'bottom' })
+  }
+
+  const handleDragEnd = () => {
+    setDraggedLayerId(null)
+    setDragOverTarget(null)
   }
 
   const handleDrop = (e: React.DragEvent, targetId: string) => {
     e.preventDefault()
-    if (!draggedLayerId || draggedLayerId === targetId) return
+    if (!draggedLayerId || draggedLayerId === targetId) {
+      setDraggedLayerId(null)
+      setDragOverTarget(null)
+      return
+    }
 
     const oldIndex = layers.findIndex((l) => l.id === draggedLayerId)
-    const newIndex = layers.findIndex((l) => l.id === targetId)
+    const baseTargetIndex = layers.findIndex((l) => l.id === targetId)
 
-    if (oldIndex !== -1 && newIndex !== -1) {
-      const next = [...layers]
-      const [removed] = next.splice(oldIndex, 1)
-      next.splice(newIndex, 0, removed)
-      reorderLayers(next)
+    if (oldIndex !== -1 && baseTargetIndex !== -1) {
+      let insertIndex = dragOverTarget?.position === 'bottom' ? baseTargetIndex + 1 : baseTargetIndex
+      if (oldIndex < insertIndex) insertIndex--
+
+      if (oldIndex !== insertIndex) {
+        const next = [...layers]
+        const [removed] = next.splice(oldIndex, 1)
+        next.splice(insertIndex, 0, removed)
+        reorderLayers(next)
+      }
     }
     setDraggedLayerId(null)
+    setDragOverTarget(null)
   }
 
   const confirmDeleteLayer = (layer: Layer) => {
@@ -157,6 +184,7 @@ export function LayersPanel({
           {layers.map((layer) => {
             const isEditing = editingLayerId === layer.id
             const isSelected = activeLayerId === layer.id
+            const isDropTarget = dragOverTarget?.id === layer.id && draggedLayerId !== layer.id
 
             return (
               <ContextMenu key={layer.id}>
@@ -164,18 +192,28 @@ export function LayersPanel({
                   <div
                     draggable={!layer.locked && !isEditing}
                     onDragStart={(e) => handleDragStart(e, layer.id)}
-                    onDragOver={handleDragOver}
+                    onDragOver={(e) => handleDragOver(e, layer.id)}
+                    onDragEnd={handleDragEnd}
                     onDrop={(e) => handleDrop(e, layer.id)}
                     onClick={() => setActiveLayerId(layer.id)}
                     onDoubleClick={() => {
                       if (!layer.locked) startEditing(layer)
                     }}
-                    className={`flex items-center py-1.5 px-2.5 rounded-md cursor-pointer text-sm transition-colors select-none ${
+                    className={`relative flex items-center py-1.5 px-2.5 rounded-md cursor-pointer text-sm transition-colors select-none ${
                       isSelected
                         ? 'bg-primary/30 text-primary-foreground font-medium border border-primary/40'
                         : 'hover:bg-sidebar-accent text-sidebar-foreground'
                     }`}
                   >
+                    {/* Horizontal drag indicator line */}
+                    {isDropTarget && (
+                      <div
+                        className={`absolute left-0 right-0 h-[2px] bg-primary shadow-[0_0_8px_rgba(59,130,246,1)] z-30 pointer-events-none rounded-full ${
+                          dragOverTarget.position === 'top' ? '-top-[2px]' : '-bottom-[2px]'
+                        }`}
+                      />
+                    )}
+
                     <div className="mr-2 shrink-0 opacity-80 cursor-grab active:cursor-grabbing">
                       {getLayerIcon(layer.type)}
                     </div>

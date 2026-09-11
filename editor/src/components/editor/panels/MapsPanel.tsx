@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import {
   Folder as FolderIcon,
   ChevronRight,
@@ -58,6 +58,13 @@ export function MapsPanel({
   handleMapDrop,
   onSelectMap,
 }: MapsPanelProps) {
+  const [draggedFileName, setDraggedFileName] = useState<string | null>(null)
+  const [dragOverFolder, setDragOverFolder] = useState<string | null>(null)
+  const [mapDropTarget, setMapDropTarget] = useState<{
+    fileName: string
+    position: 'top' | 'bottom'
+  } | null>(null)
+
   const openCreateMap = (parentPath: string | null = null) => {
     setTimeout(() => {
       setCreateMapData({ name: '', width: 50, height: 50 })
@@ -75,6 +82,12 @@ export function MapsPanel({
     }, 0)
   }
 
+  const handleDragEnd = () => {
+    setDraggedFileName(null)
+    setDragOverFolder(null)
+    setMapDropTarget(null)
+  }
+
   const renderMapTree = (currentPath: string | null, level: number = 0): React.ReactNode => {
     const childrenFolders = mapFolders.filter((f) => {
       if (currentPath === null) return !f.includes('/')
@@ -88,15 +101,31 @@ export function MapsPanel({
         {childrenFolders.map((folder) => {
           const folderName = folder.split('/').pop() || folder
           const isExpanded = expandedMapFolders.has(folder)
+          const isFolderDropTarget = dragOverFolder === folder
 
           return (
             <div key={folder} className="group/folder">
               <ContextMenu>
                 <ContextMenuTrigger>
                   <div
-                    className="flex items-center py-1.5 px-2 rounded-md cursor-pointer text-sm transition-colors select-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-sidebar-foreground"
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={(e) => handleMapDrop(e, folder)}
+                    className={`flex items-center py-1.5 px-2 rounded-md cursor-pointer text-sm transition-colors select-none text-sidebar-foreground ${
+                      isFolderDropTarget
+                        ? 'bg-primary/20 ring-2 ring-primary'
+                        : 'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                    }`}
+                    onDragOver={(e) => {
+                      e.preventDefault()
+                      setDragOverFolder(folder)
+                      setMapDropTarget(null)
+                    }}
+                    onDragLeave={() => {
+                      if (dragOverFolder === folder) setDragOverFolder(null)
+                    }}
+                    onDrop={(e) => {
+                      setDragOverFolder(null)
+                      setMapDropTarget(null)
+                      handleMapDrop(e, folder)
+                    }}
                     onClick={() => {
                       toggleMapFolder(folder)
                     }}
@@ -160,6 +189,8 @@ export function MapsPanel({
           const isSelected =
             activeMap?.fileName === m.fileName &&
             (activeMap?.folderPath || null) === (m.folderPath || null)
+          const isMapDropTarget =
+            mapDropTarget?.fileName === m.fileName && draggedFileName !== m.fileName
 
           return (
             <ContextMenu key={m.fileName}>
@@ -167,16 +198,41 @@ export function MapsPanel({
                 <div
                   draggable
                   onDragStart={(e) => {
+                    setDraggedFileName(m.fileName)
                     e.dataTransfer.setData('mapFileName', m.fileName)
                     e.dataTransfer.setData('mapSourceFolder', String(m.folderPath))
                   }}
+                  onDragOver={(e) => {
+                    e.preventDefault()
+                    e.dataTransfer.dropEffect = 'move'
+                    if (draggedFileName === m.fileName) return
+                    const rect = e.currentTarget.getBoundingClientRect()
+                    const isTop = e.clientY - rect.top < rect.height / 2
+                    setMapDropTarget({ fileName: m.fileName, position: isTop ? 'top' : 'bottom' })
+                    setDragOverFolder(null)
+                  }}
+                  onDragEnd={handleDragEnd}
+                  onDrop={(e) => {
+                    setMapDropTarget(null)
+                    setDraggedFileName(null)
+                    handleMapDrop(e, m.folderPath)
+                  }}
                   onClick={() => onSelectMap(m)}
-                  className={`flex items-center py-1.5 px-2 rounded-md cursor-pointer text-sm transition-colors select-none ${
+                  className={`relative flex items-center py-1.5 px-2 rounded-md cursor-pointer text-sm transition-colors select-none ${
                     isSelected
                       ? 'bg-primary/30 text-primary-foreground font-medium border border-primary/40'
                       : 'hover:bg-sidebar-accent text-sidebar-foreground'
                   }`}
                 >
+                  {/* Horizontal drag indicator line */}
+                  {isMapDropTarget && (
+                    <div
+                      className={`absolute left-0 right-0 h-[2px] bg-primary shadow-[0_0_8px_rgba(59,130,246,1)] z-30 pointer-events-none rounded-full ${
+                        mapDropTarget.position === 'top' ? '-top-[2px]' : '-bottom-[2px]'
+                      }`}
+                    />
+                  )}
+
                   <div className="w-4 h-4 mr-1 shrink-0 opacity-0" />
                   <MapIcon className="w-4 h-4 mr-2 shrink-0 opacity-80" />
                   <span className="flex-1 truncate">{m.name}</span>
@@ -230,7 +286,11 @@ export function MapsPanel({
         <div
           className="min-h-full h-full w-full space-y-1"
           onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => handleMapDrop(e, null)}
+          onDrop={(e) => {
+            setDragOverFolder(null)
+            setMapDropTarget(null)
+            handleMapDrop(e, null)
+          }}
         >
           {renderMapTree(null, 0)}
           {maps.length === 0 && mapFolders.length === 0 && (

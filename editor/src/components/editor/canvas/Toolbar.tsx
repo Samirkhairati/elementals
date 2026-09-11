@@ -27,7 +27,11 @@ export function Toolbar({
   const [infoOpen, setInfoOpen] = useState(false)
 
   return (
-    <div className="h-14 border-b border-border bg-background flex items-center px-4 shrink-0 shadow-sm z-10 justify-between">
+    <div className="h-14 border-b border-border bg-background flex items-center px-4 shrink-0 shadow-sm z-10">
+      {/* Left Spacer for centering */}
+      <div className="flex-1" />
+
+      {/* Centered Controls */}
       <div className="flex items-center gap-4">
         {/* History Group */}
         <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-md border">
@@ -75,6 +79,7 @@ export function Toolbar({
         </div>
       </div>
       
+      {/* Right Info Button */}
       <div className="flex-1 flex justify-end">
         <button onClick={() => setInfoOpen(true)} className="p-2 rounded-md hover:bg-muted text-muted-foreground transition-colors" title="Shortcuts Info">
           <Info className="w-4 h-4" />

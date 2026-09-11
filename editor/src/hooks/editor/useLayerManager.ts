@@ -4,10 +4,11 @@ import { Layer, LayerType, TileSelection, ActiveTool, PaintMode, DebugInfo, MapD
 interface UseLayerManagerOptions {
   activeMap: MapData | null
   setActiveMap: React.Dispatch<React.SetStateAction<MapData | null>>
+  onCommitHistory?: (layers: Layer[]) => void
 }
 
 export function useLayerManager(options: UseLayerManagerOptions) {
-  const { activeMap, setActiveMap } = options
+  const { activeMap, setActiveMap, onCommitHistory } = options
 
   const [layers, setLayers] = useState<Layer[]>([])
   const [activeLayerId, setActiveLayerId] = useState<string | null>(null)
@@ -53,7 +54,8 @@ export function useLayerManager(options: UseLayerManagerOptions) {
       setActiveMap(updatedMap)
       window.electronAPI?.saveMap(activeMap.folderPath, activeMap.fileName, updatedMap)
     }
-  }, [activeMap, setActiveMap])
+    onCommitHistory?.(newLayers)
+  }, [activeMap, setActiveMap, onCommitHistory])
 
   const toggleLayerVisibility = useCallback((id: string) => {
     setLayers(prev => {
@@ -121,9 +123,10 @@ export function useLayerManager(options: UseLayerManagerOptions) {
         window.electronAPI?.saveMap(activeMap.folderPath, activeMap.fileName, updatedMap)
       }
       setActiveLayerId(newLayer.id)
+      onCommitHistory?.(newLayers)
       return newLayers
     })
-  }, [activeMap, setActiveMap])
+  }, [activeMap, setActiveMap, onCommitHistory])
 
   const handleCreateLayer = useCallback(() => {
     handleCreateLayerOfType('tile')
@@ -139,9 +142,10 @@ export function useLayerManager(options: UseLayerManagerOptions) {
         setActiveMap(updatedMap)
         window.electronAPI?.saveMap(activeMap.folderPath, activeMap.fileName, updatedMap)
       }
+      onCommitHistory?.(newLayers)
       return newLayers
     })
-  }, [activeMap, setActiveMap])
+  }, [activeMap, setActiveMap, onCommitHistory])
 
   const handleDuplicateLayer = useCallback((id: string) => {
     setLayers(prev => {
@@ -162,9 +166,10 @@ export function useLayerManager(options: UseLayerManagerOptions) {
         window.electronAPI?.saveMap(activeMap.folderPath, activeMap.fileName, updatedMap)
       }
       setActiveLayerId(newLayer.id)
+      onCommitHistory?.(newLayers)
       return newLayers
     })
-  }, [activeMap, setActiveMap])
+  }, [activeMap, setActiveMap, onCommitHistory])
 
   const handleDeleteLayer = useCallback((id: string) => {
     setLayers(prev => {
@@ -177,9 +182,10 @@ export function useLayerManager(options: UseLayerManagerOptions) {
       if (activeLayerId === id) {
         setActiveLayerId(newLayers.length > 0 ? newLayers[0].id : null)
       }
+      onCommitHistory?.(newLayers)
       return newLayers
     })
-  }, [activeMap, setActiveMap, activeLayerId])
+  }, [activeMap, setActiveMap, activeLayerId, onCommitHistory])
 
   const handleReorderLayers = useCallback((newLayers: Layer[]) => {
     updateLayers(newLayers)

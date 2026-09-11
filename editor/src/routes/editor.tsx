@@ -15,15 +15,23 @@ import { EditorDockview } from '@/components/editor/layout/EditorDockview'
 import { EditorDialogs } from '@/components/editor/layout/EditorDialogs'
 
 export function EditorPage() {
+  // ── History Hook ─────────────────────────────────────────────────────────
+  const [layersState, setLayersState] = useState<any[]>([])
+  const historyState = useHistory(setLayersState)
+
   // ── Layer Manager ────────────────────────────────────────────────────────
-  // We initialize layer manager first with activeMap synced from mapManager
   const layerManager = useLayerManager({
     activeMap: null, // connected dynamically in handlers
     setActiveMap: () => {},
+    onCommitHistory: (layers) => historyState.commitHistory(layers),
   })
 
-  // ── History Hook ─────────────────────────────────────────────────────────
-  const historyState = useHistory(layerManager.setLayers)
+  // Keep historyState in sync with layerManager.setLayers
+  useEffect(() => {
+    if (layersState.length > 0) {
+      layerManager.setLayers(layersState)
+    }
+  }, [layersState])
 
   // ── Tileset Manager ──────────────────────────────────────────────────────
   const tilesetManager = useTilesetManager({
@@ -87,27 +95,31 @@ export function EditorPage() {
   })
 
   // ── Undo / Redo Bounding ─────────────────────────────────────────────────
-  const boundHandleUndo = useCallback(
-    () =>
+  const boundHandleUndo = useCallback(() => {
+    if (historyState.historyIndex > 0) {
       historyState.handleUndo(
         layerManager.layers,
         layerManager.setLayers,
         mapManager.activeMap,
         mapManager.setActiveMap
-      ),
-    [historyState, layerManager.layers, layerManager.setLayers, mapManager.activeMap, mapManager.setActiveMap]
-  )
+      )
+    } else if (mapManager.deletedMapsHistory.length > 0) {
+      mapManager.undoDeleteMap()
+    }
+  }, [historyState, layerManager.layers, layerManager.setLayers, mapManager])
 
-  const boundHandleRedo = useCallback(
-    () =>
+  const boundHandleRedo = useCallback(() => {
+    if (historyState.historyIndex < historyState.history.length - 1) {
       historyState.handleRedo(
         layerManager.layers,
         layerManager.setLayers,
         mapManager.activeMap,
         mapManager.setActiveMap
-      ),
-    [historyState, layerManager.layers, layerManager.setLayers, mapManager.activeMap, mapManager.setActiveMap]
-  )
+      )
+    } else if (mapManager.restoredMapsHistory.length > 0) {
+      mapManager.redoDeleteMap()
+    }
+  }, [historyState, layerManager.layers, layerManager.setLayers, mapManager])
 
   // ── Focus Domain Tracking ───────────────────────────────────────────────
   const [focusedDomain, setFocusedDomain] = useState<'maps' | 'layers' | 'tilesets' | null>(null)
