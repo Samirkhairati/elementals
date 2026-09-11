@@ -288,7 +288,10 @@ export function LayersPanel({
                     )}
 
                     {/* Compact status & inline visibility toggle */}
-                    <div className="flex items-center gap-1 ml-2 shrink-0">
+                    <div
+                      className="flex items-center gap-1 ml-2 shrink-0"
+                      onDoubleClick={(e) => e.stopPropagation()}
+                    >
                       {layer.locked && (
                         <div title="Layer locked" className="p-0.5 opacity-70">
                           <Lock className="w-3.5 h-3.5 text-amber-400" />
@@ -299,6 +302,9 @@ export function LayersPanel({
                         onClick={(e) => {
                           e.stopPropagation()
                           toggleLayerVisibility(layer.id)
+                        }}
+                        onDoubleClick={(e) => {
+                          e.stopPropagation()
                         }}
                         className="p-1 rounded hover:bg-black/20 text-sidebar-foreground opacity-60 hover:opacity-100 transition-none"
                         title={layer.visible ? 'Hide Layer' : 'Show Layer'}
