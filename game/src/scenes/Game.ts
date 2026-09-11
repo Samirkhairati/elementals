@@ -9,7 +9,7 @@ import { InputManager } from "@/components/InputManager";
 import { InteractionManager } from "@/components/InteractionManager";
 import { MAPS } from "@/constants/assets";
 import { EventBus, Events } from "@/utils/EventBus";
-import { World, RenderBridgeSystem, DecorationPrefab } from "@/ecs";
+import { World, RenderBridgeSystem } from "@/ecs";
 
 export class Game extends Scene {
   private player!: Player;
@@ -108,15 +108,8 @@ export class Game extends Scene {
       this.cameras.main.startFollow(this.player, true, 1, 1);
     }
 
-    // Spawn test decorative entity via ECS to verify RenderBridge
+    // Clear ECS world on map transition
     this.world?.clear();
-    this.world?.spawnPrefab(DecorationPrefab, {
-      x: spawnX + tileSize * 2,
-      y: spawnY,
-      texture: "bush",
-      depth: GAME_CONSTANTS.PLAYER_DEPTH - 1,
-      tag: "test-bush",
-    });
 
     // If map was switched while menu was open, ensure new player is unlocked
     gameState.setInputLocked(false);

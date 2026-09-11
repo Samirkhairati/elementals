@@ -31,6 +31,12 @@ export class CollisionSystem {
     }
 
     // 2. Tile-based collision check
+    // If the map does not have a designated collision layer, the map is considered walkable.
+    const collisionLayer = this.map.getLayer(this.collisionLayerName);
+    if (!collisionLayer) {
+      return true;
+    }
+
     // Since player origin is (0.5, 1), y is the bottom edge.
     // Subtract a tiny amount to get the tile the player is actually "in" at their base.
     const tileX = this.map.worldToTileX(x, true, undefined, this.collisionLayerName);
@@ -38,13 +44,8 @@ export class CollisionSystem {
 
     if (tileX === null || tileY === null) return false;
 
-    const collisionLayer = this.map.getLayer(this.collisionLayerName);
-    if (collisionLayer) {
-      const tile = this.map.getTileAt(tileX, tileY, true, this.collisionLayerName);
-      // A tile is considered a "collision" if it has an index (GID) > 0
-      return !tile || tile.index <= 0;
-    }
-
-    return true;
+    const tile = this.map.getTileAt(tileX, tileY, true, this.collisionLayerName);
+    // A tile is considered a "collision" if it has an index (GID) > 0
+    return !tile || tile.index <= 0;
   }
 }
