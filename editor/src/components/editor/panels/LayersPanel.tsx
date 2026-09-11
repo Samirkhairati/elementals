@@ -177,6 +177,57 @@ export function LayersPanel({
     )
   }
 
+  if (layers.length === 0) {
+    return (
+      <ContextMenu>
+        <ContextMenuTrigger className="block h-full w-full">
+          <div className="h-full flex flex-col items-center justify-center text-muted-foreground p-8 text-center select-none">
+            <p className="text-xs">
+              No layers yet.
+              <br />
+              <span className="text-[11px] opacity-70">Right-click here to create a layer.</span>
+            </p>
+          </div>
+        </ContextMenuTrigger>
+
+        <ContextMenuContent className="w-48">
+          <ContextMenuSub>
+            <ContextMenuSubTrigger>
+              <Plus className="w-3.5 h-3.5 mr-2" />
+              New Layer
+            </ContextMenuSubTrigger>
+            <ContextMenuSubContent className="w-44">
+              <ContextMenuItem onClick={() => createLayerOfType('tile')}>
+                Tile Layer
+              </ContextMenuItem>
+              <ContextMenuItem
+                disabled={hasCollision}
+                onClick={() => createLayerOfType('collision')}
+              >
+                Collision Layer
+              </ContextMenuItem>
+              <ContextMenuItem
+                disabled={hasTerrain}
+                onClick={() => createLayerOfType('terrain')}
+              >
+                Terrain Layer
+              </ContextMenuItem>
+              <ContextMenuItem
+                disabled={hasEncounters}
+                onClick={() => createLayerOfType('encounters')}
+              >
+                Encounters Layer
+              </ContextMenuItem>
+              <ContextMenuItem onClick={() => createLayerOfType('objects')}>
+                Objects Layer
+              </ContextMenuItem>
+            </ContextMenuSubContent>
+          </ContextMenuSub>
+        </ContextMenuContent>
+      </ContextMenu>
+    )
+  }
+
   return (
     <ContextMenu>
       <ContextMenuTrigger className="block min-h-full h-full w-full">
@@ -199,10 +250,10 @@ export function LayersPanel({
                     onDoubleClick={() => {
                       if (!layer.locked) startEditing(layer)
                     }}
-                    className={`relative flex items-center py-1.5 px-2.5 rounded-md cursor-pointer text-sm transition-colors select-none ${
+                    className={`relative flex items-center py-1.5 px-2.5 rounded-md cursor-pointer text-sm transition-colors select-none border ${
                       isSelected
-                        ? 'bg-primary/30 text-primary-foreground font-medium border border-primary/40'
-                        : 'hover:bg-sidebar-accent text-sidebar-foreground'
+                        ? 'bg-primary/30 text-primary-foreground font-medium border-primary/40'
+                        : 'border-transparent hover:bg-sidebar-accent text-sidebar-foreground'
                     }`}
                   >
                     {/* Horizontal drag indicator line */}
@@ -292,16 +343,6 @@ export function LayersPanel({
               </ContextMenu>
             )
           })}
-
-          {layers.length === 0 && (
-            <div className="h-40 flex items-center justify-center text-muted-foreground p-4 text-center select-none">
-              <p className="text-xs">
-                No layers yet.
-                <br />
-                <span className="text-[11px] opacity-70">Right-click here to create a layer.</span>
-              </p>
-            </div>
-          )}
         </div>
       </ContextMenuTrigger>
 
