@@ -108,7 +108,7 @@ export function MapsPanel({
               <ContextMenu>
                 <ContextMenuTrigger>
                   <div
-                    className={`flex items-center py-1.5 px-2 rounded-md cursor-pointer text-sm transition-colors select-none text-sidebar-foreground border ${
+                    className={`flex items-center py-1.5 px-2 rounded-md cursor-pointer text-sm select-none text-sidebar-foreground border ${
                       isFolderDropTarget
                         ? 'bg-primary/20 ring-2 ring-primary border-transparent'
                         : 'border-transparent hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
@@ -218,7 +218,7 @@ export function MapsPanel({
                     handleMapDrop(e, m.folderPath)
                   }}
                   onClick={() => onSelectMap(m)}
-                  className={`relative flex items-center py-1.5 px-2 rounded-md cursor-pointer text-sm transition-colors select-none border ${
+                  className={`relative flex items-center py-1.5 px-2 rounded-md cursor-pointer text-sm select-none border ${
                     isSelected
                       ? 'bg-primary/30 text-primary-foreground font-medium border-primary/40'
                       : 'border-transparent hover:bg-sidebar-accent text-sidebar-foreground'

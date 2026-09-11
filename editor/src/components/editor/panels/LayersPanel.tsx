@@ -250,7 +250,7 @@ export function LayersPanel({
                     onDoubleClick={() => {
                       if (!layer.locked) startEditing(layer)
                     }}
-                    className={`relative flex items-center py-1.5 px-2.5 rounded-md cursor-pointer text-sm transition-colors select-none border ${
+                    className={`relative flex items-center py-1.5 px-2.5 rounded-md cursor-pointer text-sm select-none border ${
                       isSelected
                         ? 'bg-primary/30 text-primary-foreground font-medium border-primary/40'
                         : 'border-transparent hover:bg-sidebar-accent text-sidebar-foreground'
