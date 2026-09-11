@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { Layer, TileSelection, ActiveTool, PaintMode, DebugInfo, MapData } from '@/types/editor'
+import { Layer, LayerType, TileSelection, ActiveTool, PaintMode, DebugInfo, MapData } from '@/types/editor'
 
 interface UseLayerManagerOptions {
   activeMap: MapData | null
