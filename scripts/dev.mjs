@@ -13,14 +13,24 @@ function detectWorktree() {
   try {
     const gitPath = path.join(ROOT_DIR, '.git');
     if (fs.existsSync(gitPath) && fs.statSync(gitPath).isFile()) {
-      const content = fs.readFileSync(gitPath, 'utf8');
-      const match = content.match(/worktrees[/\\]([^/\r\n]+)/);
-      const name = match ? match[1] : path.basename(ROOT_DIR);
+      const gitContent = fs.readFileSync(gitPath, 'utf8');
+      const gitDirMatch = gitContent.match(/gitdir:\s*(.+)/i);
+      let name = path.basename(ROOT_DIR);
+
+      if (gitDirMatch) {
+        const gitDir = gitDirMatch[1].trim();
+        const headPath = path.join(gitDir, 'HEAD');
+        if (fs.existsSync(headPath)) {
+          const headContent = fs.readFileSync(headPath, 'utf8').trim();
+          const branchMatch = headContent.match(/ref:\s*refs\/heads\/(.+)/);
+          if (branchMatch) name = branchMatch[1];
+        }
+      }
 
       try {
         const list = execSync('git worktree list --porcelain', { cwd: ROOT_DIR, encoding: 'utf8' });
         const entries = list.split('\n\n').filter(Boolean);
-        const idx = entries.findIndex(e => e.includes(ROOT_DIR) || (match && e.includes(match[1])));
+        const idx = entries.findIndex(e => e.includes(ROOT_DIR));
         const offset = idx > 0 ? idx : 1;
         return { isWorktree: true, name, offset };
       } catch {
