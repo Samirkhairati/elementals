@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
 // Hooks
 import { useHistory } from '@/hooks/useHistory'
@@ -109,12 +109,59 @@ export function EditorPage() {
     [historyState, layerManager.layers, layerManager.setLayers, mapManager.activeMap, mapManager.setActiveMap]
   )
 
+  // ── Focus Domain Tracking ───────────────────────────────────────────────
+  const [focusedDomain, setFocusedDomain] = useState<'maps' | 'layers' | 'tilesets' | null>(null)
+
+  const handleDeleteSelected = useCallback(() => {
+    if (focusedDomain === 'layers' && layerManager.activeLayerId) {
+      const layer = layerManager.layers.find(l => l.id === layerManager.activeLayerId)
+      if (layer) {
+        dialogs.setConfirmDialog({
+          open: true,
+          title: 'Delete Layer',
+          description: `Are you sure you want to delete layer "${layer.name}"?`,
+          action: () => layerManager.handleDeleteLayer(layer.id),
+        })
+      }
+    } else if (focusedDomain === 'maps' && mapManager.activeMap) {
+      mapManager.handleDeleteMap(mapManager.activeMap.folderPath, mapManager.activeMap.fileName)
+    } else if (layerManager.activeLayerId) {
+      const layer = layerManager.layers.find(l => l.id === layerManager.activeLayerId)
+      if (layer) {
+        dialogs.setConfirmDialog({
+          open: true,
+          title: 'Delete Layer',
+          description: `Are you sure you want to delete layer "${layer.name}"?`,
+          action: () => layerManager.handleDeleteLayer(layer.id),
+        })
+      }
+    } else if (mapManager.activeMap) {
+      mapManager.handleDeleteMap(mapManager.activeMap.folderPath, mapManager.activeMap.fileName)
+    }
+  }, [
+    focusedDomain,
+    layerManager.activeLayerId,
+    layerManager.layers,
+    layerManager.handleDeleteLayer,
+    mapManager.activeMap,
+    mapManager.handleDeleteMap,
+    dialogs.setConfirmDialog,
+  ])
+
   // ── Keyboard Shortcuts ───────────────────────────────────────────────────
   useKeyboardShortcuts({
     handleUndo: boundHandleUndo,
     handleRedo: boundHandleRedo,
     setActiveTool: layerManager.setActiveTool,
-    deps: [historyState.history, historyState.historyIndex, mapManager.activeMap],
+    handleDelete: handleDeleteSelected,
+    deps: [
+      historyState.history,
+      historyState.historyIndex,
+      mapManager.activeMap,
+      layerManager.activeLayerId,
+      focusedDomain,
+      handleDeleteSelected,
+    ],
   })
 
   // ── Paint Tools Hook ─────────────────────────────────────────────────────
@@ -133,6 +180,8 @@ export function EditorPage() {
 
   // ── Context Value for all panels ─────────────────────────────────────────
   const contextValue = {
+    focusedDomain,
+    setFocusedDomain,
     // Maps domain
     maps: mapManager.maps,
     mapFolders: mapManager.mapFolders,

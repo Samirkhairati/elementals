@@ -66,19 +66,23 @@ export function useMapManager(options: UseMapManagerOptions) {
   const handleDeleteMapFolder = useCallback((folderPath: string) => {
     onOpenConfirmDialog?.({
       title: 'Delete Map Folder',
-      description: `Are you sure you want to delete map folder "${folderPath}"?`,
+      description: `Are you sure you want to delete folder "${folderPath}" and all its contents?`,
       action: async () => {
         if (!window.electronAPI) return
         const res = await window.electronAPI.deleteMapFolder(folderPath)
         if (res.success) {
           if (selectedMapFolder === folderPath) setSelectedMapFolder(null)
+          if (activeMap?.folderPath === folderPath || activeMap?.folderPath?.startsWith(folderPath + '/')) {
+            setActiveMap(null)
+            onClearActiveMap?.()
+          }
           loadMaps()
         } else {
           alert(res.error)
         }
       },
     })
-  }, [selectedMapFolder, onOpenConfirmDialog, loadMaps])
+  }, [activeMap, selectedMapFolder, onClearActiveMap, onOpenConfirmDialog, loadMaps])
 
   const handleMapDrop = useCallback(async (e: React.DragEvent, targetFolder: string | null) => {
     e.preventDefault()
