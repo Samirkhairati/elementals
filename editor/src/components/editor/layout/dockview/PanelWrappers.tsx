@@ -43,6 +43,7 @@ export function LayersWrapper(_props: IDockviewPanelProps) {
   return (
     <div className="flex-1 overflow-y-auto p-2 font-mono text-xs min-h-0 bg-sidebar-background h-full">
       <LayersPanel
+        activeMap={ctx.activeMap}
         layers={ctx.layers}
         activeLayerId={ctx.activeLayerId}
         setActiveLayerId={ctx.setActiveLayerId}
@@ -50,6 +51,10 @@ export function LayersWrapper(_props: IDockviewPanelProps) {
         toggleLayerLock={ctx.toggleLayerLock}
         deleteLayer={ctx.handleDeleteLayer}
         reorderLayers={ctx.handleReorderLayers}
+        createLayerOfType={ctx.handleCreateLayerOfType}
+        renameLayer={ctx.handleRenameLayer}
+        duplicateLayer={ctx.handleDuplicateLayer}
+        setConfirmDialog={ctx.setConfirmDialog}
       />
     </div>
   );

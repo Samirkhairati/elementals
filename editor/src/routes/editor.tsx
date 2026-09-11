@@ -152,6 +152,7 @@ export function EditorPage() {
     handleExportMap: mapManager.handleExportMap,
     handleMapDrop: mapManager.handleMapDrop,
     onSelectMap: mapManager.onSelectMap,
+    setConfirmDialog: dialogs.setConfirmDialog,
 
     // Layers domain
     layers: layerManager.layers,
