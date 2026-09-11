@@ -79,20 +79,83 @@ export function useLayerManager(options: UseLayerManagerOptions) {
     })
   }, [activeMap, setActiveMap])
 
-  const handleCreateLayer = useCallback(() => {
+  const handleCreateLayerOfType = useCallback((type: LayerType) => {
     setLayers(prev => {
-      let counter = 1
-      while (prev.some(l => l.name === `Layer ${counter}`)) {
-        counter++
+      // Special layer singleton check
+      if (['collision', 'terrain', 'encounters'].includes(type) && prev.some(l => l.type === type)) {
+        return prev
       }
+
+      let name = ''
+      if (type === 'tile') {
+        let counter = 1
+        while (prev.some(l => l.name === `Layer ${counter}`)) {
+          counter++
+        }
+        name = `Layer ${counter}`
+      } else if (type === 'collision') {
+        name = 'Collision'
+      } else if (type === 'terrain') {
+        name = 'Terrain'
+      } else if (type === 'encounters') {
+        name = 'Encounters'
+      } else if (type === 'objects') {
+        let counter = 1
+        while (prev.some(l => l.name === (counter === 1 ? 'Objects' : `Objects ${counter}`))) {
+          counter++
+        }
+        name = counter === 1 ? 'Objects' : `Objects ${counter}`
+      }
+
       const newLayer: Layer = {
         id: crypto.randomUUID(),
-        name: `Layer ${counter}`,
-        type: 'tile',
+        name,
+        type,
         visible: true,
         locked: false,
       }
       const newLayers = [newLayer, ...prev]
+      if (activeMap) {
+        const updatedMap = { ...activeMap, layers: newLayers }
+        setActiveMap(updatedMap)
+        window.electronAPI?.saveMap(activeMap.folderPath, activeMap.fileName, updatedMap)
+      }
+      setActiveLayerId(newLayer.id)
+      return newLayers
+    })
+  }, [activeMap, setActiveMap])
+
+  const handleCreateLayer = useCallback(() => {
+    handleCreateLayerOfType('tile')
+  }, [handleCreateLayerOfType])
+
+  const handleRenameLayer = useCallback((id: string, newName: string) => {
+    const cleanName = newName.trim()
+    if (!cleanName) return
+    setLayers(prev => {
+      const newLayers = prev.map(l => (l.id === id ? { ...l, name: cleanName } : l))
+      if (activeMap) {
+        const updatedMap = { ...activeMap, layers: newLayers }
+        setActiveMap(updatedMap)
+        window.electronAPI?.saveMap(activeMap.folderPath, activeMap.fileName, updatedMap)
+      }
+      return newLayers
+    })
+  }, [activeMap, setActiveMap])
+
+  const handleDuplicateLayer = useCallback((id: string) => {
+    setLayers(prev => {
+      const targetIndex = prev.findIndex(l => l.id === id)
+      if (targetIndex === -1) return prev
+      const targetLayer = prev[targetIndex]
+      const newLayer: Layer = {
+        ...targetLayer,
+        id: crypto.randomUUID(),
+        name: `${targetLayer.name} Copy`,
+        data: targetLayer.data ? JSON.parse(JSON.stringify(targetLayer.data)) : undefined,
+      }
+      const newLayers = [...prev]
+      newLayers.splice(targetIndex + 1, 0, newLayer)
       if (activeMap) {
         const updatedMap = { ...activeMap, layers: newLayers }
         setActiveMap(updatedMap)
@@ -149,6 +212,9 @@ export function useLayerManager(options: UseLayerManagerOptions) {
     toggleLayerVisibility,
     toggleLayerLock,
     handleCreateLayer,
+    handleCreateLayerOfType,
+    handleRenameLayer,
+    handleDuplicateLayer,
     handleDeleteLayer,
     handleReorderLayers,
   }

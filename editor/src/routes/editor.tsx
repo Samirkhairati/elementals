@@ -83,6 +83,7 @@ export function EditorPage() {
       historyState.setHistory([{ layers: JSON.parse(JSON.stringify(initLayers)) }])
       historyState.setHistoryIndex(0)
     },
+    onRenameLayer: layerManager.handleRenameLayer,
   })
 
   // ── Undo / Redo Bounding ─────────────────────────────────────────────────
@@ -161,6 +162,9 @@ export function EditorPage() {
     handleDeleteLayer: layerManager.handleDeleteLayer,
     handleReorderLayers: layerManager.handleReorderLayers,
     handleCreateLayer: layerManager.handleCreateLayer,
+    handleCreateLayerOfType: layerManager.handleCreateLayerOfType,
+    handleRenameLayer: layerManager.handleRenameLayer,
+    handleDuplicateLayer: layerManager.handleDuplicateLayer,
     updateLayers: layerManager.updateLayers,
     activeLayerType: layerManager.activeLayerType,
 

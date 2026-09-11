@@ -3,7 +3,7 @@ import { Input } from '@/components/ui/input'
 
 interface RenameDialogProps {
   open: boolean
-  type: 'folder' | 'tileset' | 'map-folder' | 'map'
+  type: 'folder' | 'tileset' | 'map-folder' | 'map' | 'layer'
   renameInput: string
   setRenameInput: (v: string) => void
   onClose: () => void
@@ -11,7 +11,7 @@ interface RenameDialogProps {
 }
 
 export function RenameDialog({ open, type, renameInput, setRenameInput, onClose, onConfirm }: RenameDialogProps) {
-  const title = type === 'folder' || type === 'map-folder' ? 'Folder' : type === 'tileset' ? 'Tileset' : 'Map'
+  const title = type === 'folder' || type === 'map-folder' ? 'Folder' : type === 'tileset' ? 'Tileset' : type === 'layer' ? 'Layer' : 'Map'
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
