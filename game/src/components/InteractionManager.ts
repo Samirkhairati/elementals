@@ -1,5 +1,5 @@
 import { InteractionSystem } from "@/world/InteractionSystem";
-import { Player } from "@/entities/Player";
+import { gameState } from "@/core/GameState";
 import { EventBus, Events } from "@/utils/EventBus";
 import { Direction } from "@/utils/AnimationManager";
 
@@ -12,7 +12,6 @@ const DIRECTION_OFFSETS = {
 
 export class InteractionManager {
   private interactionSystem: InteractionSystem;
-  private player: Player | null = null;
   private isDialogueOpen: boolean = false;
 
   constructor(interactionSystem: InteractionSystem) {
@@ -26,10 +25,6 @@ export class InteractionManager {
     EventBus.on(Events.INPUT_ACTION, this.onInputAction);
     EventBus.on(Events.PLAYER_MOVED, this.onPlayerMoved);
     EventBus.on(Events.DIALOGUE_CLOSED, this.onDialogueClosed);
-  }
-
-  public setPlayer(player: Player) {
-    this.player = player;
   }
 
   public destroy() {
@@ -49,17 +44,17 @@ export class InteractionManager {
         return;
     }
 
-    if (!this.player || this.player.movementLocked) return;
+    if (gameState.isInputLocked) return;
 
-    const pos = this.player.getGridPosition();
+    const pos = gameState.playerPosition;
     
     // 1. Check tile player is standing on
-    let interactable = this.interactionSystem.getInteractableAt(pos.x, pos.y);
+    let interactable = this.interactionSystem.getInteractableAt(pos.gridX, pos.gridY);
     
     // 2. If nothing to interact with underneath, check tile in front of player
     if (!interactable || interactable.type !== "on_interact") {
-        const offset = DIRECTION_OFFSETS[this.player.direction];
-        interactable = this.interactionSystem.getInteractableAt(pos.x + offset.dx, pos.y + offset.dy);
+        const offset = DIRECTION_OFFSETS[pos.direction];
+        interactable = this.interactionSystem.getInteractableAt(pos.gridX + offset.dx, pos.gridY + offset.dy);
     }
 
     if (interactable && interactable.type === "on_interact") {
@@ -67,12 +62,9 @@ export class InteractionManager {
     }
   }
 
-
   private onPlayerMoved() {
-    if (!this.player) return;
-    
-    const gridPos = this.player.getGridPosition();
-    const interactable = this.interactionSystem.getInteractableAt(gridPos.x, gridPos.y);
+    const pos = gameState.playerPosition;
+    const interactable = this.interactionSystem.getInteractableAt(pos.gridX, pos.gridY);
 
     if (interactable && interactable.type === "on_step") {
         this.triggerInteraction(interactable);

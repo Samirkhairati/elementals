@@ -1,17 +1,15 @@
 import { Scene, GameObjects } from 'phaser';
 import { settingsStore } from '@/core/SettingsStore';
-import { Player } from '@/entities/Player';
+import { gameState } from '@/core/GameState';
 
 export class DebugHUD {
     private text: GameObjects.BitmapText;
     private background: GameObjects.Graphics;
     private scene: Scene;
-    private player?: Player;
     private pressedKeys: Set<string> = new Set();
 
-    constructor(scene: Scene, player?: Player) {
+    constructor(scene: Scene) {
         this.scene = scene;
-        this.player = player;
 
         this.background = scene.add.graphics();
         this.background.setScrollFactor(0);
@@ -41,10 +39,6 @@ export class DebugHUD {
         this.update();
     }
 
-    setPlayer(player: Player) {
-        this.player = player;
-    }
-
     update() {
         if (!settingsStore.debug.enabled) {
             this.text.setVisible(false);
@@ -61,9 +55,9 @@ export class DebugHUD {
             lines.push(`DEBUG: Keys: ${keysString}`);
         }
 
-        if (settingsStore.debug.showCoords && this.player) {
-            const grid = this.player.getGridPosition();
-            lines.push(`DEBUG: Pos: (${Math.round(this.player.x)}, ${Math.round(this.player.y)}) [${grid.x}, ${grid.y}]`);
+        if (settingsStore.debug.showCoords) {
+            const pos = gameState.playerPosition;
+            lines.push(`DEBUG: Pos: (${Math.round(pos.worldX)}, ${Math.round(pos.worldY)}) [${pos.gridX}, ${pos.gridY}]`);
         }
 
         if (settingsStore.debug.showGrid) {

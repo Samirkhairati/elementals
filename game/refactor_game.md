@@ -110,15 +110,15 @@ graph TD
 
 ---
 
-### Phase 2: Decouple Input & Scene Communication
+### Phase 2: Decouple Input & Scene Communication (Completed)
 *Objective: Stop 60 FPS EventBus flooding and eliminate direct object references across scene boundaries.*
 
-- [ ] **State-Polled Input Architecture:**
+- [x] **State-Polled Input Architecture:**
   - Refactor `InputManager`:
     - Instead of emitting `Events.INPUT_DIRECTION` over `EventBus` 60 times per second, `InputManager` maintains an internal `InputSnapshot` (`{ vector: Vector2, run: boolean, action: boolean, menu: boolean }`).
     - Expose `inputManager.getSnapshot()` for controllers to query on tick.
     - Reserve `EventBus` purely for discrete events (`Events.ACTION_PRESSED`, `Events.MENU_TOGGLED`).
-- [ ] **Decouple UI from Game Entities:**
+- [x] **Decouple UI from Game Entities:**
   - Remove `EventBus.emit(Events.PLAYER_READY, this.player)`.
   - UI scenes (e.g. `UIScene`, `HUDManager`) must not hold a reference to `Player`.
   - When dialogue or menu opens, UI emits `Events.SET_INPUT_LOCKED, { locked: true }`.
@@ -129,17 +129,17 @@ graph TD
 
 ---
 
-### Phase 3: Core ECS Foundation & Render Bridge
+### Phase 3: Core ECS Foundation & Render Bridge (Completed)
 *Objective: Implement a lightweight, fast TypeScript ECS and a bridge that synchronizes ECS transforms with Phaser display objects.*
 
-- [ ] **Lightweight ECS Engine (`src/ecs/`):**
+- [x] **Lightweight ECS Engine (`src/ecs/`):**
   - `World`: Container managing entities, component pools, and system update loops.
   - `Entity`: Lightweight numeric ID (`number`).
   - `Component`: Simple data classes or factory functions (`TransformComponent`, `SpriteComponent`, `TagComponent`).
   - `System`: Abstract base class with `update(world: World, delta: number)`.
-- [ ] **Declarative Prefab System (`src/ecs/prefabs/`):**
+- [x] **Declarative Prefab System (`src/ecs/prefabs/`):**
   - Implement `definePrefab({ name, components })` and `world.spawnPrefab(prefabName, overrides)`.
-- [ ] **Phaser Render Bridge System (`RenderBridgeSystem`):**
+- [x] **Phaser Render Bridge System (`RenderBridgeSystem`):**
   - Listens for entities with `TransformComponent` + `SpriteComponent`.
   - Instantiates or updates a corresponding `Phaser.GameObjects.Sprite` inside the Phaser scene.
   - Automatically updates sprite `x`, `y`, `depth`, and frame when components change.
@@ -149,30 +149,32 @@ graph TD
 
 ---
 
-### Phase 4: Componentizing Movement, Animation & Spatial Collision
+### Phase 4: Componentizing Movement, Animation & Spatial Collision (Completed)
 *Objective: Dismantle the 355-line `Player.ts` god object into reusable ECS components and systems.*
 
-- [ ] **Unified Spatial Collision System (`SpatialSystem`):**
+- [x] **Unified Spatial Collision System (`SpatialSystem`):**
   - Combines static tile collision with dynamic entity bounding boxes.
   - Stores a 2D spatial grid:
     - Tilemap solid tiles.
     - Dynamic entity colliders (`ColliderComponent`).
   - Provides `isWalkable(logicalX, logicalY, ignoreEntityId?)`.
-- [ ] **Movement Components & Systems:**
+- [x] **Movement Components & Systems:**
   - `GridMovementComponent`: Encapsulates 32px step tweens, direction, and step progress.
   - `FreeMovementComponent`: Encapsulates velocity, acceleration, and sliding collision.
   - `MovementSystem`: Executes movement updates based on active movement component.
-- [ ] **Animation System (`AnimationSystem`):**
+- [x] **Animation System (`AnimationSystem`):**
   - Manages 4-directional walk/run/idle animation states based on entity movement velocity and direction.
-- [ ] **Player Prefab Migration:**
+- [x] **Player Prefab Migration:**
   - Replace `Player.ts` class with a declarative `PlayerPrefab`:
     ```typescript
     components: [
       Transform({ x: spawnX, y: spawnY }),
-      PlayerInput(),
+      PlayerControl(),
       Collider({ width: 16, height: 8 }),
       GridMovement(),
-      SpriteView({ texture: "player", frame: "walk" })
+      FreeMovement(),
+      CharacterAnimation({ characterKey: "player" }),
+      SpriteView({ texture: "player-walk", frame: 0 })
     ]
     ```
   - The camera simply follows the entity tagged with `PlayerTag`.

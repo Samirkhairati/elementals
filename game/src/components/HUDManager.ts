@@ -1,9 +1,9 @@
 import { Scene } from 'phaser';
-import { Player } from '@/entities/Player';
 import { DebugHUD } from '@/components/DebugHUD';
 import { MapSwitcherHUD } from '@/components/MapSwitcherHUD';
 import { DialogueHUD } from '@/components/DialogueHUD';
 import { settingsStore } from '@/core/SettingsStore';
+import { gameState } from '@/core/GameState';
 import { EventBus, Events } from '@/utils/EventBus';
 
 export class HUDManager {
@@ -11,12 +11,9 @@ export class HUDManager {
     private debugHUD?: DebugHUD;
     private mapSwitcherHUD!: MapSwitcherHUD;
     private dialogueHUD!: DialogueHUD;
-    private player?: Player;
-    private onSetPlayer: (player: Player) => void;
 
-    constructor(scene: Scene, player?: Player) {
+    constructor(scene: Scene) {
         this.scene = scene;
-        this.player = player;
         this.initializeHUDs();
         
         // Bind events
@@ -25,14 +22,12 @@ export class HUDManager {
         this.onInputAction = this.onInputAction.bind(this);
         this.onShowDialogue = this.onShowDialogue.bind(this);
         this.onHideDialogue = this.onHideDialogue.bind(this);
-        this.onSetPlayer = this.setPlayer.bind(this);
         
         EventBus.on(Events.MENU_TOGGLED, this.onMenuToggled);
         EventBus.on(Events.INPUT_UI_DIRECTION, this.onInputUIDirection);
         EventBus.on(Events.INPUT_ACTION, this.onInputAction);
         EventBus.on(Events.SHOW_DIALOGUE, this.onShowDialogue);
         EventBus.on(Events.DIALOGUE_CLOSED, this.onHideDialogue);
-        EventBus.on(Events.PLAYER_READY, this.onSetPlayer);
         
         this.scene.events.on('destroy', this.cleanup, this);
     }
@@ -43,12 +38,11 @@ export class HUDManager {
         EventBus.off(Events.INPUT_ACTION, this.onInputAction);
         EventBus.off(Events.SHOW_DIALOGUE, this.onShowDialogue);
         EventBus.off(Events.DIALOGUE_CLOSED, this.onHideDialogue);
-        EventBus.off(Events.PLAYER_READY, this.onSetPlayer);
     }
 
     private initializeHUDs() {
         if (settingsStore.debug.enabled) {
-            this.debugHUD = new DebugHUD(this.scene, this.player);
+            this.debugHUD = new DebugHUD(this.scene);
         }
 
         this.mapSwitcherHUD = new MapSwitcherHUD(this.scene, (mapKey) => {
@@ -62,33 +56,21 @@ export class HUDManager {
         this.debugHUD?.update();
     }
 
-    public setPlayer(player: Player) {
-        this.player = player;
-        this.debugHUD?.setPlayer(player);
-    }
-
     private onMenuToggled() {
         if (this.dialogueHUD.isVisible) return; // Don't open map menu if dialogue is open
         
         this.mapSwitcherHUD.toggle();
-        // Lock player movement if map switcher is open
-        if (this.player) {
-            this.player.setMovementLocked(this.mapSwitcherHUD.isVisible);
-        }
+        gameState.setInputLocked(this.mapSwitcherHUD.isVisible, 'menu');
     }
 
     private onShowDialogue(message: string) {
         this.dialogueHUD.show(message);
-        if (this.player) {
-            this.player.setMovementLocked(true);
-        }
+        gameState.setInputLocked(true, 'dialogue');
     }
 
     private onHideDialogue() {
         this.dialogueHUD.hide();
-        if (this.player && !this.mapSwitcherHUD.isVisible) {
-            this.player.setMovementLocked(false);
-        }
+        gameState.setInputLocked(this.mapSwitcherHUD.isVisible, this.mapSwitcherHUD.isVisible ? 'menu' : undefined);
     }
 
     private onInputUIDirection(key: string) {
