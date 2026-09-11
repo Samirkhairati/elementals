@@ -78,7 +78,7 @@ export function TilesetsPanel({
                   )}
                 </div>
               </div>
-              {isExpanded && (
+              {isExpanded && !isEmpty && (
                 <div className="mt-1">
                   {renderTree(folder, level + 1)}
                 </div>

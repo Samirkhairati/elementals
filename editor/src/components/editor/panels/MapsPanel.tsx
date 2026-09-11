@@ -96,12 +96,22 @@ export function MapsPanel({
 
     const childrenMaps = maps.filter((m) => m.folderPath === currentPath)
 
+    if (currentPath !== null && childrenFolders.length === 0 && childrenMaps.length === 0) {
+      return null
+    }
+
     return (
       <div className="space-y-0.5">
         {childrenFolders.map((folder) => {
           const folderName = folder.split('/').pop() || folder
           const isExpanded = expandedMapFolders.has(folder)
           const isFolderDropTarget = dragOverFolder === folder
+
+          const subFolders = mapFolders.filter(
+            (f) => f.startsWith(folder + '/') && f.substring(folder.length + 1).indexOf('/') === -1
+          )
+          const subMaps = maps.filter((m) => m.folderPath === folder)
+          const hasChildren = subFolders.length > 0 || subMaps.length > 0
 
           return (
             <div key={folder} className="group/folder">
@@ -176,7 +186,7 @@ export function MapsPanel({
                 </ContextMenuContent>
               </ContextMenu>
 
-              {isExpanded && (
+              {isExpanded && hasChildren && (
                 <div className="relative pl-3 ml-2.5 border-l border-white/0 hover:border-white/30 group-hover/folder:border-white/20 transition-colors mt-0.5 space-y-0.5">
                   {renderMapTree(folder, level + 1)}
                 </div>
