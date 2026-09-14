@@ -56,7 +56,7 @@ export class InteractionManager {
     let interactable = this.interactionSystem.getInteractableAt(pos.gridX, pos.gridY);
     
     // 2. If nothing to interact with underneath, check tile in front of player
-    if (!interactable || interactable.type !== "on_interact") {
+    if (!interactable) {
       const offset = DIRECTION_OFFSETS[pos.direction];
       if (offset) {
         interactable = this.interactionSystem.getInteractableAt(pos.gridX + offset.dx, pos.gridY + offset.dy);
@@ -64,17 +64,17 @@ export class InteractionManager {
     }
 
     // 3. Fallback: check 4 cardinal adjacent tiles around player
-    if (!interactable || interactable.type !== "on_interact") {
+    if (!interactable) {
       for (const offset of Object.values(DIRECTION_OFFSETS)) {
         const candidate = this.interactionSystem.getInteractableAt(pos.gridX + offset.dx, pos.gridY + offset.dy);
-        if (candidate && candidate.type === "on_interact") {
+        if (candidate) {
           interactable = candidate;
           break;
         }
       }
     }
 
-    if (interactable && interactable.type === "on_interact") {
+    if (interactable) {
       this.triggerInteraction(interactable);
     }
   }
@@ -88,19 +88,31 @@ export class InteractionManager {
 
     if (gameState.isInputLocked) return false;
 
-    const interactable = this.interactionSystem.getInteractableAt(gridX, gridY);
-    if (!interactable || interactable.type !== "on_interact") return false;
-
+    let interactable = this.interactionSystem.getInteractableAt(gridX, gridY);
     const pos = gameState.playerPosition;
     const dist = Math.abs(pos.gridX - gridX) + Math.abs(pos.gridY - gridY);
 
-    // If player is within reach (adjacent or within 2 tiles)
-    if (dist <= 2) {
+    // If no direct interactable on clicked tile, check if any adjacent tile has one
+    if (!interactable && dist <= 3) {
+      for (const offset of Object.values(DIRECTION_OFFSETS)) {
+        const candidate = this.interactionSystem.getInteractableAt(gridX + offset.dx, gridY + offset.dy);
+        if (candidate) {
+          interactable = candidate;
+          break;
+        }
+      }
+    }
+
+    if (!interactable) return false;
+
+    // If player is within reach (adjacent or within 3 tiles)
+    if (dist <= 3) {
       let direction = pos.direction;
-      if (gridX > pos.gridX) direction = Direction.RIGHT;
-      else if (gridX < pos.gridX) direction = Direction.LEFT;
-      else if (gridY > pos.gridY) direction = Direction.DOWN;
-      else if (gridY < pos.gridY) direction = Direction.UP;
+      if (Math.abs(gridX - pos.gridX) >= Math.abs(gridY - pos.gridY)) {
+        direction = gridX > pos.gridX ? Direction.RIGHT : Direction.LEFT;
+      } else {
+        direction = gridY > pos.gridY ? Direction.DOWN : Direction.UP;
+      }
 
       gameState.updatePlayerPosition(pos.worldX, pos.worldY, pos.gridX, pos.gridY, direction);
       this.triggerInteraction(interactable);

@@ -1524,7 +1524,7 @@
           "isSolid": true
         },
         "Interactable": {
-          "type": "on_step",
+          "type": "on_interact",
           "message": "The ancient sign is faded...",
           "eventKey": ""
         },

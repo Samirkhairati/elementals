@@ -77,7 +77,7 @@ export class Game extends Scene {
         EventBus.emit(Events.INPUT_ACTION);
         return;
       }
-      const worldPoint = pointer.positionToCamera(this.cameras.main) as Phaser.Math.Vector2;
+      const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
       if (worldPoint) {
         const gridX = Math.floor(worldPoint.x / GAME_CONSTANTS.TILE_SIZE);
         const gridY = Math.floor(worldPoint.y / GAME_CONSTANTS.TILE_SIZE);

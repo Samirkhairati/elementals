@@ -12,6 +12,11 @@
       "visible": true,
       "locked": false,
       "data": {
+        "98": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
         "153": {
           "tilesetId": "__collision__",
           "x": 0,

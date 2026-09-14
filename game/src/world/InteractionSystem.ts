@@ -72,29 +72,46 @@ export class InteractionSystem {
         const interactableComp = comps.Interactable;
         if (interactableComp) {
           const transform = comps.Transform || { x: entityDef.x || 0, y: entityDef.y || 0 };
+          const collider = comps.Collider;
           const posX = transform.x ?? entityDef.x ?? 0;
           const posY = transform.y ?? entityDef.y ?? 0;
-          
-          const tileX = Math.floor(posX / GAME_CONSTANTS.TILE_SIZE);
-          const tileY = Math.floor((posY - 1) / GAME_CONSTANTS.TILE_SIZE);
+
+          const width = collider?.width || GAME_CONSTANTS.TILE_SIZE;
+          const height = collider?.height || GAME_CONSTANTS.TILE_SIZE;
+          const offsetX = collider?.offsetX || 0;
+          const offsetY = collider?.offsetY || 0;
+
+          const left = posX + offsetX - width / 2;
+          const right = posX + offsetX + width / 2;
+          const top = posY + offsetY - height;
+          const bottom = posY + offsetY;
+
+          const minTileX = Math.floor(Math.max(0, left) / GAME_CONSTANTS.TILE_SIZE);
+          const maxTileX = Math.floor(Math.max(0, right - 1) / GAME_CONSTANTS.TILE_SIZE);
+          const minTileY = Math.floor(Math.max(0, top) / GAME_CONSTANTS.TILE_SIZE);
+          const maxTileY = Math.floor(Math.max(0, bottom - 1) / GAME_CONSTANTS.TILE_SIZE);
 
           const message = interactableComp.message || entityDef.name || "";
-          const type = interactableComp.type || "on_interact";
+          const type = interactableComp.type || (collider?.isSolid ? "on_interact" : "on_step");
           const eventKey = interactableComp.eventKey || "";
           const targetMap = interactableComp.targetMap;
           const targetX = interactableComp.targetX;
           const targetY = interactableComp.targetY;
 
-          this.registerInteractable({
-            x: tileX,
-            y: tileY,
-            type,
-            message,
-            eventKey,
-            targetMap,
-            targetX,
-            targetY,
-          });
+          for (let tx = minTileX; tx <= maxTileX; tx++) {
+            for (let ty = minTileY; ty <= maxTileY; ty++) {
+              this.registerInteractable({
+                x: tx,
+                y: ty,
+                type,
+                message,
+                eventKey,
+                targetMap,
+                targetX,
+                targetY,
+              });
+            }
+          }
         }
       });
     }

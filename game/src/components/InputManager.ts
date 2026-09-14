@@ -28,14 +28,19 @@ export class InputManager {
             const key = event.key.toUpperCase();
             
             if (key === settingsStore.controls.menu) {
+                if (event.repeat) return;
                 EventBus.emit(Events.MENU_TOGGLED);
             } else if (
                 key === settingsStore.controls.action ||
                 key === ' ' ||
                 key === 'SPACE' ||
+                key === 'SPACEBAR' ||
+                key === 'ENTER' ||
+                key === 'RETURN' ||
                 key === 'E' ||
                 key === 'Z'
             ) {
+                if (event.repeat) return;
                 EventBus.emit(Events.INPUT_ACTION);
             } else if (['ARROWUP', 'ARROWDOWN', 'ARROWLEFT', 'ARROWRIGHT'].includes(key)) {
                 // Let the HUD Manager know for navigation

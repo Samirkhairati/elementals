@@ -5,8 +5,10 @@ export class DialogueHUD {
   private scene: Scene;
   private container: GameObjects.Container;
   private textObject: GameObjects.BitmapText;
+  private promptText: GameObjects.BitmapText;
   private background: GameObjects.Graphics;
   private hitZone: GameObjects.Zone;
+  private openTimestamp: number = 0;
   
   public isVisible: boolean = false;
 
@@ -23,7 +25,7 @@ export class DialogueHUD {
     this.hitZone.setOrigin(0, 0);
     this.hitZone.setInteractive();
     this.hitZone.on('pointerdown', () => {
-      if (this.isVisible) {
+      if (this.isVisible && Date.now() - this.openTimestamp > 150) {
         EventBus.emit(Events.DIALOGUE_CLOSED);
       }
     });
@@ -36,6 +38,11 @@ export class DialogueHUD {
     // Text
     this.textObject = this.scene.add.bitmapText(0, 0, 'PokemonFont', "", 72);
     this.container.add(this.textObject);
+
+    // Prompt text for dismiss
+    this.promptText = this.scene.add.bitmapText(0, 0, 'PokemonFont', "* Tap or [Action] to close", 72);
+    this.promptText.setAlpha(0.7);
+    this.container.add(this.promptText);
     
     this.container.setVisible(false);
     this.resize();
@@ -45,6 +52,7 @@ export class DialogueHUD {
   }
 
   public show(message: string) {
+    this.openTimestamp = Date.now();
     this.resize();
     this.isVisible = true;
     this.textObject.setText(message);
@@ -62,21 +70,24 @@ export class DialogueHUD {
     // Update hit zone
     this.hitZone.setSize(width, height);
 
-    // Max width of 1000px so it doesn't stretch infinitely on wide screens
+    // Box dimensions
     const boxWidth = Math.min(1000, width - 40);
-    const boxHeight = 160;
+    const boxHeight = 170;
     const boxX = (width - boxWidth) / 2;
     const boxY = height - boxHeight - 20;
 
     // Redraw background
     this.background.clear();
-    this.background.fillStyle(0xffffff, 0.95);
-    this.background.fillRoundedRect(boxX, boxY, boxWidth, boxHeight, 8);
+    this.background.fillStyle(0xffffff, 0.96);
+    this.background.fillRoundedRect(boxX, boxY, boxWidth, boxHeight, 10);
     this.background.lineStyle(3, 0x000000, 1);
-    this.background.strokeRoundedRect(boxX, boxY, boxWidth, boxHeight, 8);
+    this.background.strokeRoundedRect(boxX, boxY, boxWidth, boxHeight, 10);
 
-    // Position & constrain text
-    this.textObject.setPosition(boxX + 20, boxY + 20);
-    this.textObject.setMaxWidth(boxWidth - 40);
+    // Position & constrain main message
+    this.textObject.setPosition(boxX + 24, boxY + 20);
+    this.textObject.setMaxWidth(boxWidth - 48);
+
+    // Position prompt at bottom right of the box
+    this.promptText.setPosition(boxX + boxWidth - this.promptText.width - 24, boxY + boxHeight - 32);
   }
 }
