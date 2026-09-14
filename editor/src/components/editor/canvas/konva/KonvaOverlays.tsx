@@ -1,6 +1,7 @@
 import React from 'react'
 import { Group, Rect, Shape } from 'react-konva'
 import { ActiveTool, TileSelection, Pos, MapData } from '@/types/editor'
+import { getBoundingBox } from '../canvasUtils'
 
 interface KonvaOverlaysProps {
   activeMap: MapData
@@ -13,15 +14,6 @@ interface KonvaOverlaysProps {
   rectCurrent: Pos | null
 }
 
-function getCanvasCopyBox(start: Pos | null, current: Pos | null) {
-  if (!start || !current) return null
-  const minX = Math.min(start.x, current.x)
-  const minY = Math.min(start.y, current.y)
-  const maxX = Math.max(start.x, current.x)
-  const maxY = Math.max(start.y, current.y)
-  return { minX, minY, maxX, maxY, width: maxX - minX + 1, height: maxY - minY + 1 }
-}
-
 export const KonvaOverlays = React.memo(function KonvaOverlays({
   activeMap,
   activeTool,
@@ -32,23 +24,8 @@ export const KonvaOverlays = React.memo(function KonvaOverlays({
   rectStart,
   rectCurrent,
 }: KonvaOverlaysProps) {
-  const copyBox = getCanvasCopyBox(canvasCopyStart, canvasCopyCurrent)
-
-  const rectBox =
-    !copyBox && activeTool === 'rectangle' && rectStart && rectCurrent
-      ? (() => {
-          const minX = Math.min(rectStart.x, rectCurrent.x)
-          const minY = Math.min(rectStart.y, rectCurrent.y)
-          const maxX = Math.max(rectStart.x, rectCurrent.x)
-          const maxY = Math.max(rectStart.y, rectCurrent.y)
-          return {
-            x: minX * 32,
-            y: minY * 32,
-            width: (maxX - minX + 1) * 32,
-            height: (maxY - minY + 1) * 32,
-          }
-        })()
-      : null
+  const copyBox = getBoundingBox(canvasCopyStart, canvasCopyCurrent)
+  const rectBox = !copyBox && activeTool === 'rectangle' ? getBoundingBox(rectStart, rectCurrent) : null
 
   const mapWidthPx = activeMap.width * 32
   const mapHeightPx = activeMap.height * 32
@@ -125,10 +102,10 @@ export const KonvaOverlays = React.memo(function KonvaOverlays({
       {/* Rectangle fill tool preview box */}
       {rectBox && (
         <Rect
-          x={rectBox.x}
-          y={rectBox.y}
-          width={rectBox.width}
-          height={rectBox.height}
+          x={rectBox.minX * 32}
+          y={rectBox.minY * 32}
+          width={rectBox.width * 32}
+          height={rectBox.height * 32}
           fill="rgba(34, 197, 94, 0.3)"
           stroke="#22c55e"
           strokeWidth={2}
