@@ -54,8 +54,23 @@ export function MapCanvas({
 }: MapCanvasProps) {
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
-  const [isPanning, setIsPanning] = useState(false)
-  const [lastPanPos, setLastPanPos] = useState({ x: 0, y: 0 })
+
+  // ── Pan motion: bypass React state entirely ───────────────────────────────
+  // During active panning, we mutate the CSS transform directly via a DOM ref.
+  // This avoids queuing React re-renders (and Dockview panel re-layouts) on
+  // every pixel of mouse movement. React state (`pan`) is only synced once on
+  // mouseup so the committed position is preserved across renders.
+  const panContainerRef = useRef<HTMLDivElement | null>(null)
+  const panRef = useRef({ x: 0, y: 0 })             // tracks current pan without state
+  const zoomRef = useRef(1)                           // tracks current zoom without extra reads
+  const isPanningRef = useRef(false)                  // no state — never needs to drive render
+  const lastPanPosRef = useRef({ x: 0, y: 0 })       // no state — only read in mousemove handler
+
+  const applyTransform = useCallback((x: number, y: number, z: number) => {
+    if (panContainerRef.current) {
+      panContainerRef.current.style.transform = `translate(${x}px, ${y}px) scale(${z})`
+    }
+  }, [])
 
   const [canvasHover, setCanvasHover] = useState<Pos | null>(null)
   const [canvasCopyStart, setCanvasCopyStart] = useState<Pos | null>(null)
@@ -81,15 +96,17 @@ export function MapCanvas({
     return () => observer.disconnect()
   }, [])
 
+  // Keep panRef / zoomRef in sync with React state in case state is reset externally
+  // (e.g. switching maps). panRef/zoomRef lead during active pan/zoom; state follows.
+  useEffect(() => { panRef.current = pan }, [pan])
+  useEffect(() => { zoomRef.current = zoom }, [zoom])
+
   // ── Stable Refs for Global Window Listeners ──────────────────────────────
   const isPaintingRef = useRef(isPainting)
   useEffect(() => { isPaintingRef.current = isPainting }, [isPainting])
 
-  const isPanningRef = useRef(isPanning)
-  useEffect(() => { isPanningRef.current = isPanning }, [isPanning])
-
-  const lastPanPosRef = useRef(lastPanPos)
-  useEffect(() => { lastPanPosRef.current = lastPanPos }, [lastPanPos])
+  // isPanningRef and lastPanPosRef are declared above as standalone refs
+  // (not synced from state) — they live entirely outside React's render cycle.
 
   const rectStartRef = useRef(rectStart)
   useEffect(() => { rectStartRef.current = rectStart }, [rectStart])
@@ -176,13 +193,12 @@ export function MapCanvas({
   // ── Global Window Drag Listeners ─────────────────────────────────────────
   useEffect(() => {
     const handleWindowMouseMove = (e: MouseEvent) => {
-      // 1. Panning
+      // 1. Panning — mutate DOM transform directly, no React state involved
       if (isPanningRef.current) {
-        setPan(prev => ({
-          x: prev.x + (e.clientX - lastPanPosRef.current.x),
-          y: prev.y + (e.clientY - lastPanPosRef.current.y),
-        }))
-        setLastPanPos({ x: e.clientX, y: e.clientY })
+        panRef.current.x += e.clientX - lastPanPosRef.current.x
+        panRef.current.y += e.clientY - lastPanPosRef.current.y
+        lastPanPosRef.current = { x: e.clientX, y: e.clientY }
+        applyTransform(panRef.current.x, panRef.current.y, zoomRef.current)
         return
       }
 
@@ -221,7 +237,9 @@ export function MapCanvas({
 
     const handleWindowMouseUp = (e: MouseEvent) => {
       if (e.button === 1 && isPanningRef.current) {
-        setIsPanning(false)
+        isPanningRef.current = false
+        // Commit final pan position to React state so it survives re-renders
+        setPan({ ...panRef.current })
       }
 
       if (e.button === 2 && canvasCopyStartRef.current) {
@@ -253,25 +271,31 @@ export function MapCanvas({
       window.removeEventListener('mousemove', handleWindowMouseMove)
       window.removeEventListener('mouseup', handleWindowMouseUp)
     }
-  }, [getTileCoords, commitCanvasCopy, handleCommit, handlePaint, handleRectangleFill, setIsPainting])
+  }, [getTileCoords, commitCanvasCopy, handleCommit, handlePaint, handleRectangleFill, setIsPainting, applyTransform])
 
   return (
     <div
       className="flex-1 overflow-hidden flex items-center justify-center min-w-0 min-h-0 bg-[#1a1a1a]"
       onWheel={(e) => {
         const zoomSensitivity = (e.ctrlKey || e.metaKey) ? 0.005 : 0.001
-        setZoom(prev => Math.min(Math.max(0.1, prev - e.deltaY * zoomSensitivity), 5))
+        const newZoom = Math.min(Math.max(0.1, zoomRef.current - e.deltaY * zoomSensitivity), 5)
+        zoomRef.current = newZoom
+        setZoom(newZoom)
+        applyTransform(panRef.current.x, panRef.current.y, newZoom)
       }}
       onMouseDown={(e) => {
         if (e.button === 1) {
-          setIsPanning(true)
-          setLastPanPos({ x: e.clientX, y: e.clientY })
+          isPanningRef.current = true
+          lastPanPosRef.current = { x: e.clientX, y: e.clientY }
         }
       }}
       onContextMenu={(e) => e.preventDefault()}
     >
       {activeMap ? (
-        <div style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: 'center' }}>
+        <div
+          ref={panContainerRef}
+          style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: 'center', willChange: 'transform' }}
+        >
           <div
             ref={mapRef}
             className="bg-card shadow-sm relative overflow-hidden"
