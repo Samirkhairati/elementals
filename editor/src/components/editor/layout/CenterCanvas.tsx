@@ -1,18 +1,11 @@
 import React from 'react'
 
-import { ActiveTool, PaintMode, MapData, Layer, TilesetData, TileSelection, DebugInfo } from '@/types/editor'
-import { Toolbar } from '@/components/editor/canvas/Toolbar'
+import { ActiveTool, PaintMode, MapData, Layer, TilesetData, TileSelection, DebugInfo, EntityData } from '@/types/editor'
 import { MapCanvas } from '@/components/editor/canvas/MapCanvas'
 
 interface CenterCanvasProps {
-  historyIndex: number
-  historyLength: number
   activeTool: ActiveTool
   paintMode: PaintMode
-  handleUndo: () => void
-  handleRedo: () => void
-  setActiveTool: (tool: ActiveTool) => void
-  setPaintMode: (mode: PaintMode) => void
   activeMap: MapData | null
   layers: Layer[]
   tilesets: TilesetData[]
@@ -28,17 +21,15 @@ interface CenterCanvasProps {
   handlePaintBucket: (x: number, y: number) => void
   handleRectangleFill: (start: { x: number; y: number }, end: { x: number; y: number }) => void
   handleCommit: () => void
+  entities?: EntityData[]
+  selectedEntityId?: string | null
+  setSelectedEntityId?: (id: string | null) => void
+  moveEntity?: (id: string, x: number, y: number) => void
 }
 
 export function CenterCanvas({
-  historyIndex,
-  historyLength,
   activeTool,
   paintMode,
-  handleUndo,
-  handleRedo,
-  setActiveTool,
-  setPaintMode,
   activeMap,
   layers,
   tilesets,
@@ -53,39 +44,38 @@ export function CenterCanvas({
   handlePaint,
   handlePaintBucket,
   handleRectangleFill,
-  handleCommit
+  handleCommit,
+  entities,
+  selectedEntityId,
+  setSelectedEntityId,
+  moveEntity,
 }: CenterCanvasProps) {
   return (
-      <div className="flex-1 bg-muted/10 relative overflow-hidden flex flex-col min-w-0 min-h-0">
-        <Toolbar
-          historyIndex={historyIndex}
-          historyLength={historyLength}
-          activeTool={activeTool}
-          paintMode={paintMode}
-          handleUndo={handleUndo}
-          handleRedo={handleRedo}
-          setActiveTool={setActiveTool}
-          setPaintMode={setPaintMode}
-        />
-        <MapCanvas
-          activeMap={activeMap}
-          layers={layers}
-          tilesets={tilesets}
-          tileSelection={tileSelection}
-          setTileSelection={setTileSelection}
-          activeTool={activeTool}
-          paintMode={paintMode}
-          activeLayerId={activeLayerId}
-          isPainting={isPainting}
-          setIsPainting={setIsPainting}
-          paintStartPos={paintStartPos}
-          setPaintStartPos={setPaintStartPos}
-          debugInfo={debugInfo}
-          handlePaint={handlePaint}
-          handlePaintBucket={handlePaintBucket}
-          handleRectangleFill={handleRectangleFill}
-          handleCommit={handleCommit}
-        />
-      </div>
+    <div className="flex-1 bg-muted/10 relative overflow-hidden flex flex-col min-w-0 min-h-0">
+      <MapCanvas
+        activeMap={activeMap}
+        layers={layers}
+        tilesets={tilesets}
+        tileSelection={tileSelection}
+        setTileSelection={setTileSelection}
+        activeTool={activeTool}
+        paintMode={paintMode}
+        activeLayerId={activeLayerId}
+        isPainting={isPainting}
+        setIsPainting={setIsPainting}
+        paintStartPos={paintStartPos}
+        setPaintStartPos={setPaintStartPos}
+        debugInfo={debugInfo}
+        handlePaint={handlePaint}
+        handlePaintBucket={handlePaintBucket}
+        handleRectangleFill={handleRectangleFill}
+        handleCommit={handleCommit}
+        entities={entities}
+        selectedEntityId={selectedEntityId}
+        setSelectedEntityId={setSelectedEntityId}
+        moveEntity={moveEntity}
+      />
+    </div>
   )
 }
+
