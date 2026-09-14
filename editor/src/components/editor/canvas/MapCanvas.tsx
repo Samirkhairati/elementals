@@ -294,14 +294,19 @@ export function MapCanvas({
       {activeMap ? (
         <div
           ref={panContainerRef}
-          style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: 'center', willChange: 'transform' }}
+          style={{
+            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+            transformOrigin: 'center',
+            imageRendering: 'pixelated',
+          }}
         >
           <div
             ref={mapRef}
             className="bg-card shadow-sm relative overflow-hidden"
             style={{
               width: activeMap.width * 32,
-              height: activeMap.height * 32
+              height: activeMap.height * 32,
+              imageRendering: 'pixelated',
             }}
             onMouseDown={(e) => {
               if (e.button === 1) return
