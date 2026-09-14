@@ -9,7 +9,7 @@ import { PropertiesPanel } from '@/components/editor/panels/PropertiesPanel';
 import { TilesetsPanel } from '@/components/editor/panels/TilesetsPanel';
 import { TilesetPreview } from '@/components/editor/panels/TilesetPreview';
 import { ActiveSelectionPanel } from '@/components/editor/panels/ActiveSelectionPanel';
-import { CenterCanvas } from '../CenterCanvas';
+import { MapCanvas } from '@/components/editor/canvas/MapCanvas';
 
 // Stable no-op used as a placeholder for callbacks on inactive canvases.
 // Defined at module scope so it's the same reference every render — avoids
@@ -149,7 +149,7 @@ export function CanvasWrapper(props: IDockviewPanelProps) {
       className="h-full w-full flex flex-col"
       onPointerDownCapture={handleActivate}
     >
-      <CenterCanvas
+      <MapCanvas
         activeTool={ctx.activeTool}
         paintMode={ctx.paintMode}
         activeMap={targetMap}
