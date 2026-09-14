@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 
 // Hooks
 import { useHistory } from '@/hooks/useHistory'
@@ -7,6 +7,7 @@ import { usePaintTools } from '@/hooks/usePaintTools'
 import { useTilesetManager } from '@/hooks/editor/useTilesetManager'
 import { useMapManager } from '@/hooks/editor/useMapManager'
 import { useLayerManager } from '@/hooks/editor/useLayerManager'
+import { useEntityManager } from '@/hooks/editor/useEntityManager'
 import { useEditorDialogs } from '@/hooks/editor/useEditorDialogs'
 
 // Layout
@@ -16,22 +17,7 @@ import { EditorDialogs } from '@/components/editor/layout/EditorDialogs'
 
 export function EditorPage() {
   // ── History Hook ─────────────────────────────────────────────────────────
-  const [layersState, setLayersState] = useState<any[]>([])
-  const historyState = useHistory(setLayersState)
-
-  // ── Layer Manager ────────────────────────────────────────────────────────
-  const layerManager = useLayerManager({
-    activeMap: null, // connected dynamically in handlers
-    setActiveMap: () => {},
-    onCommitHistory: (layers) => historyState.commitHistory(layers),
-  })
-
-  // Keep historyState in sync with layerManager.setLayers
-  useEffect(() => {
-    if (layersState.length > 0) {
-      layerManager.setLayers(layersState)
-    }
-  }, [layersState])
+  const historyState = useHistory()
 
   // ── Tileset Manager ──────────────────────────────────────────────────────
   const tilesetManager = useTilesetManager({
@@ -48,29 +34,60 @@ export function EditorPage() {
     },
   })
 
+  const handleClearActiveMapRef = useRef<() => void>(() => {})
+
   // ── Map Manager ──────────────────────────────────────────────────────────
   const mapManager = useMapManager({
     tilesets: tilesetManager.tilesets,
-    layers: layerManager.layers,
-    onMapSelected: (initLayers) => {
+    layers: [], // updated dynamically in exportMap
+    onMapSelected: (initLayers, initEntities) => {
       layerManager.setLayers(initLayers)
       layerManager.setActiveLayerId(initLayers?.[0]?.id || null)
+      entityManager.setEntities(initEntities || [])
+      entityManager.setSelectedEntityId(null)
       historyState.setHistory([{ layers: JSON.parse(JSON.stringify(initLayers)) }])
       historyState.setHistoryIndex(0)
     },
-    onClearActiveMap: () => {
-      layerManager.setLayers([])
-      layerManager.setActiveLayerId(null)
-    },
+    onClearActiveMap: () => handleClearActiveMapRef.current(),
     onOpenConfirmDialog: (config) => {
       dialogs.setConfirmDialog({ open: true, ...config })
     },
   })
 
+  // ── Layer Manager ────────────────────────────────────────────────────────
+  const layerManager = useLayerManager({
+    activeMap: mapManager.activeMap,
+    setActiveMap: mapManager.setActiveMap,
+    onCommitHistory: (layers) => historyState.commitHistory(layers),
+  })
+
+  // ── Entity Manager ───────────────────────────────────────────────────────
+  const entityManager = useEntityManager({
+    activeMap: mapManager.activeMap,
+    setActiveMap: mapManager.setActiveMap,
+  })
+
+  const handleClearActiveMap = useCallback(() => {
+    mapManager.setActiveMap(null)
+    layerManager.setLayers([])
+    layerManager.setActiveLayerId(null)
+    entityManager.setEntities([])
+    entityManager.setSelectedEntityId(null)
+    historyState.setHistory([])
+    historyState.setHistoryIndex(-1)
+  }, [mapManager.setActiveMap, layerManager.setLayers, layerManager.setActiveLayerId, entityManager.setEntities, entityManager.setSelectedEntityId, historyState])
+
+  useEffect(() => {
+    handleClearActiveMapRef.current = handleClearActiveMap
+  }, [handleClearActiveMap])
+
   // ── Data Loading Coordinator ─────────────────────────────────────────────
   const loadData = useCallback(async () => {
-    await Promise.all([tilesetManager.loadTilesets(), mapManager.loadMaps()])
-  }, [tilesetManager.loadTilesets, mapManager.loadMaps])
+    const [, loadedMaps] = await Promise.all([tilesetManager.loadTilesets(), mapManager.loadMaps()])
+    if (loadedMaps && loadedMaps.length > 0 && !mapManager.activeMap) {
+      mapManager.onSelectMap(loadedMaps[0])
+    }
+  }, [tilesetManager.loadTilesets, mapManager.loadMaps, mapManager.activeMap, mapManager.onSelectMap])
 
   useEffect(() => {
     loadData()
@@ -84,12 +101,7 @@ export function EditorPage() {
     setExpandedMapFolders: mapManager.setExpandedMapFolders,
     loadData,
     onMapCreated: (map) => {
-      mapManager.setActiveMap(map)
-      const initLayers = map.layers || []
-      layerManager.setLayers(initLayers)
-      layerManager.setActiveLayerId(initLayers?.[0]?.id || null)
-      historyState.setHistory([{ layers: JSON.parse(JSON.stringify(initLayers)) }])
-      historyState.setHistoryIndex(0)
+      mapManager.onSelectMap(map)
     },
     onRenameLayer: layerManager.handleRenameLayer,
   })
@@ -98,7 +110,6 @@ export function EditorPage() {
   const boundHandleUndo = useCallback(() => {
     if (historyState.historyIndex > 0) {
       historyState.handleUndo(
-        layerManager.layers,
         layerManager.setLayers,
         mapManager.activeMap,
         mapManager.setActiveMap
@@ -106,12 +117,11 @@ export function EditorPage() {
     } else if (mapManager.deletedMapsHistory.length > 0) {
       mapManager.undoDeleteMap()
     }
-  }, [historyState, layerManager.layers, layerManager.setLayers, mapManager])
+  }, [historyState, layerManager.setLayers, mapManager])
 
   const boundHandleRedo = useCallback(() => {
     if (historyState.historyIndex < historyState.history.length - 1) {
       historyState.handleRedo(
-        layerManager.layers,
         layerManager.setLayers,
         mapManager.activeMap,
         mapManager.setActiveMap
@@ -119,16 +129,33 @@ export function EditorPage() {
     } else if (mapManager.restoredMapsHistory.length > 0) {
       mapManager.redoDeleteMap()
     }
-  }, [historyState, layerManager.layers, layerManager.setLayers, mapManager])
+  }, [historyState, layerManager.setLayers, mapManager])
+
+  const handleCommit = useCallback(() => {
+    if (layerManager.layers.length > 0) {
+      historyState.commitHistory(layerManager.layers)
+    }
+  }, [layerManager.layers, historyState])
 
   // ── Focus Domain Tracking ───────────────────────────────────────────────
-  const [focusedDomain, setFocusedDomain] = useState<'maps' | 'layers' | 'tilesets' | null>(null)
+  const [focusedDomain, setFocusedDomain] = useState<'maps' | 'layers' | 'entities' | 'tilesets' | null>(null)
 
   const handleDeleteSelected = useCallback(() => {
+    const isEntitiesDomain = focusedDomain === 'entities' || (!focusedDomain && entityManager.selectedEntityId)
     const isLayersDomain = focusedDomain === 'layers' || (!focusedDomain && layerManager.activeLayerId)
     const isMapsDomain = focusedDomain === 'maps' || (!focusedDomain && mapManager.activeMap)
 
-    if (isLayersDomain && layerManager.activeLayerId) {
+    if (isEntitiesDomain && entityManager.selectedEntityId) {
+      const entity = entityManager.entities.find(e => e.id === entityManager.selectedEntityId)
+      if (entity) {
+        dialogs.setConfirmDialog({
+          open: true,
+          title: 'Delete Entity',
+          description: `Are you sure you want to delete entity "${entity.name}"?`,
+          action: () => entityManager.deleteEntity(entity.id),
+        })
+      }
+    } else if (isLayersDomain && layerManager.activeLayerId) {
       const layer = layerManager.layers.find(l => l.id === layerManager.activeLayerId)
       if (layer) {
         dialogs.setConfirmDialog({
@@ -143,6 +170,9 @@ export function EditorPage() {
     }
   }, [
     focusedDomain,
+    entityManager.selectedEntityId,
+    entityManager.entities,
+    entityManager.deleteEntity,
     layerManager.activeLayerId,
     layerManager.layers,
     layerManager.handleDeleteLayer,
@@ -162,6 +192,7 @@ export function EditorPage() {
       historyState.historyIndex,
       mapManager.activeMap,
       layerManager.activeLayerId,
+      entityManager.selectedEntityId,
       focusedDomain,
       handleDeleteSelected,
     ],
@@ -202,6 +233,7 @@ export function EditorPage() {
     handleExportMap: mapManager.handleExportMap,
     handleMapDrop: mapManager.handleMapDrop,
     onSelectMap: mapManager.onSelectMap,
+    onClearActiveMap: handleClearActiveMap,
     setConfirmDialog: dialogs.setConfirmDialog,
 
     // Layers domain
@@ -218,6 +250,20 @@ export function EditorPage() {
     handleDuplicateLayer: layerManager.handleDuplicateLayer,
     updateLayers: layerManager.updateLayers,
     activeLayerType: layerManager.activeLayerType,
+
+    // Entities domain
+    entities: entityManager.entities,
+    selectedEntityId: entityManager.selectedEntityId,
+    setSelectedEntityId: entityManager.setSelectedEntityId,
+    handleCreateEntity: entityManager.createEntity,
+    handleDuplicateEntity: entityManager.duplicateEntity,
+    handleDeleteEntity: entityManager.deleteEntity,
+    handleRenameEntity: entityManager.renameEntity,
+    handleMoveEntity: entityManager.moveEntity,
+    handleReorderEntities: entityManager.reorderEntities,
+    handleAddComponent: entityManager.addComponent,
+    handleRemoveComponent: entityManager.removeComponent,
+    handleUpdateComponentProp: entityManager.updateComponentProp,
 
     // History & Painting tools
     historyIndex: historyState.historyIndex,
@@ -239,7 +285,7 @@ export function EditorPage() {
     handlePaint: paintTools.handlePaint,
     handlePaintBucket: paintTools.handlePaintBucket,
     handleRectangleFill: paintTools.handleRectangleFill,
-    handleCommit: historyState.handleCommit,
+    handleCommit,
 
     // Tilesets domain
     folders: tilesetManager.folders,
