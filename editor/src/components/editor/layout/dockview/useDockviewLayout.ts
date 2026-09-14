@@ -104,6 +104,49 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
       position: { referencePanel: previewPanel, direction: 'below' },
     });
 
+    // Default sizing: 20% left side panels, 60% center canvas, 20% right side panels
+    const totalWidth = api.width > 0 ? api.width : (typeof window !== 'undefined' ? window.innerWidth : 1200);
+    const sideWidth = Math.round(totalWidth * 0.2);
+    const centerWidth = Math.max(100, totalWidth - (sideWidth * 2));
+
+    mapsPanel.api.setSize({ width: sideWidth });
+    layersPanel.api.setSize({ width: sideWidth });
+    propsPanel.api.setSize({ width: sideWidth });
+    tilesetsPanel.api.setSize({ width: sideWidth });
+    previewPanel.api.setSize({ width: sideWidth });
+    selectionPanel.api.setSize({ width: sideWidth });
+    centerPanel.api.setSize({ width: centerWidth });
+
+    api.layout(api.width, api.height);
+  }, []);
+
+  const applyDefaultSizes = useCallback((api: DockviewApi) => {
+    const totalWidth = api.width > 0 ? api.width : (typeof window !== 'undefined' ? window.innerWidth : 1200);
+    if (totalWidth <= 0) return;
+
+    const sideWidth = Math.round(totalWidth * 0.2);
+    const centerWidth = Math.max(100, totalWidth - (sideWidth * 2));
+
+    const maps = api.getPanel('maps');
+    const layers = api.getPanel('layers');
+    const props = api.getPanel('properties');
+    const tilesets = api.getPanel('tilesets');
+    const preview = api.getPanel('preview');
+    const selection = api.getPanel('activeSelection');
+    const canvasPanels = api.panels.filter((p) => isMapPanelId(p.id) || p.id === 'empty_canvas');
+
+    if (maps) maps.api.setSize({ width: sideWidth });
+    if (layers) layers.api.setSize({ width: sideWidth });
+    if (props) props.api.setSize({ width: sideWidth });
+
+    if (tilesets) tilesets.api.setSize({ width: sideWidth });
+    if (preview) preview.api.setSize({ width: sideWidth });
+    if (selection) selection.api.setSize({ width: sideWidth });
+
+    if (canvasPanels.length > 0) {
+      canvasPanels[0].api.setSize({ width: centerWidth });
+    }
+
     api.layout(api.width, api.height);
   }, []);
 
@@ -195,6 +238,11 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
     apiRef.current = api;
 
     buildDefaultLayout(api);
+    applyDefaultSizes(api);
+
+    requestAnimationFrame(() => {
+      applyDefaultSizes(api);
+    });
 
     api.onDidAddPanel(updateOpenPanels);
 
@@ -526,8 +574,12 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
     if (!apiRef.current) return;
     apiRef.current.clear();
     buildDefaultLayout(apiRef.current);
+    applyDefaultSizes(apiRef.current);
+    requestAnimationFrame(() => {
+      if (apiRef.current) applyDefaultSizes(apiRef.current);
+    });
     updateOpenPanels();
-  }, [buildDefaultLayout, updateOpenPanels]);
+  }, [buildDefaultLayout, applyDefaultSizes, updateOpenPanels]);
 
   // IPC and Custom Window Events
   useEffect(() => {
