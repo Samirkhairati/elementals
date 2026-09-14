@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { LayerType } from '@/types/editor'
 
 // Hooks
 import { useHistory } from '@/hooks/useHistory'
@@ -9,6 +10,7 @@ import { useMapManager } from '@/hooks/editor/useMapManager'
 import { useLayerManager } from '@/hooks/editor/useLayerManager'
 import { useEntityManager } from '@/hooks/editor/useEntityManager'
 import { useEditorDialogs } from '@/hooks/editor/useEditorDialogs'
+import { exportMap } from '@/hooks/useExportMap'
 
 // Layout
 import { EditorContext } from '@/components/editor/layout/EditorContext'
@@ -217,6 +219,51 @@ export function EditorPage() {
     setActiveMap: mapManager.setActiveMap,
   })
 
+  // ── Unified Layer & Entity Selection Handlers ─────────────────────────────
+  const handleSelectLayer = useCallback(
+    (layerId: string | null) => {
+      layerManager.setActiveLayerId(layerId)
+      entityManager.setSelectedEntityId(null)
+      setFocusedDomain('layers')
+    },
+    [layerManager.setActiveLayerId, entityManager.setSelectedEntityId, setFocusedDomain]
+  )
+
+  const handleSelectEntity = useCallback(
+    (entityId: string | null) => {
+      entityManager.setSelectedEntityId(entityId)
+      if (entityId) {
+        setFocusedDomain('entities')
+      }
+    },
+    [entityManager.setSelectedEntityId, setFocusedDomain]
+  )
+
+  const handleCreateLayerOfType = useCallback(
+    (type: LayerType) => {
+      entityManager.setSelectedEntityId(null)
+      setFocusedDomain('layers')
+      layerManager.handleCreateLayerOfType(type)
+    },
+    [entityManager.setSelectedEntityId, setFocusedDomain, layerManager.handleCreateLayerOfType]
+  )
+
+  const handleDuplicateLayer = useCallback(
+    (id: string) => {
+      entityManager.setSelectedEntityId(null)
+      setFocusedDomain('layers')
+      layerManager.handleDuplicateLayer(id)
+    },
+    [entityManager.setSelectedEntityId, setFocusedDomain, layerManager.handleDuplicateLayer]
+  )
+
+  const handleExportMap = useCallback(
+    (m: any) => {
+      exportMap(m, tilesetManager.tilesets, mapManager.activeMap, layerManager.layers)
+    },
+    [tilesetManager.tilesets, mapManager.activeMap, layerManager.layers]
+  )
+
   // ── Context Value for all panels ─────────────────────────────────────────
   // Memoized so context only re-propagates to all Dockview panels when
   // something meaningful actually changes — not on every incidental re-render.
@@ -237,7 +284,7 @@ export function EditorPage() {
     setRenameDialog: dialogs.setRenameDialog,
     handleDeleteMapFolder: mapManager.handleDeleteMapFolder,
     handleDeleteMap: mapManager.handleDeleteMap,
-    handleExportMap: mapManager.handleExportMap,
+    handleExportMap,
     handleMapDrop: mapManager.handleMapDrop,
     onSelectMap: mapManager.onSelectMap,
     onClearActiveMap: handleClearActiveMap,
@@ -246,22 +293,22 @@ export function EditorPage() {
     // Layers domain
     layers: layerManager.layers,
     activeLayerId: layerManager.activeLayerId,
-    setActiveLayerId: layerManager.setActiveLayerId,
+    setActiveLayerId: handleSelectLayer,
     toggleLayerVisibility: layerManager.toggleLayerVisibility,
     toggleLayerLock: layerManager.toggleLayerLock,
     handleDeleteLayer: layerManager.handleDeleteLayer,
     handleReorderLayers: layerManager.handleReorderLayers,
     handleCreateLayer: layerManager.handleCreateLayer,
-    handleCreateLayerOfType: layerManager.handleCreateLayerOfType,
+    handleCreateLayerOfType,
     handleRenameLayer: layerManager.handleRenameLayer,
-    handleDuplicateLayer: layerManager.handleDuplicateLayer,
+    handleDuplicateLayer,
     updateLayers: layerManager.updateLayers,
     activeLayerType: layerManager.activeLayerType,
 
     // Entities domain
     entities: entityManager.entities,
     selectedEntityId: entityManager.selectedEntityId,
-    setSelectedEntityId: entityManager.setSelectedEntityId,
+    setSelectedEntityId: handleSelectEntity,
     handleCreateEntity: entityManager.createEntity,
     handleDuplicateEntity: entityManager.duplicateEntity,
     handleDeleteEntity: entityManager.deleteEntity,
@@ -320,24 +367,24 @@ export function EditorPage() {
     mapManager.maps, mapManager.mapFolders, mapManager.activeMap,
     mapManager.expandedMapFolders, mapManager.toggleMapFolder,
     mapManager.handleDeleteMapFolder, mapManager.handleDeleteMap,
-    mapManager.handleExportMap, mapManager.handleMapDrop, mapManager.onSelectMap,
+    handleExportMap, mapManager.handleMapDrop, mapManager.onSelectMap,
     handleClearActiveMap,
     dialogs.setCreateMapData, dialogs.setCreateMapDialog,
     dialogs.setCreateMapFolderName, dialogs.setCreateMapFolderDialog,
     dialogs.setRenameInput, dialogs.setRenameDialog, dialogs.setConfirmDialog,
     // Layers
     layerManager.layers, layerManager.activeLayerId, layerManager.activeLayerType,
-    layerManager.setActiveLayerId, layerManager.toggleLayerVisibility,
+    handleSelectLayer, layerManager.toggleLayerVisibility,
     layerManager.toggleLayerLock, layerManager.handleDeleteLayer,
     layerManager.handleReorderLayers, layerManager.handleCreateLayer,
-    layerManager.handleCreateLayerOfType, layerManager.handleRenameLayer,
-    layerManager.handleDuplicateLayer, layerManager.updateLayers,
+    handleCreateLayerOfType, layerManager.handleRenameLayer,
+    handleDuplicateLayer, layerManager.updateLayers,
     layerManager.activeTool, layerManager.paintMode, layerManager.setActiveTool,
     layerManager.setPaintMode, layerManager.tileSelection, layerManager.setTileSelection,
     layerManager.isPainting, layerManager.setIsPainting,
     layerManager.paintStartPos, layerManager.setPaintStartPos, layerManager.debugInfo,
     // Entities
-    entityManager.entities, entityManager.selectedEntityId, entityManager.setSelectedEntityId,
+    entityManager.entities, entityManager.selectedEntityId, handleSelectEntity,
     entityManager.createEntity, entityManager.duplicateEntity, entityManager.deleteEntity,
     entityManager.renameEntity, entityManager.moveEntity, entityManager.reorderEntities,
     entityManager.addComponent, entityManager.removeComponent, entityManager.updateComponentProp,

@@ -82,6 +82,7 @@ interface LayersPanelProps {
   layers: Layer[]
   activeLayerId: string | null
   setActiveLayerId: (id: string) => void
+  setSelectedEntityId?: (id: string | null) => void
   toggleLayerVisibility: (id: string) => void
   toggleLayerLock: (id: string) => void
   deleteLayer: (id: string) => void
@@ -102,6 +103,7 @@ export function LayersPanel({
   layers,
   activeLayerId,
   setActiveLayerId,
+  setSelectedEntityId,
   toggleLayerVisibility,
   toggleLayerLock,
   deleteLayer,
@@ -254,7 +256,10 @@ export function LayersPanel({
                     onDragOver={(e) => handleDragOver(e, layer.id)}
                     onDragEnd={handleDragEnd}
                     onDrop={(e) => handleDrop(e, layer.id)}
-                    onClick={() => setActiveLayerId(layer.id)}
+                    onClick={() => {
+                      setActiveLayerId(layer.id)
+                      setSelectedEntityId?.(null)
+                    }}
                     onDoubleClick={() => {
                       if (!layer.locked) startEditing(layer)
                     }}

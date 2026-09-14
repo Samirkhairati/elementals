@@ -57,6 +57,7 @@ export function LayersWrapper(_props: IDockviewPanelProps) {
         layers={ctx.layers}
         activeLayerId={ctx.activeLayerId}
         setActiveLayerId={ctx.setActiveLayerId}
+        setSelectedEntityId={ctx.setSelectedEntityId}
         toggleLayerVisibility={ctx.toggleLayerVisibility}
         toggleLayerLock={ctx.toggleLayerLock}
         deleteLayer={ctx.handleDeleteLayer}
