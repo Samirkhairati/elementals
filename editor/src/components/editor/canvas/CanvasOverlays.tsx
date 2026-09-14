@@ -1,3 +1,4 @@
+import React from 'react'
 import { ActiveTool, TileSelection, Pos } from '@/types/editor'
 
 interface CanvasOverlaysProps {
@@ -19,7 +20,7 @@ function getCanvasCopyBox(start: Pos | null, current: Pos | null) {
   return { minX, minY, maxX, maxY, width: maxX - minX + 1, height: maxY - minY + 1 }
 }
 
-export function CanvasOverlays({
+export const CanvasOverlays = React.memo(function CanvasOverlays({
   activeTool,
   tileSelection,
   canvasHover,
@@ -82,4 +83,4 @@ export function CanvasOverlays({
       })()}
     </>
   )
-}
+})

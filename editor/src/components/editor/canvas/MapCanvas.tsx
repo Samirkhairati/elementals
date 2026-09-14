@@ -65,6 +65,7 @@ export function MapCanvas({
   const panRef = useRef({ x: 0, y: 0 })
   const zoomRef = useRef(1)
   const isPanningRef = useRef(false)
+  const isZoomingRef = useRef(false)
   const lastPanPosRef = useRef({ x: 0, y: 0 })
   const rafIdRef = useRef<number | null>(null)
 
@@ -200,6 +201,9 @@ export function MapCanvas({
         return
       }
 
+      // Skip hover state updates while actively zooming to avoid React rendering cycles
+      if (isZoomingRef.current) return
+
       const coords = getTileCoords(e.clientX, e.clientY)
       if (!coords) return
 
@@ -279,16 +283,20 @@ export function MapCanvas({
     <div
       className="flex-1 overflow-hidden flex items-center justify-center min-w-0 min-h-0 bg-[#1a1a1a]"
       onWheel={(e) => {
+        // Clamp per-event delta to avoid huge single-frame leaps during trackpad flicks
+        const clampedDelta = Math.max(-120, Math.min(120, e.deltaY))
         const zoomSensitivity = (e.ctrlKey || e.metaKey) ? 0.003 : 0.0015
-        const factor = Math.exp(-e.deltaY * zoomSensitivity)
-        const newZoom = Math.min(Math.max(0.1, zoomRef.current * factor), 5)
+        const factor = Math.exp(-clampedDelta * zoomSensitivity)
+        const newZoom = Math.min(Math.max(0.15, zoomRef.current * factor), 5)
         zoomRef.current = newZoom
+        isZoomingRef.current = true
         scheduleTransformUpdate()
 
         if (zoomDebounceRef.current) clearTimeout(zoomDebounceRef.current)
         zoomDebounceRef.current = setTimeout(() => {
+          isZoomingRef.current = false
           setZoom(zoomRef.current)
-        }, 50)
+        }, 100)
       }}
       onMouseDown={(e) => {
         if (e.button === 1) {

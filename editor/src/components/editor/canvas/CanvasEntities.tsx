@@ -34,7 +34,7 @@ function getEntityDisplayIcon(entity: EntityData) {
   return <Box className="w-3.5 h-3.5 text-purple-300" />
 }
 
-export function CanvasEntities({
+export const CanvasEntities = React.memo(function CanvasEntities({
   entities,
   selectedEntityId,
   setSelectedEntityId,
@@ -172,4 +172,4 @@ export function CanvasEntities({
       })}
     </div>
   )
-}
+})
