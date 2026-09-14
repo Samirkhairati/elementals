@@ -71,7 +71,7 @@ export function MapCanvas({
 
   const applyTransform = useCallback((x: number, y: number, z: number) => {
     if (panContainerRef.current) {
-      panContainerRef.current.style.transform = `translate(${x}px, ${y}px) scale(${z})`
+      panContainerRef.current.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${z})`
     }
   }, [])
 
@@ -310,9 +310,8 @@ export function MapCanvas({
         <div
           ref={panContainerRef}
           style={{
-            transform: `translate(${panRef.current.x}px, ${panRef.current.y}px) scale(${zoomRef.current})`,
+            transform: `translate3d(${panRef.current.x}px, ${panRef.current.y}px, 0) scale(${zoomRef.current})`,
             transformOrigin: 'center',
-            imageRendering: 'pixelated',
           }}
         >
           <div
@@ -321,7 +320,6 @@ export function MapCanvas({
             style={{
               width: activeMap.width * 32,
               height: activeMap.height * 32,
-              imageRendering: 'pixelated',
             }}
             onMouseDown={(e) => {
               if (e.button === 1) return
