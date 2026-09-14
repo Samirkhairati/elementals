@@ -96,8 +96,15 @@ export function MapCanvas({
     return () => observer.disconnect()
   }, [])
 
-  // Keep panRef / zoomRef in sync with React state in case state is reset externally
-  // (e.g. switching maps). panRef/zoomRef lead during active pan/zoom; state follows.
+  const zoomDebounceRef = useRef<NodeJS.Timeout | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (zoomDebounceRef.current) clearTimeout(zoomDebounceRef.current)
+    }
+  }, [])
+
+  // Keep panRef / zoomRef in sync with React state when state changes from outside
   useEffect(() => { panRef.current = pan }, [pan])
   useEffect(() => { zoomRef.current = zoom }, [zoom])
 
@@ -198,6 +205,7 @@ export function MapCanvas({
         panRef.current.x += e.clientX - lastPanPosRef.current.x
         panRef.current.y += e.clientY - lastPanPosRef.current.y
         lastPanPosRef.current = { x: e.clientX, y: e.clientY }
+        cachedRectRef.current = null
         applyTransform(panRef.current.x, panRef.current.y, zoomRef.current)
         return
       }
@@ -280,13 +288,21 @@ export function MapCanvas({
         const zoomSensitivity = (e.ctrlKey || e.metaKey) ? 0.005 : 0.001
         const newZoom = Math.min(Math.max(0.1, zoomRef.current - e.deltaY * zoomSensitivity), 5)
         zoomRef.current = newZoom
-        setZoom(newZoom)
+        cachedRectRef.current = null
         applyTransform(panRef.current.x, panRef.current.y, newZoom)
+
+        // Debounce React state sync: avoids queueing 120 asynchronous re-renders
+        // during fast scroll bursts that race and clobber intermediate zoom values.
+        if (zoomDebounceRef.current) clearTimeout(zoomDebounceRef.current)
+        zoomDebounceRef.current = setTimeout(() => {
+          setZoom(zoomRef.current)
+        }, 150)
       }}
       onMouseDown={(e) => {
         if (e.button === 1) {
           isPanningRef.current = true
           lastPanPosRef.current = { x: e.clientX, y: e.clientY }
+          cachedRectRef.current = null
         }
       }}
       onContextMenu={(e) => e.preventDefault()}
@@ -295,7 +311,7 @@ export function MapCanvas({
         <div
           ref={panContainerRef}
           style={{
-            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+            transform: `translate(${panRef.current.x}px, ${panRef.current.y}px) scale(${zoomRef.current})`,
             transformOrigin: 'center',
             imageRendering: 'pixelated',
           }}
