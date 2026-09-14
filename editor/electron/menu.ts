@@ -55,6 +55,10 @@ export function setupMenu(win: BrowserWindow) {
                   click: () => win.webContents.send('dockview-toggle-panel', 'layers'),
                 },
                 {
+                  label: 'Entities Panel',
+                  click: () => win.webContents.send('dockview-toggle-panel', 'entities'),
+                },
+                {
                   label: 'Properties Panel',
                   click: () => win.webContents.send('dockview-toggle-panel', 'properties'),
                 },

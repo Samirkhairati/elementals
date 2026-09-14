@@ -31,6 +31,7 @@ export function getMapsRecursive(dirPath: string, relativePath: string = '') {
           width: data.width || 50,
           height: data.height || 50,
           layers: data.layers || [],
+          entities: data.entities || [],
         });
       } catch (e) {}
     }
@@ -116,7 +117,7 @@ export function registerMapHandlers(mapsDir: string) {
             data: {},
           },
         ];
-        const mapData = { name, width, height, layers: defaultLayers };
+        const mapData = { name, width, height, layers: defaultLayers, entities: [] };
         fs.writeFileSync(finalDest, JSON.stringify(mapData, null, 2));
 
         return {
@@ -128,6 +129,7 @@ export function registerMapHandlers(mapsDir: string) {
             width,
             height,
             layers: defaultLayers,
+            entities: [],
           },
         };
       } catch (error: any) {

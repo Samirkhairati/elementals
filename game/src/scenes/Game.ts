@@ -17,6 +17,7 @@ import {
   AnimationSystem,
   RenderBridgeSystem,
   PlayerPrefab,
+  createComponentFromData,
   type Entity,
 } from "@/ecs";
 
@@ -123,6 +124,20 @@ export class Game extends Scene {
       x: spawnX,
       y: spawnY,
     });
+
+    // Hydrate editor-placed entities from map JSON
+    const rawMapData = this.cache.tilemap.get(mapKey)?.data;
+    if (rawMapData?.entities && Array.isArray(rawMapData.entities)) {
+      for (const entityDef of rawMapData.entities) {
+        const entity = this.world.createEntity();
+        for (const [compType, props] of Object.entries(entityDef.components || {})) {
+          const component = createComponentFromData(compType, props as any);
+          if (component) {
+            this.world.addComponent(entity, component);
+          }
+        }
+      }
+    }
 
     // Tick world with 0 delta to instantiate sprites on the render bridge immediately
     this.world.update(0);

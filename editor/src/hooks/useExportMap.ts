@@ -9,7 +9,7 @@ export async function exportMap(
   if (!window.electronAPI) return
 
   const mapToExport = (activeMap && mapToExportRaw.fileName === activeMap.fileName)
-    ? { ...mapToExportRaw, layers }
+    ? { ...mapToExportRaw, layers, entities: activeMap.entities || [] }
     : mapToExportRaw
 
   const usedTilesets = new Set<string>()
@@ -134,6 +134,7 @@ export async function exportMap(
     type: 'map',
     version: '1.10',
     width: mapToExport.width,
+    entities: mapToExport.entities || [],
   }
 
   const res = await window.electronAPI.exportMap(JSON.stringify(tiledMap, null, 2), mapToExport.name + '.json')
