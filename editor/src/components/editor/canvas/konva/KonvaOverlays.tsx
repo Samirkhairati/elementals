@@ -35,7 +35,9 @@ export const KonvaOverlays = React.memo(function KonvaOverlays({
       {/* 32px Grid Overlay */}
       <Shape
         listening={false}
-        sceneFunc={(context, shape) => {
+        perfectDrawEnabled={false}
+        shadowForStrokeEnabled={false}
+        sceneFunc={(context) => {
           const ctx = context._context as CanvasRenderingContext2D
           ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)'
           ctx.lineWidth = 1

@@ -63,6 +63,15 @@ export function useCanvasViewport({ activeMap }: UseCanvasViewportOptions) {
     }
   }, [activeMap, dimensions])
 
+  const isZoomingRef = useRef(false)
+  const zoomTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (zoomTimeoutRef.current) clearTimeout(zoomTimeoutRef.current)
+    }
+  }, [])
+
   // ── Cursor-Centered Exponential Zoom ─────────────────────────────────────
   const handleWheel = useCallback((e: Konva.KonvaEventObject<WheelEvent>) => {
     e.evt.preventDefault()
@@ -78,25 +87,28 @@ export function useCanvasViewport({ activeMap }: UseCanvasViewportOptions) {
     const factor = Math.exp(-clampedDelta * sensitivity)
     const newScale = Math.min(Math.max(0.15, oldScale * factor), 5)
 
-    const mousePointTo = {
-      x: (pointer.x - stage.x()) / oldScale,
-      y: (pointer.y - stage.y()) / oldScale,
-    }
+    const mousePointToX = (pointer.x - stage.x()) / oldScale
+    const mousePointToY = (pointer.y - stage.y()) / oldScale
 
-    const newPos = {
-      x: pointer.x - mousePointTo.x * newScale,
-      y: pointer.y - mousePointTo.y * newScale,
-    }
+    const newPosX = pointer.x - mousePointToX * newScale
+    const newPosY = pointer.y - mousePointToY * newScale
 
+    isZoomingRef.current = true
     stage.scale({ x: newScale, y: newScale })
-    stage.position(newPos)
+    stage.position({ x: newPosX, y: newPosY })
     stage.batchDraw()
+
+    if (zoomTimeoutRef.current) clearTimeout(zoomTimeoutRef.current)
+    zoomTimeoutRef.current = setTimeout(() => {
+      isZoomingRef.current = false
+    }, 100)
   }, [])
 
   // ── Panning Handlers ─────────────────────────────────────────────────────
   const startPan = useCallback((clientX: number, clientY: number) => {
     isPanningRef.current = true
-    lastPanPosRef.current = { x: clientX, y: clientY }
+    lastPanPosRef.current.x = clientX
+    lastPanPosRef.current.y = clientY
   }, [])
 
   const movePan = useCallback((clientX: number, clientY: number) => {
@@ -104,7 +116,8 @@ export function useCanvasViewport({ activeMap }: UseCanvasViewportOptions) {
     const stage = stageRef.current
     const dx = clientX - lastPanPosRef.current.x
     const dy = clientY - lastPanPosRef.current.y
-    lastPanPosRef.current = { x: clientX, y: clientY }
+    lastPanPosRef.current.x = clientX
+    lastPanPosRef.current.y = clientY
     stage.position({ x: stage.x() + dx, y: stage.y() + dy })
     stage.batchDraw()
   }, [])
@@ -138,6 +151,7 @@ export function useCanvasViewport({ activeMap }: UseCanvasViewportOptions) {
     stageRef,
     dimensions,
     isPanningRef,
+    isZoomingRef,
     handleWheel,
     startPan,
     movePan,

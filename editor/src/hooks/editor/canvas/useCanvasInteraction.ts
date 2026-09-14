@@ -28,6 +28,7 @@ interface UseCanvasInteractionProps {
   handleCommit: () => void
   getTileCoordsFromPointer: () => TileCoords | null
   isPanningRef: React.MutableRefObject<boolean>
+  isZoomingRef: React.MutableRefObject<boolean>
   startPan: (clientX: number, clientY: number) => void
   movePan: (clientX: number, clientY: number) => void
   endPan: () => void
@@ -49,6 +50,7 @@ export function useCanvasInteraction({
   handleCommit,
   getTileCoordsFromPointer,
   isPanningRef,
+  isZoomingRef,
   startPan,
   movePan,
   endPan,
@@ -169,8 +171,7 @@ export function useCanvasInteraction({
   // ── Stage Mouse Move ─────────────────────────────────────────────────────
   const handleStageMouseMove = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
-      if (isPanningRef.current) {
-        movePan(e.evt.clientX, e.evt.clientY)
+      if (isPanningRef.current || isZoomingRef.current) {
         return
       }
 
@@ -201,7 +202,7 @@ export function useCanvasInteraction({
         handlePaint(coords.x, coords.y)
       }
     },
-    [getTileCoordsFromPointer, isPanningRef, movePan, handlePaint]
+    [getTileCoordsFromPointer, isPanningRef, isZoomingRef, handlePaint]
   )
 
   // ── Global Window Drag Listeners (Outside Stage Bounds) ───────────────────
