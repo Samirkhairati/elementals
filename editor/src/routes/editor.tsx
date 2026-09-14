@@ -81,13 +81,18 @@ export function EditorPage() {
     handleClearActiveMapRef.current = handleClearActiveMap
   }, [handleClearActiveMap])
 
+  const activeMapRef = useRef(mapManager.activeMap)
+  useEffect(() => {
+    activeMapRef.current = mapManager.activeMap
+  }, [mapManager.activeMap])
+
   // ── Data Loading Coordinator ─────────────────────────────────────────────
   const loadData = useCallback(async () => {
     const [, loadedMaps] = await Promise.all([tilesetManager.loadTilesets(), mapManager.loadMaps()])
-    if (loadedMaps && loadedMaps.length > 0 && !mapManager.activeMap) {
+    if (loadedMaps && loadedMaps.length > 0 && !activeMapRef.current) {
       mapManager.onSelectMap(loadedMaps[0])
     }
-  }, [tilesetManager.loadTilesets, mapManager.loadMaps, mapManager.activeMap, mapManager.onSelectMap])
+  }, [tilesetManager.loadTilesets, mapManager.loadMaps, mapManager.onSelectMap])
 
   useEffect(() => {
     loadData()

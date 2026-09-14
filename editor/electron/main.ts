@@ -55,6 +55,7 @@ function createWindow() {
     title: title,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
+      backgroundThrottling: false,
     },
   });
 

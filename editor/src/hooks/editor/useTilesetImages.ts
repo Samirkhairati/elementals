@@ -1,9 +1,19 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { TilesetData } from '@/types/editor'
 
+const globalImageCache = new Map<string, { url: string; img: HTMLImageElement }>()
+
 export function useTilesetImages(tilesets: TilesetData[]): Record<string, HTMLImageElement> {
-  const [images, setImages] = useState<Record<string, HTMLImageElement>>({})
-  const cacheRef = useRef<Map<string, { url: string; img: HTMLImageElement }>>(new Map())
+  const [images, setImages] = useState<Record<string, HTMLImageElement>>(() => {
+    const initial: Record<string, HTMLImageElement> = {}
+    for (const tileset of tilesets) {
+      const cached = globalImageCache.get(tileset.fileName)
+      if (cached && cached.url === tileset.dataUrl && cached.img.complete && cached.img.naturalWidth > 0) {
+        initial[tileset.fileName] = cached.img
+      }
+    }
+    return initial
+  })
 
   useEffect(() => {
     let isMounted = true
@@ -11,7 +21,7 @@ export function useTilesetImages(tilesets: TilesetData[]): Record<string, HTMLIm
     let pendingLoads = 0
 
     tilesets.forEach(tileset => {
-      const cached = cacheRef.current.get(tileset.fileName)
+      const cached = globalImageCache.get(tileset.fileName)
       if (cached && cached.url === tileset.dataUrl && cached.img.complete && cached.img.naturalWidth > 0) {
         newImages[tileset.fileName] = cached.img
       } else {
@@ -19,7 +29,7 @@ export function useTilesetImages(tilesets: TilesetData[]): Record<string, HTMLIm
         const img = new Image()
         img.src = tileset.dataUrl
         img.onload = () => {
-          cacheRef.current.set(tileset.fileName, { url: tileset.dataUrl, img })
+          globalImageCache.set(tileset.fileName, { url: tileset.dataUrl, img })
           if (isMounted) {
             setImages(prev => ({ ...prev, [tileset.fileName]: img }))
           }
