@@ -132,6 +132,26 @@
           "x": 0,
           "y": 0
         },
+        "246": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "248": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "249": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "251": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
         "303": {
           "tilesetId": "__collision__",
           "x": 0,
@@ -152,6 +172,21 @@
           "x": 0,
           "y": 0
         },
+        "315": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "316": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "317": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
         "333": {
           "tilesetId": "__collision__",
           "x": 0,
@@ -168,6 +203,26 @@
           "y": 0
         },
         "336": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "340": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "341": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "342": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "344": {
           "tilesetId": "__collision__",
           "x": 0,
           "y": 0
