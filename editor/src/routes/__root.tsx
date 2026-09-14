@@ -34,7 +34,7 @@ export function RootComponent() {
   }, [accentColor])
 
   return (
-    <SidebarProvider>
+    <SidebarProvider defaultOpen={false}>
       <div className="flex h-screen w-full bg-background text-foreground font-sans">
         <AppSidebar />
         <main className="flex-1 flex flex-col relative overflow-hidden">

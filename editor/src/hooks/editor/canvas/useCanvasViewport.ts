@@ -17,12 +17,32 @@ interface UseCanvasViewportOptions {
 export function useCanvasViewport({ activeMap }: UseCanvasViewportOptions) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const stageRef = useRef<Konva.Stage | null>(null)
-  const [dimensions, setDimensions] = useState({ width: 800, height: 600 })
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 })
 
   const isPanningRef = useRef(false)
   const lastPanPosRef = useRef({ x: 0, y: 0 })
   const activeMapRef = useRef(activeMap)
   useEffect(() => { activeMapRef.current = activeMap }, [activeMap])
+
+  // ── Auto-center Map Calculations ─────────────────────────────────────────
+  const centerMap = useCallback(() => {
+    const stage = stageRef.current
+    const map = activeMapRef.current
+    if (!stage || !map || dimensions.width <= 0 || dimensions.height <= 0) return
+
+    const mapW = map.width * 32
+    const mapH = map.height * 32
+    const initialScale = Math.min(
+      1,
+      Math.max(0.2, Math.min((dimensions.width * 0.8) / mapW, (dimensions.height * 0.8) / mapH))
+    )
+    const posX = Math.round((dimensions.width - mapW * initialScale) / 2)
+    const posY = Math.round((dimensions.height - mapH * initialScale) / 2)
+
+    stage.scale({ x: initialScale, y: initialScale })
+    stage.position({ x: posX, y: posY })
+    stage.batchDraw()
+  }, [dimensions])
 
   // ── Resize Observer for Stage Dimensions ─────────────────────────────────
   useEffect(() => {
@@ -31,7 +51,9 @@ export function useCanvasViewport({ activeMap }: UseCanvasViewportOptions) {
     const updateSize = () => {
       const rect = el.getBoundingClientRect()
       if (rect.width > 0 && rect.height > 0) {
-        setDimensions({ width: Math.floor(rect.width), height: Math.floor(rect.height) })
+        const w = Math.floor(rect.width)
+        const h = Math.floor(rect.height)
+        setDimensions(prev => (prev.width === w && prev.height === h ? prev : { width: w, height: h }))
       }
     }
     updateSize()
@@ -41,27 +63,17 @@ export function useCanvasViewport({ activeMap }: UseCanvasViewportOptions) {
   }, [])
 
   // ── Auto-center Active Map on Initial Load or Switch ─────────────────────
-  const hasCenteredMapRef = useRef<string | null>(null)
+  const centeredMapKeyRef = useRef<string | null>(null)
   useEffect(() => {
     if (!activeMap || !stageRef.current) return
     const mapKey = `${activeMap.folderPath || ''}/${activeMap.fileName}`
-    if (hasCenteredMapRef.current !== mapKey && dimensions.width > 0 && dimensions.height > 0) {
-      hasCenteredMapRef.current = mapKey
-      const stage = stageRef.current
-      const mapW = activeMap.width * 32
-      const mapH = activeMap.height * 32
-      const initialScale = Math.min(
-        1,
-        Math.max(0.2, Math.min((dimensions.width * 0.8) / mapW, (dimensions.height * 0.8) / mapH))
-      )
-      const posX = (dimensions.width - mapW * initialScale) / 2
-      const posY = (dimensions.height - mapH * initialScale) / 2
-
-      stage.scale({ x: initialScale, y: initialScale })
-      stage.position({ x: posX, y: posY })
-      stage.batchDraw()
+    if (dimensions.width > 0 && dimensions.height > 0) {
+      if (centeredMapKeyRef.current !== mapKey) {
+        centeredMapKeyRef.current = mapKey
+        centerMap()
+      }
     }
-  }, [activeMap, dimensions])
+  }, [activeMap, dimensions, centerMap])
 
   const isZoomingRef = useRef(false)
   const zoomTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -157,5 +169,6 @@ export function useCanvasViewport({ activeMap }: UseCanvasViewportOptions) {
     movePan,
     endPan,
     getTileCoordsFromPointer,
+    centerMap,
   }
 }

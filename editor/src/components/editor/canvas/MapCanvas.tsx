@@ -126,8 +126,8 @@ export function MapCanvas({
       {activeMap ? (
         <Stage
           ref={stageRef}
-          width={dimensions.width}
-          height={dimensions.height}
+          width={dimensions.width || 1}
+          height={dimensions.height || 1}
           onWheel={handleWheel}
           onMouseDown={handleStageMouseDown}
           onMouseMove={handleStageMouseMove}
