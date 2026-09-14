@@ -1,3 +1,4 @@
+import React from 'react'
 import { Layer, TilesetData, MapData } from '@/types/editor'
 
 interface CanvasLayersProps {
@@ -6,7 +7,9 @@ interface CanvasLayersProps {
   activeMap: MapData
 }
 
-export function CanvasLayers({ layers, tilesets, activeMap }: CanvasLayersProps) {
+// Memoized: only re-renders when layers/tilesets/activeMap actually change,
+// not on every canvasHover or pan state update inside MapCanvas.
+export const CanvasLayers = React.memo(function CanvasLayers({ layers, tilesets, activeMap }: CanvasLayersProps) {
   return (
     <>
       {layers.slice().reverse().filter(l => l.visible).map(layer => (
@@ -15,7 +18,7 @@ export function CanvasLayers({ layers, tilesets, activeMap }: CanvasLayersProps)
             const index = parseInt(indexStr)
             const x = index % activeMap.width
             const y = Math.floor(index / activeMap.width)
-            
+
             if (tile.tilesetId === '__collision__') {
               return (
                 <div
@@ -57,4 +60,4 @@ export function CanvasLayers({ layers, tilesets, activeMap }: CanvasLayersProps)
       ))}
     </>
   )
-}
+})

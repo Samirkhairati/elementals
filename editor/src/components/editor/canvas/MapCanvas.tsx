@@ -66,6 +66,21 @@ export function MapCanvas({
   const [debugExpanded, setDebugExpanded] = useState(false)
   const mapRef = useRef<HTMLDivElement | null>(null)
 
+  // Cached bounding rect — invalidated by ResizeObserver when the canvas element
+  // resizes (e.g. Dockview panel sash drag). Avoids forced layout reflow on every
+  // pixel of mouse movement.
+  const cachedRectRef = useRef<DOMRect | null>(null)
+
+  useEffect(() => {
+    if (!mapRef.current) return
+    const el = mapRef.current
+    const observer = new ResizeObserver(() => {
+      cachedRectRef.current = null
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
   // ── Stable Refs for Global Window Listeners ──────────────────────────────
   const isPaintingRef = useRef(isPainting)
   useEffect(() => { isPaintingRef.current = isPainting }, [isPainting])
@@ -103,7 +118,12 @@ export function MapCanvas({
   // ── Coordinate Calculation Helper ────────────────────────────────────────
   const getTileCoords = useCallback((clientX: number, clientY: number) => {
     if (!mapRef.current || !activeMapRef.current) return null
-    const rect = mapRef.current.getBoundingClientRect()
+    // Use cached rect; ResizeObserver above nullifies it on resize so we always
+    // have an accurate value without calling getBoundingClientRect() every frame.
+    if (!cachedRectRef.current) {
+      cachedRectRef.current = mapRef.current.getBoundingClientRect()
+    }
+    const rect = cachedRectRef.current
     const relX = (clientX - rect.left) / rect.width
     const relY = (clientY - rect.top) / rect.height
     const rawX = Math.floor(relX * activeMapRef.current.width)
@@ -169,9 +189,12 @@ export function MapCanvas({
       const coords = getTileCoords(e.clientX, e.clientY)
       if (!coords) return
 
-      // Update hover state
+      // Update hover state — guard against same-tile updates to avoid re-renders
+      // at 120Hz when hovering over the same tile without moving to a new one.
       if (coords.isInside) {
-        setCanvasHover({ x: coords.x, y: coords.y })
+        setCanvasHover(prev =>
+          prev?.x === coords.x && prev?.y === coords.y ? prev : { x: coords.x, y: coords.y }
+        )
       } else if (!isPaintingRef.current && !rectStartRef.current && !canvasCopyStartRef.current) {
         setCanvasHover(null)
       }

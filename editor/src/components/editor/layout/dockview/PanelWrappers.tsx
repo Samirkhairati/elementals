@@ -11,6 +11,11 @@ import { TilesetPreview } from '@/components/editor/panels/TilesetPreview';
 import { ActiveSelectionPanel } from '@/components/editor/panels/ActiveSelectionPanel';
 import { CenterCanvas } from '../CenterCanvas';
 
+// Stable no-op used as a placeholder for callbacks on inactive canvases.
+// Defined at module scope so it's the same reference every render — avoids
+// creating new arrow functions inside CanvasWrapper on every tick.
+const noop = () => {};
+
 export function MapsWrapper(_props: IDockviewPanelProps) {
   const ctx = useEditorContext();
   return (
@@ -154,18 +159,18 @@ export function CanvasWrapper(props: IDockviewPanelProps) {
         setTileSelection={ctx.setTileSelection}
         activeLayerId={isActive ? ctx.activeLayerId : null}
         isPainting={isActive ? ctx.isPainting : false}
-        setIsPainting={isActive ? ctx.setIsPainting : () => {}}
+        setIsPainting={isActive ? ctx.setIsPainting : noop}
         paintStartPos={isActive ? ctx.paintStartPos : null}
-        setPaintStartPos={isActive ? ctx.setPaintStartPos : () => {}}
+        setPaintStartPos={isActive ? ctx.setPaintStartPos : noop}
         debugInfo={isActive ? ctx.debugInfo : null}
-        handlePaint={isActive ? ctx.handlePaint : () => {}}
-        handlePaintBucket={isActive ? ctx.handlePaintBucket : () => {}}
-        handleRectangleFill={isActive ? ctx.handleRectangleFill : () => {}}
-        handleCommit={isActive ? ctx.handleCommit : () => {}}
+        handlePaint={isActive ? ctx.handlePaint : noop}
+        handlePaintBucket={isActive ? ctx.handlePaintBucket : noop}
+        handleRectangleFill={isActive ? ctx.handleRectangleFill : noop}
+        handleCommit={isActive ? ctx.handleCommit : noop}
         entities={currentEntities}
         selectedEntityId={isActive ? ctx.selectedEntityId : null}
-        setSelectedEntityId={isActive ? ctx.setSelectedEntityId : () => {}}
-        moveEntity={isActive ? ctx.moveEntity : () => {}}
+        setSelectedEntityId={isActive ? ctx.setSelectedEntityId : noop}
+        moveEntity={isActive ? ctx.moveEntity : noop}
       />
     </div>
   );

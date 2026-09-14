@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 
 // Hooks
 import { useHistory } from '@/hooks/useHistory'
@@ -213,7 +213,9 @@ export function EditorPage() {
   })
 
   // ── Context Value for all panels ─────────────────────────────────────────
-  const contextValue = {
+  // Memoized so context only re-propagates to all Dockview panels when
+  // something meaningful actually changes — not on every incidental re-render.
+  const contextValue = useMemo(() => ({
     focusedDomain,
     setFocusedDomain,
     // Maps domain
@@ -307,7 +309,51 @@ export function EditorPage() {
     setTilesetSelectionCurrent: tilesetManager.setTilesetSelectionCurrent,
     hoverTile: tilesetManager.hoverTile,
     setHoverTile: tilesetManager.setHoverTile,
-  }
+  }), [
+    focusedDomain, setFocusedDomain,
+    // Maps
+    mapManager.maps, mapManager.mapFolders, mapManager.activeMap,
+    mapManager.expandedMapFolders, mapManager.toggleMapFolder,
+    mapManager.handleDeleteMapFolder, mapManager.handleDeleteMap,
+    mapManager.handleExportMap, mapManager.handleMapDrop, mapManager.onSelectMap,
+    handleClearActiveMap,
+    dialogs.setCreateMapData, dialogs.setCreateMapDialog,
+    dialogs.setCreateMapFolderName, dialogs.setCreateMapFolderDialog,
+    dialogs.setRenameInput, dialogs.setRenameDialog, dialogs.setConfirmDialog,
+    // Layers
+    layerManager.layers, layerManager.activeLayerId, layerManager.activeLayerType,
+    layerManager.setActiveLayerId, layerManager.toggleLayerVisibility,
+    layerManager.toggleLayerLock, layerManager.handleDeleteLayer,
+    layerManager.handleReorderLayers, layerManager.handleCreateLayer,
+    layerManager.handleCreateLayerOfType, layerManager.handleRenameLayer,
+    layerManager.handleDuplicateLayer, layerManager.updateLayers,
+    layerManager.activeTool, layerManager.paintMode, layerManager.setActiveTool,
+    layerManager.setPaintMode, layerManager.tileSelection, layerManager.setTileSelection,
+    layerManager.isPainting, layerManager.setIsPainting,
+    layerManager.paintStartPos, layerManager.setPaintStartPos, layerManager.debugInfo,
+    // Entities
+    entityManager.entities, entityManager.selectedEntityId, entityManager.setSelectedEntityId,
+    entityManager.createEntity, entityManager.duplicateEntity, entityManager.deleteEntity,
+    entityManager.renameEntity, entityManager.moveEntity, entityManager.reorderEntities,
+    entityManager.addComponent, entityManager.removeComponent, entityManager.updateComponentProp,
+    // History
+    historyState.historyIndex, historyState.history.length,
+    boundHandleUndo, boundHandleRedo,
+    // Paint tools
+    paintTools.handlePaint, paintTools.handlePaintBucket, paintTools.handleRectangleFill,
+    handleCommit,
+    // Tilesets
+    tilesetManager.tilesets, tilesetManager.folders, tilesetManager.activeTileset,
+    tilesetManager.setActiveTileset, tilesetManager.expandedFolders,
+    tilesetManager.selectedFolder, tilesetManager.setSelectedFolder,
+    tilesetManager.toggleFolder, tilesetManager.handlePickFile,
+    tilesetManager.handleOpenCreateFolderDialog, tilesetManager.handleDeleteFolder,
+    tilesetManager.handleDrop, tilesetManager.tilesetDimensions,
+    tilesetManager.setTilesetDimensions, tilesetManager.tilesetSelectionStart,
+    tilesetManager.setTilesetSelectionStart, tilesetManager.tilesetSelectionCurrent,
+    tilesetManager.setTilesetSelectionCurrent, tilesetManager.hoverTile,
+    tilesetManager.setHoverTile,
+  ])
 
   return (
     <EditorContext.Provider value={contextValue}>
