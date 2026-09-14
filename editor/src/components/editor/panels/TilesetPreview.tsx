@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { TilesetData, TileSelection, CopiedTile, Pos } from '@/types/editor'
 
 interface TilesetPreviewProps {
@@ -46,7 +46,67 @@ export function TilesetPreview({
   const [isPanning, setIsPanning] = useState(false)
   const [lastPanPos, setLastPanPos] = useState({ x: 0, y: 0 })
 
+  const imageContainerRef = useRef<HTMLDivElement | null>(null)
   const dragStartRef = useRef<Pos | null>(null)
+
+  const getClampedTileCoords = useCallback((clientX: number, clientY: number): Pos | null => {
+    if (!imageContainerRef.current || !tilesetDimensions) return null
+    const rect = imageContainerRef.current.getBoundingClientRect()
+    const maxTilesX = Math.floor(tilesetDimensions.width / 32)
+    const maxTilesY = Math.floor(tilesetDimensions.height / 32)
+    if (maxTilesX <= 0 || maxTilesY <= 0) return null
+
+    // Calculate position relative to container, scaled by zoom
+    const currentZoom = zoom || 1
+    const relX = (clientX - rect.left) / currentZoom
+    const relY = (clientY - rect.top) / currentZoom
+
+    const tileX = Math.max(0, Math.min(maxTilesX - 1, Math.floor(relX / 32)))
+    const tileY = Math.max(0, Math.min(maxTilesY - 1, Math.floor(relY / 32)))
+
+    return { x: tileX, y: tileY }
+  }, [tilesetDimensions, zoom])
+
+  const commitSelection = useCallback((endPos?: Pos) => {
+    const start = dragStartRef.current || tilesetSelectionStart
+    const current = endPos || tilesetSelectionCurrent || start
+    const box = getTilesetSelectionBox(start, current)
+    if (box && activeTileset && tilesetDimensions) {
+      const maxTilesX = Math.floor(tilesetDimensions.width / 32)
+      const maxTilesY = Math.floor(tilesetDimensions.height / 32)
+
+      const minX = Math.max(0, Math.min(maxTilesX - 1, box.minX))
+      const maxX = Math.max(0, Math.min(maxTilesX - 1, box.maxX))
+      const minY = Math.max(0, Math.min(maxTilesY - 1, box.minY))
+      const maxY = Math.max(0, Math.min(maxTilesY - 1, box.maxY))
+
+      const width = maxX - minX + 1
+      const height = maxY - minY + 1
+
+      const tiles: (CopiedTile | null)[] = []
+      for (let dy = 0; dy < height; dy++) {
+        for (let dx = 0; dx < width; dx++) {
+          tiles.push({
+            tilesetId: activeTileset.fileName,
+            x: minX + dx,
+            y: minY + dy,
+          })
+        }
+      }
+      setTileSelection({ width, height, tiles })
+      setTilesetSelectionStart(null)
+      setTilesetSelectionCurrent(null)
+      dragStartRef.current = null
+    }
+  }, [
+    activeTileset,
+    tilesetDimensions,
+    tilesetSelectionStart,
+    tilesetSelectionCurrent,
+    setTileSelection,
+    setTilesetSelectionStart,
+    setTilesetSelectionCurrent,
+  ])
 
   if (activeLayerType === 'collision') {
     return (
@@ -81,26 +141,32 @@ export function TilesetPreview({
     )
   }
 
-  const commitSelection = (endPos?: Pos) => {
-    const start = dragStartRef.current || tilesetSelectionStart
-    const current = endPos || tilesetSelectionCurrent
-    const box = getTilesetSelectionBox(start, current)
-    if (box) {
-      const tiles: (CopiedTile | null)[] = []
-      for (let dy = 0; dy < box.height; dy++) {
-        for (let dx = 0; dx < box.width; dx++) {
-          tiles.push({
-            tilesetId: activeTileset.fileName,
-            x: box.minX + dx,
-            y: box.minY + dy,
-          })
-        }
+  const handleSelectionMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0 || !activeTileset || !tilesetDimensions) return
+    const coords = getClampedTileCoords(e.clientX, e.clientY)
+    if (!coords) return
+
+    dragStartRef.current = coords
+    setTilesetSelectionStart(coords)
+    setTilesetSelectionCurrent(coords)
+
+    const handleWindowMouseMove = (moveEvent: MouseEvent) => {
+      const moveCoords = getClampedTileCoords(moveEvent.clientX, moveEvent.clientY)
+      if (moveCoords) {
+        setTilesetSelectionCurrent(moveCoords)
+        setHoverTile(moveCoords)
       }
-      setTileSelection({ width: box.width, height: box.height, tiles })
-      setTilesetSelectionStart(null)
-      setTilesetSelectionCurrent(null)
-      dragStartRef.current = null
     }
+
+    const handleWindowMouseUp = (upEvent: MouseEvent) => {
+      const endCoords = getClampedTileCoords(upEvent.clientX, upEvent.clientY)
+      commitSelection(endCoords || undefined)
+      window.removeEventListener('mousemove', handleWindowMouseMove)
+      window.removeEventListener('mouseup', handleWindowMouseUp)
+    }
+
+    window.addEventListener('mousemove', handleWindowMouseMove)
+    window.addEventListener('mouseup', handleWindowMouseUp)
   }
 
   const box = getTilesetSelectionBox(tilesetSelectionStart, tilesetSelectionCurrent)
@@ -133,7 +199,10 @@ export function TilesetPreview({
       onMouseLeave={() => setIsPanning(false)}
     >
       <div style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: 'center' }}>
-        <div className="relative inline-block border shadow-sm cursor-crosshair">
+        <div
+          ref={imageContainerRef}
+          className="relative inline-block border shadow-sm cursor-crosshair select-none"
+        >
           <div
             className="absolute inset-0 opacity-10"
             style={{
@@ -146,59 +215,54 @@ export function TilesetPreview({
             src={activeTileset.dataUrl}
             onLoad={(e) => setTilesetDimensions({ width: e.currentTarget.naturalWidth, height: e.currentTarget.naturalHeight })}
             alt={activeTileset.name}
-            className="relative z-10 block max-w-none"
+            className="relative z-10 block max-w-none pointer-events-none select-none"
             style={{ imageRendering: 'pixelated' }}
+            draggable={false}
           />
 
           {tilesetDimensions && (
             <div className="absolute inset-0 z-20 pointer-events-none" style={{ backgroundImage: 'linear-gradient(to right, rgba(255,255,255,0.2) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.2) 1px, transparent 1px)', backgroundSize: '32px 32px' }}></div>
           )}
 
+          {/* Interactive Selection & Hover Layer */}
           <div
-            className="absolute inset-0 z-30 select-none"
-            onMouseDown={(e) => {
-              if (e.button !== 0) return
-              const x = Math.floor(e.nativeEvent.offsetX / 32)
-              const y = Math.floor(e.nativeEvent.offsetY / 32)
-              dragStartRef.current = { x, y }
-              setTilesetSelectionStart({ x, y })
-              setTilesetSelectionCurrent({ x, y })
-            }}
+            className="absolute inset-0 z-30 select-none cursor-crosshair"
+            onMouseDown={handleSelectionMouseDown}
             onMouseMove={(e) => {
-              if (!tilesetDimensions) return
-              const x = Math.floor(e.nativeEvent.offsetX / 32)
-              const y = Math.floor(e.nativeEvent.offsetY / 32)
-              setHoverTile({ x, y })
-              if (tilesetSelectionStart || dragStartRef.current) {
-                setTilesetSelectionCurrent({ x, y })
+              if (dragStartRef.current || tilesetSelectionStart) return
+              const coords = getClampedTileCoords(e.clientX, e.clientY)
+              setHoverTile(coords)
+            }}
+            onMouseLeave={() => {
+              if (!dragStartRef.current && !tilesetSelectionStart) {
+                setHoverTile(null)
               }
-            }}
-            onMouseUp={(e) => {
-              const x = Math.floor(e.nativeEvent.offsetX / 32)
-              const y = Math.floor(e.nativeEvent.offsetY / 32)
-              commitSelection({ x, y })
-            }}
-            onMouseLeave={(e) => {
-              setHoverTile(null)
-              const x = Math.floor(e.nativeEvent.offsetX / 32)
-              const y = Math.floor(e.nativeEvent.offsetY / 32)
-              commitSelection({ x, y })
             }}
           >
             {hoverTile && !tilesetSelectionStart && (
-              <div className="absolute border border-yellow-400 bg-yellow-400/20 pointer-events-none" style={{ left: hoverTile.x * 32, top: hoverTile.y * 32, width: 32, height: 32 }}></div>
+              <div
+                className="absolute border border-yellow-400 bg-yellow-400/20 pointer-events-none"
+                style={{ left: hoverTile.x * 32, top: hoverTile.y * 32, width: 32, height: 32 }}
+              />
             )}
             {(() => {
               if (box) {
                 return (
-                  <div className="absolute border-2 border-primary bg-primary/30 pointer-events-none" style={{ left: box.minX * 32, top: box.minY * 32, width: box.width * 32, height: box.height * 32 }}></div>
+                  <div
+                    className="absolute border-2 border-primary bg-primary/30 pointer-events-none shadow-[0_0_10px_rgba(59,130,246,0.5)]"
+                    style={{ left: box.minX * 32, top: box.minY * 32, width: box.width * 32, height: box.height * 32 }}
+                  />
                 )
               }
               if (tileSelection) {
                 return tileSelection.tiles.map((t, i) => {
                   if (!t || t.tilesetId !== activeTileset.fileName) return null
                   return (
-                    <div key={i} className="absolute border border-primary bg-primary/30 pointer-events-none" style={{ left: t.x * 32, top: t.y * 32, width: 32, height: 32 }}></div>
+                    <div
+                      key={i}
+                      className="absolute border border-primary bg-primary/30 pointer-events-none"
+                      style={{ left: t.x * 32, top: t.y * 32, width: 32, height: 32 }}
+                    />
                   )
                 })
               }
