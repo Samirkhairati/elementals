@@ -37,22 +37,41 @@ export const KonvaOverlays = React.memo(function KonvaOverlays({
         listening={false}
         perfectDrawEnabled={false}
         shadowForStrokeEnabled={false}
-        sceneFunc={(context) => {
+        sceneFunc={(context, shape) => {
           const ctx = context._context as CanvasRenderingContext2D
           ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)'
           ctx.lineWidth = 1
           ctx.beginPath()
 
+          const stage = shape.getStage()
+          let startX = 0
+          let endX = mapWidthPx
+          let startY = 0
+          let endY = mapHeightPx
+
+          if (stage) {
+            const scale = stage.scaleX() || 1
+            const stageX = stage.x()
+            const stageY = stage.y()
+            const viewW = stage.width()
+            const viewH = stage.height()
+
+            startX = Math.max(0, Math.floor((-stageX / scale) / 32) * 32)
+            endX = Math.min(mapWidthPx, Math.ceil(((-stageX + viewW) / scale) / 32) * 32)
+            startY = Math.max(0, Math.floor((-stageY / scale) / 32) * 32)
+            endY = Math.min(mapHeightPx, Math.ceil(((-stageY + viewH) / scale) / 32) * 32)
+          }
+
           // Vertical grid lines
-          for (let x = 0; x <= mapWidthPx; x += 32) {
-            ctx.moveTo(x + 0.5, 0)
-            ctx.lineTo(x + 0.5, mapHeightPx)
+          for (let x = startX; x <= endX; x += 32) {
+            ctx.moveTo(x + 0.5, startY)
+            ctx.lineTo(x + 0.5, endY)
           }
 
           // Horizontal grid lines
-          for (let y = 0; y <= mapHeightPx; y += 32) {
-            ctx.moveTo(0, y + 0.5)
-            ctx.lineTo(mapWidthPx, y + 0.5)
+          for (let y = startY; y <= endY; y += 32) {
+            ctx.moveTo(startX, y + 0.5)
+            ctx.lineTo(endX, y + 0.5)
           }
 
           ctx.stroke()

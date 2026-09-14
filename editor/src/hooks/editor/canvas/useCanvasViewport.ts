@@ -146,11 +146,13 @@ export function useCanvasViewport({ activeMap }: UseCanvasViewportOptions) {
     const pointer = stage.getPointerPosition()
     if (!pointer) return null
 
-    const transform = stage.getAbsoluteTransform().copy().invert()
-    const localPos = transform.point(pointer)
+    const scaleX = stage.scaleX() || 1
+    const scaleY = stage.scaleY() || 1
+    const localX = (pointer.x - stage.x()) / scaleX
+    const localY = (pointer.y - stage.y()) / scaleY
 
-    const rawX = Math.floor(localPos.x / 32)
-    const rawY = Math.floor(localPos.y / 32)
+    const rawX = Math.floor(localX / 32)
+    const rawY = Math.floor(localY / 32)
     const clampedX = Math.max(0, Math.min(map.width - 1, rawX))
     const clampedY = Math.max(0, Math.min(map.height - 1, rawY))
     const isInside = rawX >= 0 && rawX < map.width && rawY >= 0 && rawY < map.height

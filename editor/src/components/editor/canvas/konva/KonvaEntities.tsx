@@ -146,7 +146,9 @@ const KonvaEntityNode = React.memo(function KonvaEntityNode({
           <Shape
             x={-16}
             y={-32}
-            sceneFunc={(context, shape) => {
+            perfectDrawEnabled={false}
+            shadowForStrokeEnabled={false}
+            sceneFunc={(context) => {
               const ctx = context._context as CanvasRenderingContext2D
               const img = images[spriteView.tilesetId]
               if (img && img.complete) {
