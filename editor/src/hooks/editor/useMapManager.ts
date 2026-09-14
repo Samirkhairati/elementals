@@ -1,11 +1,11 @@
 import { useState, useCallback } from 'react'
-import { MapData, TilesetData, Layer } from '@/types/editor'
+import { MapData, TilesetData, Layer, EntityData } from '@/types/editor'
 import { exportMap } from '@/hooks/useExportMap'
 
 interface UseMapManagerOptions {
   tilesets: TilesetData[]
   layers: Layer[]
-  onMapSelected?: (layers: Layer[]) => void
+  onMapSelected?: (layers: Layer[], entities?: EntityData[]) => void
   onClearActiveMap?: () => void
   onOpenConfirmDialog?: (config: { title: string; description: string; action: () => void }) => void
 }
@@ -18,13 +18,32 @@ export function useMapManager(options: UseMapManagerOptions) {
   const [activeMap, setActiveMap] = useState<MapData | null>(null)
   const [expandedMapFolders, setExpandedMapFolders] = useState<Set<string>>(new Set())
 
+  const setActiveMapAndSync = useCallback((action: React.SetStateAction<MapData | null>) => {
+    setActiveMap(prevActive => {
+      const nextActive = typeof action === 'function' ? action(prevActive) : action
+      if (nextActive) {
+        setMaps(prevMaps =>
+          prevMaps.map(m =>
+            m.fileName === nextActive.fileName && (m.folderPath || null) === (nextActive.folderPath || null)
+              ? nextActive
+              : m
+          )
+        )
+      }
+      return nextActive
+    })
+  }, [])
+
   const loadMaps = useCallback(async () => {
-    if (!window.electronAPI) return
+    if (!window.electronAPI) return []
     const mapRes = await window.electronAPI.getMaps()
     if (mapRes.success) {
+      const loadedMaps = mapRes.maps || []
       setMapFolders(mapRes.folders || [])
-      setMaps(mapRes.maps || [])
+      setMaps(loadedMaps)
+      return loadedMaps
     }
+    return []
   }, [])
 
   const toggleMapFolder = useCallback((folder: string) => {
@@ -44,10 +63,11 @@ export function useMapManager(options: UseMapManagerOptions) {
   >([])
 
   const onSelectMap = useCallback((m: MapData) => {
-    setActiveMap(m)
+    setActiveMapAndSync(m)
     const initLayers = m.layers || []
-    onMapSelected?.(initLayers)
-  }, [onMapSelected])
+    const initEntities = m.entities || []
+    onMapSelected?.(initLayers, initEntities)
+  }, [onMapSelected, setActiveMapAndSync])
 
   const handleDeleteMap = useCallback((folderPath: string | null, fileName: string) => {
     const targetMap =
@@ -147,7 +167,7 @@ export function useMapManager(options: UseMapManagerOptions) {
     mapFolders,
     setMapFolders,
     activeMap,
-    setActiveMap,
+    setActiveMap: setActiveMapAndSync,
     expandedMapFolders,
     setExpandedMapFolders,
     loadMaps,

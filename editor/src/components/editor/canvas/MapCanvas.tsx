@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Settings2, ChevronDown, ChevronRight } from 'lucide-react'
-import { Layer, TilesetData, MapData, TileSelection, ActiveTool, PaintMode, DebugInfo, CopiedTile, Pos } from '@/types/editor'
+import { Layer, TilesetData, MapData, TileSelection, ActiveTool, PaintMode, DebugInfo, CopiedTile, Pos, EntityData } from '@/types/editor'
 import { CanvasLayers } from './CanvasLayers'
 import { CanvasOverlays } from './CanvasOverlays'
+import { CanvasEntities } from './CanvasEntities'
 
 interface MapCanvasProps {
   activeMap: MapData | null
@@ -22,6 +23,10 @@ interface MapCanvasProps {
   handlePaintBucket: (x: number, y: number) => void
   handleRectangleFill: (start: Pos, end: Pos) => void
   handleCommit: () => void
+  entities?: EntityData[]
+  selectedEntityId?: string | null
+  setSelectedEntityId?: (id: string | null) => void
+  moveEntity?: (id: string, x: number, y: number) => void
 }
 
 export function MapCanvas({
@@ -42,6 +47,10 @@ export function MapCanvas({
   handlePaintBucket,
   handleRectangleFill,
   handleCommit,
+  entities = [],
+  selectedEntityId = null,
+  setSelectedEntityId,
+  moveEntity,
 }: MapCanvasProps) {
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
@@ -286,6 +295,15 @@ export function MapCanvas({
             }}
           >
             <CanvasLayers layers={layers} tilesets={tilesets} activeMap={activeMap} />
+
+            <CanvasEntities
+              entities={entities}
+              selectedEntityId={selectedEntityId}
+              setSelectedEntityId={setSelectedEntityId || (() => {})}
+              moveEntity={moveEntity || (() => {})}
+              activeMap={activeMap}
+              tilesets={tilesets}
+            />
 
             <CanvasOverlays
               activeTool={activeTool}
