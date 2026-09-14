@@ -60,17 +60,27 @@ export function MapCanvas({
   // This avoids queuing React re-renders (and Dockview panel re-layouts) on
   // every pixel of mouse movement. React state (`pan`) is only synced once on
   // mouseup so the committed position is preserved across renders.
+  // ── Pan/Zoom transform via rAF batching ──────────────────────────────────
   const panContainerRef = useRef<HTMLDivElement | null>(null)
-  const panRef = useRef({ x: 0, y: 0 })             // tracks current pan without state
-  const zoomRef = useRef(1)                           // tracks current zoom without extra reads
-  const isPanningRef = useRef(false)                  // no state — never needs to drive render
-  const lastPanPosRef = useRef({ x: 0, y: 0 })       // no state — only read in mousemove handler
+  const panRef = useRef({ x: 0, y: 0 })
+  const zoomRef = useRef(1)
+  const isPanningRef = useRef(false)
+  const lastPanPosRef = useRef({ x: 0, y: 0 })
+  const rafIdRef = useRef<number | null>(null)
 
   const applyTransform = useCallback((x: number, y: number, z: number) => {
     if (panContainerRef.current) {
       panContainerRef.current.style.transform = `translate(${x}px, ${y}px) scale(${z})`
     }
   }, [])
+
+  const scheduleTransformUpdate = useCallback(() => {
+    if (rafIdRef.current !== null) return
+    rafIdRef.current = requestAnimationFrame(() => {
+      rafIdRef.current = null
+      applyTransform(panRef.current.x, panRef.current.y, zoomRef.current)
+    })
+  }, [applyTransform])
 
   const [canvasHover, setCanvasHover] = useState<Pos | null>(null)
   const [canvasCopyStart, setCanvasCopyStart] = useState<Pos | null>(null)
@@ -81,26 +91,12 @@ export function MapCanvas({
   const [debugExpanded, setDebugExpanded] = useState(false)
   const mapRef = useRef<HTMLDivElement | null>(null)
 
-  // Cached bounding rect — invalidated by ResizeObserver when the canvas element
-  // resizes (e.g. Dockview panel sash drag). Avoids forced layout reflow on every
-  // pixel of mouse movement.
-  const cachedRectRef = useRef<DOMRect | null>(null)
-
-  useEffect(() => {
-    if (!mapRef.current) return
-    const el = mapRef.current
-    const observer = new ResizeObserver(() => {
-      cachedRectRef.current = null
-    })
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [])
-
   const zoomDebounceRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     return () => {
       if (zoomDebounceRef.current) clearTimeout(zoomDebounceRef.current)
+      if (rafIdRef.current !== null) cancelAnimationFrame(rafIdRef.current)
     }
   }, [])
 
@@ -142,12 +138,7 @@ export function MapCanvas({
   // ── Coordinate Calculation Helper ────────────────────────────────────────
   const getTileCoords = useCallback((clientX: number, clientY: number) => {
     if (!mapRef.current || !activeMapRef.current) return null
-    // Use cached rect; ResizeObserver above nullifies it on resize so we always
-    // have an accurate value without calling getBoundingClientRect() every frame.
-    if (!cachedRectRef.current) {
-      cachedRectRef.current = mapRef.current.getBoundingClientRect()
-    }
-    const rect = cachedRectRef.current
+    const rect = mapRef.current.getBoundingClientRect()
     const relX = (clientX - rect.left) / rect.width
     const relY = (clientY - rect.top) / rect.height
     const rawX = Math.floor(relX * activeMapRef.current.width)
@@ -200,13 +191,12 @@ export function MapCanvas({
   // ── Global Window Drag Listeners ─────────────────────────────────────────
   useEffect(() => {
     const handleWindowMouseMove = (e: MouseEvent) => {
-      // 1. Panning — mutate DOM transform directly, no React state involved
+      // 1. Panning — batch DOM transform via requestAnimationFrame
       if (isPanningRef.current) {
         panRef.current.x += e.clientX - lastPanPosRef.current.x
         panRef.current.y += e.clientY - lastPanPosRef.current.y
         lastPanPosRef.current = { x: e.clientX, y: e.clientY }
-        cachedRectRef.current = null
-        applyTransform(panRef.current.x, panRef.current.y, zoomRef.current)
+        scheduleTransformUpdate()
         return
       }
 
@@ -246,7 +236,11 @@ export function MapCanvas({
     const handleWindowMouseUp = (e: MouseEvent) => {
       if (e.button === 1 && isPanningRef.current) {
         isPanningRef.current = false
-        // Commit final pan position to React state so it survives re-renders
+        if (rafIdRef.current !== null) {
+          cancelAnimationFrame(rafIdRef.current)
+          rafIdRef.current = null
+        }
+        applyTransform(panRef.current.x, panRef.current.y, zoomRef.current)
         setPan({ ...panRef.current })
       }
 
@@ -279,30 +273,27 @@ export function MapCanvas({
       window.removeEventListener('mousemove', handleWindowMouseMove)
       window.removeEventListener('mouseup', handleWindowMouseUp)
     }
-  }, [getTileCoords, commitCanvasCopy, handleCommit, handlePaint, handleRectangleFill, setIsPainting, applyTransform])
+  }, [getTileCoords, commitCanvasCopy, handleCommit, handlePaint, handleRectangleFill, setIsPainting, scheduleTransformUpdate, applyTransform])
 
   return (
     <div
       className="flex-1 overflow-hidden flex items-center justify-center min-w-0 min-h-0 bg-[#1a1a1a]"
       onWheel={(e) => {
-        const zoomSensitivity = (e.ctrlKey || e.metaKey) ? 0.005 : 0.001
-        const newZoom = Math.min(Math.max(0.1, zoomRef.current - e.deltaY * zoomSensitivity), 5)
+        const zoomSensitivity = (e.ctrlKey || e.metaKey) ? 0.003 : 0.0015
+        const factor = Math.exp(-e.deltaY * zoomSensitivity)
+        const newZoom = Math.min(Math.max(0.1, zoomRef.current * factor), 5)
         zoomRef.current = newZoom
-        cachedRectRef.current = null
-        applyTransform(panRef.current.x, panRef.current.y, newZoom)
+        scheduleTransformUpdate()
 
-        // Debounce React state sync: avoids queueing 120 asynchronous re-renders
-        // during fast scroll bursts that race and clobber intermediate zoom values.
         if (zoomDebounceRef.current) clearTimeout(zoomDebounceRef.current)
         zoomDebounceRef.current = setTimeout(() => {
           setZoom(zoomRef.current)
-        }, 150)
+        }, 50)
       }}
       onMouseDown={(e) => {
         if (e.button === 1) {
           isPanningRef.current = true
           lastPanPosRef.current = { x: e.clientX, y: e.clientY }
-          cachedRectRef.current = null
         }
       }}
       onContextMenu={(e) => e.preventDefault()}
