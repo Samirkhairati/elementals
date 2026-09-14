@@ -29,7 +29,13 @@ export class InputManager {
             
             if (key === settingsStore.controls.menu) {
                 EventBus.emit(Events.MENU_TOGGLED);
-            } else if (key === settingsStore.controls.action) {
+            } else if (
+                key === settingsStore.controls.action ||
+                key === ' ' ||
+                key === 'SPACE' ||
+                key === 'E' ||
+                key === 'Z'
+            ) {
                 EventBus.emit(Events.INPUT_ACTION);
             } else if (['ARROWUP', 'ARROWDOWN', 'ARROWLEFT', 'ARROWRIGHT'].includes(key)) {
                 // Let the HUD Manager know for navigation

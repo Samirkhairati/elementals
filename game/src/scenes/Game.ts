@@ -71,6 +71,27 @@ export class Game extends Scene {
     // Initial map load
     this.switchMap(MAPS[0].key);
     
+    // Wire pointer/touch click interaction on game scene
+    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      if (this.interactionManager.getIsDialogueOpen()) {
+        EventBus.emit(Events.INPUT_ACTION);
+        return;
+      }
+      const worldPoint = pointer.positionToCamera(this.cameras.main) as Phaser.Math.Vector2;
+      if (worldPoint) {
+        const gridX = Math.floor(worldPoint.x / GAME_CONSTANTS.TILE_SIZE);
+        const gridY = Math.floor(worldPoint.y / GAME_CONSTANTS.TILE_SIZE);
+        const handled = this.interactionManager.tryTriggerInteractionAt(gridX, gridY);
+        if (!handled) {
+          const pos = gameState.playerPosition;
+          const dist = Math.abs(pos.gridX - gridX) + Math.abs(pos.gridY - gridY);
+          if (dist <= 1) {
+            EventBus.emit(Events.INPUT_ACTION);
+          }
+        }
+      }
+    });
+
     // Launch UI Scene
     this.scene.launch("UIScene");
     
@@ -100,15 +121,17 @@ export class Game extends Scene {
   private cleanup() {
       EventBus.off(Events.MAP_SWITCH_REQUEST, this.switchMap);
       this.scale.off('resize', this.handleResize);
+      this.input.off('pointerdown');
       this.interactionManager.destroy();
       this.world?.destroy();
   }
 
   private switchMap(mapKey: string) {
     const map = this.mapSystem.loadMap(mapKey);
+    const rawMapData = this.cache.tilemap.get(mapKey)?.data;
     
-    // Load interactions for this map
-    this.interactionSystem.setMap(map);
+    // Load interactions for this map (including editor entities)
+    this.interactionSystem.setMap(map, rawMapData?.entities);
     this.spatialSystem.setMap(map);
     
     // Position at the center of the map using logical tile size (32px)
@@ -126,7 +149,6 @@ export class Game extends Scene {
     });
 
     // Hydrate editor-placed entities from map JSON
-    const rawMapData = this.cache.tilemap.get(mapKey)?.data;
     if (rawMapData?.entities && Array.isArray(rawMapData.entities)) {
       for (const entityDef of rawMapData.entities) {
         const entity = this.world.createEntity();

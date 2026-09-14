@@ -37,11 +37,15 @@ export class InteractionManager {
     this.isDialogueOpen = false;
   }
 
+  public getIsDialogueOpen(): boolean {
+    return this.isDialogueOpen;
+  }
+
   private onInputAction() {
     if (this.isDialogueOpen) {
-        EventBus.emit(Events.DIALOGUE_CLOSED);
-        this.isDialogueOpen = false;
-        return;
+      EventBus.emit(Events.DIALOGUE_CLOSED);
+      this.isDialogueOpen = false;
+      return;
     }
 
     if (gameState.isInputLocked) return;
@@ -53,13 +57,57 @@ export class InteractionManager {
     
     // 2. If nothing to interact with underneath, check tile in front of player
     if (!interactable || interactable.type !== "on_interact") {
-        const offset = DIRECTION_OFFSETS[pos.direction];
+      const offset = DIRECTION_OFFSETS[pos.direction];
+      if (offset) {
         interactable = this.interactionSystem.getInteractableAt(pos.gridX + offset.dx, pos.gridY + offset.dy);
+      }
+    }
+
+    // 3. Fallback: check 4 cardinal adjacent tiles around player
+    if (!interactable || interactable.type !== "on_interact") {
+      for (const offset of Object.values(DIRECTION_OFFSETS)) {
+        const candidate = this.interactionSystem.getInteractableAt(pos.gridX + offset.dx, pos.gridY + offset.dy);
+        if (candidate && candidate.type === "on_interact") {
+          interactable = candidate;
+          break;
+        }
+      }
     }
 
     if (interactable && interactable.type === "on_interact") {
-        this.triggerInteraction(interactable);
+      this.triggerInteraction(interactable);
     }
+  }
+
+  public tryTriggerInteractionAt(gridX: number, gridY: number): boolean {
+    if (this.isDialogueOpen) {
+      EventBus.emit(Events.DIALOGUE_CLOSED);
+      this.isDialogueOpen = false;
+      return true;
+    }
+
+    if (gameState.isInputLocked) return false;
+
+    const interactable = this.interactionSystem.getInteractableAt(gridX, gridY);
+    if (!interactable || interactable.type !== "on_interact") return false;
+
+    const pos = gameState.playerPosition;
+    const dist = Math.abs(pos.gridX - gridX) + Math.abs(pos.gridY - gridY);
+
+    // If player is within reach (adjacent or within 2 tiles)
+    if (dist <= 2) {
+      let direction = pos.direction;
+      if (gridX > pos.gridX) direction = Direction.RIGHT;
+      else if (gridX < pos.gridX) direction = Direction.LEFT;
+      else if (gridY > pos.gridY) direction = Direction.DOWN;
+      else if (gridY < pos.gridY) direction = Direction.UP;
+
+      gameState.updatePlayerPosition(pos.worldX, pos.worldY, pos.gridX, pos.gridY, direction);
+      this.triggerInteraction(interactable);
+      return true;
+    }
+
+    return false;
   }
 
   private onPlayerMoved() {
@@ -67,17 +115,18 @@ export class InteractionManager {
     const interactable = this.interactionSystem.getInteractableAt(pos.gridX, pos.gridY);
 
     if (interactable && interactable.type === "on_step") {
-        this.triggerInteraction(interactable);
+      this.triggerInteraction(interactable);
     }
   }
 
-  private triggerInteraction(interactable: any) {
-      if (interactable.message) {
-          this.isDialogueOpen = true;
-          EventBus.emit(Events.SHOW_DIALOGUE, interactable.message);
-      } else if (interactable.eventKey) {
-          // Custom logic based on event key could be emitted here
-          // EventBus.emit(interactable.eventKey, interactable);
-      }
+  public triggerInteraction(interactable: any) {
+    if (interactable.message) {
+      this.isDialogueOpen = true;
+      EventBus.emit(Events.SHOW_DIALOGUE, interactable.message);
+    } else if (interactable.targetMap) {
+      EventBus.emit(Events.MAP_SWITCH_REQUEST, interactable.targetMap);
+    } else if (interactable.eventKey) {
+      EventBus.emit(interactable.eventKey, interactable);
+    }
   }
 }

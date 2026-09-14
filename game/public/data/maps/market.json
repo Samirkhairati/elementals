@@ -1461,30 +1461,30 @@
   "tileheight": 32,
   "tilesets": [
     {
-      "name": "outside",
-      "image": "outside.png",
-      "imagewidth": 256,
-      "imageheight": 256,
       "columns": 8,
-      "tilecount": 64,
-      "tilewidth": 32,
-      "tileheight": 32,
       "firstgid": 1,
+      "image": "outside.png",
+      "imageheight": 256,
+      "imagewidth": 256,
       "margin": 0,
-      "spacing": 0
+      "name": "outside",
+      "spacing": 0,
+      "tilecount": 64,
+      "tileheight": 32,
+      "tilewidth": 32
     },
     {
-      "name": "grass",
-      "image": "grass.png",
-      "imagewidth": 64,
-      "imageheight": 64,
       "columns": 2,
-      "tilecount": 4,
-      "tilewidth": 32,
-      "tileheight": 32,
       "firstgid": 65,
+      "image": "grass.png",
+      "imageheight": 64,
+      "imagewidth": 64,
       "margin": 0,
-      "spacing": 0
+      "name": "grass",
+      "spacing": 0,
+      "tilecount": 4,
+      "tileheight": 32,
+      "tilewidth": 32
     },
     {
       "columns": 1,
@@ -1524,7 +1524,7 @@
           "isSolid": true
         },
         "Interactable": {
-          "type": "on_interact",
+          "type": "on_step",
           "message": "The ancient sign is faded...",
           "eventKey": ""
         },

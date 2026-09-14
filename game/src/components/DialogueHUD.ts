@@ -1,11 +1,12 @@
 import { Scene, GameObjects } from "phaser";
-import { GAME_CONSTANTS } from "@/constants/game";
+import { EventBus, Events } from "@/utils/EventBus";
 
 export class DialogueHUD {
   private scene: Scene;
   private container: GameObjects.Container;
   private textObject: GameObjects.BitmapText;
   private background: GameObjects.Graphics;
+  private hitZone: GameObjects.Zone;
   
   public isVisible: boolean = false;
 
@@ -17,13 +18,23 @@ export class DialogueHUD {
     this.container.setScrollFactor(0);
     this.container.setDepth(1000); // Very high depth so it sits above everything
     
+    // Full screen hit zone to intercept clicks when dialogue is open
+    this.hitZone = this.scene.add.zone(0, 0, this.scene.scale.width, this.scene.scale.height);
+    this.hitZone.setOrigin(0, 0);
+    this.hitZone.setInteractive();
+    this.hitZone.on('pointerdown', () => {
+      if (this.isVisible) {
+        EventBus.emit(Events.DIALOGUE_CLOSED);
+      }
+    });
+    this.container.add(this.hitZone);
+
     // Background box
     this.background = this.scene.add.graphics();
     this.container.add(this.background);
     
     // Text
     this.textObject = this.scene.add.bitmapText(0, 0, 'PokemonFont', "", 72);
-    this.textObject.setMaxWidth(GAME_CONSTANTS.LOGICAL_WIDTH - 40);
     this.container.add(this.textObject);
     
     this.container.setVisible(false);
@@ -34,6 +45,7 @@ export class DialogueHUD {
   }
 
   public show(message: string) {
+    this.resize();
     this.isVisible = true;
     this.textObject.setText(message);
     this.container.setVisible(true);
@@ -47,6 +59,9 @@ export class DialogueHUD {
   private resize() {
     const { width, height } = this.scene.scale;
     
+    // Update hit zone
+    this.hitZone.setSize(width, height);
+
     // Max width of 1000px so it doesn't stretch infinitely on wide screens
     const boxWidth = Math.min(1000, width - 40);
     const boxHeight = 160;
@@ -55,12 +70,13 @@ export class DialogueHUD {
 
     // Redraw background
     this.background.clear();
-    this.background.fillStyle(0xffffff, 0.9);
+    this.background.fillStyle(0xffffff, 0.95);
     this.background.fillRoundedRect(boxX, boxY, boxWidth, boxHeight, 8);
-    this.background.lineStyle(2, 0x000000, 1);
+    this.background.lineStyle(3, 0x000000, 1);
     this.background.strokeRoundedRect(boxX, boxY, boxWidth, boxHeight, 8);
 
-    // Position text
-    this.textObject.setPosition(boxX + 15, boxY + 15);
+    // Position & constrain text
+    this.textObject.setPosition(boxX + 20, boxY + 20);
+    this.textObject.setMaxWidth(boxWidth - 40);
   }
 }

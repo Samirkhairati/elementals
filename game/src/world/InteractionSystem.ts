@@ -7,6 +7,9 @@ export interface Interactable {
   type: "on_interact" | "on_step";
   message?: string;
   eventKey?: string;
+  targetMap?: string;
+  targetX?: number;
+  targetY?: number;
 }
 
 export class InteractionSystem {
@@ -18,15 +21,13 @@ export class InteractionSystem {
     this.scene = scene;
   }
 
-  public setMap(map: Phaser.Tilemaps.Tilemap) {
+  public setMap(map: Phaser.Tilemaps.Tilemap, rawEntities?: any[]) {
     this.interactables.clear();
     
-    // Parse Tiled Object Layers
+    // 1. Parse Tiled Object Layers
     const objectLayer = map.getObjectLayer("interactables");
     if (objectLayer && objectLayer.objects) {
       objectLayer.objects.forEach((obj) => {
-        // Tiled objects coordinates are usually based on bottom-left or top-left depending on type.
-        // For tile-aligned objects (e.g., standard rectangles placed on grid), x/y are top-left in pixels.
         if (obj.x !== undefined && obj.y !== undefined) {
           const tileX = Math.floor(obj.x / GAME_CONSTANTS.TILE_SIZE);
           const tileY = Math.floor(obj.y / GAME_CONSTANTS.TILE_SIZE);
@@ -43,14 +44,12 @@ export class InteractionSystem {
                 if (prop.name === "eventKey") eventKey = prop.value;
               });
             } else {
-              // Phaser sometimes parses it as a dictionary
               if (obj.properties.message !== undefined) message = obj.properties.message;
               if (obj.properties.type !== undefined) type = obj.properties.type;
               if (obj.properties.eventKey !== undefined) eventKey = obj.properties.eventKey;
             }
           }
 
-          // If no message or event is set, we can just use the object name as a fallback message
           if (!message && !eventKey && obj.name) {
             message = obj.name;
           }
@@ -61,6 +60,40 @@ export class InteractionSystem {
             type,
             message,
             eventKey
+          });
+        }
+      });
+    }
+
+    // 2. Parse Editor Entities from JSON
+    if (rawEntities && Array.isArray(rawEntities)) {
+      rawEntities.forEach((entityDef) => {
+        const comps = entityDef.components || {};
+        const interactableComp = comps.Interactable;
+        if (interactableComp) {
+          const transform = comps.Transform || { x: entityDef.x || 0, y: entityDef.y || 0 };
+          const posX = transform.x ?? entityDef.x ?? 0;
+          const posY = transform.y ?? entityDef.y ?? 0;
+          
+          const tileX = Math.floor(posX / GAME_CONSTANTS.TILE_SIZE);
+          const tileY = Math.floor((posY - 1) / GAME_CONSTANTS.TILE_SIZE);
+
+          const message = interactableComp.message || entityDef.name || "";
+          const type = interactableComp.type || "on_interact";
+          const eventKey = interactableComp.eventKey || "";
+          const targetMap = interactableComp.targetMap;
+          const targetX = interactableComp.targetX;
+          const targetY = interactableComp.targetY;
+
+          this.registerInteractable({
+            x: tileX,
+            y: tileY,
+            type,
+            message,
+            eventKey,
+            targetMap,
+            targetX,
+            targetY,
           });
         }
       });
