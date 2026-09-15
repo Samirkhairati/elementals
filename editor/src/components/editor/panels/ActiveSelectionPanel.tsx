@@ -10,38 +10,56 @@ export function ActiveSelectionPanel({ tileSelection, tilesets }: ActiveSelectio
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [isPanning, setIsPanning] = useState(false)
-  const [lastPanPos, setLastPanPos] = useState({ x: 0, y: 0 })
 
   if (!tileSelection) {
     return <div className="text-xs text-muted-foreground text-center font-mono w-full h-full flex items-center justify-center">No tiles selected</div>
   }
 
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault()
+    if (e.ctrlKey || e.metaKey) {
+      const zoomSensitivity = 0.003
+      setZoom(prev => Math.min(Math.max(0.1, prev * Math.exp(-e.deltaY * zoomSensitivity)), 5))
+    } else {
+      setPan(prev => ({
+        x: prev.x - e.deltaX,
+        y: prev.y - e.deltaY,
+      }))
+    }
+  }
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button === 1) {
+      setIsPanning(true)
+      let lastX = e.clientX
+      let lastY = e.clientY
+
+      const handleGlobalMouseMove = (moveEvent: MouseEvent) => {
+        const dx = moveEvent.clientX - lastX
+        const dy = moveEvent.clientY - lastY
+        lastX = moveEvent.clientX
+        lastY = moveEvent.clientY
+        setPan(prev => ({ x: prev.x + dx, y: prev.y + dy }))
+      }
+
+      const handleGlobalMouseUp = (upEvent: MouseEvent) => {
+        if (upEvent.button === 1) {
+          setIsPanning(false)
+          window.removeEventListener('mousemove', handleGlobalMouseMove)
+          window.removeEventListener('mouseup', handleGlobalMouseUp)
+        }
+      }
+
+      window.addEventListener('mousemove', handleGlobalMouseMove)
+      window.addEventListener('mouseup', handleGlobalMouseUp)
+    }
+  }
+
   return (
     <div
-      className="w-full h-full overflow-hidden flex items-center justify-center"
-      onWheel={(e) => {
-        const zoomSensitivity = (e.ctrlKey || e.metaKey) ? 0.005 : 0.001
-        setZoom(prev => Math.min(Math.max(0.1, prev - e.deltaY * zoomSensitivity), 5))
-      }}
-      onMouseDown={(e) => {
-        if (e.button === 1) {
-          setIsPanning(true)
-          setLastPanPos({ x: e.clientX, y: e.clientY })
-        }
-      }}
-      onMouseMove={(e) => {
-        if (isPanning) {
-          setPan(prev => ({
-            x: prev.x + (e.clientX - lastPanPos.x),
-            y: prev.y + (e.clientY - lastPanPos.y)
-          }))
-          setLastPanPos({ x: e.clientX, y: e.clientY })
-        }
-      }}
-      onMouseUp={(e) => {
-        if (e.button === 1) setIsPanning(false)
-      }}
-      onMouseLeave={() => setIsPanning(false)}
+      className={`w-full h-full overflow-hidden flex items-center justify-center ${isPanning ? 'cursor-grabbing' : ''}`}
+      onWheel={handleWheel}
+      onMouseDown={handleMouseDown}
     >
       <div style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: 'center' }}>
         <div

@@ -90,6 +90,8 @@ export function MapCanvas({
     canvasCopyCurrent,
     rectStart,
     rectCurrent,
+    isSpaceDown,
+    isPanning,
     handleStageMouseDown,
     handleStageMouseMove,
   } = useCanvasInteraction({
@@ -120,7 +122,9 @@ export function MapCanvas({
   return (
     <div
       ref={containerRef}
-      className="flex-1 overflow-hidden relative min-w-0 min-h-0 bg-[#1a1a1a]"
+      className={`flex-1 overflow-hidden relative min-w-0 min-h-0 bg-[#1a1a1a] ${
+        isPanning ? 'cursor-grabbing' : isSpaceDown ? 'cursor-grab' : ''
+      }`}
       onContextMenu={e => e.preventDefault()}
     >
       {activeMap ? (

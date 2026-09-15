@@ -84,36 +84,47 @@ export function useCanvasViewport({ activeMap }: UseCanvasViewportOptions) {
     }
   }, [])
 
-  // ── Cursor-Centered Exponential Zoom ─────────────────────────────────────
+  // ── Trackpad Pan & Cursor-Centered Exponential Zoom ──────────────────────
   const handleWheel = useCallback((e: Konva.KonvaEventObject<WheelEvent>) => {
     e.evt.preventDefault()
     const stage = stageRef.current
     if (!stage) return
 
-    const oldScale = stage.scaleX()
-    const pointer = stage.getPointerPosition()
-    if (!pointer) return
+    // Ctrl/Cmd is set on pinch-to-zoom gestures (macOS) and Ctrl/Cmd + mouse wheel
+    if (e.evt.ctrlKey || e.evt.metaKey) {
+      const oldScale = stage.scaleX()
+      const pointer = stage.getPointerPosition()
+      if (!pointer) return
 
-    const clampedDelta = Math.max(-120, Math.min(120, e.evt.deltaY))
-    const sensitivity = (e.evt.ctrlKey || e.evt.metaKey) ? 0.003 : 0.0015
-    const factor = Math.exp(-clampedDelta * sensitivity)
-    const newScale = Math.min(Math.max(0.15, oldScale * factor), 5)
+      const clampedDelta = Math.max(-120, Math.min(120, e.evt.deltaY))
+      const sensitivity = 0.003
+      const factor = Math.exp(-clampedDelta * sensitivity)
+      const newScale = Math.min(Math.max(0.15, oldScale * factor), 5)
 
-    const mousePointToX = (pointer.x - stage.x()) / oldScale
-    const mousePointToY = (pointer.y - stage.y()) / oldScale
+      const mousePointToX = (pointer.x - stage.x()) / oldScale
+      const mousePointToY = (pointer.y - stage.y()) / oldScale
 
-    const newPosX = pointer.x - mousePointToX * newScale
-    const newPosY = pointer.y - mousePointToY * newScale
+      const newPosX = pointer.x - mousePointToX * newScale
+      const newPosY = pointer.y - mousePointToY * newScale
 
-    isZoomingRef.current = true
-    stage.scale({ x: newScale, y: newScale })
-    stage.position({ x: newPosX, y: newPosY })
-    stage.batchDraw()
+      isZoomingRef.current = true
+      stage.scale({ x: newScale, y: newScale })
+      stage.position({ x: newPosX, y: newPosY })
+      stage.batchDraw()
 
-    if (zoomTimeoutRef.current) clearTimeout(zoomTimeoutRef.current)
-    zoomTimeoutRef.current = setTimeout(() => {
-      isZoomingRef.current = false
-    }, 100)
+      if (zoomTimeoutRef.current) clearTimeout(zoomTimeoutRef.current)
+      zoomTimeoutRef.current = setTimeout(() => {
+        isZoomingRef.current = false
+      }, 100)
+    } else {
+      // Direct 1:1 Pixel Panning with Trackpad 2-finger scroll or Mouse Wheel
+      const currentPos = stage.position()
+      stage.position({
+        x: currentPos.x - e.evt.deltaX,
+        y: currentPos.y - e.evt.deltaY,
+      })
+      stage.batchDraw()
+    }
   }, [])
 
   // ── Panning Handlers ─────────────────────────────────────────────────────

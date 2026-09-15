@@ -60,6 +60,53 @@ export function useCanvasInteraction({
   const [canvasCopyCurrent, setCanvasCopyCurrent] = useState<Pos | null>(null)
   const [rectStart, setRectStart] = useState<Pos | null>(null)
   const [rectCurrent, setRectCurrent] = useState<Pos | null>(null)
+  const [isSpaceDown, setIsSpaceDown] = useState(false)
+  const [isPanning, setIsPanning] = useState(false)
+
+  const isSpaceDownRef = useRef(false)
+
+  // ── Keyboard Listeners for Spacebar Pan Mode ─────────────────────────────
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return
+      }
+      if (e.code === 'Space' && !e.repeat) {
+        setIsSpaceDown(true)
+        isSpaceDownRef.current = true
+      }
+    }
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        setIsSpaceDown(false)
+        isSpaceDownRef.current = false
+        if (isPanningRef.current) {
+          endPan()
+          setIsPanning(false)
+        }
+      }
+    }
+
+    const handleBlur = () => {
+      setIsSpaceDown(false)
+      isSpaceDownRef.current = false
+      if (isPanningRef.current) {
+        endPan()
+        setIsPanning(false)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('keyup', handleKeyUp)
+    window.addEventListener('blur', handleBlur)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('keyup', handleKeyUp)
+      window.removeEventListener('blur', handleBlur)
+    }
+  }, [endPan, isPanningRef])
 
   // ── Sync Refs for Listeners ──────────────────────────────────────────────
   const isPaintingRef = useRef(isPainting)
@@ -120,9 +167,10 @@ export function useCanvasInteraction({
   // ── Stage Mouse Down ─────────────────────────────────────────────────────
   const handleStageMouseDown = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
-      // Middle-click pan start
-      if (e.evt.button === 1) {
+      // Middle-click OR Space + Left-click pan start
+      if (e.evt.button === 1 || (e.evt.button === 0 && isSpaceDownRef.current)) {
         startPan(e.evt.clientX, e.evt.clientY)
+        setIsPanning(true)
         return
       }
 
@@ -214,8 +262,11 @@ export function useCanvasInteraction({
     }
 
     const handleGlobalMouseUp = (e: MouseEvent) => {
-      if (e.button === 1 && isPanningRef.current) {
-        endPan()
+      if (isPanningRef.current) {
+        if (e.button === 1 || e.button === 0) {
+          endPan()
+          setIsPanning(false)
+        }
       }
 
       if (e.button === 2 && canvasCopyStartRef.current) {
@@ -250,6 +301,8 @@ export function useCanvasInteraction({
     canvasCopyCurrent,
     rectStart,
     rectCurrent,
+    isSpaceDown,
+    isPanning,
     handleStageMouseDown,
     handleStageMouseMove,
   }
