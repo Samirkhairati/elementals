@@ -11,6 +11,8 @@ import {
 } from '@/types/editor'
 import { getBoundingBox } from '@/components/editor/canvas/canvasUtils'
 import { TileCoords } from './useCanvasViewport'
+import { PendingEntityPlacement } from '@/hooks/editor/useEntityPlacement'
+import { CanvasContextMenuTarget } from '@/components/editor/canvas/CanvasContextMenu'
 
 interface UseCanvasInteractionProps {
   activeMap: MapData | null
@@ -32,6 +34,14 @@ interface UseCanvasInteractionProps {
   startPan: (clientX: number, clientY: number) => void
   movePan: (clientX: number, clientY: number) => void
   endPan: () => void
+  stageRef?: React.RefObject<Konva.Stage | null>
+  pendingPlacement?: PendingEntityPlacement | null
+  commitPlacement?: (x: number, y: number) => void
+  cancelPlacement?: () => void
+  snapToGrid?: boolean
+  snapEntityPos?: (rawX: number, rawY: number) => { x: number; y: number }
+  resizingColliderEntityId?: string | null
+  setResizingColliderEntityId?: (id: string | null) => void
 }
 
 export function useCanvasInteraction({
@@ -54,6 +64,14 @@ export function useCanvasInteraction({
   startPan,
   movePan,
   endPan,
+  stageRef,
+  pendingPlacement = null,
+  commitPlacement,
+  cancelPlacement,
+  snapToGrid = true,
+  snapEntityPos,
+  resizingColliderEntityId = null,
+  setResizingColliderEntityId,
 }: UseCanvasInteractionProps) {
   const [canvasHover, setCanvasHover] = useState<Pos | null>(null)
   const [canvasCopyStart, setCanvasCopyStart] = useState<Pos | null>(null)
@@ -62,6 +80,8 @@ export function useCanvasInteraction({
   const [rectCurrent, setRectCurrent] = useState<Pos | null>(null)
   const [isSpaceDown, setIsSpaceDown] = useState(false)
   const [isPanning, setIsPanning] = useState(false)
+  const [stagePointerPos, setStagePointerPos] = useState<{ x: number; y: number } | null>(null)
+  const [contextMenuTarget, setContextMenuTarget] = useState<CanvasContextMenuTarget | null>(null)
 
   const isSpaceDownRef = useRef(false)
 
@@ -178,8 +198,41 @@ export function useCanvasInteraction({
       if (!coords) return
       const { x, y, isInside } = coords
 
-      // Right-click tile copy sampler start
+      // If pending entity placement mode is active
+      if (pendingPlacement) {
+        if (e.evt.button === 0) {
+          const stage = stageRef?.current
+          let posX = coords.rawX * 32 + 16
+          let posY = coords.rawY * 32 + 32
+          if (!snapToGrid && stage) {
+            const p = stage.getPointerPosition()
+            if (p) {
+              const scale = stage.scaleX() || 1
+              posX = Math.round((p.x - stage.x()) / scale)
+              posY = Math.round((p.y - stage.y()) / scale)
+            }
+          }
+          commitPlacement?.(posX, posY)
+          return
+        }
+        if (e.evt.button === 2) {
+          cancelPlacement?.()
+          return
+        }
+      }
+
+      // Deselect collider resize mode if clicking elsewhere on canvas
+      if (resizingColliderEntityId && setResizingColliderEntityId) {
+        setResizingColliderEntityId(null)
+      }
+
+      // Right-click tile context menu & copy sampler start
       if (e.evt.button === 2) {
+        setContextMenuTarget({
+          type: 'tile',
+          tileX: coords.x,
+          tileY: coords.y,
+        })
         setCanvasCopyStart({ x, y })
         setCanvasCopyCurrent({ x, y })
         return
@@ -213,12 +266,39 @@ export function useCanvasInteraction({
         }
       }
     },
-    [getTileCoordsFromPointer, startPan, handlePaintBucket, handlePaint, setIsPainting, setPaintStartPos, paintMode]
+    [
+      getTileCoordsFromPointer,
+      startPan,
+      handlePaintBucket,
+      handlePaint,
+      setIsPainting,
+      setPaintStartPos,
+      paintMode,
+      pendingPlacement,
+      commitPlacement,
+      cancelPlacement,
+      snapToGrid,
+      stageRef,
+      resizingColliderEntityId,
+      setResizingColliderEntityId,
+    ]
   )
 
   // ── Stage Mouse Move ─────────────────────────────────────────────────────
   const handleStageMouseMove = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
+      // Track pointer position in world coordinates (for ghost placement entity)
+      if (stageRef?.current) {
+        const p = stageRef.current.getPointerPosition()
+        if (p) {
+          const scale = stageRef.current.scaleX() || 1
+          setStagePointerPos({
+            x: (p.x - stageRef.current.x()) / scale,
+            y: (p.y - stageRef.current.y()) / scale,
+          })
+        }
+      }
+
       if (isPanningRef.current || isZoomingRef.current) {
         return
       }
@@ -250,7 +330,7 @@ export function useCanvasInteraction({
         handlePaint(coords.x, coords.y)
       }
     },
-    [getTileCoordsFromPointer, isPanningRef, isZoomingRef, handlePaint]
+    [getTileCoordsFromPointer, isPanningRef, isZoomingRef, handlePaint, stageRef]
   )
 
   // ── Global Window Drag Listeners (Outside Stage Bounds) ───────────────────
@@ -303,6 +383,9 @@ export function useCanvasInteraction({
     rectCurrent,
     isSpaceDown,
     isPanning,
+    stagePointerPos,
+    contextMenuTarget,
+    setContextMenuTarget,
     handleStageMouseDown,
     handleStageMouseMove,
   }

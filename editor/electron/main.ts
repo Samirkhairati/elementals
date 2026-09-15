@@ -1,10 +1,15 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, powerSaveBlocker } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { setupMenu } from './menu.js';
 import { registerTilesetHandlers } from './ipc/tilesetHandlers.js';
 import { registerMapHandlers } from './ipc/mapHandlers.js';
+
+// Prevent macOS App Nap & idle process suspension
+app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
+app.commandLine.appendSwitch('disable-background-timer-throttling');
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -74,6 +79,7 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  powerSaveBlocker.start('prevent-app-suspension');
   ensureDirectories();
   registerTilesetHandlers(TILESETS_DIR);
   registerMapHandlers(MAPS_DIR);

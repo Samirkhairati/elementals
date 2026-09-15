@@ -45,6 +45,7 @@ interface EntitiesPanelProps {
     description: string
     action: () => void
   }) => void
+  startPlacement?: (template: { name: string; components?: any }) => void
 }
 
 function getEntityIcon(entity: EntityData) {
@@ -75,6 +76,7 @@ export function EntitiesPanel({
   renameEntity,
   reorderEntities,
   setConfirmDialog,
+  startPlacement,
 }: EntitiesPanelProps) {
   // Inline rename state
   const [editingEntityId, setEditingEntityId] = useState<string | null>(null)
@@ -170,7 +172,15 @@ export function EntitiesPanel({
 
   const renderNewEntityMenu = () => (
     <>
-      <ContextMenuItem onClick={() => createEntity('New Entity')}>
+      <ContextMenuItem
+        onClick={() => {
+          if (startPlacement) {
+            startPlacement({ name: 'New Entity' })
+          } else {
+            createEntity('New Entity')
+          }
+        }}
+      >
         <Plus className="w-3.5 h-3.5 mr-2" />
         New Empty Entity
       </ContextMenuItem>
@@ -183,7 +193,13 @@ export function EntitiesPanel({
           {PRESET_PREFABS.map(prefab => (
             <ContextMenuItem
               key={prefab.name}
-              onClick={() => createEntity(prefab.name, 0, 0, prefab.components)}
+              onClick={() => {
+                if (startPlacement) {
+                  startPlacement({ name: prefab.name, components: prefab.components })
+                } else {
+                  createEntity(prefab.name, 0, 0, prefab.components)
+                }
+              }}
             >
               {prefab.name}
             </ContextMenuItem>

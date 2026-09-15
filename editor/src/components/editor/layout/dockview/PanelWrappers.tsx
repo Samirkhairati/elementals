@@ -89,6 +89,7 @@ export function EntitiesWrapper(_props: IDockviewPanelProps) {
         renameEntity={ctx.handleRenameEntity}
         reorderEntities={ctx.handleReorderEntities}
         setConfirmDialog={ctx.setConfirmDialog}
+        startPlacement={ctx.startPlacement}
       />
     </div>
   );
@@ -171,7 +172,17 @@ export function CanvasWrapper(props: IDockviewPanelProps) {
         entities={currentEntities}
         selectedEntityId={isActive ? ctx.selectedEntityId : null}
         setSelectedEntityId={isActive ? ctx.setSelectedEntityId : noop}
-        moveEntity={isActive ? ctx.moveEntity : noop}
+        moveEntity={isActive ? (ctx.handleMoveEntity || ctx.moveEntity) : noop}
+        showGrid={ctx.showGrid}
+        snapToGrid={ctx.snapToGrid}
+        snapEntityPos={ctx.snapEntityPos}
+        pendingPlacement={ctx.pendingPlacement}
+        commitPlacement={ctx.commitPlacement}
+        cancelPlacement={ctx.cancelPlacement}
+        createEntity={ctx.handleCreateEntity}
+        duplicateEntity={ctx.handleDuplicateEntity}
+        deleteEntity={ctx.handleDeleteEntity}
+        updateComponentProp={ctx.handleUpdateComponentProp}
       />
     </div>
   );

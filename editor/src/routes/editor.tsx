@@ -10,6 +10,8 @@ import { useMapManager } from '@/hooks/editor/useMapManager'
 import { useLayerManager } from '@/hooks/editor/useLayerManager'
 import { useEntityManager } from '@/hooks/editor/useEntityManager'
 import { useEditorDialogs } from '@/hooks/editor/useEditorDialogs'
+import { useGridSettings } from '@/hooks/editor/useGridSettings'
+import { useEntityPlacement } from '@/hooks/editor/useEntityPlacement'
 import { exportMap } from '@/hooks/useExportMap'
 
 // Layout
@@ -68,6 +70,27 @@ export function EditorPage() {
     activeMap: mapManager.activeMap,
     setActiveMap: mapManager.setActiveMap,
   })
+
+  // ── Grid & Snapping Settings ──────────────────────────────────────────────
+  const gridSettings = useGridSettings()
+
+  // ── Entity Placement Mode ─────────────────────────────────────────────────
+  const entityPlacement = useEntityPlacement()
+
+  const handleCommitPlacement = useCallback(
+    (x: number, y: number) => {
+      if (entityPlacement.pendingPlacement) {
+        entityManager.createEntity(
+          entityPlacement.pendingPlacement.name,
+          x,
+          y,
+          entityPlacement.pendingPlacement.components
+        )
+        entityPlacement.cancelPlacement()
+      }
+    },
+    [entityPlacement, entityManager]
+  )
 
   const handleClearActiveMap = useCallback(() => {
     mapManager.setActiveMap(null)
@@ -341,6 +364,23 @@ export function EditorPage() {
     handleRectangleFill: paintTools.handleRectangleFill,
     handleCommit,
 
+    // Grid & Snapping
+    showGrid: gridSettings.showGrid,
+    setShowGrid: gridSettings.setShowGrid,
+    toggleShowGrid: gridSettings.toggleShowGrid,
+    snapToGrid: gridSettings.snapToGrid,
+    setSnapToGrid: gridSettings.setSnapToGrid,
+    toggleSnapToGrid: gridSettings.toggleSnapToGrid,
+    snapEntityPos: gridSettings.snapEntityPos,
+    snapCoord: gridSettings.snapCoord,
+    snapDimension: gridSettings.snapDimension,
+
+    // Placement Mode
+    pendingPlacement: entityPlacement.pendingPlacement,
+    startPlacement: entityPlacement.startPlacement,
+    cancelPlacement: entityPlacement.cancelPlacement,
+    commitPlacement: handleCommitPlacement,
+
     // Tilesets domain
     folders: tilesetManager.folders,
     activeTileset: tilesetManager.activeTileset,
@@ -363,6 +403,11 @@ export function EditorPage() {
     setHoverTile: tilesetManager.setHoverTile,
   }), [
     focusedDomain, setFocusedDomain,
+    gridSettings.showGrid, gridSettings.setShowGrid, gridSettings.toggleShowGrid,
+    gridSettings.snapToGrid, gridSettings.setSnapToGrid, gridSettings.toggleSnapToGrid,
+    gridSettings.snapEntityPos, gridSettings.snapCoord, gridSettings.snapDimension,
+    entityPlacement.pendingPlacement, entityPlacement.startPlacement, entityPlacement.cancelPlacement,
+    handleCommitPlacement,
     // Maps
     mapManager.maps, mapManager.mapFolders, mapManager.activeMap,
     mapManager.expandedMapFolders, mapManager.toggleMapFolder,

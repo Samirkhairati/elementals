@@ -12,6 +12,7 @@ interface KonvaOverlaysProps {
   canvasCopyCurrent: Pos | null
   rectStart: Pos | null
   rectCurrent: Pos | null
+  showGrid?: boolean
 }
 
 export const KonvaOverlays = React.memo(function KonvaOverlays({
@@ -23,6 +24,7 @@ export const KonvaOverlays = React.memo(function KonvaOverlays({
   canvasCopyCurrent,
   rectStart,
   rectCurrent,
+  showGrid = true,
 }: KonvaOverlaysProps) {
   const copyBox = getBoundingBox(canvasCopyStart, canvasCopyCurrent)
   const rectBox = !copyBox && activeTool === 'rectangle' ? getBoundingBox(rectStart, rectCurrent) : null
@@ -33,10 +35,11 @@ export const KonvaOverlays = React.memo(function KonvaOverlays({
   return (
     <Group listening={false}>
       {/* 32px Grid Overlay */}
-      <Shape
-        listening={false}
-        perfectDrawEnabled={false}
-        shadowForStrokeEnabled={false}
+      {showGrid && (
+        <Shape
+          listening={false}
+          perfectDrawEnabled={false}
+          shadowForStrokeEnabled={false}
         sceneFunc={(context, shape) => {
           const ctx = context._context as CanvasRenderingContext2D
           ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)'
@@ -77,6 +80,7 @@ export const KonvaOverlays = React.memo(function KonvaOverlays({
           ctx.stroke()
         }}
       />
+      )}
 
       {/* Brush hover highlight */}
       {canvasHover && !canvasCopyStart && activeTool === 'brush' && tileSelection && (

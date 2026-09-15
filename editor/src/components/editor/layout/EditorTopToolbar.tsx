@@ -7,6 +7,8 @@ import {
   Square,
   PaintBucket,
   Grid,
+  Grid3X3,
+  Magnet,
   Shuffle,
   Stamp,
   Info,
@@ -185,6 +187,35 @@ function MapToolbar() {
             title="Random Mode (Random Tile from Selection)"
           >
             <Shuffle className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        {/* Divider */}
+        <div className="w-px h-5 bg-border/60" />
+
+        {/* View & Snapping Group */}
+        <div className="flex items-center gap-0.5 bg-muted/40 p-0.5 rounded-md border border-sidebar-border">
+          <button
+            onClick={ctx.toggleShowGrid}
+            className={`p-1.5 rounded flex items-center justify-center transition-colors ${
+              ctx.showGrid
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+            }`}
+            title={ctx.showGrid ? 'Hide Grid Lines' : 'Show Grid Lines'}
+          >
+            <Grid3X3 className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={ctx.toggleSnapToGrid}
+            className={`p-1.5 rounded flex items-center justify-center transition-colors ${
+              ctx.snapToGrid
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+            }`}
+            title={ctx.snapToGrid ? 'Disable Grid Snapping' : 'Enable Grid Snapping'}
+          >
+            <Magnet className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
