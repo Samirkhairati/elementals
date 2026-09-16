@@ -17,6 +17,7 @@ interface KonvaEntitiesProps {
   setResizingColliderEntityId?: (id: string | null) => void
   onUpdateCollider?: (entityId: string, width: number, height: number, offsetX: number, offsetY: number) => void
   onContextMenuEntity?: (entity: EntityData, clientX: number, clientY: number) => void
+  onRightClickEntity?: (entity: EntityData, clientX: number, clientY: number) => void
 }
 
 interface KonvaEntityNodeProps {
@@ -32,6 +33,7 @@ interface KonvaEntityNodeProps {
   snapEntityPos: (x: number, y: number) => { x: number; y: number }
   onUpdateCollider?: (entityId: string, width: number, height: number, offsetX: number, offsetY: number) => void
   onContextMenuEntity?: (entity: EntityData, clientX: number, clientY: number) => void
+  onRightClickEntity?: (entity: EntityData, clientX: number, clientY: number) => void
 }
 
 function getEntityColor(entity: EntityData): { bg: string; border: string; text: string } {
@@ -64,6 +66,7 @@ const KonvaEntityNode = React.memo(function KonvaEntityNode({
   snapEntityPos,
   onUpdateCollider,
   onContextMenuEntity,
+  onRightClickEntity,
 }: KonvaEntityNodeProps) {
   const collider = entity.components.Collider
   const interactable = entity.components.Interactable
@@ -166,11 +169,20 @@ const KonvaEntityNode = React.memo(function KonvaEntityNode({
           e.cancelBubble = true
           setSelectedEntityId(entity.id)
         }}
+        onMouseDown={e => {
+          if (e.evt.button === 0) {
+            e.cancelBubble = true
+            setSelectedEntityId(entity.id)
+          } else if (e.evt.button === 2) {
+            e.cancelBubble = true
+            e.evt.preventDefault()
+            setSelectedEntityId(entity.id)
+            onRightClickEntity?.(entity, e.evt.clientX, e.evt.clientY)
+          }
+        }}
         onContextMenu={e => {
           e.evt.preventDefault()
           e.cancelBubble = true
-          setSelectedEntityId(entity.id)
-          onContextMenuEntity?.(entity, e.evt.clientX, e.evt.clientY)
         }}
       >
         {/* Entity Name Tooltip / Label */}
@@ -269,6 +281,7 @@ export const KonvaEntities = React.memo(function KonvaEntities({
   resizingColliderEntityId = null,
   onUpdateCollider,
   onContextMenuEntity,
+  onRightClickEntity,
 }: KonvaEntitiesProps) {
   const mapWidthPx = activeMap.width * 32
   const mapHeightPx = activeMap.height * 32
@@ -290,6 +303,7 @@ export const KonvaEntities = React.memo(function KonvaEntities({
           snapEntityPos={snapEntityPos}
           onUpdateCollider={onUpdateCollider}
           onContextMenuEntity={onContextMenuEntity}
+          onRightClickEntity={onRightClickEntity}
         />
       ))}
     </Group>

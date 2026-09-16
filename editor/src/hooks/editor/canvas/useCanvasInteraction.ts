@@ -8,11 +8,14 @@ import {
   PaintMode,
   CopiedTile,
   Pos,
+  EntityData,
 } from '@/types/editor'
 import { getBoundingBox } from '@/components/editor/canvas/canvasUtils'
 import { TileCoords } from './useCanvasViewport'
 import { PendingEntityPlacement } from '@/hooks/editor/useEntityPlacement'
-import { CanvasContextMenuTarget } from '@/components/editor/canvas/CanvasContextMenu'
+import {
+  CanvasContextMenuState,
+} from '@/components/editor/canvas/CanvasContextMenu'
 
 interface UseCanvasInteractionProps {
   activeMap: MapData | null
@@ -69,7 +72,7 @@ export function useCanvasInteraction({
   commitPlacement,
   cancelPlacement,
   snapToGrid = true,
-  snapEntityPos,
+  snapEntityPos: _snapEntityPos,
   resizingColliderEntityId = null,
   setResizingColliderEntityId,
 }: UseCanvasInteractionProps) {
@@ -81,9 +84,23 @@ export function useCanvasInteraction({
   const [isSpaceDown, setIsSpaceDown] = useState(false)
   const [isPanning, setIsPanning] = useState(false)
   const [stagePointerPos, setStagePointerPos] = useState<{ x: number; y: number } | null>(null)
-  const [contextMenuTarget, setContextMenuTarget] = useState<CanvasContextMenuTarget | null>(null)
+  const [contextMenuState, setContextMenuState] = useState<CanvasContextMenuState>({
+    isOpen: false,
+    x: 0,
+    y: 0,
+    target: null,
+  })
 
   const isSpaceDownRef = useRef(false)
+  const rightClickRef = useRef<{
+    clientX: number
+    clientY: number
+    tileX: number
+    tileY: number
+    isEntity: boolean
+    entity?: EntityData
+  } | null>(null)
+  const isRightDraggingRef = useRef(false)
 
   // ── Keyboard Listeners for Spacebar Pan Mode ─────────────────────────────
   useEffect(() => {
@@ -184,6 +201,53 @@ export function useCanvasInteraction({
     setCanvasCopyCurrent(null)
   }, [setTileSelection])
 
+  // ── Single Tile Sampling Helper ─────────────────────────────────────────
+  const sampleSingleTile = useCallback(
+    (tileX: number, tileY: number) => {
+      const map = activeMapRef.current
+      const layerId = activeLayerIdRef.current
+      if (!map || !layerId) return
+
+      const layer = layersRef.current.find((l) => l.id === layerId)
+      const currentData = layer?.data || {}
+      const tileIndex = tileY * map.width + tileX
+      const existing = currentData[tileIndex]
+      if (existing) {
+        setTileSelection({
+          width: 1,
+          height: 1,
+          tiles: [{ tilesetId: existing.tilesetId, x: existing.x, y: existing.y }],
+        })
+      }
+    },
+    [setTileSelection]
+  )
+
+  // ── Right-Click on Entity Handler ────────────────────────────────────────
+  const handleRightClickEntity = useCallback(
+    (entity: EntityData, clientX: number, clientY: number) => {
+      const coords = getTileCoordsFromPointer()
+      rightClickRef.current = {
+        clientX,
+        clientY,
+        tileX: coords?.x ?? Math.floor(entity.x / 32),
+        tileY: coords?.y ?? Math.floor(entity.y / 32),
+        isEntity: true,
+        entity,
+      }
+      isRightDraggingRef.current = false
+      if (coords) {
+        setCanvasCopyStart({ x: coords.x, y: coords.y })
+        setCanvasCopyCurrent({ x: coords.x, y: coords.y })
+      }
+    },
+    [getTileCoordsFromPointer]
+  )
+
+  const closeContextMenu = useCallback(() => {
+    setContextMenuState((prev) => ({ ...prev, isOpen: false }))
+  }, [])
+
   // ── Stage Mouse Down ─────────────────────────────────────────────────────
   const handleStageMouseDown = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -197,6 +261,23 @@ export function useCanvasInteraction({
       const coords = getTileCoordsFromPointer()
       if (!coords) return
       const { x, y, isInside } = coords
+
+      // Check if user clicked on an entity, collider shape, transformer handle
+      const isEntityOrTransformer = e.target !== e.target.getStage()
+
+      // If an interactive entity or collider transformer was clicked
+      if (isEntityOrTransformer) {
+        if (e.evt.button === 0) {
+          // Left click on entity / transformer:
+          // Do NOT paint tiles, do NOT bucket fill, do NOT rectangle fill.
+          // Let Konva's entity drag / transform events handle it cleanly!
+          return
+        }
+        if (e.evt.button === 2) {
+          // Right click on entity: KonvaEntityNode handles recording the right-click target
+          return
+        }
+      }
 
       // If pending entity placement mode is active
       if (pendingPlacement) {
@@ -226,19 +307,22 @@ export function useCanvasInteraction({
         setResizingColliderEntityId(null)
       }
 
-      // Right-click tile context menu & copy sampler start
+      // Right-click tile down: prepare for possible tile drag selection or single-click context menu
       if (e.evt.button === 2) {
-        setContextMenuTarget({
-          type: 'tile',
+        rightClickRef.current = {
+          clientX: e.evt.clientX,
+          clientY: e.evt.clientY,
           tileX: coords.x,
           tileY: coords.y,
-        })
-        setCanvasCopyStart({ x, y })
-        setCanvasCopyCurrent({ x, y })
+          isEntity: false,
+        }
+        isRightDraggingRef.current = false
+        setCanvasCopyStart({ x: coords.x, y: coords.y })
+        setCanvasCopyCurrent({ x: coords.x, y: coords.y })
         return
       }
 
-      // Left-click tools
+      // Left-click tools on tilemap
       if (e.evt.button === 0) {
         if (activeToolRef.current === 'bucket') {
           if (isInside) handlePaintBucket(x, y)
@@ -306,6 +390,29 @@ export function useCanvasInteraction({
       const coords = getTileCoordsFromPointer()
       if (!coords) return
 
+      // Right-click drag detection (eyedropper / tile selection marquee)
+      if (rightClickRef.current) {
+        const dist = Math.hypot(
+          e.evt.clientX - rightClickRef.current.clientX,
+          e.evt.clientY - rightClickRef.current.clientY
+        )
+        if (dist > 4 || coords.x !== rightClickRef.current.tileX || coords.y !== rightClickRef.current.tileY) {
+          isRightDraggingRef.current = true
+        }
+        if (isRightDraggingRef.current) {
+          if (!canvasCopyStartRef.current) {
+            setCanvasCopyStart({ x: rightClickRef.current.tileX, y: rightClickRef.current.tileY })
+          }
+          setCanvasCopyCurrent({ x: coords.x, y: coords.y })
+          return
+        }
+      }
+
+      // If an entity or node is currently being dragged, DO NOT paint!
+      if (stageRef?.current?.isDragging?.()) {
+        return
+      }
+
       // Hover state
       if (coords.isInside) {
         setCanvasHover(prev => (prev?.x === coords.x && prev?.y === coords.y ? prev : { x: coords.x, y: coords.y }))
@@ -313,8 +420,8 @@ export function useCanvasInteraction({
         setCanvasHover(null)
       }
 
-      // Canvas copy sampler drag
-      if (canvasCopyStartRef.current) {
+      // Canvas copy sampler drag (if triggered elsewhere)
+      if (canvasCopyStartRef.current && !rightClickRef.current) {
         setCanvasCopyCurrent({ x: coords.x, y: coords.y })
         return
       }
@@ -349,10 +456,40 @@ export function useCanvasInteraction({
         }
       }
 
-      if (e.button === 2 && canvasCopyStartRef.current) {
-        commitCanvasCopy()
+      // Right-click released
+      if (e.button === 2) {
+        if (rightClickRef.current) {
+          if (isRightDraggingRef.current) {
+            // Dragged -> Commit tile selection marquee!
+            commitCanvasCopy()
+          } else {
+            // Single right-click without drag -> Clear copy marquee and Open Context Menu!
+            setCanvasCopyStart(null)
+            setCanvasCopyCurrent(null)
+            if (rightClickRef.current.isEntity && rightClickRef.current.entity) {
+              setContextMenuState({
+                isOpen: true,
+                x: e.clientX,
+                y: e.clientY,
+                target: { type: 'entity', entity: rightClickRef.current.entity },
+              })
+            } else {
+              setContextMenuState({
+                isOpen: true,
+                x: e.clientX,
+                y: e.clientY,
+                target: { type: 'tile', tileX: rightClickRef.current.tileX, tileY: rightClickRef.current.tileY },
+              })
+            }
+          }
+          rightClickRef.current = null
+          isRightDraggingRef.current = false
+        } else if (canvasCopyStartRef.current) {
+          commitCanvasCopy()
+        }
       }
 
+      // Left-click released
       if (e.button === 0) {
         if (activeToolRef.current === 'rectangle' && rectStartRef.current && rectCurrentRef.current) {
           handleRectangleFill(rectStartRef.current, rectCurrentRef.current)
@@ -384,8 +521,11 @@ export function useCanvasInteraction({
     isSpaceDown,
     isPanning,
     stagePointerPos,
-    contextMenuTarget,
-    setContextMenuTarget,
+    contextMenuState,
+    setContextMenuState,
+    closeContextMenu,
+    sampleSingleTile,
+    handleRightClickEntity,
     handleStageMouseDown,
     handleStageMouseMove,
   }

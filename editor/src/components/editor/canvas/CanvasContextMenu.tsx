@@ -1,15 +1,15 @@
 import React from 'react'
 import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuSub,
-  ContextMenuSubContent,
-  ContextMenuSubTrigger,
-  ContextMenuTrigger,
-  ContextMenuLabel,
-} from '@/components/ui/context-menu'
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+  DropdownMenuLabel,
+} from '@/components/ui/dropdown-menu'
 import { Plus, Sparkles, Copy, Trash2, Maximize2, Pipette } from 'lucide-react'
 import { PRESET_PREFABS } from '@/lib/componentRegistry'
 import { EntityData, ComponentType } from '@/types/editor'
@@ -21,9 +21,16 @@ export interface CanvasContextMenuTarget {
   entity?: EntityData
 }
 
-interface CanvasContextMenuProps {
-  children: React.ReactNode
+export interface CanvasContextMenuState {
+  isOpen: boolean
+  x: number
+  y: number
   target: CanvasContextMenuTarget | null
+}
+
+interface CanvasContextMenuProps {
+  menuState: CanvasContextMenuState
+  onClose: () => void
   onCreateEntity: (
     name: string,
     x: number,
@@ -37,75 +44,109 @@ interface CanvasContextMenuProps {
 }
 
 export function CanvasContextMenu({
-  children,
-  target,
+  menuState,
+  onClose,
   onCreateEntity,
   onDuplicateEntity,
   onDeleteEntity,
   onStartResizeCollider,
   onSampleTile,
 }: CanvasContextMenuProps) {
+  const { isOpen, x, y, target } = menuState
   const tileX = target?.tileX ?? 0
   const tileY = target?.tileY ?? 0
 
   return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>
-        {children}
-      </ContextMenuTrigger>
+    <DropdownMenu
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose()
+      }}
+    >
+      <DropdownMenuTrigger asChild>
+        <div
+          style={{
+            position: 'fixed',
+            left: `${x}px`,
+            top: `${y}px`,
+            width: 1,
+            height: 1,
+            pointerEvents: 'none',
+            opacity: 0,
+          }}
+        />
+      </DropdownMenuTrigger>
 
-      <ContextMenuContent className="w-52 font-mono text-xs">
+      <DropdownMenuContent
+        align="start"
+        side="bottom"
+        className="w-52 font-mono text-xs z-50 bg-popover/95 backdrop-blur-sm border-border/80 shadow-2xl"
+        onCloseAutoFocus={(e) => {
+          e.preventDefault()
+          document.body.style.pointerEvents = ''
+        }}
+      >
         {target?.type === 'entity' && target.entity ? (
           <>
-            <ContextMenuLabel className="truncate text-foreground font-semibold">
+            <DropdownMenuLabel className="truncate text-foreground font-semibold">
               {target.entity.name}
-            </ContextMenuLabel>
-            <ContextMenuSeparator />
-            <ContextMenuItem
-              onClick={() => onStartResizeCollider?.(target.entity!.id)}
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => {
+                onStartResizeCollider?.(target.entity!.id)
+                onClose()
+              }}
             >
               <Maximize2 className="w-3.5 h-3.5 mr-2 text-primary" />
               Resize Collider
-            </ContextMenuItem>
-            <ContextMenuItem
-              onClick={() => onDuplicateEntity?.(target.entity!.id)}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => {
+                onDuplicateEntity?.(target.entity!.id)
+                onClose()
+              }}
             >
               <Copy className="w-3.5 h-3.5 mr-2" />
               Duplicate
-            </ContextMenuItem>
-            <ContextMenuSeparator />
-            <ContextMenuItem
-              onClick={() => onDeleteEntity?.(target.entity!.id)}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => {
+                onDeleteEntity?.(target.entity!.id)
+                onClose()
+              }}
               className="text-red-400 focus:text-red-400 focus:bg-red-500/10"
             >
               <Trash2 className="w-3.5 h-3.5 mr-2" />
               Delete Entity
-            </ContextMenuItem>
+            </DropdownMenuItem>
           </>
         ) : (
           <>
-            <ContextMenuLabel className="text-muted-foreground font-normal text-[10px]">
+            <DropdownMenuLabel className="text-muted-foreground font-normal text-[10px]">
               Tile ({tileX}, {tileY})
-            </ContextMenuLabel>
-            <ContextMenuSeparator />
-            <ContextMenuItem
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
               onClick={() => {
                 // Center entity on tile: x = tileX * 32 + 16, y = tileY * 32 + 32
                 onCreateEntity('New Entity', tileX * 32 + 16, tileY * 32 + 32)
+                onClose()
               }}
             >
               <Plus className="w-3.5 h-3.5 mr-2 text-primary" />
               New Empty Entity
-            </ContextMenuItem>
+            </DropdownMenuItem>
 
-            <ContextMenuSub>
-              <ContextMenuSubTrigger>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
                 <Sparkles className="w-3.5 h-3.5 mr-2 text-amber-400" />
                 From Prefab
-              </ContextMenuSubTrigger>
-              <ContextMenuSubContent className="w-48 font-mono text-xs">
-                {PRESET_PREFABS.map(prefab => (
-                  <ContextMenuItem
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="w-48 font-mono text-xs z-50 bg-popover/95 backdrop-blur-sm">
+                {PRESET_PREFABS.map((prefab) => (
+                  <DropdownMenuItem
                     key={prefab.name}
                     onClick={() => {
                       onCreateEntity(
@@ -114,24 +155,28 @@ export function CanvasContextMenu({
                         tileY * 32 + 32,
                         prefab.components
                       )
+                      onClose()
                     }}
                   >
                     {prefab.name}
-                  </ContextMenuItem>
+                  </DropdownMenuItem>
                 ))}
-              </ContextMenuSubContent>
-            </ContextMenuSub>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
 
-            <ContextMenuSeparator />
-            <ContextMenuItem
-              onClick={() => onSampleTile?.(tileX, tileY)}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => {
+                onSampleTile?.(tileX, tileY)
+                onClose()
+              }}
             >
               <Pipette className="w-3.5 h-3.5 mr-2 text-muted-foreground" />
               Sample Tile Here
-            </ContextMenuItem>
+            </DropdownMenuItem>
           </>
         )}
-      </ContextMenuContent>
-    </ContextMenu>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }

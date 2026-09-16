@@ -119,8 +119,10 @@ export function MapCanvas({
     isSpaceDown,
     isPanning,
     stagePointerPos,
-    contextMenuTarget,
-    setContextMenuTarget,
+    contextMenuState,
+    closeContextMenu,
+    sampleSingleTile,
+    handleRightClickEntity,
     handleStageMouseDown,
     handleStageMouseMove,
   } = useCanvasInteraction({
@@ -167,15 +169,10 @@ export function MapCanvas({
   const mapHeightPx = activeMap ? activeMap.height * 32 : 0
 
   return (
-    <CanvasContextMenu
-      target={contextMenuTarget}
-      onCreateEntity={(name, x, y, comps) => createEntity?.(name, x, y, comps)}
-      onDuplicateEntity={duplicateEntity}
-      onDeleteEntity={deleteEntity}
-      onStartResizeCollider={(id) => setResizingColliderEntityId(id)}
-    >
+    <>
       <div
         ref={containerRef}
+        onContextMenu={(e) => e.preventDefault()}
         className={`flex-1 overflow-hidden relative min-w-0 min-h-0 bg-[#1a1a1a] ${
           isPanning ? 'cursor-grabbing' : isSpaceDown ? 'cursor-grab' : pendingPlacement ? 'cursor-crosshair' : ''
         }`}
@@ -236,9 +233,7 @@ export function MapCanvas({
                 resizingColliderEntityId={resizingColliderEntityId}
                 setResizingColliderEntityId={setResizingColliderEntityId}
                 onUpdateCollider={handleUpdateCollider}
-                onContextMenuEntity={(entity) => {
-                  setContextMenuTarget({ type: 'entity', entity })
-                }}
+                onRightClickEntity={handleRightClickEntity}
               />
 
               {/* Ghost entity preview during placement mode */}
@@ -266,6 +261,16 @@ export function MapCanvas({
           debugInfo={debugInfo}
         />
       </div>
-    </CanvasContextMenu>
+
+      <CanvasContextMenu
+        menuState={contextMenuState}
+        onClose={closeContextMenu}
+        onCreateEntity={(name, x, y, comps) => createEntity?.(name, x, y, comps)}
+        onDuplicateEntity={duplicateEntity}
+        onDeleteEntity={deleteEntity}
+        onStartResizeCollider={(id) => setResizingColliderEntityId(id)}
+        onSampleTile={sampleSingleTile}
+      />
+    </>
   )
 }
