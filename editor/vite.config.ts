@@ -2,8 +2,9 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
-const PORT = process.env.PORT ? parseInt(process.env.PORT) : 5174
-const WORKTREE_NAME = process.env.WORKTREE_NAME || ''
+// Port contract: PORT (set by scripts/dev.mjs / dev-runner) > 5174.
+const PORT = parseInt(process.env.PORT || '5174', 10)
+const WORKTREE_NAME = process.env.WORKTREE_NAME || process.env.VITE_WORKTREE_NAME || ''
 
 // https://vite.dev/config/
 export default defineConfig({

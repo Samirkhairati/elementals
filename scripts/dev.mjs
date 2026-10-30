@@ -1,111 +1,86 @@
 #!/usr/bin/env node
-import { spawn, execSync } from 'child_process';
-import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
+// Unified dev runner: game (Vite) + editor (Vite + Electron), worktree-aware.
+// See AGENTS.md ("Multi-worktree") for the port/offset rules.
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { formatInstallProblems } from './lib/installs.mjs';
+import { HELP, buildPlan, describeSource, formatDryRun, formatList } from './lib/plan.mjs';
+import { createSupervisor } from './lib/supervisor.mjs';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const ROOT_DIR = path.resolve(__dirname, '..');
+const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const c = (code, s) => `\x1b[${code}m${s}\x1b[0m`;
 
-// 1. Auto-detect worktree name and index
-function detectWorktree() {
+async function main() {
+  let plan;
   try {
-    const gitPath = path.join(ROOT_DIR, '.git');
-    if (fs.existsSync(gitPath) && fs.statSync(gitPath).isFile()) {
-      const gitContent = fs.readFileSync(gitPath, 'utf8');
-      const gitDirMatch = gitContent.match(/gitdir:\s*(.+)/i);
-      let name = path.basename(ROOT_DIR);
-
-      if (gitDirMatch) {
-        const gitDir = gitDirMatch[1].trim();
-        const headPath = path.join(gitDir, 'HEAD');
-        if (fs.existsSync(headPath)) {
-          const headContent = fs.readFileSync(headPath, 'utf8').trim();
-          const branchMatch = headContent.match(/ref:\s*refs\/heads\/(.+)/);
-          if (branchMatch) name = branchMatch[1];
-        }
-      }
-
-      try {
-        const list = execSync('git worktree list --porcelain', { cwd: ROOT_DIR, encoding: 'utf8' });
-        const entries = list.split('\n\n').filter(Boolean);
-        const idx = entries.findIndex(e => e.includes(ROOT_DIR));
-        const offset = idx > 0 ? idx : 1;
-        return { isWorktree: true, name, offset };
-      } catch {
-        return { isWorktree: true, name, offset: 1 };
-      }
-    }
-  } catch {}
-
-  return { isWorktree: false, name: 'main', offset: 0 };
-}
-
-const detected = detectWorktree();
-
-// 2. Parse CLI args (allow overriding auto-detected offset)
-const args = process.argv.slice(2);
-let offset = detected.offset;
-let explicitOffset = false;
-
-for (let i = 0; i < args.length; i++) {
-  if (args[i] === '--offset' && args[i + 1]) {
-    offset = parseInt(args[i + 1], 10) || 0;
-    explicitOffset = true;
-  } else if (args[i].startsWith('--offset=')) {
-    offset = parseInt(args[i].split('=')[1], 10) || 0;
-    explicitOffset = true;
+    plan = await buildPlan({ rootDir: ROOT_DIR, argv: process.argv.slice(2) });
+  } catch (err) {
+    console.error(`${c(31, 'error')}: ${err.message}\n\n${HELP}`);
+    return 2;
   }
+  const { args, runtime } = plan;
+
+  if (args.help) {
+    console.log(HELP);
+    return 0;
+  }
+  if (args.list || args.dryRun) {
+    if (args.json) {
+      console.log(JSON.stringify({
+        name: plan.worktreeName,
+        isWorktree: plan.worktree.isWorktree,
+        inGit: plan.worktree.inGit,
+        root: plan.worktree.root,
+        offset: runtime.offset,
+        source: runtime.source,
+        preferredOffset: runtime.preferredOffset,
+        probed: runtime.probed,
+        gamePort: runtime.gamePort,
+        editorPort: runtime.editorPort,
+        busy: runtime.busy,
+        installProblems: plan.installProblems,
+        ...(args.dryRun ? { commands: plan.commands } : {}),
+      }, null, 2));
+    } else {
+      console.log(args.dryRun ? formatDryRun(plan) : formatList(plan));
+    }
+    return 0;
+  }
+
+  if (plan.installProblems.length) {
+    console.error(`${c(31, 'error')}: ${formatInstallProblems(plan.installProblems)}`);
+    return 1;
+  }
+  if (runtime.busy.length) {
+    const what = runtime.busy.map((b) => `${b.name} port ${b.port}`).join(', ');
+    console.error(
+      `${c(31, 'error')}: ${what} already in use (offset ${runtime.offset}, ${describeSource(runtime)}).\n` +
+        '       Is another dev server running for this checkout? Stop it, or choose another\n' +
+        '       offset with --offset N / PORT_OFFSET=N (or GAME_PORT / PORT).'
+    );
+    return 1;
+  }
+
+  console.log('\n======================================================');
+  console.log(`🚀  ${c('1;32', 'Elementals Unified Dev Server')} — ${c(36, `[${plan.worktreeName}]`)}`);
+  console.log('======================================================');
+  console.log(`🎮  ${c(1, 'Game Web App:')}      ${c(34, plan.urls.game)}`);
+  console.log(`🎨  ${c(1, 'Electron Editor:')}   ${c(35, plan.urls.editor)} (Vite dev server)`);
+  console.log(`⚡  ${c(33, `Port offset ${runtime.offset} (${describeSource(runtime)})`)}`);
+  console.log('======================================================\n');
+
+  const sup = createSupervisor({ log: (m) => console.log(`${c(33, '[dev]')} ${m}`) });
+  sup.installSignalHandlers();
+  for (const cmd of plan.commands) {
+    sup.start(cmd.name, cmd.command, cmd.args, {
+      cwd: cmd.cwd,
+      shell: cmd.shell,
+      env: { ...process.env, ...cmd.env },
+    });
+  }
+  const code = await sup.done;
+  console.log(`${c(33, '[dev]')} all processes stopped (exit ${code})`);
+  return code;
 }
 
-if (process.env.PORT_OFFSET) {
-  offset = parseInt(process.env.PORT_OFFSET, 10) || offset;
-  explicitOffset = true;
-}
-
-const worktreeName = process.env.WORKTREE_NAME || detected.name;
-const gamePort = process.env.GAME_PORT ? parseInt(process.env.GAME_PORT, 10) : 5175 + (offset * 100);
-const editorPort = process.env.PORT ? parseInt(process.env.PORT, 10) : 5174 + (offset * 100);
-
-console.log('\n======================================================');
-console.log(`🚀  \x1b[1m\x1b[32mElementals Unified Dev Server\x1b[0m — \x1b[36m[${worktreeName}]\x1b[0m`);
-console.log('======================================================');
-console.log(`🎮  \x1b[1mGame Web App:\x1b[0m      \x1b[34mhttp://localhost:${gamePort}\x1b[0m`);
-console.log(`🎨  \x1b[1mElectron Editor:\x1b[0m   \x1b[35mhttp://localhost:${editorPort}\x1b[0m (Vite dev server)`);
-if (offset > 0) {
-  console.log(`⚡  \x1b[33mWorktree Port Offset (${explicitOffset ? 'Manual' : 'Auto-detected'}): +${offset * 100}\x1b[0m`);
-}
-console.log('======================================================\n');
-
-const env = {
-  ...process.env,
-  WORKTREE_NAME: worktreeName,
-  VITE_WORKTREE_NAME: worktreeName,
-};
-
-// 1. Start Game
-const gameProc = spawn('npm', ['run', 'dev', '--prefix', 'game'], {
-  cwd: ROOT_DIR,
-  stdio: 'inherit',
-  shell: true,
-  env: { ...env, PORT: String(gamePort) }
-});
-
-// 2. Start Electron Editor
-const editorProc = spawn('npm', ['run', 'electron:dev', '--prefix', 'editor'], {
-  cwd: ROOT_DIR,
-  stdio: 'inherit',
-  shell: true,
-  env: { ...env, PORT: String(editorPort) }
-});
-
-const cleanup = () => {
-  console.log('\n🛑 Shutting down dev servers...');
-  try { gameProc.kill(); } catch {}
-  try { editorProc.kill(); } catch {}
-  process.exit(0);
-};
-
-process.on('SIGINT', cleanup);
-process.on('SIGTERM', cleanup);
+main().then((code) => process.exit(code));

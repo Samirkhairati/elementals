@@ -1,8 +1,9 @@
 import { defineConfig } from 'vite';
 import { fileURLToPath, URL } from 'node:url';
 
-const PORT = process.env.PORT ? parseInt(process.env.PORT) : 5175;
-const WORKTREE_NAME = process.env.WORKTREE_NAME || '';
+// Port contract: GAME_PORT (set by scripts/dev.mjs) > PORT (legacy) > 5175.
+const PORT = parseInt(process.env.GAME_PORT || process.env.PORT || '5175', 10);
+const WORKTREE_NAME = process.env.WORKTREE_NAME || process.env.VITE_WORKTREE_NAME || '';
 
 export default defineConfig({
   resolve: {
@@ -16,5 +17,8 @@ export default defineConfig({
   },
   server: {
     port: PORT,
+    // Fail loudly on a collision instead of silently moving to another port
+    // (the dev banner would then print the wrong URL).
+    strictPort: true,
   }
 });
