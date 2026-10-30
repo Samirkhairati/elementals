@@ -63,3 +63,5 @@ Ports are `base + offset * 100` (game base `5175`, editor Vite base `5174`):
 ### 6. Shutdown behaviour
 Children run in their own process groups (`taskkill /T` on Windows) with no shell wrapper. `Ctrl+C`/`SIGTERM` (or terminal close) stops the entire process tree (SIGTERM, then SIGKILL after 4s; a second `Ctrl+C` force-kills). If **either** the game or the editor exits (Vite crash, Electron window closed or quit) the other is stopped too and the runner exits with the failing code. In dev the editor also quits on macOS when its last window closes, so closing the window stops the whole runner.
 
+### 7. Worktree launcher
+`npm run wt` (`scripts/wt.mjs`, helpers in `scripts/lib/wt.mjs`) lists, starts, creates, installs and removes worktrees; it starts a worktree by running *that worktree's own* `scripts/dev.mjs` with its directory as cwd and without leaking `PORT`/`WORKTREE_NAME` from the calling shell. Commands: `list [--json]`, `run <wt> [-- dev.mjs args]`, `new <branch> [--from base] [--no-install]`, `install <wt>`, `rm <wt> [--force] [--yes]`. Tests: `scripts/wt.test.mjs`.

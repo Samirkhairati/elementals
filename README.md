@@ -45,6 +45,18 @@ Useful flags: `node scripts/dev.mjs --list` (show worktree, offset and ports), `
 
 ---
 
+### Worktree launcher (no Claude needed)
+```bash
+npm run wt                      # interactive menu: pick a worktree to run, or create / install / remove one
+npm run wt -- list              # worktrees with ports and status (running, deps missing, dirty)
+npm run wt -- run feature-x     # start game + editor for that worktree (number, branch, dir name or prefix)
+npm run wt -- new feature-x     # create a worktree + branch and npm install it
+npm run wt -- rm feature-x      # remove a worktree (branch is kept)
+```
+On macOS you can also double-click `wt.command`. For a short command from any terminal add
+`alias wt='node /path/to/elementals/scripts/wt.mjs'` to `~/.zshrc`. New worktrees are created in
+`../elementals-worktrees/` (override with `ELEMENTALS_WORKTREES_DIR`).
+
 ## 📖 Additional Docs
 
 * See [`AGENTS.md`](./AGENTS.md) for multi-worktree guidelines and architecture details.

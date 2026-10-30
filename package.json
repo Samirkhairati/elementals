@@ -10,6 +10,7 @@
     "dev:wt2": "node scripts/dev.mjs --offset 2",
     "dev:game": "npm run dev --prefix game",
     "dev:editor": "npm run electron:dev --prefix editor",
+    "wt": "node scripts/wt.mjs",
     "test": "npm run test --prefix game && npm run test --prefix editor && npm run test:scripts",
     "lint": "npm run lint --prefix game && npm run lint --prefix editor",
     "typecheck": "npm run typecheck --prefix game && npm run typecheck --prefix editor",
