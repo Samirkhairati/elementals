@@ -9,6 +9,13 @@
     "dev:wt": "node scripts/dev.mjs --offset 1",
     "dev:wt2": "node scripts/dev.mjs --offset 2",
     "dev:game": "npm run dev --prefix game",
-    "dev:editor": "npm run electron:dev --prefix editor"
+    "dev:editor": "npm run electron:dev --prefix editor",
+    "test": "npm run test --prefix game && npm run test --prefix editor && npm run test:scripts",
+    "lint": "npm run lint --prefix game && npm run lint --prefix editor",
+    "typecheck": "npm run typecheck --prefix game && npm run typecheck --prefix editor",
+    "test:scripts": "node --test \"scripts/**/*.test.mjs\"",
+    "maps:export": "node scripts/export-maps.mjs --write",
+    "maps:check": "node scripts/export-maps.mjs --check",
+    "verify": "npm run typecheck && npm run lint && npm run test"
   }
 }
