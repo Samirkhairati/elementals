@@ -10,5 +10,11 @@
     "allowSyntheticDefaultImports": true,
     "strict": true
   },
-  "include": ["electron"]
+  "include": [
+    "electron"
+  ],
+  "exclude": [
+    "electron/**/*.test.ts",
+    "electron/__testutils__"
+  ]
 }

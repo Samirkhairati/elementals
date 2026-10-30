@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.electron.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": [
+    "electron"
+  ],
+  "exclude": []
+}

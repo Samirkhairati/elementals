@@ -2,6 +2,7 @@ import { app, BrowserWindow, Menu } from 'electron';
 
 export function setupMenu(win: BrowserWindow) {
   const isMac = process.platform === 'darwin';
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const template: any[] = [
     ...(isMac
       ? [

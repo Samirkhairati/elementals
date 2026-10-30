@@ -7,7 +7,7 @@ interface TilesetData {
 
 interface ElectronAPI {
   ping: () => Promise<void>;
-  getTilesets: () => Promise<{ success: boolean; folders?: string[]; tilesets?: TilesetData[]; error?: string }>;
+  getTilesets: () => Promise<{ success: boolean; folders?: string[]; tilesets?: TilesetData[]; warnings?: { file: string; error: string }[]; error?: string }>;
   pickTilesetFile: () => Promise<{ success: boolean; canceled?: boolean; sourcePath?: string; defaultName?: string; error?: string }>;
   importTileset: (sourcePath: string, name: string, folderPath: string | null) => Promise<{ success: boolean; tileset?: TilesetData; error?: string }>;
   createFolder: (parentPath: string | null, folderName: string) => Promise<{ success: boolean; folderPath?: string; error?: string }>;
@@ -15,7 +15,7 @@ interface ElectronAPI {
   renameTileset: (folderPath: string | null, fileName: string, newName: string) => Promise<{ success: boolean; error?: string }>;
   moveTileset: (fileName: string, oldFolder: string | null, newFolder: string | null) => Promise<{ success: boolean; error?: string }>;
   deleteFolder: (folderPath: string) => Promise<{ success: boolean; error?: string }>;
-  getMaps: () => Promise<{ success: boolean; folders?: string[]; maps?: any[]; error?: string }>;
+  getMaps: () => Promise<{ success: boolean; folders?: string[]; maps?: any[]; warnings?: { file: string; error: string }[]; error?: string }>;
   createMap: (name: string, width: number, height: number, folderPath: string | null) => Promise<{ success: boolean; map?: any; error?: string }>;
   saveMap: (folderPath: string | null, fileName: string, mapData: any) => Promise<{ success: boolean; error?: string }>;
   deleteMap: (folderPath: string | null, fileName: string) => Promise<{ success: boolean; error?: string }>;

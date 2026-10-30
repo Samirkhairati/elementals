@@ -1,3 +1,5 @@
+// The preload runs as CommonJS inside the sandboxed preload loader (see sandbox note in main.ts).
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -12,7 +14,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   deleteFolder: (folderPath: string) => ipcRenderer.invoke('delete-folder', folderPath),
   getMaps: () => ipcRenderer.invoke('get-maps'),
   createMap: (name: string, width: number, height: number, folderPath: string | null) => ipcRenderer.invoke('create-map', name, width, height, folderPath),
-  saveMap: (folderPath: string | null, fileName: string, mapData: any) => ipcRenderer.invoke('save-map', folderPath, fileName, mapData),
+  saveMap: (folderPath: string | null, fileName: string, mapData: unknown) => ipcRenderer.invoke('save-map', folderPath, fileName, mapData),
   deleteMap: (folderPath: string | null, fileName: string) => ipcRenderer.invoke('delete-map', folderPath, fileName),
   createMapFolder: (parentPath: string | null, folderName: string) => ipcRenderer.invoke('create-map-folder', parentPath, folderName),
   deleteMapFolder: (folderPath: string) => ipcRenderer.invoke('delete-map-folder', folderPath),
@@ -21,7 +23,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   moveMap: (fileName: string, oldFolder: string | null, newFolder: string | null) => ipcRenderer.invoke('move-map', fileName, oldFolder, newFolder),
   exportMap: (jsonData: string, defaultName: string) => ipcRenderer.invoke('export-map', jsonData, defaultName),
   onTogglePanel: (callback: (panelId: string) => void) => {
-    const handler = (_: any, panelId: string) => callback(panelId);
+    const handler = (_event: unknown, panelId: string) => callback(panelId);
     ipcRenderer.on('dockview-toggle-panel', handler);
     return () => ipcRenderer.removeListener('dockview-toggle-panel', handler);
   },
