@@ -1,126 +1,79 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
-import { Layer, MapData } from '@/types/editor'
+import { useCallback, useRef, useState } from 'react'
+import {
+  EMPTY_HISTORY,
+  createHistory,
+  pushSnapshot,
+  redoHistory,
+  undoHistory,
+  type HistorySnapshot,
+  type HistoryState,
+} from '@/lib/history'
+
+export type ApplySnapshot = (snapshot: HistorySnapshot) => void
 
 export interface UseHistoryReturn {
-  history: { layers: Layer[] }[]
+  history: HistorySnapshot[]
   historyIndex: number
-  setHistory: React.Dispatch<React.SetStateAction<{ layers: Layer[] }[]>>
-  setHistoryIndex: React.Dispatch<React.SetStateAction<number>>
-  commitHistory: (stateToPush: Layer[]) => void
-  handleUndo: (
-    setLayersLocal: React.Dispatch<React.SetStateAction<Layer[]>>,
-    activeMap: MapData | null,
-    setActiveMap: React.Dispatch<React.SetStateAction<MapData | null>>
-  ) => void
-  handleRedo: (
-    setLayersLocal: React.Dispatch<React.SetStateAction<Layer[]>>,
-    activeMap: MapData | null,
-    setActiveMap: React.Dispatch<React.SetStateAction<MapData | null>>
-  ) => void
+  /** Record a snapshot (layers + entities). No-op for duplicates / empty layer lists. */
+  commitHistory: (snapshot: HistorySnapshot) => void
+  /** Replace the whole history with a single initial snapshot, or clear it with `null`. */
+  resetHistory: (snapshot: HistorySnapshot | null) => void
+  /** Step back; `apply` receives a fresh clone of the target snapshot. Returns whether a step happened. */
+  handleUndo: (apply: ApplySnapshot) => boolean
+  handleRedo: (apply: ApplySnapshot) => boolean
 }
 
 export function useHistory(): UseHistoryReturn {
-  const [history, setHistory] = useState<{ layers: Layer[] }[]>([])
-  const [historyIndex, setHistoryIndex] = useState(-1)
+  const [state, setState] = useState<HistoryState>(EMPTY_HISTORY)
+  const stateRef = useRef<HistoryState>(state)
 
-  const historyIndexRef = useRef(historyIndex)
-  useEffect(() => {
-    historyIndexRef.current = historyIndex
-  }, [historyIndex])
-
-  const historyRef = useRef(history)
-  useEffect(() => {
-    historyRef.current = history
-  }, [history])
-
-  const commitHistory = useCallback((stateToPush: Layer[]) => {
-    if (!stateToPush || stateToPush.length === 0) return
-
-    const currentIndex = historyIndexRef.current
-    const currentHist = historyRef.current
-
-    // Don't push duplicate state
-    if (
-      currentIndex >= 0 &&
-      currentIndex < currentHist.length &&
-      JSON.stringify(currentHist[currentIndex]?.layers) === JSON.stringify(stateToPush)
-    ) {
-      return
-    }
-
-    const cloned = JSON.parse(JSON.stringify(stateToPush))
-    const newHist = currentHist.slice(0, currentIndex + 1)
-    newHist.push({ layers: cloned })
-    if (newHist.length > 50) newHist.shift()
-
-    const newIndex = newHist.length - 1
-    historyRef.current = newHist
-    historyIndexRef.current = newIndex
-
-    setHistory(newHist)
-    setHistoryIndex(newIndex)
+  const update = useCallback((next: HistoryState) => {
+    if (next === stateRef.current) return
+    stateRef.current = next
+    setState(next)
   }, [])
 
-  const handleUndo = useCallback(
-    (
-      setLayersLocal: React.Dispatch<React.SetStateAction<Layer[]>>,
-      activeMap: MapData | null,
-      setActiveMap: React.Dispatch<React.SetStateAction<MapData | null>>
-    ) => {
-      const currentIndex = historyIndexRef.current
-      const currentHist = historyRef.current
+  const commitHistory = useCallback(
+    (snapshot: HistorySnapshot) => update(pushSnapshot(stateRef.current, snapshot)),
+    [update]
+  )
 
-      if (currentIndex > 0) {
-        const targetIndex = currentIndex - 1
-        const restoredLayers = JSON.parse(JSON.stringify(currentHist[targetIndex].layers))
-
-        historyIndexRef.current = targetIndex
-        setHistoryIndex(targetIndex)
-        setLayersLocal(restoredLayers)
-
-        if (activeMap) {
-          const updatedMap = { ...activeMap, layers: restoredLayers }
-          setActiveMap(updatedMap)
-          window.electronAPI?.saveMap(activeMap.folderPath, activeMap.fileName, updatedMap)
-        }
-      }
+  const resetHistory = useCallback(
+    (snapshot: HistorySnapshot | null) => {
+      const next = createHistory(snapshot)
+      stateRef.current = next
+      setState(next)
     },
     []
+  )
+
+  const handleUndo = useCallback(
+    (apply: ApplySnapshot) => {
+      const step = undoHistory(stateRef.current)
+      if (!step.snapshot) return false
+      update(step.state)
+      apply(step.snapshot)
+      return true
+    },
+    [update]
   )
 
   const handleRedo = useCallback(
-    (
-      setLayersLocal: React.Dispatch<React.SetStateAction<Layer[]>>,
-      activeMap: MapData | null,
-      setActiveMap: React.Dispatch<React.SetStateAction<MapData | null>>
-    ) => {
-      const currentIndex = historyIndexRef.current
-      const currentHist = historyRef.current
-
-      if (currentIndex < currentHist.length - 1) {
-        const targetIndex = currentIndex + 1
-        const restoredLayers = JSON.parse(JSON.stringify(currentHist[targetIndex].layers))
-
-        historyIndexRef.current = targetIndex
-        setHistoryIndex(targetIndex)
-        setLayersLocal(restoredLayers)
-
-        if (activeMap) {
-          const updatedMap = { ...activeMap, layers: restoredLayers }
-          setActiveMap(updatedMap)
-          window.electronAPI?.saveMap(activeMap.folderPath, activeMap.fileName, updatedMap)
-        }
-      }
+    (apply: ApplySnapshot) => {
+      const step = redoHistory(stateRef.current)
+      if (!step.snapshot) return false
+      update(step.state)
+      apply(step.snapshot)
+      return true
     },
-    []
+    [update]
   )
 
   return {
-    history,
-    historyIndex,
-    setHistory,
-    setHistoryIndex,
+    history: state.entries,
+    historyIndex: state.index,
     commitHistory,
+    resetHistory,
     handleUndo,
     handleRedo,
   }

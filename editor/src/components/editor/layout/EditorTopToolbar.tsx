@@ -14,16 +14,37 @@ import {
   Info,
   Map as MapIcon,
 } from 'lucide-react'
-import { useEditorContext } from './EditorContext'
+import { useEditorSelector, type EditorContextValue } from './EditorContext'
 import { ShortcutsDialog } from '../dialogs/ShortcutsDialog'
 
 export type EditorViewMode = 'map' | 'behaviour-graph' | 'lighting' | 'dialogue'
 
+// Module-level so the selector identity is stable. Flattens activeMap to primitives:
+// the map object itself changes on every paint stroke and the toolbar must not follow it.
+const selectToolbar = (c: EditorContextValue) => ({
+  hasActiveMap: !!c.activeMap,
+  mapLabel: c.activeMap ? c.activeMap.name || c.activeMap.fileName : '',
+  mapWidth: c.activeMap?.width ?? 0,
+  mapHeight: c.activeMap?.height ?? 0,
+  historyIndex: c.historyIndex,
+  historyLength: c.historyLength,
+  handleUndo: c.handleUndo,
+  handleRedo: c.handleRedo,
+  activeTool: c.activeTool,
+  setActiveTool: c.setActiveTool,
+  paintMode: c.paintMode,
+  setPaintMode: c.setPaintMode,
+  showGrid: c.showGrid,
+  toggleShowGrid: c.toggleShowGrid,
+  snapToGrid: c.snapToGrid,
+  toggleSnapToGrid: c.toggleSnapToGrid,
+})
+
 function MapToolbar() {
-  const ctx = useEditorContext()
+  const ctx = useEditorSelector(selectToolbar)
   const [infoOpen, setInfoOpen] = useState(false)
 
-  const hasActiveMap = !!ctx.activeMap
+  const hasActiveMap = ctx.hasActiveMap
   const canUndo = hasActiveMap && ctx.historyIndex > 0
   const canRedo = hasActiveMap && ctx.historyIndex < ctx.historyLength - 1
 
@@ -35,10 +56,10 @@ function MapToolbar() {
           <div className="flex items-center gap-1.5 px-2.5 py-1 bg-muted/40 border border-sidebar-border rounded-md text-xs font-mono">
             <MapIcon className="w-3.5 h-3.5 text-primary shrink-0" />
             <span className="font-medium text-foreground truncate max-w-[140px]">
-              {ctx.activeMap.name || ctx.activeMap.fileName}
+              {ctx.mapLabel}
             </span>
             <span className="text-[10px] text-muted-foreground shrink-0">
-              ({ctx.activeMap.width}×{ctx.activeMap.height})
+              ({ctx.mapWidth}×{ctx.mapHeight})
             </span>
           </div>
         ) : (

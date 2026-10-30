@@ -1,6 +1,7 @@
 import React, { useMemo, useCallback } from 'react';
 import { IDockviewPanelProps } from 'dockview-react';
-import { useEditorContext } from '../EditorContext';
+import { useEditorSelector, type EditorContextValue } from '../EditorContext';
+import type { MapData } from '@/types/editor';
 
 import { MapsPanel } from '@/components/editor/panels/MapsPanel';
 import { LayersPanel } from '@/components/editor/panels/LayersPanel';
@@ -16,11 +17,35 @@ import { MapCanvas } from '@/components/editor/canvas/MapCanvas';
 // creating new arrow functions inside CanvasWrapper on every tick.
 const noop = () => {};
 
+// Each wrapper subscribes only to the context fields it passes down. Selectors live at module
+// scope (stable identity); results are compared shallowly, so unrelated context changes
+// (e.g. entities while painting) do not re-render the panel.
+
+const selectMaps = (c: EditorContextValue) => ({
+  setFocusedDomain: c.setFocusedDomain,
+  maps: c.maps,
+  mapFolders: c.mapFolders,
+  activeMap: c.activeMap,
+  expandedMapFolders: c.expandedMapFolders,
+  toggleMapFolder: c.toggleMapFolder,
+  setCreateMapData: c.setCreateMapData,
+  setCreateMapDialog: c.setCreateMapDialog,
+  setCreateMapFolderName: c.setCreateMapFolderName,
+  setCreateMapFolderDialog: c.setCreateMapFolderDialog,
+  setRenameInput: c.setRenameInput,
+  setRenameDialog: c.setRenameDialog,
+  handleDeleteMapFolder: c.handleDeleteMapFolder,
+  handleDeleteMap: c.handleDeleteMap,
+  handleExportMap: c.handleExportMap,
+  handleMapDrop: c.handleMapDrop,
+  onSelectMap: c.onSelectMap,
+});
+
 export function MapsWrapper(_props: IDockviewPanelProps) {
-  const ctx = useEditorContext();
+  const ctx = useEditorSelector(selectMaps);
   return (
     <div
-      onClick={() => ctx.setFocusedDomain?.('maps')}
+      onClick={() => ctx.setFocusedDomain('maps')}
       className="flex-1 overflow-y-auto p-2 font-mono text-xs min-h-0 bg-sidebar-background h-full"
     >
       <MapsPanel
@@ -45,15 +70,32 @@ export function MapsWrapper(_props: IDockviewPanelProps) {
   );
 }
 
+const selectLayers = (c: EditorContextValue) => ({
+  setFocusedDomain: c.setFocusedDomain,
+  hasActiveMap: !!c.activeMap,
+  layers: c.layers,
+  activeLayerId: c.activeLayerId,
+  setActiveLayerId: c.setActiveLayerId,
+  setSelectedEntityId: c.setSelectedEntityId,
+  toggleLayerVisibility: c.toggleLayerVisibility,
+  toggleLayerLock: c.toggleLayerLock,
+  handleDeleteLayer: c.handleDeleteLayer,
+  handleReorderLayers: c.handleReorderLayers,
+  handleCreateLayerOfType: c.handleCreateLayerOfType,
+  handleRenameLayer: c.handleRenameLayer,
+  handleDuplicateLayer: c.handleDuplicateLayer,
+  setConfirmDialog: c.setConfirmDialog,
+});
+
 export function LayersWrapper(_props: IDockviewPanelProps) {
-  const ctx = useEditorContext();
+  const ctx = useEditorSelector(selectLayers);
   return (
     <div
-      onClick={() => ctx.setFocusedDomain?.('layers')}
+      onClick={() => ctx.setFocusedDomain('layers')}
       className="flex-1 overflow-y-auto p-2 font-mono text-xs min-h-0 bg-sidebar-background h-full"
     >
       <LayersPanel
-        activeMap={ctx.activeMap}
+        hasActiveMap={ctx.hasActiveMap}
         layers={ctx.layers}
         activeLayerId={ctx.activeLayerId}
         setActiveLayerId={ctx.setActiveLayerId}
@@ -71,15 +113,40 @@ export function LayersWrapper(_props: IDockviewPanelProps) {
   );
 }
 
+const selectEntities = (c: EditorContextValue) => ({
+  setFocusedDomain: c.setFocusedDomain,
+  hasActiveMap: !!c.activeMap,
+  entities: c.entities,
+  selectedEntityId: c.selectedEntityId,
+  setSelectedEntityId: c.setSelectedEntityId,
+  handleCreateEntity: c.handleCreateEntity,
+  handleDeleteEntity: c.handleDeleteEntity,
+  handleDuplicateEntity: c.handleDuplicateEntity,
+  handleRenameEntity: c.handleRenameEntity,
+  handleReorderEntities: c.handleReorderEntities,
+  setConfirmDialog: c.setConfirmDialog,
+  startPlacement: c.startPlacement,
+  showEntities: c.showEntities,
+  toggleShowEntities: c.toggleShowEntities,
+  entityFolders: c.entityFolders,
+  createEntityFolder: c.createEntityFolder,
+  renameEntityFolder: c.renameEntityFolder,
+  deleteEntityFolder: c.deleteEntityFolder,
+  toggleEntityFolderVisibility: c.toggleEntityFolderVisibility,
+  toggleEntityFolderExpanded: c.toggleEntityFolderExpanded,
+  toggleEntityVisibility: c.toggleEntityVisibility,
+  moveEntityToFolder: c.moveEntityToFolder,
+});
+
 export function EntitiesWrapper(_props: IDockviewPanelProps) {
-  const ctx = useEditorContext();
+  const ctx = useEditorSelector(selectEntities);
   return (
     <div
-      onClick={() => ctx.setFocusedDomain?.('entities')}
+      onClick={() => ctx.setFocusedDomain('entities')}
       className="flex-1 overflow-y-auto p-2 font-mono text-xs min-h-0 bg-sidebar-background h-full"
     >
       <EntitiesPanel
-        activeMap={ctx.activeMap}
+        hasActiveMap={ctx.hasActiveMap}
         entities={ctx.entities}
         selectedEntityId={ctx.selectedEntityId}
         setSelectedEntityId={ctx.setSelectedEntityId}
@@ -90,13 +157,37 @@ export function EntitiesWrapper(_props: IDockviewPanelProps) {
         reorderEntities={ctx.handleReorderEntities}
         setConfirmDialog={ctx.setConfirmDialog}
         startPlacement={ctx.startPlacement}
+        showEntities={ctx.showEntities}
+        toggleShowEntities={ctx.toggleShowEntities}
+        entityFolders={ctx.entityFolders}
+        createEntityFolder={ctx.createEntityFolder}
+        renameEntityFolder={ctx.renameEntityFolder}
+        deleteEntityFolder={ctx.deleteEntityFolder}
+        toggleEntityFolderVisibility={ctx.toggleEntityFolderVisibility}
+        toggleEntityFolderExpanded={ctx.toggleEntityFolderExpanded}
+        toggleEntityVisibility={ctx.toggleEntityVisibility}
+        moveEntityToFolder={ctx.moveEntityToFolder}
       />
     </div>
   );
 }
 
+const selectProperties = (c: EditorContextValue) => ({
+  layers: c.layers,
+  activeLayerId: c.activeLayerId,
+  updateLayers: c.updateLayers,
+  entities: c.entities,
+  selectedEntityId: c.selectedEntityId,
+  handleRenameEntity: c.handleRenameEntity,
+  handleMoveEntity: c.handleMoveEntity,
+  handleAddComponent: c.handleAddComponent,
+  handleRemoveComponent: c.handleRemoveComponent,
+  handleUpdateComponentProp: c.handleUpdateComponentProp,
+  handleDeleteEntity: c.handleDeleteEntity,
+});
+
 export function PropertiesWrapper(_props: IDockviewPanelProps) {
-  const ctx = useEditorContext();
+  const ctx = useEditorSelector(selectProperties);
   return (
     <div className="flex-1 overflow-auto p-4 flex flex-col items-center justify-start text-xs text-muted-foreground text-center min-h-0 bg-card/40 h-full">
       <PropertiesPanel
@@ -116,8 +207,48 @@ export function PropertiesWrapper(_props: IDockviewPanelProps) {
   );
 }
 
+const selectCanvas = (c: EditorContextValue) => ({
+  activeMap: c.activeMap,
+  maps: c.maps,
+  layers: c.layers,
+  entities: c.entities,
+  onSelectMap: c.onSelectMap,
+  activeTool: c.activeTool,
+  paintMode: c.paintMode,
+  tilesets: c.tilesets,
+  tileSelection: c.tileSelection,
+  setTileSelection: c.setTileSelection,
+  activeLayerId: c.activeLayerId,
+  isPainting: c.isPainting,
+  setIsPainting: c.setIsPainting,
+  paintStartPos: c.paintStartPos,
+  setPaintStartPos: c.setPaintStartPos,
+  debugInfo: c.debugInfo,
+  handlePaint: c.handlePaint,
+  handlePaintBucket: c.handlePaintBucket,
+  handleRectangleFill: c.handleRectangleFill,
+  handleCommit: c.handleCommit,
+  selectedEntityId: c.selectedEntityId,
+  setSelectedEntityId: c.setSelectedEntityId,
+  handleMoveEntity: c.handleMoveEntity,
+  showGrid: c.showGrid,
+  snapToGrid: c.snapToGrid,
+  snapEntityPos: c.snapEntityPos,
+  pendingPlacement: c.pendingPlacement,
+  commitPlacement: c.commitPlacement,
+  cancelPlacement: c.cancelPlacement,
+  handleCreateEntity: c.handleCreateEntity,
+  handleDuplicateEntity: c.handleDuplicateEntity,
+  handleDeleteEntity: c.handleDeleteEntity,
+  handleUpdateComponentProp: c.handleUpdateComponentProp,
+  handleUpdateComponentProps: c.handleUpdateComponentProps,
+  showEntities: c.showEntities,
+  entityFolders: c.entityFolders,
+  handleAddComponent: c.handleAddComponent,
+});
+
 export function CanvasWrapper(props: IDockviewPanelProps) {
-  const ctx = useEditorContext();
+  const ctx = useEditorSelector(selectCanvas);
   const folderPath = props.params?.folderPath ?? null;
   const fileName = props.params?.fileName ?? '';
 
@@ -130,7 +261,7 @@ export function CanvasWrapper(props: IDockviewPanelProps) {
     if (isActive) return ctx.activeMap;
     return (
       ctx.maps.find(
-        (m: any) =>
+        (m: MapData) =>
           m.fileName === fileName && (m.folderPath || null) === (folderPath || null)
       ) || null
     );
@@ -139,12 +270,13 @@ export function CanvasWrapper(props: IDockviewPanelProps) {
   const currentLayers = isActive ? ctx.layers : targetMap?.layers || [];
   const currentEntities = isActive ? ctx.entities : targetMap?.entities || [];
 
+  const onSelectMap = ctx.onSelectMap;
   const handleActivate = useCallback(() => {
     if (!isActive && targetMap) {
-      ctx.onSelectMap?.(targetMap);
+      onSelectMap(targetMap);
       props.api.setActive();
     }
-  }, [isActive, targetMap, ctx, props.api]);
+  }, [isActive, targetMap, onSelectMap, props.api]);
 
   return (
     <div
@@ -172,7 +304,7 @@ export function CanvasWrapper(props: IDockviewPanelProps) {
         entities={currentEntities}
         selectedEntityId={isActive ? ctx.selectedEntityId : null}
         setSelectedEntityId={isActive ? ctx.setSelectedEntityId : noop}
-        moveEntity={isActive ? (ctx.handleMoveEntity || ctx.moveEntity) : noop}
+        moveEntity={isActive ? ctx.handleMoveEntity : noop}
         showGrid={ctx.showGrid}
         snapToGrid={ctx.snapToGrid}
         snapEntityPos={ctx.snapEntityPos}
@@ -183,6 +315,10 @@ export function CanvasWrapper(props: IDockviewPanelProps) {
         duplicateEntity={ctx.handleDuplicateEntity}
         deleteEntity={ctx.handleDeleteEntity}
         updateComponentProp={ctx.handleUpdateComponentProp}
+        updateComponentProps={ctx.handleUpdateComponentProps}
+        showEntities={ctx.showEntities}
+        entityFolders={ctx.entityFolders}
+        addComponent={ctx.handleAddComponent}
       />
     </div>
   );
@@ -208,8 +344,26 @@ export function EmptyCanvasWrapper(_props: IDockviewPanelProps) {
   );
 }
 
+const selectTilesets = (c: EditorContextValue) => ({
+  handleDrop: c.handleDrop,
+  tilesets: c.tilesets,
+  folders: c.folders,
+  activeTileset: c.activeTileset,
+  setActiveTileset: c.setActiveTileset,
+  expandedFolders: c.expandedFolders,
+  selectedFolder: c.selectedFolder,
+  setSelectedFolder: c.setSelectedFolder,
+  toggleFolder: c.toggleFolder,
+  handlePickFile: c.handlePickFile,
+  handleOpenCreateFolderDialog: c.handleOpenCreateFolderDialog,
+  setRenameInput: c.setRenameInput,
+  setRenameDialog: c.setRenameDialog,
+  handleDeleteFolder: c.handleDeleteFolder,
+  activeLayerType: c.activeLayerType,
+});
+
 export function TilesetsWrapper(_props: IDockviewPanelProps) {
-  const ctx = useEditorContext();
+  const ctx = useEditorSelector(selectTilesets);
   return (
     <div
       className="flex-1 overflow-y-auto p-2 font-mono text-xs min-h-0 bg-sidebar-background h-full"
@@ -237,8 +391,23 @@ export function TilesetsWrapper(_props: IDockviewPanelProps) {
   );
 }
 
+const selectPreview = (c: EditorContextValue) => ({
+  activeTileset: c.activeTileset,
+  tilesetDimensions: c.tilesetDimensions,
+  setTilesetDimensions: c.setTilesetDimensions,
+  tileSelection: c.tileSelection,
+  setTileSelection: c.setTileSelection,
+  tilesetSelectionStart: c.tilesetSelectionStart,
+  setTilesetSelectionStart: c.setTilesetSelectionStart,
+  tilesetSelectionCurrent: c.tilesetSelectionCurrent,
+  setTilesetSelectionCurrent: c.setTilesetSelectionCurrent,
+  hoverTile: c.hoverTile,
+  setHoverTile: c.setHoverTile,
+  activeLayerType: c.activeLayerType,
+});
+
 export function PreviewWrapper(_props: IDockviewPanelProps) {
-  const ctx = useEditorContext();
+  const ctx = useEditorSelector(selectPreview);
   return (
     <div className="flex-1 overflow-auto p-4 relative bg-muted/10 min-h-0 h-full">
       <TilesetPreview
@@ -259,8 +428,13 @@ export function PreviewWrapper(_props: IDockviewPanelProps) {
   );
 }
 
+const selectActiveSelection = (c: EditorContextValue) => ({
+  tileSelection: c.tileSelection,
+  tilesets: c.tilesets,
+});
+
 export function ActiveSelectionWrapper(_props: IDockviewPanelProps) {
-  const ctx = useEditorContext();
+  const ctx = useEditorSelector(selectActiveSelection);
   return (
     <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-muted/10 min-h-0 h-full">
       <ActiveSelectionPanel tileSelection={ctx.tileSelection} tilesets={ctx.tilesets} />

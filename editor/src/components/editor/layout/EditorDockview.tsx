@@ -4,7 +4,7 @@ import { IDockviewPanelHeaderProps } from 'dockview';
 import 'dockview/dist/styles/dockview.css';
 import './DockviewTheme.css';
 
-import { EditorContext, useEditorContext } from './EditorContext';
+import { EditorExtensionProvider, useEditorSelector, type EditorContextValue } from './EditorContext';
 import { dockviewComponents } from './dockview/PanelWrappers';
 import { DefaultHeaderActions } from './dockview/HeaderActions';
 import { useDockviewLayout } from './dockview/useDockviewLayout';
@@ -16,8 +16,15 @@ const TabHeaderComponent = (props: IDockviewPanelHeaderProps) => {
   return <DockviewDefaultTab {...props} hideClose={!isMap} />;
 };
 
+const selectDockInputs = (c: EditorContextValue) => ({
+  maps: c.maps,
+  activeMap: c.activeMap,
+  onSelectMap: c.onSelectMap,
+  onClearActiveMap: c.onClearActiveMap,
+});
+
 export function EditorDockview() {
-  const parentCtx = useEditorContext();
+  const parentCtx = useEditorSelector(selectDockInputs);
   const {
     onReady,
     openPanels,
@@ -35,9 +42,8 @@ export function EditorDockview() {
     onClearActiveMap: parentCtx.onClearActiveMap,
   });
 
-  const contextValue = useMemo(
+  const layoutValue = useMemo(
     () => ({
-      ...parentCtx,
       openPanels,
       openPanel,
       closePanel,
@@ -47,21 +53,11 @@ export function EditorDockview() {
       closeMapTab,
       isPanelOpen,
     }),
-    [
-      parentCtx,
-      openPanels,
-      openPanel,
-      closePanel,
-      togglePanel,
-      resetLayout,
-      openMapTab,
-      closeMapTab,
-      isPanelOpen,
-    ]
+    [openPanels, openPanel, closePanel, togglePanel, resetLayout, openMapTab, closeMapTab, isPanelOpen]
   );
 
   return (
-    <EditorContext.Provider value={contextValue}>
+    <EditorExtensionProvider extension={layoutValue}>
       <div className="flex flex-col flex-1 w-full h-full overflow-hidden">
         <EditorTopToolbar mode="map" />
         <div className="flex-1 w-full h-full overflow-hidden min-h-0">
@@ -74,7 +70,7 @@ export function EditorDockview() {
           />
         </div>
       </div>
-    </EditorContext.Provider>
+    </EditorExtensionProvider>
   );
 }
 

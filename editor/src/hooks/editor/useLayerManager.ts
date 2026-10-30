@@ -1,16 +1,18 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { Layer, LayerType, TileSelection, ActiveTool, PaintMode, DebugInfo, MapData } from '@/types/editor'
+import { useSyncedState } from '@/hooks/useSyncedState'
 
 interface UseLayerManagerOptions {
-  activeMap: MapData | null
+  /** Functional updates only: the manager never closes over the current map. */
   setActiveMap: React.Dispatch<React.SetStateAction<MapData | null>>
+  /** Called once per committed layer mutation, after the new layers are readable via `getLayers()`. */
   onCommitHistory?: (layers: Layer[]) => void
 }
 
 export function useLayerManager(options: UseLayerManagerOptions) {
-  const { activeMap, setActiveMap, onCommitHistory } = options
+  const { setActiveMap, onCommitHistory } = options
 
-  const [layers, setLayers] = useState<Layer[]>([])
+  const [layers, setLayers, layersRef] = useSyncedState<Layer[]>([])
   const [activeLayerId, setActiveLayerId] = useState<string | null>(null)
   const [tileSelection, setTileSelection] = useState<TileSelection | null>(null)
   const [activeTool, setActiveTool] = useState<ActiveTool>('brush')
@@ -19,12 +21,10 @@ export function useLayerManager(options: UseLayerManagerOptions) {
   const [paintStartPos, setPaintStartPos] = useState<{ x: number; y: number } | null>(null)
   const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null)
 
-  // ── Collision Virtual Tile Effect ─────────────────────────────────────────
-  const layersRef = useRef(layers)
-  useEffect(() => {
-    layersRef.current = layers
-  }, [layers])
+  /** Latest layers, readable synchronously (e.g. for history snapshots / paint ops). */
+  const getLayers = useCallback(() => layersRef.current, [layersRef])
 
+  // ── Collision Virtual Tile Effect ─────────────────────────────────────────
   const prevTileSelectionRef = useRef<TileSelection | null>(null)
 
   useEffect(() => {
@@ -44,25 +44,21 @@ export function useLayerManager(options: UseLayerManagerOptions) {
         return current
       })
     }
-  }, [activeLayerId])
+  }, [activeLayerId, layersRef])
 
   // ── Layer helpers ─────────────────────────────────────────────────────────
   const commitNewLayers = useCallback(
     (updater: (prev: Layer[]) => Layer[], onAfter?: (next: Layer[]) => void) => {
-      setLayers(prev => {
-        const next = updater(prev)
-        if (next === prev) return prev
-        if (activeMap) {
-          const updatedMap = { ...activeMap, layers: next }
-          setActiveMap(updatedMap)
-          window.electronAPI?.saveMap(activeMap.folderPath, activeMap.fileName, updatedMap)
-        }
-        onCommitHistory?.(next)
-        onAfter?.(next)
-        return next
-      })
+      // Computed from the ref, *outside* of any React updater: side effects below run exactly once.
+      const prev = layersRef.current
+      const next = updater(prev)
+      if (next === prev) return
+      setLayers(next)
+      setActiveMap(m => (m ? { ...m, layers: next } : m))
+      onCommitHistory?.(next)
+      onAfter?.(next)
     },
-    [activeMap, setActiveMap, onCommitHistory]
+    [layersRef, setLayers, setActiveMap, onCommitHistory]
   )
 
   const updateLayers = useCallback(
@@ -193,13 +189,11 @@ export function useLayerManager(options: UseLayerManagerOptions) {
       commitNewLayers(
         prev => prev.filter(l => l.id !== id),
         next => {
-          if (activeLayerId === id) {
-            setActiveLayerId(next.length > 0 ? next[0].id : null)
-          }
+          setActiveLayerId(current => (current === id ? (next.length > 0 ? next[0].id : null) : current))
         }
       )
     },
-    [commitNewLayers, activeLayerId]
+    [commitNewLayers]
   )
 
   const handleReorderLayers = useCallback(
@@ -216,6 +210,7 @@ export function useLayerManager(options: UseLayerManagerOptions) {
 
   return {
     layers,
+    getLayers,
     setLayers,
     activeLayerId,
     setActiveLayerId,

@@ -11,6 +11,7 @@ import {
   Pos,
   EntityData,
   ComponentType,
+  EntityFolder,
 } from '@/types/editor'
 import { useTilesetImages } from '@/hooks/editor/useTilesetImages'
 import { useCanvasViewport } from '@/hooks/editor/canvas/useCanvasViewport'
@@ -55,6 +56,11 @@ interface MapCanvasProps {
   duplicateEntity?: (id: string) => void
   deleteEntity?: (id: string) => void
   updateComponentProp?: (entityId: string, type: ComponentType, key: string, value: any) => void
+  /** Batch variant: applies several props in one commit (one undo step / one save). */
+  updateComponentProps?: (entityId: string, type: ComponentType, props: Record<string, any>) => void
+  addComponent?: (entityId: string, type: ComponentType) => void
+  showEntities?: boolean
+  entityFolders?: EntityFolder[]
 }
 
 export function MapCanvas({
@@ -89,6 +95,10 @@ export function MapCanvas({
   duplicateEntity,
   deleteEntity,
   updateComponentProp,
+  updateComponentProps,
+  addComponent,
+  showEntities = true,
+  entityFolders = [],
 }: MapCanvasProps) {
   // Preload and cache tileset image textures
   const images = useTilesetImages(tilesets)
@@ -153,16 +163,22 @@ export function MapCanvas({
     snapEntityPos,
     resizingColliderEntityId,
     setResizingColliderEntityId,
+    selectedEntityId,
+    setSelectedEntityId,
   })
 
   const handleUpdateCollider = useCallback(
     (entityId: string, width: number, height: number, offsetX: number, offsetY: number) => {
+      if (updateComponentProps) {
+        updateComponentProps(entityId, 'Collider', { width, height, offsetX, offsetY })
+        return
+      }
       updateComponentProp?.(entityId, 'Collider', 'width', width)
       updateComponentProp?.(entityId, 'Collider', 'height', height)
       updateComponentProp?.(entityId, 'Collider', 'offsetX', offsetX)
       updateComponentProp?.(entityId, 'Collider', 'offsetY', offsetY)
     },
-    [updateComponentProp]
+    [updateComponentProp, updateComponentProps]
   )
 
   const mapWidthPx = activeMap ? activeMap.width * 32 : 0
@@ -234,6 +250,8 @@ export function MapCanvas({
                 setResizingColliderEntityId={setResizingColliderEntityId}
                 onUpdateCollider={handleUpdateCollider}
                 onRightClickEntity={handleRightClickEntity}
+                showEntities={showEntities}
+                entityFolders={entityFolders}
               />
 
               {/* Ghost entity preview during placement mode */}
@@ -268,7 +286,22 @@ export function MapCanvas({
         onCreateEntity={(name, x, y, comps) => createEntity?.(name, x, y, comps)}
         onDuplicateEntity={duplicateEntity}
         onDeleteEntity={deleteEntity}
-        onStartResizeCollider={(id) => setResizingColliderEntityId(id)}
+        onStartResizeCollider={(id) => {
+          const entity = entities.find((e) => e.id === id)
+          if (entity && !entity.components.Collider) {
+            if (addComponent) {
+              addComponent(id, 'Collider')
+            } else {
+              updateComponentProp?.(id, 'Collider', 'width', 32)
+              updateComponentProp?.(id, 'Collider', 'height', 32)
+              updateComponentProp?.(id, 'Collider', 'offsetX', 0)
+              updateComponentProp?.(id, 'Collider', 'offsetY', 0)
+              updateComponentProp?.(id, 'Collider', 'isSolid', true)
+            }
+          }
+          setSelectedEntityId?.(id)
+          setResizingColliderEntityId(id)
+        }}
         onSampleTile={sampleSingleTile}
       />
     </>

@@ -57,7 +57,16 @@ export interface EntityData {
   name: string
   x: number
   y: number
+  visible?: boolean
+  folder?: string | null
   components: Partial<Record<ComponentType, Record<string, any>>>
+}
+
+export interface EntityFolder {
+  id: string
+  name: string
+  expanded?: boolean
+  visible?: boolean
 }
 
 export interface MapData {
@@ -68,6 +77,7 @@ export interface MapData {
   height: number
   layers: Layer[]
   entities?: EntityData[]
+  entityFolders?: EntityFolder[]
 }
 
 export interface TilesetData {

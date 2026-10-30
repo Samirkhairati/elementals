@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
 import { MapData } from '@/types/editor'
+import { mapSaveQueue } from '@/lib/saveQueue'
 
 interface UseEditorDialogsOptions {
   folders: string[]
@@ -142,8 +143,11 @@ export function useEditorDialogs(options: UseEditorDialogsOptions) {
         cleanName
       )
     } else if (renameDialog.type === 'map-folder' && renameDialog.oldPath) {
+      // Pending debounced autosaves target the old path: write them before the files move.
+      await mapSaveQueue.flushAll()
       res = await window.electronAPI.renameMapFolder(renameDialog.oldPath, cleanName)
     } else if (renameDialog.type === 'map' && renameDialog.oldPath) {
+      await mapSaveQueue.flushAll()
       res = await window.electronAPI.renameMap(
         renameDialog.targetFolder || null,
         renameDialog.oldPath,

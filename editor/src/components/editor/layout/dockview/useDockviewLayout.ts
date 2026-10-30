@@ -26,7 +26,10 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
   const updateOpenPanels = useCallback(() => {
     if (!apiRef.current) return;
     const ids = apiRef.current.panels.map((p) => p.id);
-    setOpenPanels(ids);
+    // Keep the same array when nothing changed so context consumers don't re-render needlessly.
+    setOpenPanels((prev) =>
+      prev.length === ids.length && prev.every((id, i) => id === ids[i]) ? prev : ids
+    );
   }, []);
 
   const buildDefaultLayout = useCallback((api: DockviewApi) => {
@@ -330,12 +333,16 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
     updateOpenPanels();
   }, [buildDefaultLayout, updateOpenPanels]);
 
-  // Sync activeMap tab when activeMap changes from outside
+  // Sync activeMap tab when the active map *identity* changes from outside
+  // (content edits produce a new activeMap object on every stroke and must not re-run this).
+  const activeMapFile = activeMap?.fileName;
+  const activeMapFolder = activeMap?.folderPath;
   useEffect(() => {
-    if (activeMap && apiRef.current) {
-      openMapTab(activeMap);
+    const current = optionsRef.current.activeMap;
+    if (current && apiRef.current) {
+      openMapTab(current);
     }
-  }, [activeMap, openMapTab]);
+  }, [activeMapFile, activeMapFolder, openMapTab]);
 
   const openPanel = useCallback((id: PanelId | string) => {
     if (!apiRef.current) return;
@@ -570,6 +577,8 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
     }
   }, [openPanel, updateOpenPanels]);
 
+  const isPanelOpen = useCallback((id: string) => openPanels.includes(id), [openPanels]);
+
   const resetLayout = useCallback(() => {
     if (!apiRef.current) return;
     apiRef.current.clear();
@@ -618,7 +627,7 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
     resetLayout,
     openMapTab,
     closeMapTab,
-    isPanelOpen: (id: string) => openPanels.includes(id),
+    isPanelOpen,
   };
 }
 

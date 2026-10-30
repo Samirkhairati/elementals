@@ -45,6 +45,8 @@ interface UseCanvasInteractionProps {
   snapEntityPos?: (rawX: number, rawY: number) => { x: number; y: number }
   resizingColliderEntityId?: string | null
   setResizingColliderEntityId?: (id: string | null) => void
+  selectedEntityId?: string | null
+  setSelectedEntityId?: (id: string | null) => void
 }
 
 export function useCanvasInteraction({
@@ -75,6 +77,8 @@ export function useCanvasInteraction({
   snapEntityPos: _snapEntityPos,
   resizingColliderEntityId = null,
   setResizingColliderEntityId,
+  selectedEntityId = null,
+  setSelectedEntityId,
 }: UseCanvasInteractionProps) {
   const [canvasHover, setCanvasHover] = useState<Pos | null>(null)
   const [canvasCopyStart, setCanvasCopyStart] = useState<Pos | null>(null)
@@ -302,6 +306,18 @@ export function useCanvasInteraction({
         }
       }
 
+      // If an entity was selected or we were resizing collider, clicking elsewhere on the canvas
+      // should ONLY deselect on the first click and NOT start painting immediately!
+      if (e.evt.button === 0 && (selectedEntityId || resizingColliderEntityId)) {
+        if (selectedEntityId && setSelectedEntityId) {
+          setSelectedEntityId(null)
+        }
+        if (resizingColliderEntityId && setResizingColliderEntityId) {
+          setResizingColliderEntityId(null)
+        }
+        return
+      }
+
       // Deselect collider resize mode if clicking elsewhere on canvas
       if (resizingColliderEntityId && setResizingColliderEntityId) {
         setResizingColliderEntityId(null)
@@ -365,6 +381,8 @@ export function useCanvasInteraction({
       stageRef,
       resizingColliderEntityId,
       setResizingColliderEntityId,
+      selectedEntityId,
+      setSelectedEntityId,
     ]
   )
 

@@ -14,7 +14,7 @@ import {
   Copy,
   Plus,
 } from 'lucide-react'
-import { Layer, LayerType, MapData } from '@/types/editor'
+import { Layer, LayerType } from '@/types/editor'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -78,7 +78,8 @@ function NewLayerSubmenu({
 }
 
 interface LayersPanelProps {
-  activeMap: MapData | null
+  /** Whether a map is open (the panel only needs presence, not the map itself). */
+  hasActiveMap: boolean
   layers: Layer[]
   activeLayerId: string | null
   setActiveLayerId: (id: string) => void
@@ -99,7 +100,7 @@ interface LayersPanelProps {
 }
 
 export function LayersPanel({
-  activeMap,
+  hasActiveMap,
   layers,
   activeLayerId,
   setActiveLayerId,
@@ -205,7 +206,7 @@ export function LayersPanel({
   const hasTerrain = layers.some((l) => l.type === 'terrain')
   const hasEncounters = layers.some((l) => l.type === 'encounters')
 
-  if (!activeMap) {
+  if (!hasActiveMap) {
     return (
       <div className="h-full flex items-center justify-center text-muted-foreground p-8 text-center select-none">
         <p className="text-xs">Select a map to view layers</p>

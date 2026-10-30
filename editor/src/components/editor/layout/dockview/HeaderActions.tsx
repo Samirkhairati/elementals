@@ -1,9 +1,14 @@
 import React from 'react';
 import { Plus, FolderPlus } from 'lucide-react';
-import { useEditorContext } from '../EditorContext';
+import { useEditorSelector, type EditorContextValue } from '../EditorContext';
+
+const selectTilesetActions = (c: EditorContextValue) => ({
+  handleOpenCreateFolderDialog: c.handleOpenCreateFolderDialog,
+  handlePickFile: c.handlePickFile,
+});
 
 export function TilesetsActions() {
-  const ctx = useEditorContext();
+  const ctx = useEditorSelector(selectTilesetActions);
   return (
     <div className="flex items-center space-x-1 px-2">
       <button

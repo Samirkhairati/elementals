@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react'
 import { Group, Rect, Text, Shape } from 'react-konva'
 import Konva from 'konva'
-import { EntityData, MapData } from '@/types/editor'
+import { EntityData, MapData, EntityFolder } from '@/types/editor'
 import { KonvaColliderTransformer } from './KonvaColliderTransformer'
 
 interface KonvaEntitiesProps {
@@ -18,6 +18,8 @@ interface KonvaEntitiesProps {
   onUpdateCollider?: (entityId: string, width: number, height: number, offsetX: number, offsetY: number) => void
   onContextMenuEntity?: (entity: EntityData, clientX: number, clientY: number) => void
   onRightClickEntity?: (entity: EntityData, clientX: number, clientY: number) => void
+  showEntities?: boolean
+  entityFolders?: EntityFolder[]
 }
 
 interface KonvaEntityNodeProps {
@@ -36,23 +38,6 @@ interface KonvaEntityNodeProps {
   onRightClickEntity?: (entity: EntityData, clientX: number, clientY: number) => void
 }
 
-function getEntityColor(entity: EntityData): { bg: string; border: string; text: string } {
-  const comps = entity.components
-  if (comps.Tag?.tag === 'warp' || comps.Interactable?.targetMap) {
-    return { bg: 'rgba(6, 182, 212, 0.45)', border: '#22d3ee', text: '#cffafe' }
-  }
-  if (comps.CharacterAnimation || comps.Tag?.tag === 'npc' || comps.AIWander) {
-    return { bg: 'rgba(16, 185, 129, 0.45)', border: '#34d399', text: '#d1fae5' }
-  }
-  if (comps.Tag?.tag === 'sign') {
-    return { bg: 'rgba(59, 130, 246, 0.45)', border: '#60a5fa', text: '#dbeafe' }
-  }
-  if (comps.Tag?.tag === 'chest') {
-    return { bg: 'rgba(245, 158, 11, 0.45)', border: '#fbbf24', text: '#fef3c7' }
-  }
-  return { bg: 'rgba(168, 85, 247, 0.45)', border: '#c084fc', text: '#f3e8ff' }
-}
-
 const KonvaEntityNode = React.memo(function KonvaEntityNode({
   entity,
   isSelected,
@@ -65,17 +50,16 @@ const KonvaEntityNode = React.memo(function KonvaEntityNode({
   snapToGrid,
   snapEntityPos,
   onUpdateCollider,
-  onContextMenuEntity,
+  onContextMenuEntity: _onContextMenuEntity,
   onRightClickEntity,
 }: KonvaEntityNodeProps) {
   const collider = entity.components.Collider
   const interactable = entity.components.Interactable
   const spriteView = entity.components.SpriteView
-  const colors = getEntityColor(entity)
-  const colliderShapeRef = useRef<Konva.Rect | null>(null)
+  const [colliderNode, setColliderNode] = useState<Konva.Rect | null>(null)
 
-  const colliderW = collider?.width || 16
-  const colliderH = collider?.height || 8
+  const colliderW = collider?.width || 32
+  const colliderH = collider?.height || 32
   const colliderOffX = collider?.offsetX || 0
   const colliderOffY = collider?.offsetY || 0
 
@@ -85,13 +69,13 @@ const KonvaEntityNode = React.memo(function KonvaEntityNode({
       {(isSelected || isResizingCollider) && collider && (
         <>
           <Rect
-            ref={colliderShapeRef}
+            ref={setColliderNode}
             x={entity.x + colliderOffX - colliderW / 2}
             y={entity.y + colliderOffY - colliderH}
             width={colliderW}
             height={colliderH}
-            fill="rgba(248, 113, 113, 0.2)"
-            stroke={isResizingCollider ? '#ef4444' : 'rgba(248, 113, 113, 0.8)'}
+            fill="rgba(239, 68, 68, 0.2)"
+            stroke={isResizingCollider ? '#ef4444' : 'rgba(239, 68, 68, 0.8)'}
             strokeWidth={isResizingCollider ? 1.5 : 1}
             dash={isResizingCollider ? undefined : [3, 3]}
             listening={isResizingCollider}
@@ -99,7 +83,7 @@ const KonvaEntityNode = React.memo(function KonvaEntityNode({
 
           {isResizingCollider && (
             <KonvaColliderTransformer
-              targetNode={colliderShapeRef.current}
+              targetNode={colliderNode}
               snapToGrid={snapToGrid}
               baseEntityX={entity.x}
               baseEntityY={entity.y}
@@ -193,7 +177,7 @@ const KonvaEntityNode = React.memo(function KonvaEntityNode({
             width={Math.max(40, entity.name.length * 7 + 16)}
             height={15}
             fill="rgba(0, 0, 0, 0.85)"
-            stroke={isSelected ? '#3b82f6' : 'rgba(255, 255, 255, 0.2)'}
+            stroke={isSelected ? '#ffffff' : 'rgba(255, 255, 255, 0.25)'}
             strokeWidth={1}
             cornerRadius={2}
             listening={false}
@@ -206,12 +190,12 @@ const KonvaEntityNode = React.memo(function KonvaEntityNode({
             align="center"
             fontSize={10}
             fontFamily="monospace"
-            fill={isSelected ? '#60a5fa' : '#ffffff'}
+            fill={isSelected ? '#ffffff' : 'rgba(255, 255, 255, 0.85)'}
             listening={false}
           />
         </Group>
 
-        {/* Entity Icon Badge / Sprite */}
+        {/* Entity Box or Sprite: Centered 32x32 tile box */}
         {spriteView && spriteView.tilesetId && images[spriteView.tilesetId] ? (
           <Shape
             x={-16}
@@ -238,31 +222,19 @@ const KonvaEntityNode = React.memo(function KonvaEntityNode({
             }}
           />
         ) : (
-          <Group x={-14} y={-28}>
-            <Rect
-              width={28}
-              height={28}
-              fill={isSelected ? 'rgba(59, 130, 246, 0.6)' : colors.bg}
-              stroke={isSelected ? '#60a5fa' : colors.border}
-              strokeWidth={isSelected ? 2 : 1.5}
-              cornerRadius={2}
-              shadowColor="black"
-              shadowBlur={3}
-              shadowOpacity={0.3}
-            />
-            <Text
-              text={entity.name.slice(0, 2).toUpperCase()}
-              x={0}
-              y={7}
-              width={28}
-              align="center"
-              fontSize={11}
-              fontStyle="bold"
-              fontFamily="monospace"
-              fill={colors.text}
-              listening={false}
-            />
-          </Group>
+          <Rect
+            x={-16}
+            y={-32}
+            width={32}
+            height={32}
+            fill={isSelected ? 'rgba(255, 255, 255, 0.35)' : 'rgba(255, 255, 255, 0.12)'}
+            stroke={isSelected ? '#ffffff' : 'rgba(255, 255, 255, 0.4)'}
+            strokeWidth={isSelected ? 1.5 : 1}
+            cornerRadius={3}
+            shadowColor={isSelected ? '#ffffff' : 'black'}
+            shadowBlur={isSelected ? 6 : 2}
+            shadowOpacity={isSelected ? 0.4 : 0.2}
+          />
         )}
       </Group>
     </Group>
@@ -282,13 +254,29 @@ export const KonvaEntities = React.memo(function KonvaEntities({
   onUpdateCollider,
   onContextMenuEntity,
   onRightClickEntity,
+  showEntities = true,
+  entityFolders = [],
 }: KonvaEntitiesProps) {
+  if (showEntities === false) return null
+
   const mapWidthPx = activeMap.width * 32
   const mapHeightPx = activeMap.height * 32
 
+  // Collect hidden folder IDs
+  const hiddenFolderIds = new Set(
+    (entityFolders || []).filter(f => f.visible === false).map(f => f.id)
+  )
+
+  // Filter out invisible entities
+  const visibleEntities = entities.filter(entity => {
+    if (entity.visible === false) return false
+    if (entity.folder && hiddenFolderIds.has(entity.folder)) return false
+    return true
+  })
+
   return (
     <Group>
-      {entities.map(entity => (
+      {visibleEntities.map(entity => (
         <KonvaEntityNode
           key={entity.id}
           entity={entity}
@@ -309,3 +297,4 @@ export const KonvaEntities = React.memo(function KonvaEntities({
     </Group>
   )
 })
+
