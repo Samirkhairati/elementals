@@ -1,4 +1,23 @@
 import { Layer, MapData, TilesetData } from '@/types/editor'
+// The conversion and validation live in /shared so the editor and scripts/export-maps.mjs use the same code.
+import { collectUsedTilesetIds, convertEditorMapToTiled, serializeTiledMap } from '../../../shared/mapExport'
+import { validateEditorMap, validateTiledMap } from '../../../shared/mapSchema'
+import type { EditorMap, TilesetInfo } from '../../../shared/mapTypes'
+
+function loadImageSize(dataUrl: string): Promise<{ w: number; h: number }> {
+  return new Promise(resolve => {
+    const img = new Image()
+    img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight })
+    img.onerror = () => resolve({ w: 0, h: 0 })
+    img.src = dataUrl
+  })
+}
+
+function formatErrors(title: string, errors: string[]): string {
+  const shown = errors.slice(0, 10).map(e => '- ' + e)
+  if (errors.length > shown.length) shown.push(`- ... and ${errors.length - shown.length} more`)
+  return `${title}\n${shown.join('\n')}`
+}
 
 export async function exportMap(
   mapToExportRaw: any,
@@ -8,136 +27,41 @@ export async function exportMap(
 ): Promise<void> {
   if (!window.electronAPI) return
 
-  const mapToExport = (activeMap && mapToExportRaw.fileName === activeMap.fileName)
+  const mapToExport: EditorMap = (activeMap && mapToExportRaw.fileName === activeMap.fileName)
     ? { ...mapToExportRaw, layers, entities: activeMap.entities || [] }
     : mapToExportRaw
 
-  const usedTilesets = new Set<string>()
-  let hasCollisionLayer = false
-  for (const layer of mapToExport.layers || []) {
-    if (layer.type === 'collision') {
-      hasCollisionLayer = true
-      continue
-    }
-    for (const tile of Object.values(layer.data || {}) as any[]) {
-      usedTilesets.add(tile.tilesetId)
-    }
+  // Measure the images of the tilesets the map actually uses.
+  const used = new Set(collectUsedTilesetIds(mapToExport))
+  const tilesetInfos: TilesetInfo[] = []
+  for (const ts of tilesets) {
+    const dim = used.has(ts.fileName) ? await loadImageSize(ts.dataUrl) : { w: 0, h: 0 }
+    tilesetInfos.push({ name: ts.name, fileName: ts.fileName, width: dim.w, height: dim.h })
   }
 
-  const exportTilesets: any[] = []
-  let currentGid = 1
-  for (const tsId of usedTilesets) {
-    const ts = tilesets.find(t => t.fileName === tsId)
-    if (!ts) continue
-
-    const dim = await new Promise<{ w: number; h: number }>(resolve => {
-      const img = new Image()
-      img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight })
-      img.onerror = () => resolve({ w: 0, h: 0 })
-      img.src = ts.dataUrl
-    })
-
-    if (dim.w === 0 || dim.h === 0) continue
-
-    const columns = Math.floor(dim.w / 32)
-    const tilecount = columns * Math.floor(dim.h / 32)
-
-    exportTilesets.push({
-      columns,
-      firstgid: currentGid,
-      image: ts.fileName,
-      imageheight: dim.h,
-      imagewidth: dim.w,
-      margin: 0,
-      name: ts.name,
-      spacing: 0,
-      tilecount,
-      tileheight: 32,
-      tilewidth: 32,
-    })
-
-    currentGid += tilecount
+  const unreadable = tilesetInfos.filter(t => used.has(t.fileName) && (t.width === 0 || t.height === 0))
+  if (unreadable.length > 0) {
+    alert('Export failed: ' + formatErrors(
+      'Some tileset images could not be loaded:',
+      unreadable.map(t => t.fileName)
+    ))
+    return
   }
 
-  let collisionGid = 0
-  if (hasCollisionLayer) {
-    collisionGid = currentGid
-    exportTilesets.push({
-      columns: 1,
-      firstgid: collisionGid,
-      image: "collision_dummy.png",
-      imageheight: 32,
-      imagewidth: 32,
-      margin: 0,
-      name: "collision_dummy",
-      spacing: 0,
-      tilecount: 1,
-      tileheight: 32,
-      tilewidth: 32,
-    })
-    currentGid += 1
+  const editorCheck = validateEditorMap(mapToExport, { tilesets: tilesetInfos })
+  if (!editorCheck.ok) {
+    alert('Export failed: ' + formatErrors(`The map "${mapToExport?.name}" is invalid:`, editorCheck.errors))
+    return
   }
 
-  const exportLayers = (mapToExport.layers || []).map((layer: any, index: number) => {
-    const data = new Array(mapToExport.width * mapToExport.height).fill(0)
-
-    for (const [indexStr, tile] of Object.entries(layer.data || {}) as any[]) {
-      const idx = parseInt(indexStr)
-      if (layer.type === 'collision') {
-        data[idx] = collisionGid
-      } else {
-        const tsExport = exportTilesets.find(t => t.name === tilesets.find(ts => ts.fileName === tile.tilesetId)?.name)
-        if (tsExport) {
-          const gid = tsExport.firstgid + (tile.y * tsExport.columns + tile.x)
-          data[idx] = gid
-        }
-      }
-    }
-
-    const exportLayer: any = {
-      data,
-      height: mapToExport.height,
-      id: index + 1,
-      name: layer.type === 'collision' ? 'collision' : layer.name,
-      opacity: 1,
-      type: layer.type === 'tile' ? 'tilelayer' : (layer.type === 'collision' ? 'tilelayer' : (layer.type === 'objects' ? 'objectgroup' : 'tilelayer')),
-      visible: layer.visible,
-      width: mapToExport.width,
-      x: 0,
-      y: 0,
-    }
-
-    const props: any[] = []
-    if (layer.z !== undefined) {
-      props.push({ name: 'z', type: 'int', value: Number(layer.z) })
-    }
-    if (props.length > 0) {
-      exportLayer.properties = props
-    }
-
-    return exportLayer
-  })
-
-  const tiledMap = {
-    compressionlevel: -1,
-    height: mapToExport.height,
-    infinite: false,
-    layers: exportLayers,
-    nextlayerid: exportLayers.length + 1,
-    nextobjectid: 1,
-    orientation: 'orthogonal',
-    renderorder: 'right-down',
-    tiledversion: '1.10.2',
-    tileheight: 32,
-    tilesets: exportTilesets,
-    tilewidth: 32,
-    type: 'map',
-    version: '1.10',
-    width: mapToExport.width,
-    entities: mapToExport.entities || [],
+  const tiledMap = convertEditorMapToTiled(mapToExport, tilesetInfos)
+  const tiledCheck = validateTiledMap(tiledMap)
+  if (!tiledCheck.ok) {
+    alert('Export failed: ' + formatErrors('The exported map would be invalid:', tiledCheck.errors))
+    return
   }
 
-  const res = await window.electronAPI.exportMap(JSON.stringify(tiledMap, null, 2), mapToExport.name + '.json')
+  const res = await window.electronAPI.exportMap(serializeTiledMap(tiledMap), mapToExport.name + '.json')
   if (res && res.error && res.error !== 'Canceled') {
     alert('Export failed: ' + res.error)
   }
