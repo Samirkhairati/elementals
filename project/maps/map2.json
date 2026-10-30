@@ -12,6 +12,11 @@
       "visible": true,
       "locked": false,
       "data": {
+        "36": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
         "98": {
           "tilesetId": "__collision__",
           "x": 0,
@@ -3801,5 +3806,26 @@
       }
     }
   ],
-  "entities": []
+  "entities": [
+    {
+      "id": "2005a387-2346-4cf3-bdea-8838aa7ab4cc",
+      "name": "New Entity",
+      "x": 80,
+      "y": 64,
+      "components": {
+        "Transform": {
+          "x": 80,
+          "y": 64,
+          "depth": 10
+        },
+        "Collider": {
+          "width": 56,
+          "height": 32,
+          "offsetX": 16,
+          "offsetY": 0,
+          "isSolid": true
+        }
+      }
+    }
+  ]
 }
