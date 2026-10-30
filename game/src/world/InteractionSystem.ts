@@ -1,5 +1,7 @@
 import { GAME_CONSTANTS } from "@/constants/game";
 import { settingsStore } from "@/core/SettingsStore";
+import type { World } from "@/ecs/World";
+import { collectEntityInteractables } from "./entityInteractables";
 
 export interface Interactable {
   x: number; // Tile X
@@ -15,13 +17,14 @@ export interface Interactable {
 export class InteractionSystem {
   private interactables: Map<string, Interactable> = new Map();
   private scene: Phaser.Scene;
+  private world: World | null = null;
   private debugGraphics: Phaser.GameObjects.Graphics | null = null;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
   }
 
-  public setMap(map: Phaser.Tilemaps.Tilemap, rawEntities?: any[]) {
+  public setMap(map: Phaser.Tilemaps.Tilemap) {
     this.interactables.clear();
     
     // 1. Parse Tiled Object Layers
@@ -65,58 +68,15 @@ export class InteractionSystem {
       });
     }
 
-    // 2. Parse Editor Entities from JSON
-    if (rawEntities && Array.isArray(rawEntities)) {
-      rawEntities.forEach((entityDef) => {
-        const comps = entityDef.components || {};
-        const interactableComp = comps.Interactable;
-        if (interactableComp) {
-          const transform = comps.Transform || { x: entityDef.x || 0, y: entityDef.y || 0 };
-          const collider = comps.Collider;
-          const posX = transform.x ?? entityDef.x ?? 0;
-          const posY = transform.y ?? entityDef.y ?? 0;
-
-          const width = collider?.width || GAME_CONSTANTS.TILE_SIZE;
-          const height = collider?.height || GAME_CONSTANTS.TILE_SIZE;
-          const offsetX = collider?.offsetX || 0;
-          const offsetY = collider?.offsetY || 0;
-
-          const left = posX + offsetX - width / 2;
-          const right = posX + offsetX + width / 2;
-          const top = posY + offsetY - height;
-          const bottom = posY + offsetY;
-
-          const minTileX = Math.floor(Math.max(0, left) / GAME_CONSTANTS.TILE_SIZE);
-          const maxTileX = Math.floor(Math.max(0, right - 1) / GAME_CONSTANTS.TILE_SIZE);
-          const minTileY = Math.floor(Math.max(0, top) / GAME_CONSTANTS.TILE_SIZE);
-          const maxTileY = Math.floor(Math.max(0, bottom - 1) / GAME_CONSTANTS.TILE_SIZE);
-
-          const message = interactableComp.message || entityDef.name || "";
-          const type = interactableComp.type || (collider?.isSolid ? "on_interact" : "on_step");
-          const eventKey = interactableComp.eventKey || "";
-          const targetMap = interactableComp.targetMap;
-          const targetX = interactableComp.targetX;
-          const targetY = interactableComp.targetY;
-
-          for (let tx = minTileX; tx <= maxTileX; tx++) {
-            for (let ty = minTileY; ty <= maxTileY; ty++) {
-              this.registerInteractable({
-                x: tx,
-                y: ty,
-                type,
-                message,
-                eventKey,
-                targetMap,
-                targetX,
-                targetY,
-              });
-            }
-          }
-        }
-      });
-    }
-
     this.renderDebug();
+  }
+
+  /**
+   * Editor-placed entities (ECS) are looked up from the world on every query, so an
+   * interactable NPC keeps its dialogue while it wanders.
+   */
+  public setWorld(world: World) {
+    this.world = world;
   }
 
   public registerInteractable(interactable: Interactable) {
@@ -125,7 +85,16 @@ export class InteractionSystem {
   }
 
   public getInteractableAt(tileX: number, tileY: number): Interactable | undefined {
+    if (this.world) {
+      const dynamic = collectEntityInteractables(this.world).find((i) => i.x === tileX && i.y === tileY);
+      if (dynamic) return dynamic;
+    }
     return this.interactables.get(`${tileX},${tileY}`);
+  }
+
+  /** Redraws the debug overlay (call after entities were spawned). */
+  public refreshDebug() {
+    this.renderDebug();
   }
 
   private renderDebug() {
@@ -140,7 +109,8 @@ export class InteractionSystem {
 
     const tileSize = GAME_CONSTANTS.TILE_SIZE;
 
-    this.interactables.forEach((interactable) => {
+    const all = [...this.interactables.values(), ...(this.world ? collectEntityInteractables(this.world) : [])];
+    all.forEach((interactable) => {
       const px = interactable.x * tileSize;
       const py = interactable.y * tileSize;
       

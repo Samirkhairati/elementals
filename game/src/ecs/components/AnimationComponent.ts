@@ -1,4 +1,4 @@
-import { Direction, MovementType } from "@/utils/AnimationManager";
+import { Direction, MovementType } from "@/utils/Direction";
 
 export interface AnimationComponentInit {
   characterKey: string;

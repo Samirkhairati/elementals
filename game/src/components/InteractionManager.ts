@@ -1,7 +1,7 @@
 import { InteractionSystem } from "@/world/InteractionSystem";
 import { gameState } from "@/core/GameState";
 import { EventBus, Events } from "@/utils/EventBus";
-import { Direction } from "@/utils/AnimationManager";
+import { Direction } from "@/utils/Direction";
 
 const DIRECTION_OFFSETS = {
   [Direction.LEFT]: { dx: -1, dy: 0 },

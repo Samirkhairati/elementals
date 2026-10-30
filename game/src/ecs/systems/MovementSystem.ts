@@ -6,7 +6,7 @@ import { GridMovementComponent } from "../components/GridMovementComponent";
 import { FreeMovementComponent } from "../components/FreeMovementComponent";
 import { PlayerControlComponent } from "../components/PlayerControlComponent";
 import { SpatialSystem } from "./SpatialSystem";
-import { Direction, MovementType } from "@/utils/AnimationManager";
+import { Direction, MovementType } from "@/utils/Direction";
 import { GAME_CONSTANTS } from "@/constants/game";
 import { settingsStore } from "@/core/SettingsStore";
 import { gameState } from "@/core/GameState";

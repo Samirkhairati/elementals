@@ -1,4 +1,4 @@
-import { Direction } from "@/utils/AnimationManager";
+import { Direction } from "@/utils/Direction";
 import { EventBus, Events } from "@/utils/EventBus";
 
 export interface PlayerPositionState {

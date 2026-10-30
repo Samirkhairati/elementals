@@ -1,4 +1,4 @@
-import { Direction } from "@/utils/AnimationManager";
+import { Direction } from "@/utils/Direction";
 
 export interface Vector2D {
   x: number;

@@ -5,7 +5,7 @@ import { GridMovementComponent } from "../components/GridMovementComponent";
 import { FreeMovementComponent } from "../components/FreeMovementComponent";
 import type { InputSnapshot } from "@/input/InputSnapshot";
 import { gameState } from "@/core/GameState";
-import { MovementType } from "@/utils/AnimationManager";
+import { MovementType } from "@/utils/Direction";
 
 export class InputSystem extends System {
   public priority = 200;

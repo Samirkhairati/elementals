@@ -1,21 +1,8 @@
 import { Scene, GameObjects } from "phaser";
 
-export const Direction = {
-  DOWN: "down",
-  LEFT: "left",
-  RIGHT: "right",
-  UP: "up",
-} as const;
-
-export type Direction = (typeof Direction)[keyof typeof Direction];
-
-export const MovementType = {
-  WALK: "walk",
-  RUN: "run",
-  SWIM: "swim",
-} as const;
-
-export type MovementType = (typeof MovementType)[keyof typeof MovementType];
+// Direction / MovementType live in a Phaser-free module so pure ECS code and tests can use them.
+export { Direction, MovementType } from "./Direction";
+import { Direction, MovementType } from "./Direction";
 
 /**
  * Handles character animations across the game.

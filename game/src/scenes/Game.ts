@@ -14,10 +14,11 @@ import {
   SpatialSystem,
   InputSystem,
   MovementSystem,
+  AIWanderSystem,
   AnimationSystem,
   RenderBridgeSystem,
-  PlayerPrefab,
-  createComponentFromData,
+  hydrateMapEntities,
+  spawnPlayer,
   type Entity,
 } from "@/ecs";
 
@@ -30,6 +31,7 @@ export class Game extends Scene {
   private spatialSystem!: SpatialSystem;
   private inputSystem!: InputSystem;
   private movementSystem!: MovementSystem;
+  private aiWanderSystem!: AIWanderSystem;
   private animationSystem!: AnimationSystem;
   private renderBridgeSystem!: RenderBridgeSystem;
   private playerEntity?: Entity;
@@ -46,14 +48,17 @@ export class Game extends Scene {
     
     // Initialize ECS World and Systems
     this.world = new World();
+    this.interactionSystem.setWorld(this.world);
     this.spatialSystem = new SpatialSystem(this.mapSystem.collisions);
     this.inputSystem = new InputSystem();
     this.movementSystem = new MovementSystem(this.spatialSystem);
+    this.aiWanderSystem = new AIWanderSystem(this.spatialSystem);
     this.animationSystem = new AnimationSystem();
     this.renderBridgeSystem = new RenderBridgeSystem(this);
 
     this.world.addSystem(this.spatialSystem);
     this.world.addSystem(this.inputSystem);
+    this.world.addSystem(this.aiWanderSystem);
     this.world.addSystem(this.movementSystem);
     this.world.addSystem(this.animationSystem);
     this.world.addSystem(this.renderBridgeSystem);
@@ -131,35 +136,18 @@ export class Game extends Scene {
     const rawMapData = this.cache.tilemap.get(mapKey)?.data;
     
     // Load interactions for this map (including editor entities)
-    this.interactionSystem.setMap(map, rawMapData?.entities);
+    this.interactionSystem.setMap(map);
     this.spatialSystem.setMap(map);
     
-    // Position at the center of the map using logical tile size (32px)
-    const tileSize = GAME_CONSTANTS.TILE_SIZE;
-    const spawnX = Math.floor(map.width / 2) * tileSize + tileSize / 2;
-    const spawnY = (Math.floor(map.height / 2) + 1) * tileSize;
-
     // Clear ECS world on map transition
     this.world.clear();
 
-    // Spawn player entity declaratively via ECS
-    this.playerEntity = this.world.spawnPrefab(PlayerPrefab, {
-      x: spawnX,
-      y: spawnY,
-    });
-
-    // Hydrate editor-placed entities from map JSON
-    if (rawMapData?.entities && Array.isArray(rawMapData.entities)) {
-      for (const entityDef of rawMapData.entities) {
-        const entity = this.world.createEntity();
-        for (const [compType, props] of Object.entries(entityDef.components || {})) {
-          const component = createComponentFromData(compType, props as any);
-          if (component) {
-            this.world.addComponent(entity, component);
-          }
-        }
-      }
-    }
+    // Spawn the player at the center of the map (logical tile size), then the editor-placed entities
+    const tileSize = GAME_CONSTANTS.TILE_SIZE;
+    const spawn = spawnPlayer(this.world, map, tileSize);
+    this.playerEntity = spawn.entity;
+    hydrateMapEntities(this.world, rawMapData?.entities);
+    this.interactionSystem.refreshDebug();
 
     // Tick world with 0 delta to instantiate sprites on the render bridge immediately
     this.world.update(0);
@@ -175,10 +163,10 @@ export class Game extends Scene {
 
     // Ensure player position is synced to GameState on spawn
     gameState.updatePlayerPosition(
-      spawnX,
-      spawnY,
-      Math.floor(spawnX / tileSize),
-      Math.floor((spawnY - 1) / tileSize),
+      spawn.x,
+      spawn.y,
+      Math.floor(spawn.x / tileSize),
+      Math.floor((spawn.y - 1) / tileSize),
       Direction.DOWN
     );
 

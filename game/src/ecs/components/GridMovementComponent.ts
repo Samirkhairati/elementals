@@ -1,4 +1,4 @@
-import { Direction, MovementType } from "@/utils/AnimationManager";
+import { Direction, MovementType } from "@/utils/Direction";
 import { GAME_CONSTANTS } from "@/constants/game";
 
 export interface GridMovementInit {
