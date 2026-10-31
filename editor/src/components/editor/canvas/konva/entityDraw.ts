@@ -75,10 +75,14 @@ export function drawPlaceholder(ctx: CanvasRenderingContext2D, iconName: string,
 export function drawFootprint(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, rgb: string, scale: number, strong: boolean) {
   ctx.beginPath()
   ctx.rect(x, y, w, h)
-  ctx.fillStyle = `rgba(${rgb},${strong ? 0.16 : 0.08})`
+  ctx.fillStyle = `rgba(${rgb},${strong ? 0.3 : 0.14})`
   ctx.fill()
-  ctx.lineWidth = (strong ? 1.5 : 1) / scale
-  ctx.strokeStyle = `rgba(${rgb},${strong ? 1 : 0.85})`
+  // A dark halo under the tint keeps pastel outlines readable on light tiles.
+  ctx.lineWidth = ((strong ? 2 : 1.5) + 1.5) / scale
+  ctx.strokeStyle = 'rgba(0,0,0,0.45)'
+  ctx.stroke()
+  ctx.lineWidth = (strong ? 2 : 1.5) / scale
+  ctx.strokeStyle = `rgba(${rgb},1)`
   ctx.stroke()
 }
 
