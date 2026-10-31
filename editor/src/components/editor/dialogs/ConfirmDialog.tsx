@@ -61,7 +61,7 @@ export function ConfirmDialog({ open, title, description, onClose, onConfirm }: 
             className="ed-btn" data-variant="primary" style={{ background: 'hsl(var(--solid))', color: 'white' }}
           >
             <span>Delete</span>
-            <kbd className="pointer-events-none inline-flex h-6 select-none items-center gap-1 rounded bg-black/60 px-2 font-mono text-xs font-bold text-white border border-white/30 tracking-wider">
+            <kbd className="pointer-events-none inline-flex h-6 select-none items-center gap-1 rounded bg-black/60 px-2 text-xs font-bold text-white border border-white/30 tracking-wider">
               {shortcutLabel}
             </kbd>
           </button>

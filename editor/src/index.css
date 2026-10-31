@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -7,6 +7,7 @@
 @layer base {
   :root {
     --font-serif: "Tiempos Text", "Tiempos Headline", "Newsreader", Georgia, serif;
+    --font-ui: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
     --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
     --background: 0 0% 100%;
@@ -123,7 +124,11 @@
   * {
     @apply border-border;
     cursor: default;
-    font-family: var(--font-mono);
+  }
+  /* Mixed typography: Inter for the interface (labels, titles, names, descriptions), JetBrains Mono for data
+     (values in inputs, ids, coordinates, sizes, shortcuts). Use .ed-mono for any other literal value. */
+  button, input, select, textarea {
+    font-family: inherit;
   }
   .konvajs-content,
   .konvajs-content canvas {
@@ -167,12 +172,16 @@
   }
   body {
     @apply bg-background text-foreground select-none;
+    font-family: var(--font-ui);
+    -webkit-font-smoothing: antialiased;
+  }
+  kbd, code, pre, samp, .ed-mono {
     font-family: var(--font-mono);
   }
   input, textarea {
     @apply select-auto;
   }
-  h1, h2, h3, h4, h5, h6, .font-serif, .font-mono {
+  .font-serif {
     font-family: var(--font-mono);
   }
 }
@@ -315,6 +324,7 @@
   }
   .ed-input {
     @apply w-full min-w-0 rounded-md border border-input bg-background/50 px-2 text-foreground outline-none;
+    font-family: var(--font-mono);
     height: var(--control-h);
     font-size: var(--text-body);
   }
@@ -391,6 +401,7 @@
   }
 
   .ed-badge {
+    font-family: var(--font-mono);
     @apply inline-flex shrink-0 items-center rounded-sm bg-muted/60 text-muted-foreground;
     height: 16px;
     padding: 0 4px;

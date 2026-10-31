@@ -1,19 +1,17 @@
 import React, { useMemo, useState } from 'react'
-import { BoxSelect, Maximize, RotateCcw, ShieldAlert, Footprints, Square } from 'lucide-react'
+import { Maximize, RotateCcw, Square } from 'lucide-react'
 import { COMPONENT_SCHEMAS } from '../../../../../shared/engine/components'
 import { FIT_TILE, fitColliderToSprite, normalizeCollider, sameCollider, type ColliderPatch } from '@/lib/entityVisuals'
 import { useEditorSelector, type EditorContextValue } from '../layout/EditorContext'
-import { EdButton, Field, NumberField, Segmented } from '../ui/controls'
+import { EdButton, Field, InfoTip, NumberField, Toggle } from '../ui/controls'
 import { EntityViewport } from './EntityViewport'
 import type { CustomEditorProps } from './customEditors'
 
 const selectSprites = (c: EditorContextValue) => ({ spriteAssets: c.spriteAssets })
 
-const ZOOMS = [2, 3, 4, 6] as const
 
 export function ColliderComponentEditor({ value, components, onChange, onChangeMany }: CustomEditorProps) {
   const { spriteAssets } = useEditorSelector(selectSprites)
-  const [zoom, setZoom] = useState<number | 'fit'>('fit')
   const collider = useMemo(() => normalizeCollider(value), [value])
   const current: ColliderPatch = { width: collider.width, height: collider.height, offsetX: collider.offsetX, offsetY: collider.offsetY }
 
@@ -46,40 +44,18 @@ export function ColliderComponentEditor({ value, components, onChange, onChangeM
 
   return (
     <div className="flex flex-col gap-3" data-testid="collider-editor">
-      <div className="flex flex-col gap-1">
-        <Segmented
-          aria-label="Collider type"
-          className="w-full"
-          value={collider.isSolid ? 'solid' : 'trigger'}
-          onChange={(v) => onChange('isSolid', v === 'solid')}
-          options={[
-            { value: 'solid', label: 'Solid', icon: <Square />, title: 'Blocks movement', tone: 'solid' },
-            { value: 'trigger', label: 'Trigger', icon: <Footprints />, title: 'Walk-through area that only triggers events', tone: 'trigger' },
-          ]}
-        />
-        <div className="ed-hint flex items-center gap-1">
-          {collider.isSolid ? <ShieldAlert className="h-3 w-3 text-solid" /> : <BoxSelect className="h-3 w-3 text-trigger" />}
-          {collider.isSolid ? 'Blocks the player and other entities.' : 'Can be walked through; only used to start events.'}
-        </div>
-      </div>
+      <Field label="Solid" info="Solid blocks the player and other entities. Off lets them walk through; the area still exists for events.">
+        <Toggle checked={collider.isSolid} onChange={(v) => onChange('isSolid', v)} aria-label="Solid" />
+      </Field>
 
       <div className="flex flex-col gap-2">
-        <Segmented
-          aria-label="Diagram zoom"
-          value={zoom === 'fit' ? 'fit' : String(zoom)}
-          onChange={(v) => setZoom(v === 'fit' ? 'fit' : Number(v))}
-          options={[{ value: 'fit', label: 'Fit' }, ...ZOOMS.map((z) => ({ value: String(z), label: `${z}×` }))]}
-        />
-        <EntityViewport
-          asset={asset}
-          sprite={silhouette}
-          zoom={zoom}
-          collider={collider}
-          onColliderChange={(patch) => onChangeMany(patch)}
-        />
-        <div className="ed-hint">
-          Drag the box or its handles (snaps to 4px, hold Shift for free). The dashed square is the entity&apos;s tile, the cross its anchor.
+        <div className="flex items-center gap-1">
+          <span className="ed-section-title">Area</span>
+          <InfoTip>
+            Drag the box or its handles (snaps to 4px, hold Shift for free). The dashed square is the entity&apos;s tile, the cross its anchor. Ctrl/⌘ + scroll or pinch zooms, middle-drag or Alt-drag pans, and the Fit button resets the view.
+          </InfoTip>
         </div>
+        <EntityViewport asset={asset} sprite={silhouette} collider={collider} onColliderChange={(patch) => onChangeMany(patch)} />
       </div>
 
       <div className="grid grid-cols-2 gap-x-3 gap-y-2">

@@ -161,16 +161,12 @@ describe('SpriteComponentEditor', () => {
     expect(screen.getByRole('button', { name: /Reset offset/ })).toBeDisabled()
   })
 
-  it('writes opacity, flip, visibility and tint', () => {
-    const { onChange } = setup(spriteValue({ tint: '#ff0000' }))
-    fireEvent.change(screen.getByLabelText('Opacity'), { target: { value: '0.5' } })
-    expect(onChange).toHaveBeenCalledWith('opacity', 0.5)
-    fireEvent.click(screen.getByRole('switch', { name: 'Flip horizontally' }))
-    expect(onChange).toHaveBeenCalledWith('flipX', true)
-    fireEvent.click(screen.getByRole('switch', { name: 'Visible' }))
-    expect(onChange).toHaveBeenCalledWith('visible', false)
-    fireEvent.click(screen.getByRole('button', { name: 'Clear tint' }))
-    expect(onChange).toHaveBeenCalledWith('tint', '')
+  it('has no opacity, flip, tint or visibility controls (those become their own component)', () => {
+    setup(spriteValue({ tint: '#ff0000' }))
+    expect(screen.queryByLabelText('Opacity')).toBeNull()
+    expect(screen.queryByRole('switch', { name: 'Flip horizontally' })).toBeNull()
+    expect(screen.queryByRole('switch', { name: 'Visible' })).toBeNull()
+    expect(screen.queryByLabelText('Tint colour')).toBeNull()
   })
 
   it('shows the collider in the preview when the entity has one and lets the author hide it', () => {
@@ -180,11 +176,12 @@ describe('SpriteComponentEditor', () => {
     expect(screen.queryByTestId('collider-body')).toBeNull()
   })
 
-  it('zoom buttons set the preview zoom', () => {
+  it('zooms with the buttons and Fit resets the view', () => {
     setup()
-    fireEvent.click(screen.getByRole('radio', { name: '4×' }))
-    expect(viewport().dataset.zoom).toBe('4')
-    fireEvent.click(screen.getByRole('radio', { name: '1×' }))
-    expect(viewport().dataset.zoom).toBe('1')
+    const fitZoom = Number(viewport().dataset.zoom)
+    fireEvent.click(screen.getByRole('button', { name: 'Zoom in' }))
+    expect(Number(viewport().dataset.zoom)).toBeGreaterThan(fitZoom)
+    fireEvent.click(screen.getByRole('button', { name: 'Fit view' }))
+    expect(Number(viewport().dataset.zoom)).toBe(fitZoom)
   })
 })

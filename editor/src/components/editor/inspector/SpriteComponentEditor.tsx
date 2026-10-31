@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Eraser, Grid3X3, ImageOff, Pause, Play, RotateCcw, ScanLine, TriangleAlert, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Grid3X3, ImageOff, Pause, Play, RotateCcw, ScanLine, TriangleAlert, X } from 'lucide-react'
 import type { Facing } from '../../../../../shared/engine/types'
 import { FACINGS } from '../../../../../shared/engine/constants'
 import { sheetGrid } from '../../../../../shared/engine/sprites'
 import { normalizeCollider } from '@/lib/entityVisuals'
 import { getSpriteImageSize, useSpriteImagesVersion } from '@/lib/spriteImages'
 import { useEditorSelector, type EditorContextValue } from '../layout/EditorContext'
-import { Badge, EdButton, Field, IconButton, NumberField, Segmented, Toggle, useAnimationClock } from '../ui/controls'
+import { Badge, EdButton, Field, IconButton, InfoTip, NumberField, SectionTitle, Segmented, useAnimationClock } from '../ui/controls'
 import { SpriteThumb } from '../sprites/SpriteThumb'
 import { EntityViewport } from './EntityViewport'
 import { SpritePicker, splitAssetId } from './SpritePicker'
@@ -16,7 +16,6 @@ const selectSprites = (c: EditorContextValue) => ({ spriteAssets: c.spriteAssets
 
 const FACING_ARROWS: Record<Facing, string> = { down: '↓', left: '←', right: '→', up: '↑' }
 const FACING_LABEL: Record<Facing, string> = { down: 'Down', left: 'Left', right: 'Right', up: 'Up' }
-const ZOOMS = [1, 2, 3, 4, 6] as const
 
 type Phase = 'idle' | 'walk' | 'run'
 
@@ -29,7 +28,6 @@ export function SpriteComponentEditor({ value, components, onChange, onChangeMan
   const isCharacter = meta?.kind === 'character'
 
   const [pickerOpen, setPickerOpen] = useState(false)
-  const [zoom, setZoom] = useState<number | 'fit'>('fit')
   const [phase, setPhase] = useState<Phase>('idle')
   const [playing, setPlaying] = useState(true)
   const [showGrid, setShowGrid] = useState(true)
@@ -80,8 +78,6 @@ export function SpriteComponentEditor({ value, components, onChange, onChangeMan
 
   const offsetX = Number(value.offsetX) || 0
   const offsetY = Number(value.offsetY) || 0
-  const opacity = typeof value.opacity === 'number' ? value.opacity : 1
-  const tint: string = typeof value.tint === 'string' ? value.tint : ''
   const meaningfulName = meta ? meta.name || splitAssetId(assetId).leaf : ''
 
   return (
@@ -137,12 +133,12 @@ export function SpriteComponentEditor({ value, components, onChange, onChangeMan
           {/* Live preview */}
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between gap-2">
-              <Segmented
-                aria-label="Preview zoom"
-                value={zoom === 'fit' ? 'fit' : String(zoom)}
-                onChange={(v) => setZoom(v === 'fit' ? 'fit' : Number(v))}
-                options={[{ value: 'fit', label: 'Fit', title: 'Fit the preview' }, ...ZOOMS.map((z) => ({ value: String(z), label: `${z}×`, title: `Zoom ${z}×` }))]}
-              />
+              <div className="flex items-center gap-1">
+                <span className="ed-section-title">Preview</span>
+                <InfoTip>
+                  Drag the sprite to move it (1px, hold Shift for 8px). The cross is the anchor on the map. Ctrl/⌘ + scroll or pinch zooms, middle-drag or Alt-drag pans, and the Fit button resets the view.
+                </InfoTip>
+              </div>
               <div className="flex items-center gap-1">
                 <IconButton active={showGrid} title="Tile grid" aria-label="Toggle tile grid" onClick={() => setShowGrid((v) => !v)}>
                   <Grid3X3 />
@@ -157,13 +153,11 @@ export function SpriteComponentEditor({ value, components, onChange, onChangeMan
               asset={asset}
               sprite={previewSprite}
               tick={tick}
-              zoom={zoom}
               showTileGrid={showGrid}
               collider={collider}
               showSpriteFrame
               onSpriteOffsetChange={(x, y) => onChangeMany({ offsetX: x, offsetY: y })}
             />
-            <div className="ed-hint">Drag the sprite to move it (1px, hold Shift for 8px). The cross is the anchor on the map.</div>
 
             {isCharacter && (
               <div className="flex flex-col gap-2">
@@ -175,7 +169,7 @@ export function SpriteComponentEditor({ value, components, onChange, onChangeMan
                     options={FACINGS.map((f) => ({ value: f, label: FACING_ARROWS[f], title: `Face ${FACING_LABEL[f].toLowerCase()}`, ariaLabel: `Face ${FACING_LABEL[f].toLowerCase()}` }))}
                   />
                 </Field>
-                <Field label="Preview">
+                <Field label="Preview" info="Characters pick idle / walk / run themselves in the game; the phase here is only a preview.">
                   <Segmented
                     aria-label="Preview phase"
                     value={phase}
@@ -192,7 +186,6 @@ export function SpriteComponentEditor({ value, components, onChange, onChangeMan
                     </IconButton>
                   )}
                 </Field>
-                <div className="ed-hint">Characters pick idle / walk / run themselves in the game; the phase here is only a preview.</div>
               </div>
             )}
 
@@ -235,15 +228,19 @@ export function SpriteComponentEditor({ value, components, onChange, onChangeMan
         </>
       )}
 
-      {/* Transform of the graphic */}
+      {/* Where the graphic sits relative to the entity */}
       <div className="flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <div className="ed-section-title">Placement</div>
-          <EdButton size="sm" disabled={offsetX === 0 && offsetY === 0} onClick={() => onChangeMany({ offsetX: 0, offsetY: 0 })} title="Put the sprite back on its anchor">
-            <RotateCcw />
-            Reset offset
-          </EdButton>
-        </div>
+        <SectionTitle
+          info="Shifts the graphic from the entity's anchor, in pixels. Opacity, tint and flipping are not part of the Sprite; they will become a separate component."
+          actions={
+            <EdButton size="sm" disabled={offsetX === 0 && offsetY === 0} onClick={() => onChangeMany({ offsetX: 0, offsetY: 0 })} title="Put the sprite back on its anchor">
+              <RotateCcw />
+              Reset offset
+            </EdButton>
+          }
+        >
+          Placement
+        </SectionTitle>
         <Field label="Offset X" hint="Shifts the graphic from the anchor (px)">
           <NumberField value={offsetX} unit="px" onCommit={(v) => onChange('offsetX', v)} aria-label="Offset X" />
         </Field>
@@ -252,44 +249,6 @@ export function SpriteComponentEditor({ value, components, onChange, onChangeMan
         </Field>
         <Field label="Scale">
           <NumberField value={Number(value.scale) || 1} min={0.1} max={8} step={0.25} integer={false} onCommit={(v) => onChange('scale', v)} aria-label="Scale" />
-        </Field>
-        <Field label="Flip X">
-          <Toggle checked={!!value.flipX} onChange={(v) => onChange('flipX', v)} aria-label="Flip horizontally" />
-        </Field>
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <div className="ed-section-title">Appearance</div>
-        <Field label="Opacity">
-          <input
-            type="range"
-            className="ed-range"
-            min={0}
-            max={1}
-            step={0.05}
-            value={opacity}
-            aria-label="Opacity"
-            onChange={(e) => onChange('opacity', Number(e.target.value))}
-          />
-          <span className="w-9 shrink-0 text-right text-ed-label text-muted-foreground">{Math.round(opacity * 100)}%</span>
-        </Field>
-        <Field label="Tint">
-          <input
-            type="color"
-            aria-label="Tint colour"
-            className="h-7 w-10 shrink-0 rounded-sm border border-input bg-transparent p-0.5"
-            value={tint || '#ffffff'}
-            onChange={(e) => onChange('tint', e.target.value)}
-          />
-          <span className="flex-1 truncate text-ed-label text-muted-foreground">{tint || 'none'}</span>
-          {tint && (
-            <IconButton title="Clear tint" aria-label="Clear tint" onClick={() => onChange('tint', '')}>
-              <Eraser />
-            </IconButton>
-          )}
-        </Field>
-        <Field label="Visible" hint="Not drawn in the game when off (events can still show it again)">
-          <Toggle checked={value.visible !== false} onChange={(v) => onChange('visible', v)} aria-label="Visible" />
         </Field>
       </div>
 

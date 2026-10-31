@@ -1,8 +1,8 @@
 import React from 'react'
-import { Gamepad2, Info, Pause, Shuffle } from 'lucide-react'
+import { Gamepad2, Pause, Shuffle } from 'lucide-react'
 import type { Controller } from '../../../../../shared/engine/types'
 import { CONTROLLERS } from '../../../../../shared/engine/constants'
-import { Field, NumberField, Segmented, Toggle } from '../ui/controls'
+import { Field, InfoTip, NumberField, Segmented, Toggle } from '../ui/controls'
 import type { CustomEditorProps } from './customEditors'
 
 export const CONTROLLER_INFO: Record<Controller, { label: string; icon: React.ReactNode; description: string }> = {
@@ -44,21 +44,17 @@ export function MovementComponentEditor({ value, onChange }: CustomEditorProps) 
 
   return (
     <div className="flex flex-col gap-3" data-testid="movement-editor">
-      <div className="flex flex-col gap-1">
+      <Field label="Controller" info={<span data-testid="controller-description">{info.description}</span>}>
         <Segmented
           aria-label="Controller"
-          className="w-full"
           value={controller}
           onChange={(c) => onChange('controller', c)}
           options={CONTROLLERS.map((c) => ({ value: c, label: CONTROLLER_INFO[c].label, icon: CONTROLLER_INFO[c].icon, title: CONTROLLER_INFO[c].description }))}
         />
-        <div className="ed-hint" data-testid="controller-description">
-          {info.description}
-        </div>
-      </div>
+      </Field>
 
       {controller !== 'none' && (
-        <Field label="Speed" hint="Walking speed in pixels per second">
+        <Field label="Speed" info="Walking speed in pixels per second. Whether the world moves tile by tile or freely is a setting of the game, not of this entity.">
           <NumberField value={speed} min={10} max={500} step={10} unit="px/s" onCommit={(v) => onChange('speed', v)} aria-label="Speed" />
         </Field>
       )}
@@ -82,21 +78,20 @@ export function MovementComponentEditor({ value, onChange }: CustomEditorProps) 
           <Field label="Interval" hint="Pause between wander decisions">
             <NumberField value={interval} min={500} max={30000} step={500} unit="ms" onCommit={(v) => onChange('wanderInterval', v)} aria-label="Wander interval" />
           </Field>
-          <div className="flex items-center gap-3 rounded-md border border-border bg-muted/20 p-2">
+          <div className="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/20 p-2">
+            <div className="flex items-center gap-1">
+              <span className="ed-section-title">Roaming area</span>
+              <InfoTip>
+                The ring is the roaming area: {radius * 2 + 1}×{radius * 2 + 1} tiles around its start tile. It also shows on the map while the entity is selected.
+              </InfoTip>
+            </div>
             <div className="shrink-0">
               <WanderPreview radius={radius} />
-            </div>
-            <div className="ed-hint">
-              The ring is the roaming area: {radius * 2 + 1}×{radius * 2 + 1} tiles around its start tile. It also shows on the map while the entity is selected.
             </div>
           </div>
         </>
       )}
 
-      <div className="flex items-start gap-2 rounded-md bg-muted/30 p-2 ed-hint">
-        <Info className="mt-px h-3.5 w-3.5 shrink-0" />
-        <span>Whether the world moves tile by tile or freely is a setting of the game, not of this entity.</span>
-      </div>
     </div>
   )
 }

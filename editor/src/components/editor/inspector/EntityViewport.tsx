@@ -26,8 +26,13 @@ import {
   type Rect,
 } from '@/lib/entityVisuals'
 import { drawResolvedSprite, resolveSprite, useSpriteImagesVersion } from '@/lib/spriteImages'
+import { ZoomControls } from '../ui/controls'
 
 export const VIEWPORT_HEIGHT = 200
+const MIN_ZOOM = 0.5
+const MAX_ZOOM = 16
+const ZOOM_STEP = 1.25
+const clampZoom = (z: number) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z))
 /** Share of the viewport height above the anchor (the rest is room for sprites hanging below it). */
 const ANCHOR_RATIO = 0.76
 const DEFAULT_WIDTH = 280
@@ -39,8 +44,9 @@ export interface EntityViewportProps {
   sprite?: Partial<SpriteView>
   /** Animation clock in ms. */
   tick?: number
-  /** Whole-number zoom, or 'fit' to pick the largest one that shows the tile and the sprite. */
-  zoom: number | 'fit'
+  /** Starting zoom: a factor, or 'fit' (default) for the largest whole-number zoom that shows the tile and the sprite.
+   *  The user changes it with Ctrl/Cmd + scroll (or pinch), the +/- buttons, and resets it with Fit. */
+  zoom?: number | 'fit'
   height?: number
   showTileGrid?: boolean
   showAnchor?: boolean
@@ -75,7 +81,7 @@ export function EntityViewport({
   asset,
   sprite,
   tick = 0,
-  zoom: zoomProp,
+  zoom: zoomProp = 'fit',
   height = VIEWPORT_HEIGHT,
   showTileGrid = true,
   showAnchor = true,
@@ -98,13 +104,34 @@ export function EntityViewport({
   const gestureRef = useRef<Gesture | null>(null)
   const cleanupRef = useRef<(() => void) | null>(null)
 
-  const ax = Math.round(width / 2)
-  const ay = Math.round(height * ANCHOR_RATIO)
-  const zoom = useMemo(() => {
-    if (zoomProp !== 'fit') return zoomProp
+  // Zoom (null = fitted) and pan are the viewer's own; they only affect this preview.
+  const [userZoom, setUserZoom] = useState<number | null>(zoomProp === 'fit' ? null : zoomProp)
+  const [pan, setPan] = useState({ x: 0, y: 0 })
+  const ax0 = Math.round(width / 2)
+  const ay0 = Math.round(height * ANCHOR_RATIO)
+  const ax = ax0 + pan.x
+  const ay = ay0 + pan.y
+  const fitZoom = useMemo(() => {
     const base = asset && sprite ? unionRect(TILE_RECT_LOCAL, spriteLocalRect(asset.meta, { ...sprite, offsetX: sprite.offsetX ?? 0, offsetY: sprite.offsetY ?? 0 })) : TILE_RECT_LOCAL
-    return fitViewportZoom(base, width, height, ay)
-  }, [zoomProp, asset, sprite, width, height, ay])
+    return fitViewportZoom(base, width, height, ay0)
+  }, [asset, sprite, width, height, ay0])
+  const zoom = userZoom ?? fitZoom
+  const fitted = userZoom === null && pan.x === 0 && pan.y === 0
+  const view = useRef({ zoom, ax, ay })
+  view.current = { zoom, ax, ay }
+  const resetView = () => {
+    setUserZoom(null)
+    setPan({ x: 0, y: 0 })
+  }
+  /** Zoom to `next`, keeping the point at (px, py) (viewport pixels) where it is. */
+  const zoomAround = useCallback((next: number, px: number, py: number) => {
+    const v = view.current
+    const z = clampZoom(next)
+    const wx = (px - v.ax) / v.zoom
+    const wy = (py - v.ay) / v.zoom
+    setUserZoom(z)
+    setPan((p) => ({ x: p.x + (px - wx * z - v.ax), y: p.y + (py - wy * z - v.ay) }))
+  }, [])
   const toX = (x: number) => ax + x * zoom
   const toY = (y: number) => ay + y * zoom
 
@@ -123,6 +150,43 @@ export function EntityViewport({
   }, [])
 
   useEffect(() => () => cleanupRef.current?.(), [])
+
+  // Ctrl/Cmd + scroll (this is also what a trackpad pinch sends) zooms around the pointer. A plain scroll is left
+  // alone so the inspector keeps scrolling when the pointer happens to be over the preview.
+  useEffect(() => {
+    const el = rootRef.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return
+      e.preventDefault()
+      const box = el.getBoundingClientRect()
+      zoomAround(view.current.zoom * Math.exp(-e.deltaY * 0.01), e.clientX - box.left, e.clientY - box.top)
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [zoomAround])
+
+  // Middle-drag (or Alt-drag) pans.
+  const beginPan = (e: React.MouseEvent) => {
+    if (!(e.button === 1 || (e.button === 0 && e.altKey))) return
+    e.preventDefault()
+    e.stopPropagation()
+    let lx = e.clientX
+    let ly = e.clientY
+    const move = (ev: MouseEvent) => {
+      const dx = ev.clientX - lx
+      const dy = ev.clientY - ly
+      lx = ev.clientX
+      ly = ev.clientY
+      setPan((p) => ({ x: p.x + dx, y: p.y + dy }))
+    }
+    const up = () => {
+      window.removeEventListener('mousemove', move)
+      window.removeEventListener('mouseup', up)
+    }
+    window.addEventListener('mousemove', move)
+    window.addEventListener('mouseup', up)
+  }
 
   const effSprite = useMemo(() => {
     if (!sprite) return undefined
@@ -298,6 +362,7 @@ export function EntityViewport({
       className={`relative select-none overflow-hidden rounded-md border border-border ed-checker ${className ?? ''}`}
       style={{ height }}
       data-testid="entity-viewport"
+      onMouseDownCapture={beginPan}
       data-zoom={zoom}
       data-anchor-x={ax}
       data-anchor-y={ay}
@@ -420,6 +485,15 @@ export function EntityViewport({
         )}
         {children}
       </svg>
+
+      <ZoomControls
+        className="absolute bottom-1.5 right-1.5"
+        zoom={zoom}
+        fitted={fitted}
+        onZoomIn={() => zoomAround(zoom * ZOOM_STEP, width / 2, height / 2)}
+        onZoomOut={() => zoomAround(zoom / ZOOM_STEP, width / 2, height / 2)}
+        onFit={resetView}
+      />
 
       {(liveCollider || liveOffset) && (
         <div className="pointer-events-none absolute left-2 top-2 rounded-sm bg-black/80 px-2 py-1 text-[10px] text-white">

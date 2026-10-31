@@ -24,10 +24,10 @@ const geo = () => ({ ax: Number(viewport().dataset.anchorX), ay: Number(viewport
 const withSprite = { Sprite: { asset: 'characters/hero', facing: 'down', frame: 0, offsetX: 0, offsetY: 0, scale: 1, flipX: false } }
 
 describe('ColliderComponentEditor', () => {
-  it('switches between Solid and Trigger', () => {
+  it('toggles Solid on and off', () => {
     const { onChange } = setup()
-    expect(screen.getByRole('radio', { name: /Solid/ })).toHaveAttribute('aria-checked', 'true')
-    fireEvent.click(screen.getByRole('radio', { name: /Trigger/ }))
+    expect(screen.getByRole('switch', { name: 'Solid' })).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(screen.getByRole('switch', { name: 'Solid' }))
     expect(onChange).toHaveBeenCalledWith('isSolid', false)
   })
 

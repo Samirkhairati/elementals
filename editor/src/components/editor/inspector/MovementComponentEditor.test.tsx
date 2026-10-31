@@ -12,9 +12,13 @@ function setup(value = mv()) {
   return { onChange }
 }
 
+/** Opens every info popover (the explanations are behind the "i" icons). */
+const openInfo = () => screen.getAllByRole('button', { name: 'More info' }).forEach((b) => fireEvent.click(b))
+
 describe('MovementComponentEditor', () => {
-  it('explains each controller in one line', () => {
+  it('explains each controller in one line (in its info popover)', () => {
     setup()
+    openInfo()
     expect(screen.getByTestId('controller-description')).toHaveTextContent('Stays put')
     fireEvent.click(screen.getByRole('radio', { name: /Wander/ }))
   })
@@ -37,6 +41,7 @@ describe('MovementComponentEditor', () => {
 
   it('shows only the fields that apply: player', () => {
     const { onChange } = setup(mv({ controller: 'player' }))
+    openInfo()
     expect(screen.getByTestId('controller-description')).toHaveTextContent('input')
     expect(screen.getByLabelText('Speed')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('switch', { name: 'Can run' }))
@@ -68,7 +73,8 @@ describe('MovementComponentEditor', () => {
   })
 
   it('says that tile-based vs free movement is a game setting', () => {
-    setup()
+    setup(mv({ controller: 'player' }))
+    openInfo()
     expect(screen.getByText(/setting of the game/)).toBeInTheDocument()
   })
 
