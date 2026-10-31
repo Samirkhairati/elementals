@@ -1033,6 +1033,47 @@ function validateField(field: FieldDef, params: Record<string, unknown>, ctx: Va
 }
 
 /**
+ * Validates one command's type and parameters (shared by command trees and event graphs). Returns
+ * false when the type is unknown, in which case nothing else can be checked.
+ */
+export function validateCommandParams(
+  cmd: { type?: unknown; params?: unknown },
+  ctx: ValidationContext,
+  report: (severity: IssueSeverity, code: string, message: string) => void,
+): boolean {
+  const d = typeof cmd.type === 'string' ? getCommandDef(cmd.type) : undefined;
+  if (!d) {
+    report('error', 'unknown-command', `Unknown command type "${String(cmd.type)}"`);
+    return false;
+  }
+  const params = isRecord(cmd.params) ? cmd.params : {};
+  if (!isRecord(cmd.params)) report('error', 'bad-param', 'Command params must be an object');
+
+  for (const field of d.params) {
+    if (!isFieldVisible(field, params, d.defaultParams)) continue;
+    validateField(field, params, ctx, report);
+  }
+
+  if (cmd.type === 'showChoices') {
+    const options = Array.isArray(params.options) ? params.options : [];
+    if (options.length === 0) report('error', 'empty-choices', 'Show Choices needs at least one option');
+    const optionIds = new Set<string>();
+    options.forEach((o, i) => {
+      const opt = o as Partial<ChoiceOption>;
+      if (!isRecord(o) || typeof opt.id !== 'string' || opt.id === '') report('error', 'bad-choice', `Option ${i + 1} has no id`);
+      else if (optionIds.has(opt.id)) report('error', 'bad-choice', `Option id "${opt.id}" is used more than once`);
+      else optionIds.add(opt.id);
+      if (isRecord(o) && (typeof opt.label !== 'string' || opt.label.trim() === '')) report('warning', 'missing-param', `Option ${i + 1} has no label`);
+    });
+  }
+
+  if (cmd.type === 'conditional' && Array.isArray(params.conditions) && params.conditions.length === 0) {
+    report('warning', 'missing-param', 'Conditional Branch has no conditions (it always takes the Then branch)');
+  }
+  return true;
+}
+
+/**
  * Validates a command tree. Never throws. Unset required parameters are warnings (the author has not
  * finished yet); wrong types, unknown commands, dangling references and structural problems are errors.
  */
@@ -1056,37 +1097,10 @@ export function validateCommands(commands: Command[], ctx: ValidationContext = {
       else if (seen.has(id)) report('error', 'duplicate-command-id', `Command id "${id}" is used more than once`);
       else seen.add(id);
 
-      const d = typeof cmd.type === 'string' ? getCommandDef(cmd.type) : undefined;
-      if (!d) {
-        report('error', 'unknown-command', `Unknown command type "${String(cmd.type)}"`);
-        return;
-      }
+      if (!validateCommandParams(cmd, ctx, report)) return;
       const params = isRecord(cmd.params) ? cmd.params : {};
-      if (!isRecord(cmd.params)) report('error', 'bad-param', 'Command params must be an object');
-
-      for (const field of d.params) {
-        if (!isFieldVisible(field, params, d.defaultParams)) continue;
-        validateField(field, params, ctx, report);
-      }
 
       if (cmd.type === 'breakLoop' && !inLoop) report('error', 'break-outside-loop', 'Break Loop can only be used inside a Loop');
-
-      if (cmd.type === 'showChoices') {
-        const options = Array.isArray(params.options) ? params.options : [];
-        if (options.length === 0) report('error', 'empty-choices', 'Show Choices needs at least one option');
-        const optionIds = new Set<string>();
-        options.forEach((o, i) => {
-          const opt = o as Partial<ChoiceOption>;
-          if (!isRecord(o) || typeof opt.id !== 'string' || opt.id === '') report('error', 'bad-choice', `Option ${i + 1} has no id`);
-          else if (optionIds.has(opt.id)) report('error', 'bad-choice', `Option id "${opt.id}" is used more than once`);
-          else optionIds.add(opt.id);
-          if (isRecord(o) && (typeof opt.label !== 'string' || opt.label.trim() === '')) report('warning', 'missing-param', `Option ${i + 1} has no label`);
-        });
-      }
-
-      if (cmd.type === 'conditional' && Array.isArray(params.conditions) && params.conditions.length === 0) {
-        report('warning', 'missing-param', 'Conditional Branch has no conditions (it always takes the Then branch)');
-      }
 
       if (cmd.branches !== undefined) {
         if (!isRecord(cmd.branches)) {

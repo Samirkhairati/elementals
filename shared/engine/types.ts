@@ -130,6 +130,57 @@ export interface Command {
   branches?: Record<string, Command[]>;
 }
 
+// ── Event graphs (see docs/event-graph-spec.md) ─────────────────────────────────────────────────
+
+/** An output of a graph node. `next` is the default; branching nodes expose `then`/`else`, one per choice... */
+export interface PortDef {
+  id: string;
+  label: string;
+}
+
+/**
+ * One step of an event graph: a command (or a structural `start` / `end` / `junction`) with a canvas
+ * position and its wiring. `out` maps an output port id to the id of the node it leads to; a port with no
+ * entry ends the run (like the end of a command list). At most one wire per port by construction.
+ */
+export interface GraphNode {
+  /** Stable id. For migrated commands this IS the old Command.id. */
+  id: string;
+  /** Key of COMMAND_CATALOG, or 'start' | 'end' | 'junction'. */
+  type: string;
+  params: Record<string, unknown>;
+  out: Record<string, string>;
+  x: number;
+  y: number;
+}
+
+/** Visual-only comment box. The game ignores it; membership is geometric. */
+export interface GraphFrame {
+  id: string;
+  title: string;
+  /** '#rrggbb' */
+  color: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export interface EventGraph {
+  nodes: GraphNode[];
+  frames: GraphFrame[];
+}
+
+export interface GraphIssue {
+  nodeId: string;
+  /** Set when the issue is about one output port. */
+  port?: string;
+  severity: IssueSeverity;
+  /** Stable machine-readable code, e.g. 'dangling-edge', 'cycle-without-wait'. */
+  code: string;
+  message: string;
+}
+
 export interface StateAppearance {
   /** Override the Sprite while this state is active. Omitted fields keep the entity's Sprite. */
   visible?: boolean;

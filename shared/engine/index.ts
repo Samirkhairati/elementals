@@ -4,6 +4,7 @@ export * from './constants.ts';
 export * from './ids.ts';
 export * from './util.ts';
 export * from './commands.ts';
+export * from './graph.ts';
 export * from './components.ts';
 export * from './migrate.ts';
 export * from './validate.ts';
