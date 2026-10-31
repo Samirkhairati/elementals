@@ -114,9 +114,9 @@ export function PropertiesPanel({
     return (
       <div className="flex w-full flex-col gap-3 text-left" data-testid="entity-inspector">
         {onBack && (
-          <button type="button" onClick={onBack} className="ed-btn self-start" data-size="sm" aria-label="Back to layers">
+          <button type="button" onClick={onBack} className="ed-btn self-start" data-size="sm" aria-label="Back to tiles">
             <ArrowLeft />
-            Back to layers
+            Back to tiles
           </button>
         )}
 

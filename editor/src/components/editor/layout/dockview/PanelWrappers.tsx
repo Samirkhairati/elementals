@@ -189,7 +189,11 @@ const selectProperties = (c: EditorContextValue) => ({
   setSelectedEntityId: c.setSelectedEntityId,
 });
 
-export function PropertiesWrapper(_props: IDockviewPanelProps) {
+/**
+ * Layer properties live in the left sidebar; the entity inspector is its own panel in the right sidebar
+ * (it replaces the tileset panels while an entity is selected, see useDockviewLayout).
+ */
+function PropertiesBody({ entityMode }: { entityMode: boolean }) {
   const ctx = useEditorSelector(selectProperties);
   return (
     // A plain block that scrolls vertically: a flex column here let the inspector shrink instead of scroll.
@@ -199,7 +203,7 @@ export function PropertiesWrapper(_props: IDockviewPanelProps) {
         activeLayerId={ctx.activeLayerId}
         updateLayers={ctx.updateLayers}
         entities={ctx.entities}
-        selectedEntityId={ctx.selectedEntityId}
+        selectedEntityId={entityMode ? ctx.selectedEntityId : null}
         renameEntity={ctx.handleRenameEntity}
         moveEntity={ctx.handleMoveEntity}
         addComponent={ctx.handleAddComponent}
@@ -207,10 +211,18 @@ export function PropertiesWrapper(_props: IDockviewPanelProps) {
         updateComponentProp={ctx.handleUpdateComponentProp}
         updateComponentProps={ctx.handleUpdateComponentProps}
         deleteEntity={ctx.handleDeleteEntity}
-        onBack={() => ctx.setSelectedEntityId(null)}
+        onBack={entityMode ? () => ctx.setSelectedEntityId(null) : undefined}
       />
     </div>
   );
+}
+
+export function PropertiesWrapper(_props: IDockviewPanelProps) {
+  return <PropertiesBody entityMode={false} />;
+}
+
+export function InspectorWrapper(_props: IDockviewPanelProps) {
+  return <PropertiesBody entityMode />;
 }
 
 const selectCanvas = (c: EditorContextValue) => ({
@@ -486,6 +498,7 @@ export const dockviewComponents = {
   layers: LayersWrapper,
   entities: EntitiesWrapper,
   properties: PropertiesWrapper,
+  inspector: InspectorWrapper,
   canvas: CanvasWrapper,
   emptyCanvas: EmptyCanvasWrapper,
   tilesets: TilesetsWrapper,

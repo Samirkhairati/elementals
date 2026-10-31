@@ -16,6 +16,7 @@ interface FakePanel {
   id: string
   component: string
   api: { setSize: ReturnType<typeof vi.fn>; setActive: ReturnType<typeof vi.fn>; close: () => void; isActive: boolean }
+  group: { api: { setVisible: ReturnType<typeof vi.fn> } }
 }
 
 function createFakeApi() {
@@ -25,6 +26,7 @@ function createFakeApi() {
       id: opts.id,
       component: opts.component,
       api: { setSize: vi.fn(), setActive: vi.fn(), close: () => void panels.delete(opts.id), isActive: false },
+      group: { api: { setVisible: vi.fn() } },
     }
     panels.set(opts.id, panel)
     return panel
@@ -46,16 +48,16 @@ function createFakeApi() {
   return { api: api as unknown as DockviewApi, addPanel, panels }
 }
 
-function mountLayout() {
+function mountLayout(options: { entityFocus?: boolean } = {}) {
   const fake = createFakeApi()
-  const hook = renderHook(() => useDockviewLayout({}))
+  const hook = renderHook((props: { entityFocus?: boolean }) => useDockviewLayout(props), { initialProps: options })
   act(() => {
     hook.result.current.onReady({ api: fake.api } as unknown as DockviewReadyEvent)
   })
   return { ...fake, hook }
 }
 
-const DEFAULT_OPEN = ['empty_canvas', 'maps', 'layers', 'entities', 'properties', 'tilesets', 'preview', 'activeSelection']
+const DEFAULT_OPEN = ['empty_canvas', 'maps', 'layers', 'entities', 'properties', 'tilesets', 'inspector', 'preview', 'activeSelection']
 
 describe('panel registry', () => {
   it('lists the Database in the right column with its shortcut', () => {
@@ -105,6 +107,23 @@ describe('panel wrappers', () => {
     expect((value as unknown as { addSwitch: ReturnType<typeof vi.fn> }).addSwitch).toHaveBeenCalledTimes(1)
   })
 
+})
+
+describe('entity focus', () => {
+  const visible = (panels: Map<string, FakePanel>, id: string) => panels.get(id)!.group.api.setVisible.mock.calls.at(-1)?.[0]
+
+  it('shows the inspector instead of the tileset panels while an entity is selected, and back again', () => {
+    const { hook, panels } = mountLayout({ entityFocus: false })
+    expect(visible(panels, 'inspector')).toBe(false)
+    expect(visible(panels, 'tilesets')).toBe(true)
+    hook.rerender({ entityFocus: true })
+    expect(visible(panels, 'inspector')).toBe(true)
+    for (const id of ['tilesets', 'preview', 'activeSelection']) expect(visible(panels, id)).toBe(false)
+    expect(visible(panels, 'maps')).toBeUndefined() // the left sidebar is untouched
+    hook.rerender({ entityFocus: false })
+    expect(visible(panels, 'inspector')).toBe(false)
+    expect(visible(panels, 'tilesets')).toBe(true)
+  })
 })
 
 describe('useDockviewLayout with the new panels', () => {
