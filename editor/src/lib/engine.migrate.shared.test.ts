@@ -8,6 +8,7 @@ import {
   listLegacyComponents,
   migrateEntity,
   migrateMap,
+  normalizeEventProps,
   normalizeProps,
   validateEntity,
 } from '../../../shared/engine/index'
@@ -45,7 +46,7 @@ describe('legacy project maps (fixtures from git history)', () => {
     const { value, changed } = migrateMap(map)
     expect(map).toEqual(before) // input never mutated
     expect(changed).toBe(true)
-    expect(value.schemaVersion).toBe(2)
+    expect(value.schemaVersion).toBe(3)
 
     const [plain, full] = value.entities
     expect(plain).toBe(map.entities[0]) // same object: nothing to migrate
@@ -58,9 +59,9 @@ describe('legacy project maps (fixtures from git history)', () => {
       asset: 'characters/player', facing: 'down', animation: '', frame: 0, offsetX: 0, offsetY: 0, scale: 1, flipX: false, tint: '', opacity: 1, visible: true,
     })
     expect(full.components.Movement).toEqual({ controller: 'player', speed: 100, canRun: true, wanderRadius: 3, wanderInterval: 4000 })
-    // empty Interactable -> an Event with one empty action page
-    expect(full.components.Event.pages).toHaveLength(1)
-    expect(full.components.Event.pages[0]).toMatchObject({ name: 'Page 1', conditions: [], trigger: 'action', commands: [], faceOnInteract: true, solid: null, appearance: {} })
+    // empty Interactable -> an Event with one empty action state
+    expect(full.components.Event.states).toHaveLength(1)
+    expect(full.components.Event.states[0]).toMatchObject({ name: 'State 1', conditions: [], trigger: 'action', commands: [], faceOnInteract: true, solid: null, appearance: {} })
     expect(full).toMatchObject({ id: map.entities[1].id, name: 'New Entity1', x: 48, y: 192, visible: true, folder: null })
     for (const e of value.entities) expect(validateEntity(e)).toEqual([])
   })
@@ -72,10 +73,10 @@ describe('legacy project maps (fixtures from git history)', () => {
     expect(Object.keys(sign.components)).toEqual(['Transform', 'Collider', 'Event', 'Tag'])
     expect(sign.components.Transform).toEqual({ x: 336, y: 128, depth: 0 })
     expect(sign.components.Tag).toEqual({ tag: 'sign' })
-    const page = sign.components.Event.pages[0]
-    expect(page.trigger).toBe('action')
-    expect(page.commands).toHaveLength(1)
-    expect(page.commands[0]).toMatchObject({ type: 'showText', params: { speaker: '', text: 'The ancient sign is faded...' } })
+    const state = sign.components.Event.states[0]
+    expect(state.trigger).toBe('action')
+    expect(state.commands).toHaveLength(1)
+    expect(state.commands[0]).toMatchObject({ type: 'showText', params: { speaker: '', text: 'The ancient sign is faded...' } })
     expect(validateEntity(sign)).toEqual([])
   })
 
@@ -187,38 +188,38 @@ describe('Movement (Grid/Free/PlayerControl/AIWander)', () => {
 })
 
 describe('Interactable -> Event', () => {
-  const page = (inter: Record<string, any>, id = 'ent-1') => migrateEntity(ent({ Interactable: inter }, { id })).value.components.Event!.pages[0]
+  const state = (inter: Record<string, any>, id = 'ent-1') => migrateEntity(ent({ Interactable: inter }, { id })).value.components.Event!.states[0]
 
   it('message -> showText; on_interact -> action trigger', () => {
-    const p = page({ type: 'on_interact', message: 'Hello' })
+    const p = state({ type: 'on_interact', message: 'Hello' })
     expect(p.trigger).toBe('action')
     expect(p.commands.map((c: any) => [c.type, c.params])).toEqual([['showText', { speaker: '', text: 'Hello' }]])
   })
 
   it('on_step -> playerTouch', () => {
-    expect(page({ type: 'on_step', eventKey: 'WARP' }).trigger).toBe('playerTouch')
-    expect(page({ type: 'something-else', message: 'x' }).trigger).toBe('action')
-    expect(page({ message: 'x' }).trigger).toBe('action')
+    expect(state({ type: 'on_step', eventKey: 'WARP' }).trigger).toBe('playerTouch')
+    expect(state({ type: 'something-else', message: 'x' }).trigger).toBe('action')
+    expect(state({ message: 'x' }).trigger).toBe('action')
   })
 
   it('targetMap -> warp with TILE coordinates (as the old runtime/editor labels treat them)', () => {
-    const p = page({ type: 'on_step', targetMap: 'city.json', targetX: 5, targetY: 7 })
+    const p = state({ type: 'on_step', targetMap: 'city.json', targetX: 5, targetY: 7 })
     expect(p.commands).toHaveLength(1)
     expect(p.commands[0]).toMatchObject({ type: 'warp', params: { map: 'city', x: 5, y: 7, facing: '', fade: true } })
-    expect(page({ targetMap: 'market', targetX: '2' }).commands[0].params).toMatchObject({ map: 'market', x: 0, y: 0 })
+    expect(state({ targetMap: 'market', targetX: '2' }).commands[0].params).toMatchObject({ map: 'market', x: 0, y: 0 })
   })
 
   it('eventKey -> emit', () => {
-    expect(page({ eventKey: 'OPEN_CHEST_01' }).commands.map((c: any) => [c.type, c.params.event])).toEqual([['emit', 'OPEN_CHEST_01']])
+    expect(state({ eventKey: 'OPEN_CHEST_01' }).commands.map((c: any) => [c.type, c.params.event])).toEqual([['emit', 'OPEN_CHEST_01']])
   })
 
   it('several fields become several commands in the order showText, warp, emit', () => {
-    const p = page({ type: 'on_interact', message: 'Bye', targetMap: 'town', targetX: 1, targetY: 2, eventKey: 'LEFT' })
+    const p = state({ type: 'on_interact', message: 'Bye', targetMap: 'town', targetX: 1, targetY: 2, eventKey: 'LEFT' })
     expect(p.commands.map((c: any) => c.type)).toEqual(['showText', 'warp', 'emit'])
   })
 
-  it('nothing set -> an empty action page (the Event component is kept)', () => {
-    const p = page({ type: 'on_interact', message: '', eventKey: '', targetMap: '' })
+  it('nothing set -> an empty action state (the Event component is kept)', () => {
+    const p = state({ type: 'on_interact', message: '', eventKey: '', targetMap: '' })
     expect(p).toMatchObject({ trigger: 'action', commands: [] })
   })
 
@@ -227,14 +228,14 @@ describe('Interactable -> Event', () => {
     const b = migrateEntity(ent({ Interactable: { message: 'a', targetMap: 'm', eventKey: 'k' } })).value
     expect(JSON.stringify(a)).toBe(JSON.stringify(b))
     const other = migrateEntity(ent({ Interactable: { message: 'a', targetMap: 'm', eventKey: 'k' } }, { id: 'ent-2' })).value
-    const ids = (e: any) => [e.components.Event.pages[0].id, ...e.components.Event.pages[0].commands.map((c: any) => c.id)]
+    const ids = (e: any) => [e.components.Event.states[0].id, ...e.components.Event.states[0].commands.map((c: any) => c.id)]
     expect(new Set(ids(a)).size).toBe(4)
     expect(ids(a)).not.toEqual(ids(other))
     expect(validateEntity(a, { mapIds: ['m'] }).filter((i) => i.severity === 'error')).toEqual([])
   })
 
   it('an existing Event wins over Interactable', () => {
-    const event = normalizeProps('Event', { pages: [{ id: 'p', commands: [] }] })
+    const event = normalizeProps('Event', { states: [{ id: 'p', commands: [] }] })
     const out = migrateEntity(ent({ Event: event, Interactable: { message: 'x' } })).value
     expect(out.components.Event).toEqual(event)
     expect(out.components).not.toHaveProperty('Interactable')
@@ -299,11 +300,11 @@ describe('Transform, extras and bookkeeping', () => {
 })
 
 describe('migrateMap', () => {
-  it('stamps schemaVersion 2 even without entities, once', () => {
+  it('stamps the current schemaVersion even without entities, once', () => {
     const map = { name: 'm', width: 1, height: 1, layers: [] }
     const r = migrateMap(map)
     expect(r.changed).toBe(true)
-    expect(r.value).toEqual({ ...map, schemaVersion: 2 })
+    expect(r.value).toEqual({ ...map, schemaVersion: 3 })
     expect(map).not.toHaveProperty('schemaVersion')
     const again = migrateMap(r.value)
     expect(again.changed).toBe(false)
@@ -311,9 +312,38 @@ describe('migrateMap', () => {
   })
 
   it('leaves newer schema versions alone but still migrates entities', () => {
-    const r = migrateMap({ schemaVersion: 3, entities: [ent({ Interactable: { message: 'x' } })] })
-    expect(r.value.schemaVersion).toBe(3)
+    const r = migrateMap({ schemaVersion: 99, entities: [ent({ Interactable: { message: 'x' } })] })
+    expect(r.value.schemaVersion).toBe(99)
     expect(Object.keys(r.value.entities[0].components)).toContain('Event')
+  })
+
+  describe('Event pages -> states (schemaVersion 3)', () => {
+    const page = { id: 'p1', name: 'Page 1', conditions: [], trigger: 'action', commands: [], faceOnInteract: true, solid: null, appearance: {} }
+
+    it('renames the Event component list and leaves everything else alone', () => {
+      const r = migrateMap({ schemaVersion: 2, entities: [ent({ Event: { pages: [page] }, Tag: { tag: 'npc' } })] })
+      expect(r.changed).toBe(true)
+      expect(r.value.schemaVersion).toBe(3)
+      const components = r.value.entities[0].components as Record<string, any>
+      expect(components.Event).toEqual({ states: [page] })
+      expect(components.Tag).toEqual({ tag: 'npc' })
+    })
+
+    it('is idempotent and keeps already migrated maps by reference', () => {
+      const first = migrateMap({ schemaVersion: 2, entities: [ent({ Event: { pages: [page] } })] })
+      const again = migrateMap(first.value)
+      expect(again.changed).toBe(false)
+      expect(again.value).toBe(first.value)
+    })
+
+    it('prefers an existing states list and drops the stale pages key', () => {
+      const r = migrateMap({ schemaVersion: 2, entities: [ent({ Event: { pages: [{ ...page, id: 'old' }], states: [page] } })] })
+      expect((r.value.entities[0].components as Record<string, any>).Event).toEqual({ states: [page] })
+    })
+
+    it('normalizes un-migrated props that still use pages', () => {
+      expect(normalizeEventProps({ pages: [page] }).states[0].id).toBe('p1')
+    })
   })
 
   it('keeps unchanged entities by reference, ignores non-object entries and non-object maps', () => {

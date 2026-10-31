@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import type { EventPage } from '../../../../../shared/engine/types'
+import type { EventState } from '../../../../../shared/engine/types'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { useEventEnv } from './eventEnv'
 import { EventEditor } from './EventEditor'
@@ -8,12 +8,12 @@ import { PortalContainerProvider } from './primitives'
 interface EventEditorDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  pages: EventPage[]
-  onChange: (pages: EventPage[]) => void
+  states: EventState[]
+  onChange: (states: EventState[]) => void
 }
 
 /** The large modal (about 90vw x 85vh) hosting the full event editor. */
-export function EventEditorDialog({ open, onOpenChange, pages, onChange }: EventEditorDialogProps) {
+export function EventEditorDialog({ open, onOpenChange, states, onChange }: EventEditorDialogProps) {
   const env = useEventEnv()
   const [content, setContent] = useState<HTMLDivElement | null>(null)
   return (
@@ -35,10 +35,10 @@ export function EventEditorDialog({ open, onOpenChange, pages, onChange }: Event
         >
           <header className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-2.5 pr-12">
             <DialogTitle className="text-sm font-semibold">Event editor{env.entityName ? ` · ${env.entityName}` : ''}</DialogTitle>
-            <DialogDescription className="text-xs">Pages decide when something runs; commands decide what happens. The last page whose conditions hold is the active one.</DialogDescription>
+            <DialogDescription className="text-xs">States decide when something runs; commands decide what happens. The last state whose conditions hold is the active one.</DialogDescription>
           </header>
           <PortalContainerProvider value={content}>
-            <EventEditor pages={pages} onChange={onChange} />
+            <EventEditor states={states} onChange={onChange} />
           </PortalContainerProvider>
         </div>
       </DialogContent>

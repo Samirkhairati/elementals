@@ -220,7 +220,7 @@ describe('adding commands', () => {
     expect(screen.getByTestId('selected')).toHaveTextContent('n-1')
   })
 
-  it('appends to the end of the page when nothing is selected', () => {
+  it('appends to the end of the state when nothing is selected', () => {
     const onChange = vi.fn()
     renderWithEnv(<Harness initial={sample()} onChange={onChange} />)
     fireEvent.click(toolbarAdd())

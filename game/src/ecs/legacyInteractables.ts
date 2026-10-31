@@ -8,8 +8,8 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 /**
  * Converts the objects of a legacy Tiled `interactables` object layer into editor-format entities that
  * carry a legacy `Interactable` component. Feeding them through the normal pipeline
- * (`migrateEntity` -> Event component with one page) makes them behave like any other entity event:
- * `on_interact` -> action page, `on_step` -> playerTouch page, `message` -> showText, `eventKey` -> emit.
+ * (`migrateEntity` -> Event component with one state) makes them behave like any other entity event:
+ * `on_interact` -> action state, `on_step` -> playerTouch state, `message` -> showText, `eventKey` -> emit.
  *
  * They occupy one non-solid tile (`floor(obj.x / 32), floor(obj.y / 32)`, like the old InteractionSystem).
  * With neither message nor eventKey the object's name is shown as the message (old behaviour).

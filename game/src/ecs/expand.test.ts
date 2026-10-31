@@ -117,23 +117,23 @@ describe('expandEntity', () => {
     expect(find(FreeMovementComponent)).toBeUndefined();
   });
 
-  it('Event -> EventComponent with the pages, the authored sprite and the authored solid flag', () => {
+  it('Event -> EventComponent with the states, the authored sprite and the authored solid flag', () => {
     const { find } = expand({
       Sprite: createDefaultComponent('Sprite', { asset: 'objects/chest' }),
       Collider: createDefaultComponent('Collider', { isSolid: false }),
-      Event: { pages: [{ id: 'p', name: 'P', conditions: [], trigger: 'playerTouch', commands: [], faceOnInteract: true, solid: null, appearance: {} }] },
+      Event: { states: [{ id: 'p', name: 'P', conditions: [], trigger: 'playerTouch', commands: [], faceOnInteract: true, solid: null, appearance: {} }] },
     });
     const ev = find(EventComponent)!;
-    expect(ev.pages).toHaveLength(1);
-    expect(ev.pages[0].trigger).toBe('playerTouch');
+    expect(ev.states).toHaveLength(1);
+    expect(ev.states[0].trigger).toBe('playerTouch');
     expect(ev.baseSprite?.asset).toBe('objects/chest');
     expect(ev.baseSolid).toBe(false);
-    expect(ev.activePage).toBe(-1);
+    expect(ev.activeState).toBe(-1);
   });
 
-  it('Event with no pages gets the default empty action page; Tag falls back to "entity"', () => {
+  it('Event with no states gets the default empty action state; Tag falls back to "entity"', () => {
     const { find } = expand({ Event: {}, Tag: { tag: '' } });
-    expect(find(EventComponent)!.pages).toHaveLength(1);
+    expect(find(EventComponent)!.states).toHaveLength(1);
     expect(find(TagComponent)!.tag).toBe('entity');
   });
 
@@ -162,14 +162,14 @@ describe('legacy maps through the spawner', () => {
     const e = entities[0];
     expect(w.getComponent(e, AnimationComponent)).toMatchObject({ assetId: 'characters/npc', direction: 'left' });
     expect(w.getComponent(e, AIWanderComponent)).toMatchObject({ radius: 2, interval: 2500, speed: 55 });
-    const page = w.getComponent(e, EventComponent)!.pages[0];
-    expect(page.commands.map((c) => c.type)).toEqual(['showText', 'emit']);
+    const state = w.getComponent(e, EventComponent)!.states[0];
+    expect(state.commands.map((c) => c.type)).toEqual(['showText', 'emit']);
   });
 
   it('a legacy Interactable without content shows the entity name', () => {
     const w = new World();
     const { entities } = hydrateMapEntities(w, [{ id: 's', name: 'Old Sign', components: { Transform: { x: 1, y: 2 }, Interactable: {} } }], ctx);
-    expect(w.getComponent(entities[0], EventComponent)!.pages[0].commands[0].params.text).toBe('Old Sign');
+    expect(w.getComponent(entities[0], EventComponent)!.states[0].commands[0].params.text).toBe('Old Sign');
   });
 });
 

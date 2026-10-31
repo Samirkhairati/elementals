@@ -16,7 +16,7 @@ describe('COMPONENT_REGISTRY (adapter over shared schemas)', () => {
     }
     expect(COMPONENT_REGISTRY.Collider.defaultProps).toEqual({ width: 32, height: 32, offsetX: 0, offsetY: 0, isSolid: true })
     expect(COMPONENT_REGISTRY.Transform.defaultProps).toEqual({ x: 0, y: 0, depth: 10 })
-    expect(COMPONENT_REGISTRY.Event.defaultProps.pages).toHaveLength(1)
+    expect(COMPONENT_REGISTRY.Event.defaultProps.states).toHaveLength(1)
   })
 
   it('maps shared field kinds onto the primitive editors', () => {
@@ -53,7 +53,7 @@ describe('PRESET_PREFABS', () => {
     const a = chest.components
     const b = chest.components
     expect(a).not.toBe(b)
-    expect(a.Event?.pages[0].id).not.toBe(b.Event?.pages[0].id)
+    expect(a.Event?.states[0].id).not.toBe(b.Event?.states[0].id)
     const entity = { id: 'x', name: 'c', x: 0, y: 0, components: a }
     expect(validateEntity(entity).filter((i) => i.severity === 'error')).toEqual([])
     expect(Object.keys(a)).not.toContain('Interactable')

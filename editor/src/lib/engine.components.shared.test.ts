@@ -84,15 +84,15 @@ describe('defaults', () => {
     expect(createDefaultComponent('Tag')).toEqual({ tag: 'entity', icon: '', color: '' })
   })
 
-  it('Event defaults to one action page without commands and gets fresh ids', () => {
+  it('Event defaults to one action state without commands and gets fresh ids', () => {
     setIdGenerator(createSequentialIdGenerator('p'))
     const a = createDefaultComponent('Event')
     const b = createDefaultEventProps()
-    expect(a.pages).toHaveLength(1)
-    expect(a.pages[0]).toEqual({
-      id: 'p-1', name: 'Page 1', conditions: [], trigger: 'action', commands: [], faceOnInteract: true, solid: null, appearance: {},
+    expect(a.states).toHaveLength(1)
+    expect(a.states[0]).toEqual({
+      id: 'p-1', name: 'State 1', conditions: [], trigger: 'action', commands: [], faceOnInteract: true, solid: null, appearance: {},
     })
-    expect(b.pages[0].id).toBe('p-2')
+    expect(b.states[0].id).toBe('p-2')
   })
 
   it('returns independent objects and applies overrides', () => {
@@ -160,10 +160,10 @@ describe('normalizeProps', () => {
     expect(normalizeProps('Collider', once)).toEqual(once)
   })
 
-  it('normalises Event pages: ids, triggers, conditions, commands, appearance', () => {
+  it('normalises Event states: ids, triggers, conditions, commands, appearance', () => {
     setIdGenerator(createSequentialIdGenerator('n'))
     const ev = normalizeProps('Event', {
-      pages: [
+      states: [
         {
           name: 3,
           trigger: 'nope',
@@ -174,19 +174,19 @@ describe('normalizeProps', () => {
         },
       ],
     })
-    const page = ev.pages[0]
-    expect(page.id).toBe('n-1')
-    expect(page.name).toBe('Page 1')
-    expect(page.trigger).toBe('action')
-    expect(page.conditions).toEqual([{ kind: 'switch', id: 's', value: true }, { kind: 'hasItem', item: 'potion', qty: 1 }])
-    expect(page.commands.map((c) => c.type)).toEqual(['showText', 'loop'])
-    expect(page.commands[1].id).toBe('keep')
-    expect(page.commands[1].branches).toEqual({ body: [{ id: expect.any(String), type: 'wait', params: {} }], bad: [] })
-    expect(page.appearance).toEqual({ frame: 2, visible: false })
-    expect(page.solid).toBeNull()
-    expect(page.faceOnInteract).toBe(true)
-    expect(normalizeProps('Event', { pages: [] }).pages).toHaveLength(1)
-    expect(normalizeProps('Event', 'x').pages).toHaveLength(1)
+    const state = ev.states[0]
+    expect(state.id).toBe('n-1')
+    expect(state.name).toBe('State 1')
+    expect(state.trigger).toBe('action')
+    expect(state.conditions).toEqual([{ kind: 'switch', id: 's', value: true }, { kind: 'hasItem', item: 'potion', qty: 1 }])
+    expect(state.commands.map((c) => c.type)).toEqual(['showText', 'loop'])
+    expect(state.commands[1].id).toBe('keep')
+    expect(state.commands[1].branches).toEqual({ body: [{ id: expect.any(String), type: 'wait', params: {} }], bad: [] })
+    expect(state.appearance).toEqual({ frame: 2, visible: false })
+    expect(state.solid).toBeNull()
+    expect(state.faceOnInteract).toBe(true)
+    expect(normalizeProps('Event', { states: [] }).states).toHaveLength(1)
+    expect(normalizeProps('Event', 'x').states).toHaveLength(1)
   })
 
   it('coerceFieldValue handles text kinds and fallbacks', () => {
@@ -237,7 +237,7 @@ describe('cloneEntity', () => {
   const entity = (): EngineEntity => ({
     id: 'e1', name: 'E', x: 16, y: 32, components: {
       Transform: createDefaultComponent('Transform', { x: 16, y: 32 }),
-      Event: { pages: [{ ...createDefaultEventProps().pages[0], id: 'pg', commands: [{ id: 'c1', type: 'wait', params: { ms: 5 } }] }] },
+      Event: { states: [{ ...createDefaultEventProps().states[0], id: 'pg', commands: [{ id: 'c1', type: 'wait', params: { ms: 5 } }] }] },
     },
   })
 
@@ -247,17 +247,17 @@ describe('cloneEntity', () => {
     expect(c).toEqual(e)
     expect(c).not.toBe(e)
     expect(c.components.Event).not.toBe(e.components.Event)
-    c.components.Event!.pages[0].commands[0].params.ms = 9
-    expect(e.components.Event!.pages[0].commands[0].params.ms).toBe(5)
+    c.components.Event!.states[0].commands[0].params.ms = 9
+    expect(e.components.Event!.states[0].commands[0].params.ms).toBe(5)
   })
 
-  it('freshIds regenerates entity, page and command ids only', () => {
+  it('freshIds regenerates entity, state and command ids only', () => {
     const e = entity()
     const c = cloneEntity(e, true)
     expect(c.id).not.toBe('e1')
-    expect(c.components.Event!.pages[0].id).not.toBe('pg')
-    expect(c.components.Event!.pages[0].commands[0].id).not.toBe('c1')
-    expect(c.components.Event!.pages[0].commands[0].params).toEqual({ ms: 5 })
+    expect(c.components.Event!.states[0].id).not.toBe('pg')
+    expect(c.components.Event!.states[0].commands[0].id).not.toBe('c1')
+    expect(c.components.Event!.states[0].commands[0].params).toEqual({ ms: 5 })
     expect(c.components.Transform).toEqual(e.components.Transform)
   })
 })

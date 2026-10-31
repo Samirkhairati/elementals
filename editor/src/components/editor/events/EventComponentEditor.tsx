@@ -2,14 +2,14 @@
 
 import React, { useEffect, useMemo, useState } from 'react'
 import { AlertCircle, AlertTriangle, CheckCircle2, ExternalLink } from 'lucide-react'
-import type { EventPage } from '../../../../../shared/engine/types'
+import type { EventState } from '../../../../../shared/engine/types'
 import { TRIGGER_LABELS } from '../../../../../shared/engine/constants'
-import { createDefaultEventPage } from '../../../../../shared/engine/components'
+import { createDefaultEventState } from '../../../../../shared/engine/components'
 import { countCommands, getCommandDef, summarizeCommand } from '../../../../../shared/engine/commands'
 import type { CustomEditorProps } from '../inspector/customEditors'
 import { EditorEventEnvProvider, useEventEnv } from './eventEnv'
 import { EventEditorDialog } from './EventEditorDialog'
-import { buildSummaryContext, buildValidationContext, collectProblems, countBySeverity, defaultActivePageIndex, pageLabel } from './eventModel'
+import { buildSummaryContext, buildValidationContext, collectProblems, countBySeverity, defaultActiveStateIndex, stateLabel } from './eventModel'
 import { CommandIcon, PlannedBadge } from './commandStyle'
 import { SmallButton } from './primitives'
 
@@ -18,25 +18,25 @@ export const OPEN_EVENT_EDITOR_EVENT = 'editor:open-event-editor'
 
 const MAX_LINES = 4
 
-export function EventSummary({ pages, onOpen }: { pages: EventPage[]; onOpen: () => void }) {
+export function EventSummary({ states, onOpen }: { states: EventState[]; onOpen: () => void }) {
   const env = useEventEnv()
   const summaryCtx = useMemo(() => buildSummaryContext(env), [env])
-  const problems = useMemo(() => collectProblems(pages, buildValidationContext(env)), [pages, env])
+  const problems = useMemo(() => collectProblems(states, buildValidationContext(env)), [states, env])
   const counts = countBySeverity(problems)
-  const startIndex = defaultActivePageIndex(pages, env.variables)
+  const startIndex = defaultActiveStateIndex(states, env.variables)
   const shownIndex = startIndex >= 0 ? startIndex : 0
-  const shown = pages[shownIndex]
+  const shown = states[shownIndex]
   const lines = shown?.commands.slice(0, MAX_LINES) ?? []
   const extra = Math.max(0, (shown?.commands.length ?? 0) - lines.length)
 
   return (
     <div className="space-y-2" data-testid="event-summary">
       <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-        <span className="rounded bg-muted px-1.5 py-0.5 font-medium" data-testid="event-page-count">
-          {pages.length} {pages.length === 1 ? 'page' : 'pages'}
+        <span className="rounded bg-muted px-1.5 py-0.5 font-medium" data-testid="event-state-count">
+          {states.length} {states.length === 1 ? 'state' : 'states'}
         </span>
         {shown && (
-          <span className="rounded bg-muted px-1.5 py-0.5 text-muted-foreground" title={startIndex >= 0 ? 'The page that runs with no switch or variable set' : 'No page is eligible before something changes; showing page 1'}>
+          <span className="rounded bg-muted px-1.5 py-0.5 text-muted-foreground" title={startIndex >= 0 ? 'The state that runs with no switch or variable set' : 'No state is eligible before something changes; showing state 1'}>
             {TRIGGER_LABELS[shown.trigger]}
           </span>
         )}
@@ -60,7 +60,7 @@ export function EventSummary({ pages, onOpen }: { pages: EventPage[]; onOpen: ()
       {shown && (
         <div className="rounded border border-border/60 bg-background/40 p-1.5">
           <div className="mb-1 text-[10px] uppercase tracking-wider text-muted-foreground">
-            {pageLabel(shown, shownIndex)}
+            {stateLabel(shown, shownIndex)}
             {shown.conditions.length > 0 && ` · ${shown.conditions.length} condition${shown.conditions.length > 1 ? 's' : ''}`}
           </div>
           {lines.length === 0 ? (
@@ -94,9 +94,9 @@ export function EventSummary({ pages, onOpen }: { pages: EventPage[]; onOpen: ()
 
 function EventCardBody({ entityId, value, onChange }: CustomEditorProps) {
   const [open, setOpen] = useState(false)
-  const pages = useMemo<EventPage[]>(() => {
-    const list = Array.isArray(value?.pages) ? (value.pages as EventPage[]) : []
-    return list.length > 0 ? list : [createDefaultEventPage()]
+  const states = useMemo<EventState[]>(() => {
+    const list = Array.isArray(value?.states) ? (value.states as EventState[]) : []
+    return list.length > 0 ? list : [createDefaultEventState()]
   }, [value])
 
   // Lets the canvas / entity list open the editor for an entity without importing this file.
@@ -110,8 +110,8 @@ function EventCardBody({ entityId, value, onChange }: CustomEditorProps) {
 
   return (
     <>
-      <EventSummary pages={pages} onOpen={() => setOpen(true)} />
-      {open && <EventEditorDialog open={open} onOpenChange={setOpen} pages={pages} onChange={(next) => onChange('pages', next)} />}
+      <EventSummary states={states} onOpen={() => setOpen(true)} />
+      {open && <EventEditorDialog open={open} onOpenChange={setOpen} states={states} onChange={(next) => onChange('states', next)} />}
     </>
   )
 }

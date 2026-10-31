@@ -48,7 +48,7 @@ function onOff(v: unknown): string {
   return v === false ? 'OFF' : 'ON';
 }
 
-/** Human-readable one-liner for a page/conditional condition. */
+/** Human-readable one-liner for a state/conditional condition. */
 export function describeCondition(c: unknown, ctx?: SummaryContext): string {
   if (!isRecord(c)) return '(invalid condition)';
   switch (c.kind) {
@@ -905,7 +905,7 @@ export interface ConditionIssue {
   message: string;
 }
 
-/** Validates a list of conditions (page conditions and the `conditional` command). Never throws. */
+/** Validates a list of conditions (state conditions and the `conditional` command). Never throws. */
 export function validateConditions(conditions: unknown, ctx: ValidationContext = {}): ConditionIssue[] {
   const issues: ConditionIssue[] = [];
   if (!Array.isArray(conditions)) {

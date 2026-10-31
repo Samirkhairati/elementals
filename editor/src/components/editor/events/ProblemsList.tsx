@@ -1,9 +1,9 @@
 import React from 'react'
 import { AlertCircle, AlertTriangle, CheckCircle2 } from 'lucide-react'
-import type { EventPage } from '../../../../../shared/engine/types'
-import { pageLabel, type Problem } from './eventModel'
+import type { EventState } from '../../../../../shared/engine/types'
+import { stateLabel, type Problem } from './eventModel'
 
-export function ProblemsList({ problems, pages, onJump }: { problems: Problem[]; pages: EventPage[]; onJump: (problem: Problem) => void }) {
+export function ProblemsList({ problems, states, onJump }: { problems: Problem[]; states: EventState[]; onJump: (problem: Problem) => void }) {
   if (problems.length === 0) {
     return (
       <div className="flex items-center gap-2 p-3 text-xs text-emerald-400" data-testid="no-problems">
@@ -16,9 +16,9 @@ export function ProblemsList({ problems, pages, onJump }: { problems: Problem[];
     <ul className="divide-y divide-border/50" data-testid="problems-list">
       {problems.map((p, i) => {
         const Icon = p.severity === 'error' ? AlertCircle : AlertTriangle
-        const page = pages[p.pageIndex]
+        const state = states[p.stateIndex]
         return (
-          <li key={`${p.pageId}-${p.code}-${p.commandId ?? 'page'}-${i}`}>
+          <li key={`${p.stateId}-${p.code}-${p.commandId ?? 'state'}-${i}`}>
             <button
               type="button"
               onClick={() => onJump(p)}
@@ -29,7 +29,7 @@ export function ProblemsList({ problems, pages, onJump }: { problems: Problem[];
               <span className="min-w-0 flex-1">
                 <span className="block text-xs">{p.message}</span>
                 <span className="block text-[10px] text-muted-foreground">
-                  {page ? pageLabel(page, p.pageIndex) : `Page ${p.pageIndex + 1}`} · {p.scope === 'command' ? 'command' : p.scope}
+                  {state ? stateLabel(state, p.stateIndex) : `State ${p.stateIndex + 1}`} · {p.scope === 'command' ? 'command' : p.scope}
                 </span>
               </span>
             </button>

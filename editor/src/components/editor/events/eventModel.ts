@@ -1,4 +1,4 @@
-// Pure helpers behind the event editor: page operations, command-tree edits (on top of the shared
+// Pure helpers behind the event editor: state operations, command-tree edits (on top of the shared
 // helpers), clipboard format, templates, validation/summary contexts. No React in here, so everything
 // is unit-testable and every function returns new data (inputs are never mutated).
 
@@ -6,7 +6,7 @@ import type {
   Command,
   CommandIssue,
   Condition,
-  EventPage,
+  EventState,
   IssueSeverity,
   SummaryContext,
   ValidationContext,
@@ -24,57 +24,57 @@ import {
   validateCommands,
   validateConditions,
 } from '../../../../../shared/engine/commands'
-import { createDefaultEventPage } from '../../../../../shared/engine/components'
+import { createDefaultEventState } from '../../../../../shared/engine/components'
 import { newId } from '../../../../../shared/engine/ids'
 import { cloneJson } from '../../../../../shared/engine/util'
 import type { EventEnv } from './eventEnv'
 
-// ── pages ───────────────────────────────────────────────────────────────────────────────────────
+// ── states ───────────────────────────────────────────────────────────────────────────────────────
 
-export function pageLabel(page: Pick<EventPage, 'name'>, index: number): string {
-  return page.name.trim() || `Page ${index + 1}`
+export function stateLabel(state: Pick<EventState, 'name'>, index: number): string {
+  return state.name.trim() || `State ${index + 1}`
 }
 
-/** Appends an empty page. */
-export function addPage(pages: EventPage[]): { pages: EventPage[]; id: string } {
-  const page = createDefaultEventPage(`Page ${pages.length + 1}`)
-  return { pages: [...pages, page], id: page.id }
+/** Appends an empty state. */
+export function addState(states: EventState[]): { states: EventState[]; id: string } {
+  const state = createDefaultEventState(`State ${states.length + 1}`)
+  return { states: [...states, state], id: state.id }
 }
 
-/** Inserts a copy (fresh ids, "name copy") right after the page. */
-export function duplicatePage(pages: EventPage[], id: string): { pages: EventPage[]; id: string | null } {
-  const index = pages.findIndex((p) => p.id === id)
-  if (index < 0) return { pages, id: null }
-  const source = pages[index]
-  const copy: EventPage = {
+/** Inserts a copy (fresh ids, "name copy") right after the state. */
+export function duplicateState(states: EventState[], id: string): { states: EventState[]; id: string | null } {
+  const index = states.findIndex((p) => p.id === id)
+  if (index < 0) return { states, id: null }
+  const source = states[index]
+  const copy: EventState = {
     ...cloneJson({ ...source, commands: [] as Command[] }),
     id: newId(),
     name: source.name.trim() ? `${source.name.trim()} copy` : '',
     commands: cloneCommands(source.commands, true),
   }
-  return { pages: [...pages.slice(0, index + 1), copy, ...pages.slice(index + 1)], id: copy.id }
+  return { states: [...states.slice(0, index + 1), copy, ...states.slice(index + 1)], id: copy.id }
 }
 
-/** Removes a page; an event always keeps at least one page. */
-export function deletePage(pages: EventPage[], id: string): EventPage[] {
-  if (pages.length <= 1 || !pages.some((p) => p.id === id)) return pages
-  return pages.filter((p) => p.id !== id)
+/** Removes a state; an event always keeps at least one state. */
+export function deleteState(states: EventState[], id: string): EventState[] {
+  if (states.length <= 1 || !states.some((p) => p.id === id)) return states
+  return states.filter((p) => p.id !== id)
 }
 
-/** Moves a page one step (delta -1 = earlier, +1 = later). Later pages win over earlier ones. */
-export function movePage(pages: EventPage[], id: string, delta: -1 | 1): EventPage[] {
-  const from = pages.findIndex((p) => p.id === id)
+/** Moves a state one step (delta -1 = earlier, +1 = later). Later states win over earlier ones. */
+export function moveState(states: EventState[], id: string, delta: -1 | 1): EventState[] {
+  const from = states.findIndex((p) => p.id === id)
   const to = from + delta
-  if (from < 0 || to < 0 || to >= pages.length) return pages
-  const next = pages.slice()
-  const [page] = next.splice(from, 1)
-  next.splice(to, 0, page)
+  if (from < 0 || to < 0 || to >= states.length) return states
+  const next = states.slice()
+  const [state] = next.splice(from, 1)
+  next.splice(to, 0, state)
   return next
 }
 
-export function updatePage(pages: EventPage[], id: string, patch: Partial<EventPage>): EventPage[] {
-  if (!pages.some((p) => p.id === id)) return pages
-  return pages.map((p) => (p.id === id ? { ...p, ...patch } : p))
+export function updateState(states: EventState[], id: string, patch: Partial<EventState>): EventState[] {
+  if (!states.some((p) => p.id === id)) return states
+  return states.map((p) => (p.id === id ? { ...p, ...patch } : p))
 }
 
 function compare(op: string, a: number, b: number): boolean {
@@ -109,10 +109,10 @@ export function conditionHoldsAtStart(c: Condition, variables: readonly Variable
   }
 }
 
-/** Index of the page that would run with no state set (the last page whose conditions all hold), or -1. */
-export function defaultActivePageIndex(pages: readonly EventPage[], variables: readonly VariableDef[]): number {
-  for (let i = pages.length - 1; i >= 0; i--) {
-    if (pages[i].conditions.every((c) => conditionHoldsAtStart(c, variables))) return i
+/** Index of the state that would run with nothing set (the last state whose conditions all hold), or -1. */
+export function defaultActiveStateIndex(states: readonly EventState[], variables: readonly VariableDef[]): number {
+  for (let i = states.length - 1; i >= 0; i--) {
+    if (states[i].conditions.every((c) => conditionHoldsAtStart(c, variables))) return i
   }
   return -1
 }
@@ -426,12 +426,12 @@ export interface EventTemplate {
   label: string
   description: string
   icon: string
-  /** Builds fresh commands (and optionally extra pages) every call. */
-  build: () => { commands: Command[]; extraPages?: EventPage[] }
+  /** Builds fresh commands (and optionally extra states) every call. */
+  build: () => { commands: Command[]; extraStates?: EventState[] }
 }
 
-function extraPage(name: string, partial: Partial<EventPage>): EventPage {
-  return { ...createDefaultEventPage(name), ...partial }
+function extraState(name: string, partial: Partial<EventState>): EventState {
+  return { ...createDefaultEventState(name), ...partial }
 }
 
 export const EVENT_TEMPLATES: EventTemplate[] = [
@@ -458,7 +458,7 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
   {
     id: 'give-item',
     label: 'Give item & hide',
-    description: 'Hands out an item once, then a second page hides the entity.',
+    description: 'Hands out an item once, then a second state hides the entity.',
     icon: 'package-plus',
     build: () => ({
       commands: [
@@ -466,8 +466,8 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
         createCommand('showText', { text: 'You found a Potion!' }),
         createCommand('setSelfSwitch', { key: 'A', value: true }),
       ],
-      extraPages: [
-        extraPage('Taken', {
+      extraStates: [
+        extraState('Taken', {
           conditions: [{ kind: 'selfSwitch', key: 'A', value: true }],
           solid: false,
           appearance: { visible: false },
@@ -493,8 +493,8 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
         createCommand('showText', { text: 'You found a Potion!' }),
         createCommand('setSelfSwitch', { key: 'A', value: true }),
       ],
-      extraPages: [
-        extraPage('Opened', {
+      extraStates: [
+        extraState('Opened', {
           conditions: [{ kind: 'selfSwitch', key: 'A', value: true }],
           appearance: { frame: 1 },
           commands: [createCommand('showText', { text: 'The chest is empty.' })],
@@ -505,22 +505,22 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
 ]
 
 /**
- * Applies a template to a page list: the commands go to `target` of the given page, extra pages are
- * appended (skipped when the event already has more than this page, so applying twice stays tidy).
+ * Applies a template to a state list: the commands go to `target` of the given state, extra states are
+ * appended (skipped when the event already has more than this state, so applying twice stays tidy).
  */
 export function applyTemplate(
-  pages: EventPage[],
-  pageId: string,
+  states: EventState[],
+  stateId: string,
   template: EventTemplate,
   target?: InsertTarget,
-): { pages: EventPage[]; selectId: string | null } {
-  const page = pages.find((p) => p.id === pageId)
-  if (!page) return { pages, selectId: null }
+): { states: EventState[]; selectId: string | null } {
+  const state = states.find((p) => p.id === stateId)
+  if (!state) return { states, selectId: null }
   const built = template.build()
-  const commands = insertCommands(page.commands, target ?? { kind: 'end', parentId: null, branch: null }, built.commands)
-  let next = updatePage(pages, pageId, { commands })
-  if (built.extraPages && pages.length === 1) next = [...next, ...built.extraPages]
-  return { pages: next, selectId: built.commands[0]?.id ?? null }
+  const commands = insertCommands(state.commands, target ?? { kind: 'end', parentId: null, branch: null }, built.commands)
+  let next = updateState(states, stateId, { commands })
+  if (built.extraStates && states.length === 1) next = [...next, ...built.extraStates]
+  return { states: next, selectId: built.commands[0]?.id ?? null }
 }
 
 // ── contexts ────────────────────────────────────────────────────────────────────────────────────
@@ -548,8 +548,8 @@ export function buildValidationContext(env: Pick<EventEnv, 'switches' | 'variabl
 // ── problems ────────────────────────────────────────────────────────────────────────────────────
 
 export interface Problem {
-  pageId: string
-  pageIndex: number
+  stateId: string
+  stateIndex: number
   severity: IssueSeverity
   code: string
   message: string
@@ -577,28 +577,28 @@ export function groupIssuesByCommand(issues: readonly CommandIssue[]): Map<strin
   return map
 }
 
-/** Validation of one page: conditions, appearance and the command tree. Never throws. */
-export function validatePage(page: EventPage, ctx: ValidationContext): { commandIssues: CommandIssue[]; pageProblems: Omit<Problem, 'pageId' | 'pageIndex'>[] } {
-  const pageProblems: Omit<Problem, 'pageId' | 'pageIndex'>[] = []
-  for (const c of validateConditions(page.conditions, ctx)) {
-    pageProblems.push({ severity: c.severity, code: c.code, message: `Condition ${c.index + 1}: ${c.message}`, scope: 'conditions' })
+/** Validation of one state: conditions, appearance and the command tree. Never throws. */
+export function validateState(state: EventState, ctx: ValidationContext): { commandIssues: CommandIssue[]; stateProblems: Omit<Problem, 'stateId' | 'stateIndex'>[] } {
+  const stateProblems: Omit<Problem, 'stateId' | 'stateIndex'>[] = []
+  for (const c of validateConditions(state.conditions, ctx)) {
+    stateProblems.push({ severity: c.severity, code: c.code, message: `Condition ${c.index + 1}: ${c.message}`, scope: 'conditions' })
   }
-  const asset = page.appearance?.asset
+  const asset = state.appearance?.asset
   if (asset && ctx.spriteIds && !ctx.spriteIds.includes(asset)) {
-    pageProblems.push({ severity: 'warning', code: 'dangling-sprite', message: `Appearance sprite "${asset}" does not exist`, scope: 'appearance' })
+    stateProblems.push({ severity: 'warning', code: 'dangling-sprite', message: `Appearance sprite "${asset}" does not exist`, scope: 'appearance' })
   }
-  return { commandIssues: validateCommands(page.commands, ctx), pageProblems }
+  return { commandIssues: validateCommands(state.commands, ctx), stateProblems }
 }
 
-export function collectProblems(pages: readonly EventPage[], ctx: ValidationContext): Problem[] {
+export function collectProblems(states: readonly EventState[], ctx: ValidationContext): Problem[] {
   const out: Problem[] = []
-  pages.forEach((page, pageIndex) => {
-    const { commandIssues, pageProblems } = validatePage(page, ctx)
-    for (const p of pageProblems) out.push({ ...p, pageId: page.id, pageIndex })
+  states.forEach((state, stateIndex) => {
+    const { commandIssues, stateProblems } = validateState(state, ctx)
+    for (const p of stateProblems) out.push({ ...p, stateId: state.id, stateIndex })
     for (const i of commandIssues) {
       out.push({
-        pageId: page.id,
-        pageIndex,
+        stateId: state.id,
+        stateIndex,
         severity: i.severity,
         code: i.code,
         message: i.message,
@@ -607,7 +607,7 @@ export function collectProblems(pages: readonly EventPage[], ctx: ValidationCont
       })
     }
   })
-  return out.sort((a, b) => severityRank(a.severity) - severityRank(b.severity) || a.pageIndex - b.pageIndex)
+  return out.sort((a, b) => severityRank(a.severity) - severityRank(b.severity) || a.stateIndex - b.stateIndex)
 }
 
 export function countBySeverity(problems: readonly { severity: IssueSeverity }[]): { errors: number; warnings: number } {

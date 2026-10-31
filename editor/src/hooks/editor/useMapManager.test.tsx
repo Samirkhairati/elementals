@@ -40,7 +40,7 @@ describe('useMapManager', () => {
     expect(onMapSelected).toHaveBeenCalledWith(map.layers, map.entities)
   })
 
-  it('onSelectMap migrates legacy entities and stamps schemaVersion 2', () => {
+  it('onSelectMap migrates legacy entities and stamps the current schemaVersion', () => {
     const onMapSelected = vi.fn()
     const legacy = makeMap({
       schemaVersion: undefined,
@@ -54,9 +54,9 @@ describe('useMapManager', () => {
     const { result } = renderHook(() => useMapManager({ onMapSelected }), { wrapper })
     act(() => result.current.onSelectMap(legacy))
     const active = result.current.activeMap!
-    expect(active.schemaVersion).toBe(2)
+    expect(active.schemaVersion).toBe(3)
     expect(Object.keys(active.entities![0].components)).toEqual(['Transform', 'Event'])
-    expect(active.entities![0].components.Event!.pages[0].commands[0]).toMatchObject({ type: 'showText', params: { text: 'hello' } })
+    expect(active.entities![0].components.Event!.states[0].commands[0]).toMatchObject({ type: 'showText', params: { text: 'hello' } })
     expect(legacy.entities![0].components).toHaveProperty('Interactable') // input untouched
     expect(onMapSelected).toHaveBeenCalledWith(active.layers, active.entities)
   })
@@ -73,7 +73,7 @@ describe('useMapManager', () => {
       await result.current.loadMaps()
     })
     const loaded = result.current.maps[0]
-    expect(loaded.schemaVersion).toBe(2)
+    expect(loaded.schemaVersion).toBe(3)
     expect(loaded.entities![0].components.Movement).toMatchObject({ controller: 'player' })
     expect(loaded.entities![0].components.Sprite).toMatchObject({ asset: 'characters/player' })
   })

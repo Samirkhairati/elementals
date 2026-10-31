@@ -43,8 +43,8 @@ describe('validateEditorMap + engine validation', () => {
 
   it('reports bad props and broken events as errors', () => {
     const ev = createDefaultComponent('Event')
-    ev.pages[0].commands.push(createCommand('breakLoop'))
-    ev.pages[0].trigger = 'whenever' as any
+    ev.states[0].commands.push(createCommand('breakLoop'))
+    ev.states[0].trigger = 'whenever' as any
     const res = validateEditorMap(map([entity({ Collider: { isSolid: 'maybe' }, Event: ev })]))
     expect(res.ok).toBe(false)
     expect(res.errors.join('\n')).toMatch(/Solid: must be true or false/)
@@ -55,7 +55,7 @@ describe('validateEditorMap + engine validation', () => {
 
   it('missing references only fail when a context is supplied', () => {
     const ev = createDefaultComponent('Event')
-    ev.pages[0].commands.push(createCommand('setSwitch', { id: 'ghost' }))
+    ev.states[0].commands.push(createCommand('setSwitch', { id: 'ghost' }))
     const m = map([entity({ Event: ev })])
     expect(validateEditorMap(m).ok).toBe(true)
     const res = validateEditorMap(m, { context: { switchIds: ['s1'] } })
@@ -65,7 +65,7 @@ describe('validateEditorMap + engine validation', () => {
 
   it('unset command parameters are only warnings', () => {
     const ev = createDefaultComponent('Event')
-    ev.pages[0].commands.push(createCommand('warp'))
+    ev.states[0].commands.push(createCommand('warp'))
     const res = validateEditorMap(map([entity({ Event: ev })]))
     expect(res.ok).toBe(true)
     expect(res.warnings.join()).toMatch(/"Map" is not set/)
@@ -83,7 +83,7 @@ describe('export always carries canonical entities', () => {
   it('migrates legacy maps and the result validates and re-exports identically', () => {
     const legacy = map([entity({ SpriteView: { texture: 'player-walk' }, Interactable: { type: 'on_step', targetMap: 'city.json', targetX: 3, targetY: 4 } })])
     const first = convertEditorMapToTiled(legacy, [])
-    expect(first.schemaVersion).toBe(2)
+    expect(first.schemaVersion).toBe(3)
     expect(Object.keys(first.entities[0].components)).toEqual(['Transform', 'Sprite', 'Event'])
     expect(validateEditorMap({ ...legacy, entities: first.entities }).warnings).toEqual([])
     expect(serializeTiledMap(convertEditorMapToTiled({ ...legacy, entities: first.entities } as any, []))).toBe(serializeTiledMap(first))
@@ -101,6 +101,6 @@ describe('plain Node (no bundler)', () => {
       console.log(JSON.stringify({ v: t.schemaVersion, c: Object.keys(t.entities[0].components), ok: validateEditorMap(m).ok, p: PREFABS.length, issues: validateEntity(t.entities[0]).length, changed: migrateMap(m).changed }));
     `
     const out = execFileSync(process.execPath, ['--input-type=module', '-e', script], { cwd: REPO, encoding: 'utf8' })
-    expect(JSON.parse(out.trim())).toEqual({ v: 2, c: ['Transform', 'Event'], ok: true, p: 7, issues: 0, changed: true })
+    expect(JSON.parse(out.trim())).toEqual({ v: 3, c: ['Transform', 'Event'], ok: true, p: 7, issues: 0, changed: true })
   })
 })

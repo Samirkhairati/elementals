@@ -18,7 +18,7 @@ export function makeMap(overrides: Partial<MapData> = {}): MapData {
     layers: [makeLayer('L1')],
     entities: [],
     entityFolders: [],
-    schemaVersion: 2,
+    schemaVersion: 3,
     ...overrides,
   }
 }

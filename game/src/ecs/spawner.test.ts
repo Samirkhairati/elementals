@@ -70,9 +70,9 @@ describe('hydrateMapEntities', () => {
     expect(w.getComponent(e, TransformComponent)).toMatchObject({ x: 336, y: 128, depth: 0 });
     expect(w.getComponent(e, ColliderComponent)).toMatchObject({ width: 32, height: 32, isSolid: true });
     const event = w.getComponent(e, EventComponent)!;
-    expect(event.pages).toHaveLength(1);
-    expect(event.pages[0]).toMatchObject({ trigger: 'action' });
-    expect(event.pages[0].commands[0]).toMatchObject({ type: 'showText', params: { text: 'The ancient sign is faded...' } });
+    expect(event.states).toHaveLength(1);
+    expect(event.states[0]).toMatchObject({ trigger: 'action' });
+    expect(event.states[0].commands[0]).toMatchObject({ type: 'showText', params: { text: 'The ancient sign is faded...' } });
     expect(w.getComponent(e, EntityInfoComponent)).toMatchObject({ editorId: 'e41e2972', name: 'Sign / Inspectable' });
     expect(w.getComponent(e, TagComponent)?.tag).toBe('sign');
   });
@@ -161,7 +161,7 @@ describe('hydrateMapEntities', () => {
     expect(w.getComponent(entities[0], AIWanderComponent)).toMatchObject({ radius: 2, interval: 4000, speed: 60 });
     expect(w.getComponent(entities[0], SpriteComponent)).toMatchObject({ assetId: 'characters/npc' });
     expect(w.getComponent(entities[0], AnimationComponent)).toMatchObject({ assetId: 'characters/npc', hasRun: false });
-    expect(w.getComponent(entities[0], EventComponent)!.pages[0].commands[0].params.text).toBe('Hello traveler!');
+    expect(w.getComponent(entities[0], EventComponent)!.states[0].commands[0].params.text).toBe('Hello traveler!');
   });
 });
 

@@ -24,7 +24,7 @@ How the game (`game/src`) runs the data the editor writes. The data contract is 
 | Sprite | `SpriteComponent` (+ `AnimationComponent` for `character` assets). Empty asset = no graphic; unknown asset = warning and no graphic |
 | Collider | `ColliderComponent` (32x32 default, bottom-centred on the anchor + offsets; the top edge is exclusive in `SpatialSystem`) |
 | Movement | `GridMovement`; `player` adds `FreeMovement` + `PlayerControl{canRun}`; `wander` adds `AIWander` |
-| Event | `EventComponent` (pages, authored sprite/solid for page overrides) |
+| Event | `EventComponent` (states, authored sprite/solid for state overrides) |
 | Tag | `TagComponent` |
 
 Legacy Tiled `interactables` object layers become entities with an `Interactable` and are migrated like any legacy entity
@@ -32,24 +32,24 @@ Legacy Tiled `interactables` object layers become entities with an `Interactable
 
 ## Event runtime (`game/src/events`)
 ```
-EventState        switches / variables / self switches (mapId/entityId/A-D); notifies subscribers + EventBus; JSON snapshot
+GameFlags         switches / variables / self switches (mapId/entityId/A-D); notifies subscribers + EventBus; JSON snapshot
 Inventory         in-memory item counts (hasItem, giveItem, removeItem)
 conditions.ts     evaluateCondition(s)
-PageSelector      active page = last page whose conditions hold; applies appearance + solid overrides when the page CHANGES
+StateSelector     active state = last state whose conditions hold; applies appearance + solid overrides when the state CHANGES
 EventInterpreter  async, cancellable command-tree runner; handlers in commands/*.ts
-EventRuntime      owns state, clock, page selector, running interpreters, the `event` input lock
+EventRuntime      owns state, clock, state selector, running interpreters, the `event` input lock
 TriggerSystem     ECS system (priority 350): decides when events start
 RouteSystem       ECS system (priority 260): runs moveRoute steps through GridMovement.pendingDirection
 BusEventUI        EventUI over the EventBus -> DialogueHUD / ChoiceMenuHUD (UIScene); CameraEffects does fade/shake
 ```
 * Rules: one interpreter per entity; one **blocking** interpreter at a time (holds `gameState` lock reason `event`); `parallel` is
   non-blocking. A map switch cancels everything (`runtime.onMapLoaded`). Global switches/variables/inventory and self switches
-  persist across maps; the new map's entities select their pages from them.
+  persist across maps; the new map's entities select their states from them.
 * **Triggers.** `action`: player tile, tile in front, then the other three neighbours, against each entity's live footprint (a wandering NPC
   keeps its dialogue); presses made while input is locked are dropped. `playerTouch`: the player's step ends on the tile (also when chaining
   into the next step) or bumps into a solid trigger; the spawn/warp tile never fires. `eventTouch`: another walking entity ends a step on it.
-  `autorun`: blocking, restarts while its page stays active. `parallel`: background, restarts, cancelled when its page is no longer active.
-* **Inactive events.** No active page = hidden and not solid (RPG Maker behaviour).
+  `autorun`: blocking, restarts while its state stays active. `parallel`: background, restarts, cancelled when its state is no longer active.
+* **Inactive events.** No active state = hidden and not solid (RPG Maker behaviour).
 * **Movement routes.** Steps use the normal movement intent (collision applies, blocked steps are skipped). `back` turns the character
   around (the movement system sets the facing from the intent). `speed` persists. Routed entities ignore the input lock, wander AI and player input
   while the route runs; entities without Movement get a `GridMovement` on demand.

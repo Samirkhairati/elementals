@@ -24,7 +24,7 @@ const OFFSETS: Record<Facing, { dc: number; dr: number }> = {
 };
 const FACINGS: Facing[] = ["down", "left", "right", "up"];
 
-/** Consecutive instant restarts of one autorun page before we warn that it never switches itself off. */
+/** Consecutive instant restarts of one autorun state before we warn that it never switches itself off. */
 const AUTORUN_WARN_AFTER = 300;
 
 /**
@@ -38,9 +38,9 @@ const AUTORUN_WARN_AFTER = 300;
  *    player chains straight into the next step), or when the player walks into a solid trigger
  *    (bump). Standing still never re-fires; arriving on a map does not fire for the spawn tile;
  *  - `eventTouch`: fires when another walking entity ends a step on the event's tiles;
- *  - `autorun`: starts as a blocking event (input locked) whenever the page is active and nothing is
- *    running on it, and restarts for as long as its page stays active;
- *  - `parallel`: runs in the background, restarts when finished, cancelled when its page is no longer
+ *  - `autorun`: starts as a blocking event (input locked) whenever the state is active and nothing is
+ *    running on it, and restarts for as long as its state stays active;
+ *  - `parallel`: runs in the background, restarts when finished, cancelled when its state is no longer
  *    active.
  */
 export class TriggerSystem extends System {
@@ -54,7 +54,7 @@ export class TriggerSystem extends System {
   private readonly autorunRestarts = new Map<Entity, number>();
   /**
    * Action key press. Presses made while input is locked are dropped on purpose: the press that
-   * dismisses the last dialogue page must not start the same NPC's event again.
+   * dismisses the last dialogue state must not start the same NPC's event again.
    */
   private readonly onAction = () => {
     this.requestAction();
@@ -176,14 +176,14 @@ export class TriggerSystem extends System {
     return false;
   }
 
-  /** [entity, active page index] of events with `trigger` whose footprint covers `tile`. */
+  /** [entity, active state index] of events with `trigger` whose footprint covers `tile`. */
   private findAt(world: World, tile: Tile, trigger: string): Array<[Entity, number]> {
     const out: Array<[Entity, number]> = [];
     for (const [entity, ev, transform] of world.view(EventComponent, TransformComponent)) {
-      if (ev.activePage < 0 || ev.pages[ev.activePage].trigger !== trigger) continue;
+      if (ev.activeState < 0 || ev.states[ev.activeState].trigger !== trigger) continue;
       if (this.runtime.isRunning(entity)) continue;
       const range = footprint(transform, world.getComponent(entity, ColliderComponent), this.tileSize);
-      if (coversTile(range, tile)) out.push([entity, ev.activePage]);
+      if (coversTile(range, tile)) out.push([entity, ev.activeState]);
     }
     return out;
   }
@@ -192,30 +192,30 @@ export class TriggerSystem extends System {
 
   private startAutoAndParallel(world: World): void {
     for (const [entity, ev] of world.view(EventComponent)) {
-      if (ev.activePage < 0 || this.runtime.isRunning(entity)) continue;
-      const trigger = ev.pages[ev.activePage].trigger;
+      if (ev.activeState < 0 || this.runtime.isRunning(entity)) continue;
+      const trigger = ev.states[ev.activeState].trigger;
       if (trigger === "parallel") {
-        this.runtime.start(entity, ev.activePage, { blocking: false });
+        this.runtime.start(entity, ev.activeState, { blocking: false });
       } else if (trigger === "autorun") {
         if (this.runtime.isBlocking) continue;
         const n = (this.autorunRestarts.get(entity) ?? 0) + 1;
         this.autorunRestarts.set(entity, n);
         if (n === AUTORUN_WARN_AFTER) {
-          this.runtime.warn(`[Event] an autorun page keeps restarting (${n} times); it should switch itself off (switch / self switch)`);
+          this.runtime.warn(`[Event] an autorun state keeps restarting (${n} times); it should switch itself off (switch / self switch)`);
         }
-        this.runtime.start(entity, ev.activePage, { blocking: true });
+        this.runtime.start(entity, ev.activeState, { blocking: true });
       } else {
         this.autorunRestarts.delete(entity);
       }
     }
   }
 
-  /** Parallel events stop when their page is no longer the active (parallel) page. */
+  /** Parallel events stop when their state is no longer the active (parallel) state. */
   private cancelStaleParallels(world: World): void {
     for (const [entity, ev] of world.view(EventComponent)) {
       const run = this.runtime.getRunning(entity);
       if (!run || run.blocking) continue;
-      if (ev.activePage < 0 || ev.pages[ev.activePage] !== run.page) this.runtime.cancel(entity);
+      if (ev.activeState < 0 || ev.states[ev.activeState] !== run.state) this.runtime.cancel(entity);
     }
   }
 
@@ -247,7 +247,7 @@ export class TriggerSystem extends System {
   // ── event touch ───────────────────────────────────────────────────────────────────────────────
 
   private checkEventTouch(world: World, player: Entity): void {
-    const touchers = world.view(EventComponent).filter(([, ev]) => ev.activePage >= 0 && ev.pages[ev.activePage].trigger === "eventTouch");
+    const touchers = world.view(EventComponent).filter(([, ev]) => ev.activeState >= 0 && ev.states[ev.activeState].trigger === "eventTouch");
     for (const [entity, transform, grid] of world.view(TransformComponent, GridMovementComponent)) {
       if (entity === player || grid.isMoving) continue;
       const tile = tileOfAnchor(transform.x, transform.y, this.tileSize);
@@ -261,7 +261,7 @@ export class TriggerSystem extends System {
         const t = world.getComponent(other, TransformComponent);
         if (!t) continue;
         const range = footprint(t, world.getComponent(other, ColliderComponent), this.tileSize);
-        if (coversTile(range, tile) && this.runtime.start(other, ev.activePage, { blocking: true })) break;
+        if (coversTile(range, tile) && this.runtime.start(other, ev.activeState, { blocking: true })) break;
       }
     }
   }

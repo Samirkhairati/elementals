@@ -85,7 +85,7 @@ export class Game extends Scene {
     this.animationSystem = new AnimationSystem();
     this.renderBridgeSystem = new RenderBridgeSystem(this);
 
-    // Event runtime: state/pages/interpreters + the system that decides when they start
+    // Event runtime: state/states/interpreters + the system that decides when they start
     const maps: MapService = {
       hasMap: (id) => MAPS.some((m) => m.key === id),
       warp: (request) => this.warpPlayer(request),
@@ -185,7 +185,7 @@ export class Game extends Scene {
   /**
    * Loads a map and places the player: at the map centre by default, on a tile for warps.
    * Everything event-related of the old map is cancelled first; global switches/variables and self
-   * switches persist, the new map's events pick their pages from them.
+   * switches persist, the new map's events pick their states from them.
    */
   private switchMap(mapKey: string, spawn?: { col: number; row: number; facing?: Facing }) {
     if (!MAPS.some((m) => m.key === mapKey)) {
@@ -216,7 +216,7 @@ export class Game extends Scene {
     ];
     hydrateMapEntities(this.world, entityDefs);
 
-    // Events of the new map: pages, then no touch event fires for the tile we arrive on.
+    // Events of the new map: states, then no touch event fires for the tile we arrive on.
     this.runtime.onMapLoaded(mapKey);
     this.triggerSystem.resetTouchState(this.world);
 
@@ -283,13 +283,13 @@ export class Game extends Scene {
     this.cameras.main.centerOn(x, y - 24);
   }
 
-  /** Footprints of event entities (yellow = solid, magenta = walkable trigger, grey = no active page). */
+  /** Footprints of event entities (yellow = solid, magenta = walkable trigger, grey = no active state). */
   private redrawDebugOverlay() {
     const g = this.debugGraphics;
     if (!g) return;
     g.clear();
     for (const [, transform, ev, collider] of this.world.view(TransformComponent, EventComponent, ColliderComponent)) {
-      const color = ev.page ? (collider.isSolid ? 0xffff00 : 0xff00ff) : 0x888888;
+      const color = ev.state ? (collider.isSolid ? 0xffff00 : 0xff00ff) : 0x888888;
       g.lineStyle(2, color, 0.8);
       g.strokeRect(transform.x + collider.offsetX - collider.width / 2, transform.y + collider.offsetY - collider.height, collider.width, collider.height);
     }
@@ -305,7 +305,7 @@ export class Game extends Scene {
       spawn: (defs) => {
         const result = hydrateMapEntities(this.world, defs);
         this.runtime.markDirty();
-        this.runtime.pages.refreshAll();
+        this.runtime.states.refreshAll();
         this.world.update(0);
         return result.entities;
       },

@@ -58,9 +58,9 @@ describe('spriteDraft', () => {
 })
 
 describe('countSpriteUsage', () => {
-  it('counts entities per asset across maps, including event page appearance overrides', () => {
+  it('counts entities per asset across maps, including event state appearance overrides', () => {
     const maps = [
-      makeMap({ fileName: 'a.json', entities: [makeEntity('1', { components: { Sprite: { asset: 'x/a' } } }), makeEntity('2', { components: { Sprite: { asset: 'x/a' }, Event: { pages: [{ appearance: { asset: 'x/b' } }, { appearance: { asset: 'x/a' } }] } } })] }),
+      makeMap({ fileName: 'a.json', entities: [makeEntity('1', { components: { Sprite: { asset: 'x/a' } } }), makeEntity('2', { components: { Sprite: { asset: 'x/a' }, Event: { states: [{ appearance: { asset: 'x/b' } }, { appearance: { asset: 'x/a' } }] } } })] }),
       makeMap({ fileName: 'b.json', entities: [makeEntity('3', { components: { Sprite: { asset: 'x/b' } } }), makeEntity('4', { components: {} })] }),
     ]
     expect(countSpriteUsage(maps)).toEqual({ 'x/a': 2, 'x/b': 2 })

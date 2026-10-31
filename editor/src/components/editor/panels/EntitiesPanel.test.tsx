@@ -68,7 +68,7 @@ describe('EntitiesPanel Edit event', () => {
     const opened: string[] = []
     const listener = (e: Event) => opened.push((e as CustomEvent<string>).detail)
     window.addEventListener('editor:open-event-editor', listener)
-    const props = setup([makeEntity('ev', { name: 'Guard', components: { Event: { pages: [] } } }), makeEntity('plain', { name: 'Rock' })])
+    const props = setup([makeEntity('ev', { name: 'Guard', components: { Event: { states: [] } } }), makeEntity('plain', { name: 'Rock' })])
     fireEvent.contextMenu(screen.getByTestId('entity-row-plain'))
     expect(screen.queryByRole('menuitem', { name: /Edit event/ })).toBeNull()
     fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
@@ -85,8 +85,8 @@ describe('EntitiesPanel Edit event', () => {
 
 describe('EntitiesPanel rows', () => {
   const rows = () => [
-    makeEntity('npc', { name: 'Elder', components: { Sprite: { asset: 'characters/hero' }, Event: { pages: [] }, Movement: { controller: 'wander' }, Collider: { isSolid: true } } }),
-    makeEntity('zone', { name: 'Warp zone', components: { Collider: { isSolid: false }, Event: { pages: [] } } }),
+    makeEntity('npc', { name: 'Elder', components: { Sprite: { asset: 'characters/hero' }, Event: { states: [] }, Movement: { controller: 'wander' }, Collider: { isSolid: true } } }),
+    makeEntity('zone', { name: 'Warp zone', components: { Collider: { isSolid: false }, Event: { states: [] } } }),
     makeEntity('plain', { name: 'Marker', components: {} }),
   ]
 

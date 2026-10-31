@@ -1,4 +1,4 @@
-// The hierarchical command list of one event page: rows, nested branches, insert affordances, the
+// The hierarchical command list of one event state: rows, nested branches, insert affordances, the
 // add-command popover, keyboard shortcuts and drag & drop. It never mutates the tree; every user action
 // computes a new tree with the pure helpers and reports it through ONE `onChange` call.
 
@@ -55,7 +55,7 @@ export interface CommandListProps {
   commands: Command[]
   /** The new tree, plus which command to select afterwards (`undefined` = keep the selection). */
   onChange: (next: Command[], select?: string | null) => void
-  /** Template with optional target; the parent also adds the template's extra pages. */
+  /** Template with optional target; the parent also adds the template's extra states. */
   onApplyTemplate: (template: EventTemplate, target: InsertTarget) => void
   selectedId: string | null
   onSelect: (id: string | null) => void
@@ -565,8 +565,8 @@ export function CommandList({ commands, onChange, onApplyTemplate, selectedId, o
         {commands.length === 0 ? (
           <div className="flex flex-col items-center gap-3 rounded-md border border-dashed border-border py-8 text-center" data-testid="empty-commands">
             <div>
-              <p className="text-sm font-medium">This page does nothing yet</p>
-              <p className="text-[11px] text-muted-foreground">Commands run top to bottom when the page is triggered.</p>
+              <p className="text-sm font-medium">This state does nothing yet</p>
+              <p className="text-[11px] text-muted-foreground">Commands run top to bottom when the state is triggered.</p>
             </div>
             <SmallButton variant="primary" onClick={(e) => openAddFrom({ kind: 'end', parentId: null, branch: null }, e.currentTarget)}>
               <Plus className="h-3 w-3" /> Add your first command

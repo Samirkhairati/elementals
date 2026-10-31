@@ -16,7 +16,7 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 
 /**
  * Runtime lookup of the sprite assets listed in `data/sprites.json` (written by `npm run assets:sync`).
- * Pure data, no Phaser: the Preloader fills it, ECS expansion / page selection / `changeSprite` read it.
+ * Pure data, no Phaser: the Preloader fills it, ECS expansion / state selection / `changeSprite` read it.
  */
 export class SpriteRegistry {
   private entries = new Map<string, SpriteManifestEntry>();

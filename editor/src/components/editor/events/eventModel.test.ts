@@ -3,7 +3,7 @@ import type { Command } from '../../../../../shared/engine/types'
 import { createCommand, findCommand } from '../../../../../shared/engine/commands'
 import {
   EVENT_TEMPLATES,
-  addPage,
+  addState,
   applyTemplate,
   branchCommandCount,
   branchHeading,
@@ -12,17 +12,17 @@ import {
   collectProblems,
   conditionHoldsAtStart,
   countBySeverity,
-  defaultActivePageIndex,
-  deletePage,
+  defaultActiveStateIndex,
+  deleteState,
   dropCommand,
-  duplicatePage,
+  duplicateState,
   freshCopies,
   getMemoryClipboard,
   insertCommands,
-  movePage,
+  moveState,
   moveWithin,
   orderedBranches,
-  pageLabel,
+  stateLabel,
   parseCommands,
   readCommandClipboard,
   removeBranch,
@@ -31,13 +31,13 @@ import {
   serializeCommands,
   setCommandParams,
   setMemoryClipboard,
-  updatePage,
-  validatePage,
+  updateState,
+  validateState,
   visibleOrder,
   worstSeverity,
   writeCommandClipboard,
 } from './eventModel'
-import { cmd, flat, makeEnv, page, sequentialIds } from './eventTestUtils'
+import { cmd, flat, makeEnv, state, sequentialIds } from './eventTestUtils'
 
 const ids = sequentialIds('n')
 beforeEach(() => {
@@ -54,68 +54,68 @@ function sample(): Command[] {
   ]
 }
 
-describe('pages', () => {
-  it('adds, names and appends pages', () => {
-    const base = [page('p1')]
-    const r = addPage(base)
-    expect(r.pages).toHaveLength(2)
-    expect(r.pages[1].name).toBe('Page 2')
-    expect(r.pages[1].id).toBe(r.id)
+describe('states', () => {
+  it('adds, names and appends states', () => {
+    const base = [state('p1')]
+    const r = addState(base)
+    expect(r.states).toHaveLength(2)
+    expect(r.states[1].name).toBe('State 2')
+    expect(r.states[1].id).toBe(r.id)
     expect(base).toHaveLength(1)
   })
 
   it('duplicates with fresh ids right after the original', () => {
-    const p1 = page('p1', sample(), { name: 'Intro' })
-    const r = duplicatePage([p1, page('p2')], 'p1')
-    expect(r.pages.map((p) => p.id)).toEqual(['p1', r.id, 'p2'])
-    const copy = r.pages[1]
+    const p1 = state('p1', sample(), { name: 'Intro' })
+    const r = duplicateState([p1, state('p2')], 'p1')
+    expect(r.states.map((p) => p.id)).toEqual(['p1', r.id, 'p2'])
+    const copy = r.states[1]
     expect(copy.name).toBe('Intro copy')
     expect(flat(copy.commands)).toEqual(flat(p1.commands))
     const originalIds = new Set(flat(p1.commands, true))
     expect(flat(copy.commands, true).some((x) => originalIds.has(x))).toBe(false)
-    expect(duplicatePage([p1], 'nope').id).toBeNull()
+    expect(duplicateState([p1], 'nope').id).toBeNull()
   })
 
-  it('never deletes the last page', () => {
-    const pages = [page('p1'), page('p2')]
-    expect(deletePage(pages, 'p1').map((p) => p.id)).toEqual(['p2'])
-    const single = [page('p1')]
-    expect(deletePage(single, 'p1')).toBe(single)
-    expect(deletePage(pages, 'zzz')).toBe(pages)
+  it('never deletes the last state', () => {
+    const states = [state('p1'), state('p2')]
+    expect(deleteState(states, 'p1').map((p) => p.id)).toEqual(['p2'])
+    const single = [state('p1')]
+    expect(deleteState(single, 'p1')).toBe(single)
+    expect(deleteState(states, 'zzz')).toBe(states)
   })
 
-  it('moves pages and refuses to leave the list', () => {
-    const pages = [page('p1'), page('p2'), page('p3')]
-    expect(movePage(pages, 'p2', -1).map((p) => p.id)).toEqual(['p2', 'p1', 'p3'])
-    expect(movePage(pages, 'p2', 1).map((p) => p.id)).toEqual(['p1', 'p3', 'p2'])
-    expect(movePage(pages, 'p1', -1)).toBe(pages)
-    expect(movePage(pages, 'p3', 1)).toBe(pages)
+  it('moves states and refuses to leave the list', () => {
+    const states = [state('p1'), state('p2'), state('p3')]
+    expect(moveState(states, 'p2', -1).map((p) => p.id)).toEqual(['p2', 'p1', 'p3'])
+    expect(moveState(states, 'p2', 1).map((p) => p.id)).toEqual(['p1', 'p3', 'p2'])
+    expect(moveState(states, 'p1', -1)).toBe(states)
+    expect(moveState(states, 'p3', 1)).toBe(states)
   })
 
-  it('updates one page immutably', () => {
-    const pages = [page('p1'), page('p2')]
-    const next = updatePage(pages, 'p2', { name: 'Second' })
+  it('updates one state immutably', () => {
+    const states = [state('p1'), state('p2')]
+    const next = updateState(states, 'p2', { name: 'Second' })
     expect(next[1].name).toBe('Second')
-    expect(next[0]).toBe(pages[0])
-    expect(updatePage(pages, 'zzz', { name: 'x' })).toBe(pages)
+    expect(next[0]).toBe(states[0])
+    expect(updateState(states, 'zzz', { name: 'x' })).toBe(states)
   })
 
-  it('labels pages by name or number', () => {
-    expect(pageLabel({ name: '  ' }, 2)).toBe('Page 3')
-    expect(pageLabel({ name: 'Intro' }, 0)).toBe('Intro')
+  it('labels states by name or number', () => {
+    expect(stateLabel({ name: '  ' }, 2)).toBe('State 3')
+    expect(stateLabel({ name: 'Intro' }, 0)).toBe('Intro')
   })
 
-  it('finds the page that is active with no state set', () => {
+  it('finds the state that is active with nothing set', () => {
     const vars = [{ id: 'badges', name: 'Badges', initial: 2 }]
-    const pages = [
-      page('p1'),
-      page('p2', [], { conditions: [{ kind: 'switch', id: 'met', value: true }] }),
-      page('p3', [], { conditions: [{ kind: 'variable', id: 'badges', op: '>=', value: 2 }] }),
-      page('p4', [], { conditions: [{ kind: 'selfSwitch', key: 'A', value: true }] }),
+    const states = [
+      state('p1'),
+      state('p2', [], { conditions: [{ kind: 'switch', id: 'met', value: true }] }),
+      state('p3', [], { conditions: [{ kind: 'variable', id: 'badges', op: '>=', value: 2 }] }),
+      state('p4', [], { conditions: [{ kind: 'selfSwitch', key: 'A', value: true }] }),
     ]
-    expect(defaultActivePageIndex(pages, vars)).toBe(2)
-    expect(defaultActivePageIndex(pages, [])).toBe(0)
-    expect(defaultActivePageIndex([page('x', [], { conditions: [{ kind: 'hasItem', item: 'potion', qty: 1 }] })], vars)).toBe(-1)
+    expect(defaultActiveStateIndex(states, vars)).toBe(2)
+    expect(defaultActiveStateIndex(states, [])).toBe(0)
+    expect(defaultActiveStateIndex([state('x', [], { conditions: [{ kind: 'hasItem', item: 'potion', qty: 1 }] })], vars)).toBe(-1)
     expect(conditionHoldsAtStart({ kind: 'switch', id: 'met', value: false }, vars)).toBe(true)
     expect(conditionHoldsAtStart({ kind: 'variable', id: 'unknown', op: '==', value: 0 }, vars)).toBe(true)
   })
@@ -297,8 +297,8 @@ describe('templates', () => {
       const b = t.build()
       expect(a.commands.length).toBeGreaterThan(0)
       expect(a.commands[0].id).not.toBe(b.commands[0].id)
-      const p = page('p', a.commands)
-      expect(validatePage(p, {}).commandIssues.filter((i) => i.severity === 'error')).toEqual([])
+      const p = state('p', a.commands)
+      expect(validateState(p, {}).commandIssues.filter((i) => i.severity === 'error')).toEqual([])
     }
   })
 
@@ -310,22 +310,22 @@ describe('templates', () => {
     expect(choices.branches?.opt2).toHaveLength(1)
   })
 
-  it('applies at the target and adds extra pages only to single-page events', () => {
+  it('applies at the target and adds extra states only to single-state events', () => {
     const tpl = EVENT_TEMPLATES.find((x) => x.id === 'chest')!
-    const r = applyTemplate([page('p1', [cmd('a', 'wait')])], 'p1', tpl, { kind: 'before', id: 'a' })
-    expect(r.pages).toHaveLength(2)
-    expect(r.pages[0].commands.map((c) => c.type)).toEqual(['giveItem', 'showText', 'setSelfSwitch', 'wait'])
-    expect(r.pages[1].conditions).toEqual([{ kind: 'selfSwitch', key: 'A', value: true }])
-    expect(r.pages[1].appearance).toEqual({ frame: 1 })
-    expect(r.selectId).toBe(r.pages[0].commands[0].id)
-    const again = applyTemplate(r.pages, 'p1', tpl)
-    expect(again.pages).toHaveLength(2)
-    expect(applyTemplate(r.pages, 'zzz', tpl).pages).toBe(r.pages)
+    const r = applyTemplate([state('p1', [cmd('a', 'wait')])], 'p1', tpl, { kind: 'before', id: 'a' })
+    expect(r.states).toHaveLength(2)
+    expect(r.states[0].commands.map((c) => c.type)).toEqual(['giveItem', 'showText', 'setSelfSwitch', 'wait'])
+    expect(r.states[1].conditions).toEqual([{ kind: 'selfSwitch', key: 'A', value: true }])
+    expect(r.states[1].appearance).toEqual({ frame: 1 })
+    expect(r.selectId).toBe(r.states[0].commands[0].id)
+    const again = applyTemplate(r.states, 'p1', tpl)
+    expect(again.states).toHaveLength(2)
+    expect(applyTemplate(r.states, 'zzz', tpl).states).toBe(r.states)
   })
 
-  it('give item & hide adds a page that hides the entity', () => {
-    const r = applyTemplate([page('p1')], 'p1', EVENT_TEMPLATES.find((x) => x.id === 'give-item')!)
-    expect(r.pages[1]).toMatchObject({ solid: false, appearance: { visible: false } })
+  it('give item & hide adds a state that hides the entity', () => {
+    const r = applyTemplate([state('p1')], 'p1', EVENT_TEMPLATES.find((x) => x.id === 'give-item')!)
+    expect(r.states[1]).toMatchObject({ solid: false, appearance: { visible: false } })
   })
 })
 
@@ -353,17 +353,17 @@ describe('contexts and problems', () => {
   })
 
   it('collects problems from conditions, appearance and commands, errors first', () => {
-    const pages = [
-      page('p1', [cmd('w', 'warp', { map: '' }), cmd('s', 'setSwitch', { id: 'ghost' })], {
+    const states = [
+      state('p1', [cmd('w', 'warp', { map: '' }), cmd('s', 'setSwitch', { id: 'ghost' })], {
         conditions: [{ kind: 'switch', id: 'ghost2', value: true }],
         appearance: { asset: 'objects/missing' },
       }),
-      page('p2'),
+      state('p2'),
     ]
-    const problems = collectProblems(pages, buildValidationContext(env))
+    const problems = collectProblems(states, buildValidationContext(env))
     expect(problems[0].severity).toBe('error')
     expect(problems.map((p) => p.code)).toEqual(expect.arrayContaining(['dangling-switch', 'missing-param', 'dangling-sprite']))
-    expect(problems.every((p) => p.pageId === 'p1')).toBe(true)
+    expect(problems.every((p) => p.stateId === 'p1')).toBe(true)
     expect(problems.find((p) => p.scope === 'conditions')).toBeDefined()
     expect(problems.find((p) => p.scope === 'appearance')).toBeDefined()
     expect(problems.find((p) => p.commandId === 's')).toBeDefined()

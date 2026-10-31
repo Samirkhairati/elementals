@@ -172,7 +172,7 @@ describe('entity summaries', () => {
   const entity = (components: Record<string, any>, extra = {}) => ({ x: 80, y: 128, components, ...extra })
 
   it('summarises components', () => {
-    const s = summarizeEntity(entity({ Sprite: { visible: false }, Collider: { isSolid: false }, Movement: { controller: 'wander', wanderRadius: 5 }, Event: { pages: [] }, Transform: { depth: 20 } }))
+    const s = summarizeEntity(entity({ Sprite: { visible: false }, Collider: { isSolid: false }, Movement: { controller: 'wander', wanderRadius: 5 }, Event: { states: [] }, Transform: { depth: 20 } }))
     expect(s).toMatchObject({ hasSprite: true, spriteHidden: true, hasEvent: true, solid: false, controller: 'wander', wanderRadius: 5, depth: 20 })
     expect(summarizeEntity(entity({}))).toMatchObject({ hasSprite: false, hasEvent: false, solid: null, controller: null, depth: 10 })
   })
@@ -180,9 +180,9 @@ describe('entity summaries', () => {
   it('picks an icon that says what the entity is', () => {
     expect(entityIconName(entity({ Tag: { tag: 'npc' } }))).toBe('user')
     expect(entityIconName(entity({ Tag: { tag: 'sign' } }))).toBe('signpost')
-    expect(entityIconName(entity({ Event: { pages: [{ commands: [{ type: 'warp' }] }] } }))).toBe('door-open')
+    expect(entityIconName(entity({ Event: { states: [{ commands: [{ type: 'warp' }] }] } }))).toBe('door-open')
     expect(entityIconName(entity({ Collider: { isSolid: false } }))).toBe('square-dashed')
-    expect(entityIconName(entity({ Event: { pages: [] } }))).toBe('zap')
+    expect(entityIconName(entity({ Event: { states: [] } }))).toBe('zap')
     expect(entityIconName(entity({}))).toBe('box')
   })
 

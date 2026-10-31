@@ -1,4 +1,4 @@
-import type { Command, EventPage, GameDatabase } from "@shared/engine/index.ts";
+import type { Command, EventState, GameDatabase } from "@shared/engine/index.ts";
 import type { World } from "@/ecs/World";
 import type { Entity } from "@/ecs/Entity";
 import { EventComponent } from "@/ecs/components/EventComponent";
@@ -10,7 +10,7 @@ import { EventBus, Events } from "@/utils/EventBus";
 import { GameFlags } from "./GameFlags";
 import { Inventory } from "./Inventory";
 import { GameClock } from "./GameClock";
-import { PageSelector } from "./PageSelector";
+import { StateSelector } from "./StateSelector";
 import { WorldEntityOps } from "./WorldEntityOps";
 import { EventInterpreter, type RunResult } from "./EventInterpreter";
 import type { EventContext, EventUI, MapService } from "./types";
@@ -32,14 +32,14 @@ export interface EventRuntimeOptions {
 export interface StartOptions {
   /** Blocking events lock player input and exclude each other (only one at a time). Default true. */
   blocking?: boolean;
-  /** `action` triggers: the entity turns towards this entity when the page asks for it (faceOnInteract). */
+  /** `action` triggers: the entity turns towards this entity when the state asks for it (faceOnInteract). */
   faceTarget?: Entity;
 }
 
 export interface RunningEvent {
   entity: Entity;
   entityId: string;
-  page: EventPage;
+  state: EventState;
   blocking: boolean;
   interpreter: EventInterpreter;
   /** Resolves when the run ended (completed, cancelled or errored). */
@@ -47,7 +47,7 @@ export interface RunningEvent {
 }
 
 /**
- * Owns the event runtime state of one game: global switches/variables/inventory, the clock, the page
+ * Owns the event runtime state of one game: global switches/variables/inventory, the clock, the state
  * selector and the running interpreters. The TriggerSystem decides WHEN events start; this class
  * decides whether they may, builds their context and keeps the input lock.
  *
@@ -62,7 +62,7 @@ export class EventRuntime {
   public readonly inventory = new Inventory();
   public readonly clock = new GameClock();
   public readonly ops: WorldEntityOps;
-  public readonly pages: PageSelector;
+  public readonly states: StateSelector;
   public readonly ui: EventUI;
   public readonly maps: MapService;
   public mapId = "";
@@ -90,7 +90,7 @@ export class EventRuntime {
     this.random = options.random ?? Math.random;
     this.flags = new GameFlags(options.database);
     this.ops = new WorldEntityOps(this.world, options.sprites, (m) => this.warn(m));
-    this.pages = new PageSelector({
+    this.states = new StateSelector({
       world: this.world,
       flags: this.flags,
       inventory: this.inventory,
@@ -139,53 +139,53 @@ export class EventRuntime {
 
   // ── lifecycle ─────────────────────────────────────────────────────────────────────────────────
 
-  /** Called once per game update: advances event time and re-selects pages after state changes. */
+  /** Called once per game update: advances event time and re-selects states after state changes. */
   public update(delta: number): void {
     this.clock.tick(delta);
     if (this.dirty) {
       this.dirty = false;
-      this.pages.refreshAll();
+      this.states.refreshAll();
     }
   }
 
-  /** A map was (re)built: events of the old one are gone, pages are selected for the new entities. */
+  /** A map was (re)built: events of the old one are gone, states are selected for the new entities. */
   public onMapLoaded(mapId: string): void {
     this.cancelAll();
     this.mapId = mapId;
     this.dirty = false;
-    this.pages.refreshAll();
+    this.states.refreshAll();
   }
 
-  /** Forces a page re-evaluation on the next update. */
+  /** Forces a state re-evaluation on the next update. */
   public markDirty(): void {
     this.dirty = true;
   }
 
-  public start(entity: Entity, pageIndex: number, options: StartOptions = {}): RunningEvent | null {
+  public start(entity: Entity, stateIndex: number, options: StartOptions = {}): RunningEvent | null {
     const blocking = options.blocking ?? true;
     const ev = this.world.getComponent(entity, EventComponent);
-    const page = ev?.pages[pageIndex];
-    if (!ev || !page) return null;
+    const state = ev?.states[stateIndex];
+    if (!ev || !state) return null;
     if (this.running.has(entity)) return null;
     if (blocking && this.blockingRun) return null;
 
     // faceOnInteract: only for solid entities (zones that are not solid do not turn to the player).
-    if (options.faceTarget !== undefined && page.faceOnInteract) {
+    if (options.faceTarget !== undefined && state.faceOnInteract) {
       const solid = this.world.getComponent(entity, ColliderComponent)?.isSolid ?? false;
       if (solid) this.ops.faceTowards(entity, options.faceTarget);
     }
 
     const entityId = this.world.getComponent(entity, EntityInfoComponent)?.editorId ?? `entity#${entity}`;
     const ctx = this.createContext(entity, entityId);
-    const interpreter = new EventInterpreter(page.commands as Command[], ctx);
+    const interpreter = new EventInterpreter(state.commands as Command[], ctx);
 
-    const run: RunningEvent = { entity, entityId, page, blocking, interpreter, done: Promise.resolve("completed") };
+    const run: RunningEvent = { entity, entityId, state, blocking, interpreter, done: Promise.resolve("completed") };
     this.running.set(entity, run);
     if (blocking) {
       this.blockingRun = run;
       this.releases.set(run, this.lockInput("event"));
     }
-    this.emitBus(Events.EVENT_STARTED, { entity: entityId, map: this.mapId, pageId: page.id, blocking });
+    this.emitBus(Events.EVENT_STARTED, { entity: entityId, map: this.mapId, stateId: state.id, blocking });
 
     run.done = interpreter.run().then((result) => {
       this.finish(run, result);
@@ -223,7 +223,7 @@ export class EventRuntime {
     this.releases.get(run)?.();
     this.releases.delete(run);
     this.dirty = true;
-    this.emitBus(Events.EVENT_ENDED, { entity: run.entityId, map: this.mapId, pageId: run.page.id, blocking: run.blocking, result });
+    this.emitBus(Events.EVENT_ENDED, { entity: run.entityId, map: this.mapId, stateId: run.state.id, blocking: run.blocking, result });
     for (const l of [...this.finishListeners]) l(run, result);
   }
 

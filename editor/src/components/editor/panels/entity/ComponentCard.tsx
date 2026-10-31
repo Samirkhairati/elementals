@@ -30,8 +30,8 @@ export function componentSummary(type: ComponentType, props: PropBag): string {
     case 'Movement':
       return String(props.controller ?? 'none')
     case 'Event': {
-      const pages = Array.isArray(props.pages) ? props.pages.length : 0
-      return `${pages} page${pages === 1 ? '' : 's'}`
+      const states = Array.isArray(props.states) ? props.states.length : 0
+      return `${states} state${states === 1 ? '' : 's'}`
     }
     case 'Tag':
       return String(props.tag ?? '')

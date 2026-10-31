@@ -1,57 +1,57 @@
-// The full event editor: page tabs | page settings + command list | command inspector or problems.
-// It is a pure function of `pages`; every edit calls `onChange(newPages)` exactly once.
+// The full event editor: state tabs | state settings + command list | command inspector or problems.
+// It is a pure function of `states`; every edit calls `onChange(newStates)` exactly once.
 
 import React, { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { AlertCircle, AlertTriangle, ChevronDown, ChevronRight, Redo2, Undo2 } from 'lucide-react'
-import type { Command, EventPage } from '../../../../../shared/engine/types'
+import type { Command, EventState } from '../../../../../shared/engine/types'
 import { findCommand, getCommandDef } from '../../../../../shared/engine/commands'
-import { createDefaultEventPage } from '../../../../../shared/engine/components'
+import { createDefaultEventState } from '../../../../../shared/engine/components'
 import { TRIGGER_LABELS } from '../../../../../shared/engine/constants'
 import { cn } from '@/lib/utils'
 import { useEventEnv } from './eventEnv'
 import {
-  addPage,
+  addState,
   applyTemplate,
   buildValidationContext,
   collectProblems,
   countBySeverity,
-  defaultActivePageIndex,
-  deletePage,
-  duplicatePage,
+  defaultActiveStateIndex,
+  deleteState,
+  duplicateState,
   groupIssuesByCommand,
-  movePage,
+  moveState,
   setCommandParams,
-  updatePage,
-  validatePage,
+  updateState,
+  validateState,
   type EventTemplate,
   type InsertTarget,
   type Problem,
 } from './eventModel'
 import { CommandList } from './CommandList'
-import { PageTabs } from './PageTabs'
-import { PageSettings } from './PageSettings'
+import { StateTabs } from './StateTabs'
+import { StateSettings } from './StateSettings'
 import { ParamForm } from './ParamForm'
 import { ProblemsList } from './ProblemsList'
 import { CommandIcon, PlannedBadge } from './commandStyle'
 import { IconButton } from './primitives'
 
 export interface EventEditorProps {
-  pages: EventPage[]
-  /** Called once per user edit with the complete new page list. */
-  onChange: (pages: EventPage[]) => void
+  states: EventState[]
+  /** Called once per user edit with the complete new state list. */
+  onChange: (states: EventState[]) => void
   className?: string
 }
 
-export function EventEditor({ pages: pagesProp, onChange, className }: EventEditorProps) {
+export function EventEditor({ states: statesProp, onChange, className }: EventEditorProps) {
   const env = useEventEnv()
-  const pages = useMemo(() => (pagesProp.length > 0 ? pagesProp : [createDefaultEventPage()]), [pagesProp])
-  const pagesRef = useRef(pages)
+  const states = useMemo(() => (statesProp.length > 0 ? statesProp : [createDefaultEventState()]), [statesProp])
+  const pagesRef = useRef(states)
   useLayoutEffect(() => {
-    pagesRef.current = pages
+    pagesRef.current = states
   })
 
   const commit = useCallback(
-    (next: EventPage[]) => {
+    (next: EventState[]) => {
       if (next === pagesRef.current) return
       pagesRef.current = next
       onChange(next)
@@ -59,56 +59,56 @@ export function EventEditor({ pages: pagesProp, onChange, className }: EventEdit
     [onChange],
   )
 
-  const [selectedPageId, setSelectedPageId] = useState<string>(pages[0].id)
+  const [selectedStateId, setSelectedStateId] = useState<string>(states[0].id)
   const [selectedCommandId, setSelectedCommandId] = useState<string | null>(null)
   const [rightTab, setRightTab] = useState<'command' | 'problems'>('command')
   const [settingsOpen, setSettingsOpen] = useState(true)
   const formRef = useRef<HTMLDivElement>(null)
 
-  const page = pages.find((p) => p.id === selectedPageId) ?? pages[0]
-  const pageIndex = pages.indexOf(page)
-  const selected = selectedCommandId ? findCommand(page.commands, selectedCommandId) : null
+  const state = states.find((p) => p.id === selectedStateId) ?? states[0]
+  const stateIndex = states.indexOf(state)
+  const selected = selectedCommandId ? findCommand(state.commands, selectedCommandId) : null
 
   const vctx = useMemo(() => buildValidationContext(env), [env])
-  const problems = useMemo(() => collectProblems(pages, vctx), [pages, vctx])
+  const problems = useMemo(() => collectProblems(states, vctx), [states, vctx])
   const counts = countBySeverity(problems)
-  const pageValidation = useMemo(() => validatePage(page, vctx), [page, vctx])
-  const issuesByCommand = useMemo(() => groupIssuesByCommand(pageValidation.commandIssues), [pageValidation])
-  const startIndex = defaultActivePageIndex(pages, env.variables)
+  const stateValidation = useMemo(() => validateState(state, vctx), [state, vctx])
+  const issuesByCommand = useMemo(() => groupIssuesByCommand(stateValidation.commandIssues), [stateValidation])
+  const startIndex = defaultActiveStateIndex(states, env.variables)
 
   const commitCommands = useCallback(
-    (pageId: string, commands: Command[]) => commit(updatePage(pagesRef.current, pageId, { commands })),
+    (stateId: string, commands: Command[]) => commit(updateState(pagesRef.current, stateId, { commands })),
     [commit],
   )
 
   const onCommandsChange = useCallback(
     (next: Command[], select?: string | null) => {
-      commitCommands(page.id, next)
+      commitCommands(state.id, next)
       if (select !== undefined) setSelectedCommandId(select)
       if (select) setRightTab('command')
     },
-    [commitCommands, page.id],
+    [commitCommands, state.id],
   )
 
   const onApplyTemplate = useCallback(
     (template: EventTemplate, target: InsertTarget) => {
-      const result = applyTemplate(pagesRef.current, page.id, template, target)
-      commit(result.pages)
+      const result = applyTemplate(pagesRef.current, state.id, template, target)
+      commit(result.states)
       if (result.selectId) {
         setSelectedCommandId(result.selectId)
         setRightTab('command')
       }
     },
-    [commit, page.id],
+    [commit, state.id],
   )
 
-  const selectPage = (id: string) => {
-    setSelectedPageId(id)
+  const selectState = (id: string) => {
+    setSelectedStateId(id)
     setSelectedCommandId(null)
   }
 
   const jumpToProblem = (p: Problem) => {
-    setSelectedPageId(p.pageId)
+    setSelectedStateId(p.stateId)
     setSelectedCommandId(p.commandId ?? null)
     setRightTab('command')
     if (p.scope !== 'command') setSettingsOpen(true)
@@ -125,39 +125,39 @@ export function EventEditor({ pages: pagesProp, onChange, className }: EventEdit
 
   return (
     <div className={cn('flex min-h-0 flex-1 text-foreground', className)} data-testid="event-editor">
-      {/* pages */}
+      {/* states */}
       <aside className="w-[210px] shrink-0 border-r border-border bg-muted/20">
-        <PageTabs
-          pages={pages}
-          selectedId={page.id}
+        <StateTabs
+          states={states}
+          selectedId={state.id}
           startIndex={startIndex}
           problems={problems}
-          onSelect={selectPage}
-          onRename={(id, name) => commit(updatePage(pagesRef.current, id, { name }))}
+          onSelect={selectState}
+          onRename={(id, name) => commit(updateState(pagesRef.current, id, { name }))}
           onAdd={() => {
-            const r = addPage(pagesRef.current)
-            commit(r.pages)
-            selectPage(r.id)
+            const r = addState(pagesRef.current)
+            commit(r.states)
+            selectState(r.id)
           }}
           onDuplicate={(id) => {
-            const r = duplicatePage(pagesRef.current, id)
-            commit(r.pages)
-            if (r.id) selectPage(r.id)
+            const r = duplicateState(pagesRef.current, id)
+            commit(r.states)
+            if (r.id) selectState(r.id)
           }}
           onDelete={(id) => {
-            const remaining = deletePage(pagesRef.current, id)
+            const remaining = deleteState(pagesRef.current, id)
             commit(remaining)
-            if (id === page.id) {
-              const idx = Math.min(pageIndex, remaining.length - 1)
-              selectPage(remaining[idx].id)
+            if (id === state.id) {
+              const idx = Math.min(stateIndex, remaining.length - 1)
+              selectState(remaining[idx].id)
             }
           }}
-          onMove={(id, delta) => commit(movePage(pagesRef.current, id, delta))}
+          onMove={(id, delta) => commit(moveState(pagesRef.current, id, delta))}
         />
       </aside>
 
-      {/* page content */}
-      <section className="flex min-h-0 min-w-0 flex-1 flex-col" aria-label={`Page ${pageIndex + 1}`}>
+      {/* state content */}
+      <section className="flex min-h-0 min-w-0 flex-1 flex-col" aria-label={`State ${stateIndex + 1}`}>
         <div className="shrink-0 border-b border-border">
           <button
             type="button"
@@ -166,21 +166,21 @@ export function EventEditor({ pages: pagesProp, onChange, className }: EventEdit
             className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left hover:bg-accent/40"
           >
             {settingsOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-            <span className="text-xs font-semibold">Page {pageIndex + 1}</span>
+            <span className="text-xs font-semibold">State {stateIndex + 1}</span>
             <span className="truncate text-xs text-muted-foreground">
-              {page.name.trim() ? `“${page.name.trim()}” · ` : ''}
-              {TRIGGER_LABELS[page.trigger]}
-              {page.conditions.length > 0 ? ` · ${page.conditions.length} condition${page.conditions.length > 1 ? 's' : ''}` : ' · always eligible'}
+              {state.name.trim() ? `“${state.name.trim()}” · ` : ''}
+              {TRIGGER_LABELS[state.trigger]}
+              {state.conditions.length > 0 ? ` · ${state.conditions.length} condition${state.conditions.length > 1 ? 's' : ''}` : ' · always eligible'}
             </span>
           </button>
           {settingsOpen && (
             <div className="max-h-[36vh] overflow-y-auto border-t border-border/60">
-              <PageSettings page={page} onChange={(patch) => commit(updatePage(pagesRef.current, page.id, patch))} />
+              <StateSettings state={state} onChange={(patch) => commit(updateState(pagesRef.current, state.id, patch))} />
             </div>
           )}
         </div>
         <CommandList
-          commands={page.commands}
+          commands={state.commands}
           onChange={onCommandsChange}
           onApplyTemplate={onApplyTemplate}
           selectedId={selected ? selected.command.id : null}
@@ -237,7 +237,7 @@ export function EventEditor({ pages: pagesProp, onChange, className }: EventEdit
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto" ref={formRef}>
           {rightTab === 'problems' ? (
-            <ProblemsList problems={problems} pages={pages} onJump={jumpToProblem} />
+            <ProblemsList problems={problems} states={states} onJump={jumpToProblem} />
           ) : selected ? (
             <div className="p-3" data-testid="command-inspector">
               <div className="mb-2 flex items-start gap-2">
@@ -265,8 +265,8 @@ export function EventEditor({ pages: pagesProp, onChange, className }: EventEdit
                 key={selected.command.id}
                 command={selected.command}
                 onPatch={(patch, prune) => {
-                  const cur = pagesRef.current.find((p) => p.id === page.id)
-                  if (cur) commitCommands(page.id, setCommandParams(cur.commands, selected.command.id, patch, prune))
+                  const cur = pagesRef.current.find((p) => p.id === state.id)
+                  if (cur) commitCommands(state.id, setCommandParams(cur.commands, selected.command.id, patch, prune))
                 }}
               />
             </div>
@@ -274,7 +274,7 @@ export function EventEditor({ pages: pagesProp, onChange, className }: EventEdit
             <div className="p-4 text-center text-xs text-muted-foreground" data-testid="no-selection">
               Select a command to edit its parameters.
               <br />
-              <span className="text-[10px]">Pages with no commands can start from a template.</span>
+              <span className="text-[10px]">States with no commands can start from a template.</span>
             </div>
           )}
         </div>

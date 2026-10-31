@@ -1,4 +1,4 @@
-import { createCommand, createDefaultComponent, tileToAnchor, type Command, type EngineEntity, type EventPage, type Facing } from "@shared/engine/index.ts";
+import { createCommand, createDefaultComponent, tileToAnchor, type Command, type EngineEntity, type EventState, type Facing } from "@shared/engine/index.ts";
 import { World } from "@/ecs/World";
 import type { Entity } from "@/ecs/Entity";
 import type { ExpandContext } from "@/ecs/expand";
@@ -100,9 +100,9 @@ export const cmd = (type: string, params: Record<string, unknown> = {}, branches
   return c;
 };
 
-export const page = (commands: Command[], extra: Partial<EventPage> = {}): EventPage => ({
+export const state = (commands: Command[], extra: Partial<EventState> = {}): EventState => ({
   id: `p${++idCounter}`,
-  name: "page",
+  name: "state",
   conditions: [],
   trigger: "action",
   commands,
@@ -119,7 +119,7 @@ export interface EntityOptions {
   sprite?: Record<string, unknown> | false;
   collider?: Record<string, unknown> | false;
   movement?: Record<string, unknown>;
-  pages?: EventPage[];
+  states?: EventState[];
   tag?: string;
 }
 
@@ -132,7 +132,7 @@ export function makeEntityDef(o: EntityOptions = {}): EngineEntity {
   if (o.sprite !== false) components.Sprite = createDefaultComponent("Sprite", { asset: "characters/npc", ...(o.sprite ?? {}) });
   if (o.collider !== false) components.Collider = createDefaultComponent("Collider", o.collider ?? {});
   if (o.movement) components.Movement = createDefaultComponent("Movement", o.movement);
-  if (o.pages) components.Event = { pages: o.pages };
+  if (o.states) components.Event = { states: o.states };
   if (o.tag) components.Tag = { tag: o.tag };
   return { id, name: id, x, y, components } as EngineEntity;
 }
@@ -169,11 +169,11 @@ export function makeRig(options: { random?: () => number } = {}) {
     warnings,
     emitted,
     expandCtx,
-    /** Creates an entity from options and selects its page. */
+    /** Creates an entity from options and selects its state. */
     add(o: EntityOptions = {}): Entity {
       const def = makeEntityDef(o);
       const { entities } = hydrateMapEntities(world, [def], expandCtx);
-      runtime.pages.refresh(entities[0]);
+      runtime.states.refresh(entities[0]);
       return entities[0];
     },
     addPlayer(col = 5, row = 5, facing: Facing = "down"): Entity {
@@ -191,7 +191,7 @@ export function makeRig(options: { random?: () => number } = {}) {
     },
     /** Starts an ad-hoc event made of `commands` on a fresh invisible entity (or `on`). */
     runCommands(commands: Command[], on?: Entity) {
-      const entity = on ?? rig.add({ id: `adhoc${++idCounter}`, sprite: false, collider: false, pages: [page(commands)] });
+      const entity = on ?? rig.add({ id: `adhoc${++idCounter}`, sprite: false, collider: false, states: [state(commands)] });
       return runtime.start(entity, 0, { blocking: true });
     },
     /** Lets promises settle and advances game time by `ms` in 16 ms frames. */

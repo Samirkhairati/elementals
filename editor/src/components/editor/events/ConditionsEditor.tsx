@@ -1,4 +1,4 @@
-// Conditions builder, used for page conditions and the `conditional` command's `conditions` field.
+// Conditions builder, used for state conditions and the `conditional` command's `conditions` field.
 // Every row is one condition; all rows must hold (AND).
 
 import React, { useRef, useState } from 'react'

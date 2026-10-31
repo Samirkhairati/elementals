@@ -122,45 +122,45 @@ function validateEvent(
   ctx: ValidationContext,
   add: (s: IssueSeverity, code: string, msg: string, p?: string, commandId?: string) => void,
 ): void {
-  if (!Array.isArray(props.pages) || props.pages.length === 0) {
-    add('error', 'no-pages', 'Event needs at least one page', `${base}.pages`);
+  if (!Array.isArray(props.states) || props.states.length === 0) {
+    add('error', 'no-states', 'Event needs at least one state', `${base}.states`);
     return;
   }
-  const pageIds = new Set<string>();
-  props.pages.forEach((page: unknown, i: number) => {
-    const pp = `${base}.pages[${i}]`;
-    if (!isRecord(page)) {
-      add('error', 'bad-page', `Page ${i + 1} is not an object`, pp);
+  const stateIds = new Set<string>();
+  props.states.forEach((state: unknown, i: number) => {
+    const pp = `${base}.states[${i}]`;
+    if (!isRecord(state)) {
+      add('error', 'bad-state', `State ${i + 1} is not an object`, pp);
       return;
     }
-    if (typeof page.id !== 'string' || page.id === '') add('error', 'bad-page', `Page ${i + 1} has no id`, `${pp}.id`);
-    else if (pageIds.has(page.id)) add('error', 'duplicate-page-id', `Page id "${page.id}" is used more than once`, `${pp}.id`);
-    else pageIds.add(page.id);
+    if (typeof state.id !== 'string' || state.id === '') add('error', 'bad-state', `State ${i + 1} has no id`, `${pp}.id`);
+    else if (stateIds.has(state.id)) add('error', 'duplicate-state-id', `State id "${state.id}" is used more than once`, `${pp}.id`);
+    else stateIds.add(state.id);
 
-    if (!(EVENT_TRIGGERS as readonly unknown[]).includes(page.trigger)) {
-      add('error', 'bad-trigger', `Page ${i + 1}: unknown trigger "${String(page.trigger)}"`, `${pp}.trigger`);
+    if (!(EVENT_TRIGGERS as readonly unknown[]).includes(state.trigger)) {
+      add('error', 'bad-trigger', `State ${i + 1}: unknown trigger "${String(state.trigger)}"`, `${pp}.trigger`);
     }
-    if (page.faceOnInteract !== undefined && typeof page.faceOnInteract !== 'boolean') {
-      add('error', 'bad-page', `Page ${i + 1}: faceOnInteract must be true or false`, `${pp}.faceOnInteract`);
+    if (state.faceOnInteract !== undefined && typeof state.faceOnInteract !== 'boolean') {
+      add('error', 'bad-state', `State ${i + 1}: faceOnInteract must be true or false`, `${pp}.faceOnInteract`);
     }
-    if (page.solid !== undefined && page.solid !== null && typeof page.solid !== 'boolean') {
-      add('error', 'bad-page', `Page ${i + 1}: solid must be true, false or null`, `${pp}.solid`);
-    }
-
-    for (const issue of validateConditions(page.conditions ?? [], ctx)) {
-      add(issue.severity, issue.code, `Page ${i + 1}: ${issue.message}`, issue.index >= 0 ? `${pp}.conditions[${issue.index}]` : `${pp}.conditions`);
+    if (state.solid !== undefined && state.solid !== null && typeof state.solid !== 'boolean') {
+      add('error', 'bad-state', `State ${i + 1}: solid must be true, false or null`, `${pp}.solid`);
     }
 
-    if (isRecord(page.appearance) && typeof page.appearance.asset === 'string' && page.appearance.asset !== '' && ctx.spriteIds && !ctx.spriteIds.includes(page.appearance.asset)) {
-      add('warning', 'dangling-sprite', `Page ${i + 1}: appearance sprite "${page.appearance.asset}" does not exist`, `${pp}.appearance.asset`);
+    for (const issue of validateConditions(state.conditions ?? [], ctx)) {
+      add(issue.severity, issue.code, `State ${i + 1}: ${issue.message}`, issue.index >= 0 ? `${pp}.conditions[${issue.index}]` : `${pp}.conditions`);
     }
 
-    if (!Array.isArray(page.commands)) {
-      add('error', 'bad-page', `Page ${i + 1}: commands must be a list`, `${pp}.commands`);
+    if (isRecord(state.appearance) && typeof state.appearance.asset === 'string' && state.appearance.asset !== '' && ctx.spriteIds && !ctx.spriteIds.includes(state.appearance.asset)) {
+      add('warning', 'dangling-sprite', `State ${i + 1}: appearance sprite "${state.appearance.asset}" does not exist`, `${pp}.appearance.asset`);
+    }
+
+    if (!Array.isArray(state.commands)) {
+      add('error', 'bad-state', `State ${i + 1}: commands must be a list`, `${pp}.commands`);
       return;
     }
-    for (const issue of validateCommands(page.commands as never, ctx)) {
-      add(issue.severity, issue.code, `Page ${i + 1}: ${issue.message}`, formatCommandPath(issue.path, `${pp}.commands`), issue.commandId);
+    for (const issue of validateCommands(state.commands as never, ctx)) {
+      add(issue.severity, issue.code, `State ${i + 1}: ${issue.message}`, formatCommandPath(issue.path, `${pp}.commands`), issue.commandId);
     }
   });
 }

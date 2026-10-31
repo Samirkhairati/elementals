@@ -223,7 +223,7 @@ export function useEntityManager(options: UseEntityManagerOptions) {
             y: target.y + 16,
             visible: target.visible !== false,
             folder: target.folder || null,
-            // fresh event page / command ids so the copy is independent of the original
+            // fresh event state / command ids so the copy is independent of the original
             components: cloneEntity(target as any, true).components as EntityData['components'],
           }
 

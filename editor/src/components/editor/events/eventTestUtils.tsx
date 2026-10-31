@@ -3,10 +3,10 @@
 import React, { StrictMode, useState } from 'react'
 import { render } from '@testing-library/react'
 import { vi } from 'vitest'
-import type { Command, EventPage, SpriteAssetInfo } from '../../../../../shared/engine/types'
+import type { Command, EventState, SpriteAssetInfo } from '../../../../../shared/engine/types'
 import { createSequentialIdGenerator, setIdGenerator } from '../../../../../shared/engine/ids'
 import { createCommand } from '../../../../../shared/engine/commands'
-import { createDefaultEventPage } from '../../../../../shared/engine/components'
+import { createDefaultEventState } from '../../../../../shared/engine/components'
 import { EventEnvProvider, type EventEnv } from './eventEnv'
 import { PortalContainerProvider } from './primitives'
 
@@ -55,7 +55,7 @@ export function makeEnv(overrides: Partial<EventEnv> = {}): EventEnv {
   }
 }
 
-/** Deterministic ids (`t-1`, `t-2` ...) for commands/pages created during a test. */
+/** Deterministic ids (`t-1`, `t-2` ...) for commands/states created during a test. */
 export function sequentialIds(prefix = 't') {
   let previous: ReturnType<typeof setIdGenerator> | undefined
   return {
@@ -74,8 +74,8 @@ export function cmd(id: string, type: string, params?: Record<string, unknown>, 
   return c
 }
 
-export function page(id: string, commands: Command[] = [], extra: Partial<EventPage> = {}): EventPage {
-  return { ...createDefaultEventPage(), id, name: '', commands, ...extra }
+export function state(id: string, commands: Command[] = [], extra: Partial<EventState> = {}): EventState {
+  return { ...createDefaultEventState(), id, name: '', commands, ...extra }
 }
 
 /** Flat list of `type` (or `type:id`) in depth-first order, for tree assertions. */

@@ -5,7 +5,7 @@
 // simply invisible until the author picks a sprite): characters/player, objects/sign, objects/chest,
 // objects/item-ball. The chest asset is expected to have frame 0 = closed and frame 1 = open.
 
-import type { Command, Condition, EngineEntity, EntityComponents, EventPage, PageAppearance, Prefab } from './types.ts';
+import type { Command, Condition, EngineEntity, EntityComponents, EventState, StateAppearance, Prefab } from './types.ts';
 import { cloneEntity, createDefaultComponent } from './components.ts';
 import { createCommand } from './commands.ts';
 import { newId, deterministicId } from './ids.ts';
@@ -15,11 +15,11 @@ function builder(prefabId: string) {
   let n = 0;
   const idFn = () => deterministicId(`prefab/${prefabId}/${++n}`);
   const cmd = (type: string, params?: Record<string, unknown>): Command => createCommand(type, params, idFn);
-  const page = (
+  const state = (
     name: string,
     commands: Command[],
-    extra: { conditions?: Condition[]; trigger?: EventPage['trigger']; solid?: boolean | null; appearance?: PageAppearance } = {},
-  ): EventPage => ({
+    extra: { conditions?: Condition[]; trigger?: EventState['trigger']; solid?: boolean | null; appearance?: StateAppearance } = {},
+  ): EventState => ({
     id: idFn(),
     name,
     conditions: extra.conditions ?? [],
@@ -29,11 +29,11 @@ function builder(prefabId: string) {
     solid: extra.solid ?? null,
     appearance: extra.appearance ?? {},
   });
-  return { cmd, page };
+  return { cmd, state };
 }
 
 function buildNpc(): Prefab {
-  const { cmd, page } = builder('npc');
+  const { cmd, state } = builder('npc');
   return {
     id: 'npc',
     name: 'NPC',
@@ -44,14 +44,14 @@ function buildNpc(): Prefab {
       Sprite: createDefaultComponent('Sprite', { asset: 'characters/player', facing: 'down' }),
       Collider: createDefaultComponent('Collider'),
       Movement: createDefaultComponent('Movement', { controller: 'none', speed: 80 }),
-      Event: { pages: [page('Page 1', [cmd('showText', { text: 'Hello traveler!' })])] },
+      Event: { states: [state('State 1', [cmd('showText', { text: 'Hello traveler!' })])] },
       Tag: createDefaultComponent('Tag', { tag: 'npc' }),
     },
   };
 }
 
 function buildSign(): Prefab {
-  const { cmd, page } = builder('sign');
+  const { cmd, state } = builder('sign');
   return {
     id: 'sign',
     name: 'Sign',
@@ -61,27 +61,27 @@ function buildSign(): Prefab {
       Transform: createDefaultComponent('Transform', { depth: 10 }),
       Sprite: createDefaultComponent('Sprite', { asset: 'objects/sign' }),
       Collider: createDefaultComponent('Collider'),
-      Event: { pages: [page('Page 1', [cmd('showText', { text: 'The ancient sign is faded...' })])] },
+      Event: { states: [state('State 1', [cmd('showText', { text: 'The ancient sign is faded...' })])] },
       Tag: createDefaultComponent('Tag', { tag: 'sign' }),
     },
   };
 }
 
 function buildChest(): Prefab {
-  const { cmd, page } = builder('chest');
+  const { cmd, state } = builder('chest');
   return {
     id: 'chest',
     name: 'Chest',
-    description: 'A chest that can be opened once (page 2 uses self switch A).',
+    description: 'A chest that can be opened once (state 2 uses self switch A).',
     icon: 'package',
     components: {
       Transform: createDefaultComponent('Transform', { depth: 10 }),
       Sprite: createDefaultComponent('Sprite', { asset: 'objects/chest', frame: 0 }),
       Collider: createDefaultComponent('Collider'),
       Event: {
-        pages: [
-          page('Closed', [cmd('showText', { text: 'You found a potion!' }), cmd('setSelfSwitch', { key: 'A', value: true })]),
-          page('Open', [cmd('showText', { text: 'The chest is empty.' })], {
+        states: [
+          state('Closed', [cmd('showText', { text: 'You found a potion!' }), cmd('setSelfSwitch', { key: 'A', value: true })]),
+          state('Open', [cmd('showText', { text: 'The chest is empty.' })], {
             conditions: [{ kind: 'selfSwitch', key: 'A', value: true }],
             appearance: { frame: 1 },
           }),
@@ -93,7 +93,7 @@ function buildChest(): Prefab {
 }
 
 function buildDoor(): Prefab {
-  const { cmd, page } = builder('door');
+  const { cmd, state } = builder('door');
   return {
     id: 'door',
     name: 'Door / Warp',
@@ -102,14 +102,14 @@ function buildDoor(): Prefab {
     components: {
       Transform: createDefaultComponent('Transform', { depth: 5 }),
       Collider: createDefaultComponent('Collider', { isSolid: false }),
-      Event: { pages: [page('Page 1', [cmd('warp')], { trigger: 'playerTouch' })] },
+      Event: { states: [state('State 1', [cmd('warp')], { trigger: 'playerTouch' })] },
       Tag: createDefaultComponent('Tag', { tag: 'warp' }),
     },
   };
 }
 
 function buildTrigger(): Prefab {
-  const { page } = builder('trigger');
+  const { state } = builder('trigger');
   return {
     id: 'trigger',
     name: 'Trigger Zone',
@@ -118,14 +118,14 @@ function buildTrigger(): Prefab {
     components: {
       Transform: createDefaultComponent('Transform', { depth: 5 }),
       Collider: createDefaultComponent('Collider', { isSolid: false }),
-      Event: { pages: [page('Page 1', [], { trigger: 'playerTouch' })] },
+      Event: { states: [state('State 1', [], { trigger: 'playerTouch' })] },
       Tag: createDefaultComponent('Tag', { tag: 'trigger' }),
     },
   };
 }
 
 function buildItemBall(): Prefab {
-  const { cmd, page } = builder('item-ball');
+  const { cmd, state } = builder('item-ball');
   return {
     id: 'item-ball',
     name: 'Item Ball',
@@ -136,13 +136,13 @@ function buildItemBall(): Prefab {
       Sprite: createDefaultComponent('Sprite', { asset: 'objects/item-ball' }),
       Collider: createDefaultComponent('Collider'),
       Event: {
-        pages: [
-          page('Pick up', [
+        states: [
+          state('Pick up', [
             cmd('giveItem', { item: 'potion', qty: 1 }),
             cmd('showText', { text: 'You found a Potion!' }),
             cmd('setSelfSwitch', { key: 'A', value: true }),
           ]),
-          page('Taken', [], {
+          state('Taken', [], {
             conditions: [{ kind: 'selfSwitch', key: 'A', value: true }],
             solid: false,
             appearance: { visible: false },
@@ -155,7 +155,7 @@ function buildItemBall(): Prefab {
 }
 
 function buildTrainer(): Prefab {
-  const { cmd, page } = builder('trainer');
+  const { cmd, state } = builder('trainer');
   return {
     id: 'trainer',
     name: 'Trainer',
@@ -167,13 +167,13 @@ function buildTrainer(): Prefab {
       Collider: createDefaultComponent('Collider'),
       Movement: createDefaultComponent('Movement', { controller: 'none', speed: 80 }),
       Event: {
-        pages: [
-          page('Challenge', [
+        states: [
+          state('Challenge', [
             cmd('showText', { text: 'Let\'s battle!' }),
             cmd('startBattle', { kind: 'trainer', id: 'trainer-1' }),
             cmd('setSelfSwitch', { key: 'A', value: true }),
           ]),
-          page('Defeated', [cmd('showText', { text: 'You beat me fair and square.' })], {
+          state('Defeated', [cmd('showText', { text: 'You beat me fair and square.' })], {
             conditions: [{ kind: 'selfSwitch', key: 'A', value: true }],
           }),
         ],
@@ -199,7 +199,7 @@ export interface InstantiateOptions {
   id?: string;
 }
 
-/** Builds an entity from a prefab: deep copy, fresh ids for the entity, event pages and commands, Transform set. */
+/** Builds an entity from a prefab: deep copy, fresh ids for the entity, event states and commands, Transform set. */
 export function instantiatePrefab(prefab: Prefab, options: InstantiateOptions): EngineEntity {
   const entity = cloneEntity(
     {

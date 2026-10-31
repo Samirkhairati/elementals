@@ -62,7 +62,7 @@ Contents
 | New term | Old term | Meaning |
 |---|---|---|
 | **Event** | Event (unchanged) | The `Event` component on an entity: a list of states. |
-| **State** | Page | One version of the entity plus the rule for when it is active: `when` conditions, look, trigger, solidity, and a graph. The **last** state whose `when` holds is active. |
+| **State** | Page | One version of the entity plus the rule for when it is active: `conditions`, look, trigger, solidity, and a graph. The **last** state whose `conditions` hold is active. |
 | **Graph** | Command list | The behaviour that runs when the state is triggered. |
 | **Node** | Command | One step in a graph. `Command` becomes `GraphNode`. |
 | **Port** | Branch | A named output of a node. `next` is the default; `then`/`else`, one per choice, etc. |
@@ -84,7 +84,7 @@ All types live in `shared/engine/types.ts` and are consumed by both editor and g
 
 ```ts
 export interface EventProps {
-  /** Evaluated last-to-first; the LAST state whose `when` holds is active. */
+  /** Evaluated last-to-first; the LAST state whose `conditions` hold is active. */
   states: EventState[]
   /** Names for this event's local flags (see §6.4). Optional; undeclared keys still work. */
   locals?: LocalFlagDef[]
@@ -93,7 +93,7 @@ export interface EventProps {
 export interface EventState {
   id: string
   name: string                 // shown on the tab; '' falls back to "State N"
-  when: Condition[]            // was `conditions`
+  conditions: Condition[]      // unchanged name: "active when these all hold"
   trigger: EventTrigger
   faceOnInteract: boolean
   solid: boolean | null
@@ -328,7 +328,7 @@ Is it progress through steps? → Stage. Does only this event care? → Local fl
 * **Folders** on switches, variables and stages (`folder` path). The Database panel shows a collapsible
   tree, with search across names, ids and folders.
 * **Usage tracking** extends the existing `editor/src/lib/databaseUsage.ts` scanner:
-  * scan `states[].when` and every graph node (instead of `pages[].conditions` / command trees);
+  * scan `states[].conditions` and every graph node (instead of `pages[].conditions` / command trees);
   * record `access: 'read' | 'write'` per reference (conditions and `conditional`/`branchStage` are reads;
     `setSwitch`/`setVariable`/`setStage` are writes);
   * `UsageRef` replaces `pageIndex`/`pageName`/`commandId` with `stateIndex`/`stateName`/`nodeId`, so
@@ -434,9 +434,9 @@ idempotent, and stamps `schemaVersion: 3` (`SCHEMA_VERSION` 2 → 3). Database: 
 
 ### 9.1 Event component
 
-1. `pages` → `states`; per page: `conditions` → `when`; everything else copies.
+1. `pages` → `states`; everything else copies (`conditions` keeps its name).
 2. `commands` (tree) → `graph` via `commandsToGraph` (below).
-3. `locals`: declare `A`–`D` for keys found in `when` and in `setSelfSwitch` params.
+3. `locals`: declare `A`–`D` for keys found in `conditions` and in `setSelfSwitch` params.
 
 ### 9.2 `commandsToGraph(commands, idFn)`
 
@@ -574,7 +574,7 @@ Each phase leaves the game and editor working and tests green; each is a reviewa
 need no UI, so correctness is locked in before the canvas exists.
 
 **Phase 0: Vocabulary rename** (mechanical, no behaviour change).
-`EventState` → `GameFlags`, `pages` → `states`, `conditions` → `when`, `PageSelector` → `StateSelector`,
+`EventState` → `GameFlags`, `pages` → `states`, `PageSelector` → `StateSelector`,
 editor labels "Page" → "State". Data migration for the key rename (schema 3 stage 1). Done when the
 whole suite passes and a map round-trips.
 

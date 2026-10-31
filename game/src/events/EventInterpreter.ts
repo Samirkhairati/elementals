@@ -8,7 +8,7 @@ export type RunResult = "completed" | "cancelled" | "error";
 export const YIELD_EVERY_COMMANDS = 2000;
 
 /**
- * Runs one command tree (an event page's `commands`).
+ * Runs one command tree (an event state's `commands`).
  *
  *  - async: commands that wait (text, choices, wait, routes, fades) just `await`; time and input come
  *    from the injected services, so the interpreter itself has no Phaser or timer dependency;
@@ -16,7 +16,7 @@ export const YIELD_EVERY_COMMANDS = 2000;
  *  - cancellable: `cancel()` aborts the signal handed to every service, rejects every pending wait and
  *    stops before the next command. `run()` never rejects; it resolves with how the run ended;
  *  - robust: a handler that throws is logged and skipped, planned/unknown commands warn once and are
- *    skipped, and long command streaks yield a frame so a bare `loop` cannot freeze the page.
+ *    skipped, and long command streaks yield a frame so a bare `loop` cannot freeze the state.
  */
 export class EventInterpreter {
   private readonly controller = new AbortController();

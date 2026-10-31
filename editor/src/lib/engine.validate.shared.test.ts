@@ -13,9 +13,9 @@ const good = (): any => ({
     Collider: createDefaultComponent('Collider'),
     Movement: createDefaultComponent('Movement'),
     Event: {
-      pages: [
+      states: [
         {
-          id: 'p1', name: 'Page 1', conditions: [{ kind: 'switch', id: 's1', value: true }], trigger: 'action',
+          id: 'p1', name: 'State 1', conditions: [{ kind: 'switch', id: 's1', value: true }], trigger: 'action',
           commands: [createCommand('showText', { text: 'hi' }), createCommand('warp', { map: 'city' })],
           faceOnInteract: true, solid: null, appearance: {},
         },
@@ -90,49 +90,49 @@ describe('validateEntity', () => {
     expect(codes(good())).toEqual([])
     expect(codes(good(), { spriteIds: ['objects/x'] })).toEqual(['warning:dangling-sprite'])
     const e = good()
-    e.components.Event.pages[0].appearance = { asset: 'nope' }
+    e.components.Event.states[0].appearance = { asset: 'nope' }
     expect(codes(e, { spriteIds: ['characters/player', 'objects/x'] })).toEqual(['warning:dangling-sprite'])
   })
 })
 
 describe('validateEntity: Event', () => {
-  it('needs at least one page with unique ids', () => {
+  it('needs at least one state with unique ids', () => {
     const e = good()
-    e.components.Event.pages = []
-    expect(codes(e)).toEqual(['error:no-pages'])
+    e.components.Event.states = []
+    expect(codes(e)).toEqual(['error:no-states'])
     const d = good()
-    d.components.Event.pages.push({ ...d.components.Event.pages[0] })
-    expect(codes(d)).toEqual(['error:duplicate-page-id'])
+    d.components.Event.states.push({ ...d.components.Event.states[0] })
+    expect(codes(d)).toEqual(['error:duplicate-state-id'])
     const m = good()
     m.components.Event = {}
-    expect(codes(m)).toEqual(['error:no-pages'])
+    expect(codes(m)).toEqual(['error:no-states'])
   })
 
-  it('checks page fields', () => {
+  it('checks state fields', () => {
     const e = good()
-    const p = e.components.Event.pages[0]
+    const p = e.components.Event.states[0]
     p.trigger = 'sometimes'
     p.faceOnInteract = 'y'
     p.solid = 'n'
     delete p.id
-    expect(codes(e)).toEqual(['error:bad-page', 'error:bad-trigger', 'error:bad-page', 'error:bad-page'])
+    expect(codes(e)).toEqual(['error:bad-state', 'error:bad-trigger', 'error:bad-state', 'error:bad-state'])
     const n = good()
-    n.components.Event.pages[0] = 5
-    expect(codes(n)).toEqual(['error:bad-page'])
+    n.components.Event.states[0] = 5
+    expect(codes(n)).toEqual(['error:bad-state'])
     const c = good()
-    c.components.Event.pages[0].commands = 'x'
-    expect(codes(c)).toEqual(['error:bad-page'])
+    c.components.Event.states[0].commands = 'x'
+    expect(codes(c)).toEqual(['error:bad-state'])
   })
 
-  it('reports page condition problems with a path', () => {
+  it('reports state condition problems with a path', () => {
     const e = good()
-    e.components.Event.pages[0].conditions = [{ kind: 'switch', id: 'gone', value: true }, { kind: 'zzz' }]
+    e.components.Event.states[0].conditions = [{ kind: 'switch', id: 'gone', value: true }, { kind: 'zzz' }]
     const issues = validateEntity(e, { switchIds: ['other'] })
     expect(issues.map((i) => [i.code, i.path])).toEqual([
-      ['dangling-switch', 'components.Event.pages[0].conditions[0]'],
-      ['bad-condition', 'components.Event.pages[0].conditions[1]'],
+      ['dangling-switch', 'components.Event.states[0].conditions[0]'],
+      ['bad-condition', 'components.Event.states[0].conditions[1]'],
     ])
-    expect(issues[0].message).toMatch(/^Page 1:/)
+    expect(issues[0].message).toMatch(/^State 1:/)
   })
 
   it('delegates commands to validateCommands and keeps command ids and paths', () => {
@@ -140,11 +140,11 @@ describe('validateEntity: Event', () => {
     const cond = createCommand('conditional', { conditions: [{ kind: 'selfSwitch', key: 'A', value: true }] })
     const bad = createCommand('breakLoop')
     cond.branches!.then.push(bad)
-    e.components.Event.pages[0].commands.push(cond, { id: 'u', type: 'teleport', params: {} })
+    e.components.Event.states[0].commands.push(cond, { id: 'u', type: 'teleport', params: {} })
     const issues = validateEntity(e)
     expect(issues.map((i) => [i.code, i.commandId, i.path])).toEqual([
-      ['break-outside-loop', bad.id, 'components.Event.pages[0].commands[2].branches.then[0]'],
-      ['unknown-command', 'u', 'components.Event.pages[0].commands[3]'],
+      ['break-outside-loop', bad.id, 'components.Event.states[0].commands[2].branches.then[0]'],
+      ['unknown-command', 'u', 'components.Event.states[0].commands[3]'],
     ])
   })
 

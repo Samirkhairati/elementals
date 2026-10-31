@@ -12,15 +12,16 @@
 //   GridMovement / FreeMovement / PlayerControl / AIWander -> Movement
 //     controller: PlayerControl -> player; else AIWander -> wander; else none
 //     speed: AIWander.speed for wander, else Grid/FreeMovement.speed; wanderRadius/Interval from AIWander
-//   Interactable -> Event with ONE page
+//   Interactable -> Event with ONE state
 //     type on_step -> trigger playerTouch, anything else -> action
 //     commands (in this order, only the ones that are set): message -> showText,
 //     targetMap -> warp (targetX/targetY are TILE coordinates; a trailing ".json" is removed from the map),
 //     eventKey -> emit
 //   Transform is kept (created from entity.x/y when missing); Transform x/y win over entity.x/y.
-//   Collider, Tag and unknown components are kept untouched. Maps get schemaVersion 2.
+//   Collider, Tag and unknown components are kept untouched. Maps get schemaVersion 3.
+//   schemaVersion 3: the Event component's `pages` list is called `states` (renamed on load).
 
-import type { Command, EngineEntity, EventPage, LegacyComponentType } from './types.ts';
+import type { Command, EngineEntity, EventState, LegacyComponentType } from './types.ts';
 import { SCHEMA_VERSION } from './types.ts';
 import { createCommand } from './commands.ts';
 import { normalizeProps } from './components.ts';
@@ -156,9 +157,9 @@ function migrateInteractable(entityId: string, inter: Record<string, unknown>) {
     commands.push(createCommand('emit', { event: inter.eventKey, payload: '' }, seed('emit')));
   }
 
-  const page: EventPage = {
+  const state: EventState = {
     id: deterministicId(`${entityId}/Event/page-1`),
-    name: 'Page 1',
+    name: 'State 1',
     conditions: [],
     trigger: inter.type === 'on_step' ? 'playerTouch' : 'action',
     commands,
@@ -166,7 +167,18 @@ function migrateInteractable(entityId: string, inter: Record<string, unknown>) {
     solid: null,
     appearance: {},
   };
-  return { pages: [page] };
+  return { states: [state] };
+}
+
+/**
+ * schemaVersion 2 -> 3: the Event component's `pages` list is called `states` (an event state is one
+ * version of the entity plus the rule for when it is active). Idempotent; non-objects and already
+ * migrated props are returned as they are.
+ */
+function migrateEventProps(event: unknown): unknown {
+  if (!isRecord(event) || !Object.hasOwn(event, 'pages')) return event;
+  const { pages, ...rest } = event;
+  return Object.hasOwn(rest, 'states') ? rest : { ...rest, states: pages };
 }
 
 /** Converts one entity to the canonical components. Returns the same object when nothing changed. */
@@ -199,7 +211,7 @@ export function migrateEntity(entity: EntityLike): MigrateResult<EngineEntity> {
     out.Movement = migrateMovement(grid, free, rec(src.PlayerControl) ?? (src.PlayerControl !== undefined ? {} : undefined), rec(src.AIWander) ?? (src.AIWander !== undefined ? {} : undefined));
   }
 
-  if (src.Event !== undefined) out.Event = src.Event;
+  if (src.Event !== undefined) out.Event = migrateEventProps(src.Event);
   else if (src.Interactable !== undefined) out.Event = migrateInteractable(entityId, rec(src.Interactable) ?? {});
 
   if (src.Tag !== undefined) out.Tag = src.Tag;
@@ -214,7 +226,7 @@ export function migrateEntity(entity: EntityLike): MigrateResult<EngineEntity> {
 }
 
 /**
- * Migrates every entity and stamps `schemaVersion: 2` (maps already at a newer version keep theirs).
+ * Migrates every entity and stamps the current `schemaVersion` (maps already at a newer version keep theirs).
  * Returns the same object when nothing changed.
  */
 export function migrateMap<T extends object>(map: T): MigrateResult<T> {

@@ -1,7 +1,7 @@
-// Where are the global switches and variables used? Pure scanner over the event pages of every map.
+// Where are the global switches and variables used? Pure scanner over the event states of every map.
 // Used by the Database panel (usage counts, "delete anyway?" lists) - no React, no IPC.
 
-import type { Command, Condition, EventPage } from '../../../shared/engine/types'
+import type { Command, Condition, EventState } from '../../../shared/engine/types'
 import { getCommandDef, isFieldVisible } from '../../../shared/engine/commands'
 
 /** The slice of a map this scanner needs (a `MapData` fits). */
@@ -23,9 +23,9 @@ export interface UsageRef {
   mapName: string
   entityId: string
   entityName: string
-  pageIndex: number
-  pageName: string
-  /** 'condition' = a page condition, 'command' = a command parameter or a conditional command. */
+  stateIndex: number
+  stateName: string
+  /** 'condition' = a state condition, 'command' = a command parameter or a conditional command. */
   where: 'condition' | 'command'
   /** Set for `where === 'command'`. */
   commandId?: string
@@ -45,12 +45,12 @@ export function countEvents(refs: readonly UsageRef[] | undefined): number {
   return new Set(refs.map((r) => `${r.mapFile}\u0000${r.entityId}`)).size
 }
 
-/** One line per event ("Town > Old man (Page 2)"), duplicates folded. */
+/** One line per event ("Town > Old man (State 2)"), duplicates folded. */
 export function describeRefs(refs: readonly UsageRef[] | undefined): string[] {
   const seen = new Set<string>()
   const out: string[] = []
   for (const r of refs ?? []) {
-    const line = `${r.mapName} > ${r.entityName || r.entityId} (${r.pageName || `Page ${r.pageIndex + 1}`})`
+    const line = `${r.mapName} > ${r.entityName || r.entityId} (${r.stateName || `State ${r.stateIndex + 1}`})`
     if (seen.has(line)) continue
     seen.add(line)
     out.push(line)
@@ -102,7 +102,7 @@ function visitCommands(list: unknown, visit: (cmd: Command) => void): void {
   }
 }
 
-/** Scans every Event page (conditions and the whole command tree, branches included) of every map. */
+/** Scans every Event state (conditions and the whole command tree, branches included) of every map. */
 export function scanDatabaseUsage(maps: readonly UsageMap[]): DatabaseUsage {
   const usage: DatabaseUsage = { switches: {}, variables: {} }
   const add = (kind: 'switch' | 'variable', id: string, ref: UsageRef) => {
@@ -113,20 +113,20 @@ export function scanDatabaseUsage(maps: readonly UsageMap[]): DatabaseUsage {
   for (const map of maps) {
     for (const entity of map.entities ?? []) {
       const event = entity.components?.Event
-      if (!isObject(event) || !Array.isArray(event.pages)) continue
-      ;(event.pages as EventPage[]).forEach((page, pageIndex) => {
-        if (!isObject(page)) return
+      if (!isObject(event) || !Array.isArray(event.states)) continue
+      ;(event.states as EventState[]).forEach((state, stateIndex) => {
+        if (!isObject(state)) return
         const base = {
           mapFile: map.fileName,
           mapName: map.name || map.fileName,
           entityId: entity.id,
           entityName: entity.name,
-          pageIndex,
-          pageName: typeof page.name === 'string' ? page.name : '',
+          stateIndex,
+          stateName: typeof state.name === 'string' ? state.name : '',
         }
-        for (const r of conditionRefs(page.conditions)) add(r.kind, r.id, { ...base, where: 'condition' })
-        if (Array.isArray(page.commands)) {
-          visitCommands(page.commands, (cmd) => {
+        for (const r of conditionRefs(state.conditions)) add(r.kind, r.id, { ...base, where: 'condition' })
+        if (Array.isArray(state.commands)) {
+          visitCommands(state.commands, (cmd) => {
             for (const r of commandRefs(cmd)) {
               add(r.kind, r.id, { ...base, where: 'command', commandId: cmd.id, commandType: cmd.type })
             }

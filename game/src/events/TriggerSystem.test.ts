@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { tileToAnchor } from '@shared/engine/index.ts';
-import { makeRig, cmd, page, flush, type Rig } from '@/test/rig';
+import { makeRig, cmd, state, flush, type Rig } from '@/test/rig';
 import { TriggerSystem } from './TriggerSystem';
 import { MovementSystem } from '@/ecs/systems/MovementSystem';
 import { SpatialSystem } from '@/ecs/systems/SpatialSystem';
@@ -48,7 +48,7 @@ afterEach(() => {
 describe('action trigger', () => {
   it('triggers on the tile in front of the player and turns the NPC towards the player', async () => {
     const player = rig.addPlayer(5, 5, 'down');
-    const npc = rig.add({ id: 'npc', col: 5, row: 6, movement: { controller: 'none' }, sprite: { facing: 'left' }, pages: [page([say('hi')])] });
+    const npc = rig.add({ id: 'npc', col: 5, row: 6, movement: { controller: 'none' }, sprite: { facing: 'left' }, states: [state([say('hi')])] });
     triggers.resetTouchState(rig.world);
     triggers.requestAction();
     await step();
@@ -61,8 +61,8 @@ describe('action trigger', () => {
 
   it('does not trigger on events that are not adjacent or not facing... (fallback only covers the 4 neighbours)', async () => {
     rig.addPlayer(5, 5, 'down');
-    rig.add({ id: 'far', col: 5, row: 8, pages: [page([say('far')])] });
-    rig.add({ id: 'diag', col: 6, row: 6, pages: [page([say('diag')])] });
+    rig.add({ id: 'far', col: 5, row: 8, states: [state([say('far')])] });
+    rig.add({ id: 'diag', col: 6, row: 6, states: [state([say('diag')])] });
     triggers.resetTouchState(rig.world);
     triggers.requestAction();
     await step();
@@ -71,7 +71,7 @@ describe('action trigger', () => {
 
   it('falls back to any of the four neighbours, front first', async () => {
     rig.addPlayer(5, 5, 'up');
-    rig.add({ id: 'right', col: 6, row: 5, pages: [page([say('right')])] });
+    rig.add({ id: 'right', col: 6, row: 5, states: [state([say('right')])] });
     triggers.resetTouchState(rig.world);
     triggers.requestAction();
     await step();
@@ -80,7 +80,7 @@ describe('action trigger', () => {
     await flush();
     rig.ui.texts.length = 0;
 
-    rig.add({ id: 'front', col: 5, row: 4, pages: [page([say('front')])] });
+    rig.add({ id: 'front', col: 5, row: 4, states: [state([say('front')])] });
     triggers.requestAction();
     await step();
     expect(rig.ui.texts[0].text).toBe('front');
@@ -88,8 +88,8 @@ describe('action trigger', () => {
 
   it('triggers an event the player stands on (walkable zone) before looking ahead', async () => {
     rig.addPlayer(5, 5, 'down');
-    rig.add({ id: 'zone', col: 5, row: 5, sprite: false, collider: { isSolid: false }, pages: [page([say('under')])] });
-    rig.add({ id: 'ahead', col: 5, row: 6, pages: [page([say('ahead')])] });
+    rig.add({ id: 'zone', col: 5, row: 5, sprite: false, collider: { isSolid: false }, states: [state([say('under')])] });
+    rig.add({ id: 'ahead', col: 5, row: 6, states: [state([say('ahead')])] });
     triggers.resetTouchState(rig.world);
     triggers.requestAction();
     await step();
@@ -98,7 +98,7 @@ describe('action trigger', () => {
 
   it('non-solid zones and faceOnInteract:false do not turn to the player', async () => {
     rig.addPlayer(5, 5, 'down');
-    const zone = rig.add({ id: 'zone', col: 5, row: 6, movement: { controller: 'none' }, sprite: { facing: 'left' }, collider: { isSolid: false }, pages: [page([say('z')])] });
+    const zone = rig.add({ id: 'zone', col: 5, row: 6, movement: { controller: 'none' }, sprite: { facing: 'left' }, collider: { isSolid: false }, states: [state([say('z')])] });
     triggers.resetTouchState(rig.world);
     triggers.requestAction();
     await step();
@@ -106,7 +106,7 @@ describe('action trigger', () => {
 
     rig.runtime.cancelAll();
     await flush();
-    const proud = rig.add({ id: 'proud', col: 4, row: 5, movement: { controller: 'none' }, sprite: { facing: 'left' }, pages: [page([say('p')], { faceOnInteract: false })] });
+    const proud = rig.add({ id: 'proud', col: 4, row: 5, movement: { controller: 'none' }, sprite: { facing: 'left' }, states: [state([say('p')], { faceOnInteract: false })] });
     rig.world.getComponent(zone, ColliderComponent)!.offsetX = 500; // move the zone out of the way
     rig.world.getComponent(rig.world.query(GridMovementComponent)[0], GridMovementComponent)!.direction = 'left';
     triggers.requestAction();
@@ -114,18 +114,18 @@ describe('action trigger', () => {
     expect(rig.world.getComponent(proud, AnimationComponent)!.direction).toBe('left');
   });
 
-  it('only triggers action pages; other triggers are ignored by the action key', async () => {
+  it('only triggers action states; other triggers are ignored by the action key', async () => {
     rig.addPlayer(5, 5, 'down');
-    rig.add({ id: 'touchy', col: 5, row: 6, pages: [page([say('t')], { trigger: 'playerTouch' })] });
+    rig.add({ id: 'touchy', col: 5, row: 6, states: [state([say('t')], { trigger: 'playerTouch' })] });
     triggers.resetTouchState(rig.world);
     triggers.requestAction();
     await step();
     expect(rig.ui.texts).toEqual([]);
   });
 
-  it('uses the active page: a conditional second page replaces the first', async () => {
+  it('uses the active state: a conditional second state replaces the first', async () => {
     rig.addPlayer(5, 5, 'down');
-    rig.add({ id: 'npc', col: 5, row: 6, pages: [page([say('one')]), page([say('two')], { conditions: [{ kind: 'switch', id: 's1', value: true }] })] });
+    rig.add({ id: 'npc', col: 5, row: 6, states: [state([say('one')]), state([say('two')], { conditions: [{ kind: 'switch', id: 's1', value: true }] })] });
     triggers.resetTouchState(rig.world);
     rig.runtime.flags.setSwitch('s1', true);
     triggers.requestAction();
@@ -135,7 +135,7 @@ describe('action trigger', () => {
 
   it('is ignored while input is locked (a dismissing key press must not re-open the dialogue) and during an event', async () => {
     rig.addPlayer(5, 5, 'down');
-    rig.add({ id: 'npc', col: 5, row: 6, pages: [page([say('hi')])] });
+    rig.add({ id: 'npc', col: 5, row: 6, states: [state([say('hi')])] });
     triggers.resetTouchState(rig.world);
 
     gameState.setInputLocked(true, 'menu');
@@ -154,7 +154,7 @@ describe('action trigger', () => {
 
   it('a wandering NPC keeps its dialogue: the live footprint follows it', async () => {
     rig.addPlayer(5, 5, 'down');
-    const npc = rig.add({ id: 'wanderer', col: 5, row: 6, movement: { controller: 'wander' }, pages: [page([say('still me')])] });
+    const npc = rig.add({ id: 'wanderer', col: 5, row: 6, movement: { controller: 'wander' }, states: [state([say('still me')])] });
     triggers.resetTouchState(rig.world);
     place(npc, 8, 6); // wandered away
     triggers.requestAction();
@@ -168,7 +168,7 @@ describe('action trigger', () => {
 
   it('a mid-step NPC covers both tiles', async () => {
     rig.addPlayer(5, 5, 'down');
-    const npc = rig.add({ id: 'walker', col: 5, row: 6, pages: [page([say('hey')])] });
+    const npc = rig.add({ id: 'walker', col: 5, row: 6, states: [state([say('hey')])] });
     triggers.resetTouchState(rig.world);
     const t = rig.world.getComponent(npc, TransformComponent)!;
     t.y += 16; // half way down to row 7: still overlaps row 6
@@ -179,7 +179,7 @@ describe('action trigger', () => {
 
   it('tap on an event within 3 tiles turns the player and triggers it', async () => {
     const player = rig.addPlayer(5, 5, 'down');
-    rig.add({ id: 'npc', col: 7, row: 5, pages: [page([say('tapped')])] });
+    rig.add({ id: 'npc', col: 7, row: 5, states: [state([say('tapped')])] });
     triggers.resetTouchState(rig.world);
     expect(triggers.tryActionAt(rig.world, player, { col: 7, row: 5 })).toBe(true);
     expect(rig.world.getComponent(player, GridMovementComponent)!.direction).toBe('right');
@@ -192,9 +192,9 @@ describe('action trigger', () => {
 describe('only one blocking event at a time', () => {
   it('a second blocking event cannot start while one runs; parallel ones can', async () => {
     rig.addPlayer(5, 5, 'down');
-    const a = rig.add({ id: 'a', col: 5, row: 6, pages: [page([say('a')])] });
-    const b = rig.add({ id: 'b', col: 4, row: 5, pages: [page([say('b')])] });
-    const par = rig.add({ id: 'par', col: 0, row: 0, sprite: false, collider: false, pages: [page([cmd('wait', { ms: 1000 })], { trigger: 'parallel' })] });
+    const a = rig.add({ id: 'a', col: 5, row: 6, states: [state([say('a')])] });
+    const b = rig.add({ id: 'b', col: 4, row: 5, states: [state([say('b')])] });
+    const par = rig.add({ id: 'par', col: 0, row: 0, sprite: false, collider: false, states: [state([cmd('wait', { ms: 1000 })], { trigger: 'parallel' })] });
     triggers.resetTouchState(rig.world);
     await step();
     expect(rig.runtime.isRunning(par)).toBe(true);
@@ -209,7 +209,7 @@ describe('only one blocking event at a time', () => {
 describe('playerTouch', () => {
   it('fires when the player arrives on the tile, not while standing there, again after leaving and re-entering', async () => {
     const player = rig.addPlayer(5, 5);
-    rig.add({ id: 'door', col: 6, row: 5, sprite: false, collider: { isSolid: false }, pages: [page([cmd('setVariable', { id: 'v1', op: 'add', operand: 'const', value: 1 })], { trigger: 'playerTouch' })] });
+    rig.add({ id: 'door', col: 6, row: 5, sprite: false, collider: { isSolid: false }, states: [state([cmd('setVariable', { id: 'v1', op: 'add', operand: 'const', value: 1 })], { trigger: 'playerTouch' })] });
     triggers.resetTouchState(rig.world);
     await step();
     expect(rig.runtime.flags.getVariable('v1')).toBe(0);
@@ -232,7 +232,7 @@ describe('playerTouch', () => {
 
   it('does not fire for the tile the player spawned / was warped onto', async () => {
     rig.addPlayer(6, 5);
-    rig.add({ id: 'door', col: 6, row: 5, sprite: false, collider: { isSolid: false }, pages: [page([cmd('setSwitch', { id: 's1', value: true })], { trigger: 'playerTouch' })] });
+    rig.add({ id: 'door', col: 6, row: 5, sprite: false, collider: { isSolid: false }, states: [state([cmd('setSwitch', { id: 's1', value: true })], { trigger: 'playerTouch' })] });
     triggers.resetTouchState(rig.world);
     await step();
     await step();
@@ -246,7 +246,7 @@ describe('playerTouch', () => {
     rig.world.addSystem(spatial);
     rig.world.addSystem(movement);
     const player = rig.addPlayer(5, 5, 'right');
-    rig.add({ id: 'door', col: 6, row: 5, sprite: false, collider: { isSolid: false }, pages: [page([cmd('setSwitch', { id: 's1', value: true })], { trigger: 'playerTouch' })] });
+    rig.add({ id: 'door', col: 6, row: 5, sprite: false, collider: { isSolid: false }, states: [state([cmd('setSwitch', { id: 's1', value: true })], { trigger: 'playerTouch' })] });
     triggers.resetTouchState(rig.world);
 
     const grid = rig.world.getComponent(player, GridMovementComponent)!;
@@ -270,7 +270,7 @@ describe('playerTouch', () => {
 
   it('bumping into a SOLID playerTouch event triggers it; walkable ones wait for arrival', async () => {
     const player = rig.addPlayer(5, 5, 'right');
-    rig.add({ id: 'guard', col: 6, row: 5, pages: [page([cmd('setSwitch', { id: 's1', value: true })], { trigger: 'playerTouch' })] });
+    rig.add({ id: 'guard', col: 6, row: 5, states: [state([cmd('setSwitch', { id: 's1', value: true })], { trigger: 'playerTouch' })] });
     triggers.resetTouchState(rig.world);
     const grid = rig.world.getComponent(player, GridMovementComponent)!;
     grid.pendingDirection = 'right';
@@ -287,7 +287,7 @@ describe('playerTouch', () => {
 describe('eventTouch', () => {
   it('fires when another entity ends a step on the event', async () => {
     rig.addPlayer(1, 1);
-    rig.add({ id: 'pad', col: 8, row: 8, sprite: false, collider: { isSolid: false }, pages: [page([cmd('setSwitch', { id: 's1', value: true })], { trigger: 'eventTouch' })] });
+    rig.add({ id: 'pad', col: 8, row: 8, sprite: false, collider: { isSolid: false }, states: [state([cmd('setSwitch', { id: 's1', value: true })], { trigger: 'eventTouch' })] });
     const walker = rig.add({ id: 'walker', col: 7, row: 8, movement: { controller: 'none' } });
     triggers.resetTouchState(rig.world);
     await step();
@@ -301,7 +301,7 @@ describe('eventTouch', () => {
 });
 
 describe('autorun', () => {
-  it('blocks input, runs, and restarts while its page stays active until it switches itself off', async () => {
+  it('blocks input, runs, and restarts while its state stays active until it switches itself off', async () => {
     rig.addPlayer(5, 5);
     rig.add({
       id: 'cutscene',
@@ -309,9 +309,9 @@ describe('autorun', () => {
       row: 0,
       sprite: false,
       collider: false,
-      pages: [
-        page([cmd('showText', { text: 'intro' }), cmd('setVariable', { id: 'v1', op: 'add', operand: 'const', value: 1 })], { trigger: 'autorun' }),
-        page([], { conditions: [{ kind: 'selfSwitch', key: 'A', value: true }], trigger: 'action' }),
+      states: [
+        state([cmd('showText', { text: 'intro' }), cmd('setVariable', { id: 'v1', op: 'add', operand: 'const', value: 1 })], { trigger: 'autorun' }),
+        state([], { conditions: [{ kind: 'selfSwitch', key: 'A', value: true }], trigger: 'action' }),
       ],
     });
     triggers.resetTouchState(rig.world);
@@ -322,7 +322,7 @@ describe('autorun', () => {
     await flush();
     await step();
     expect(rig.runtime.flags.getVariable('v1')).toBe(1);
-    expect(rig.ui.texts).toHaveLength(2); // restarted: the page is still active
+    expect(rig.ui.texts).toHaveLength(2); // restarted: the state is still active
     rig.runtime.flags.setSelfSwitch('test', 'cutscene', 'A', true); // switch it off
     rig.ui.dismiss();
     await flush();
@@ -334,11 +334,11 @@ describe('autorun', () => {
 
   it('does not start while another blocking event is running, then runs after it', async () => {
     rig.addPlayer(5, 5, 'down');
-    rig.add({ id: 'npc', col: 5, row: 6, pages: [page([say('npc')])] });
+    rig.add({ id: 'npc', col: 5, row: 6, states: [state([say('npc')])] });
     triggers.resetTouchState(rig.world);
     triggers.requestAction();
     await step();
-    rig.add({ id: 'auto', col: 0, row: 0, sprite: false, collider: false, pages: [page([cmd('setSwitch', { id: 's1', value: true })], { trigger: 'autorun' })] });
+    rig.add({ id: 'auto', col: 0, row: 0, sprite: false, collider: false, states: [state([cmd('setSwitch', { id: 's1', value: true })], { trigger: 'autorun' })] });
     await step();
     expect(rig.runtime.flags.getSwitch('s1')).toBe(false);
     rig.ui.dismiss();
@@ -351,18 +351,18 @@ describe('autorun', () => {
 describe('parallel', () => {
   it('runs in the background without locking input and restarts when finished', async () => {
     rig.addPlayer(5, 5);
-    rig.add({ id: 'par', col: 0, row: 0, sprite: false, collider: false, pages: [page([cmd('setVariable', { id: 'v1', op: 'add', operand: 'const', value: 1 }), cmd('wait', { ms: 32 })], { trigger: 'parallel' })] });
+    rig.add({ id: 'par', col: 0, row: 0, sprite: false, collider: false, states: [state([cmd('setVariable', { id: 'v1', op: 'add', operand: 'const', value: 1 }), cmd('wait', { ms: 32 })], { trigger: 'parallel' })] });
     triggers.resetTouchState(rig.world);
     for (let i = 0; i < 10; i++) await step(16);
     expect(rig.runtime.flags.getVariable('v1')).toBeGreaterThanOrEqual(3);
     expect(gameState.isInputLocked).toBe(false);
   });
 
-  it('is cancelled when its page is no longer active', async () => {
+  it('is cancelled when its state is no longer active', async () => {
     rig.addPlayer(5, 5);
     const par = rig.add({
       id: 'par', col: 0, row: 0, sprite: false, collider: false,
-      pages: [page([cmd('wait', { ms: 100000 })], { trigger: 'parallel', conditions: [{ kind: 'switch', id: 's1', value: false }] })],
+      states: [state([cmd('wait', { ms: 100000 })], { trigger: 'parallel', conditions: [{ kind: 'switch', id: 's1', value: false }] })],
     });
     triggers.resetTouchState(rig.world);
     await step();
@@ -377,7 +377,7 @@ describe('parallel', () => {
 describe('lifecycle', () => {
   it('destroying an entity cancels its interpreter', async () => {
     rig.addPlayer(5, 5, 'down');
-    const npc = rig.add({ id: 'npc', col: 5, row: 6, pages: [page([say('hi')])] });
+    const npc = rig.add({ id: 'npc', col: 5, row: 6, states: [state([say('hi')])] });
     triggers.resetTouchState(rig.world);
     triggers.requestAction();
     await step();
@@ -387,9 +387,9 @@ describe('lifecycle', () => {
     expect(gameState.isInputLocked).toBe(false);
   });
 
-  it('onMapLoaded cancels running events and re-selects pages for the new map (self switches are per map)', async () => {
+  it('onMapLoaded cancels running events and re-selects states for the new map (self switches are per map)', async () => {
     rig.addPlayer(5, 5, 'down');
-    const npc = rig.add({ id: 'npc', col: 5, row: 6, pages: [page([say('hi')])] });
+    const npc = rig.add({ id: 'npc', col: 5, row: 6, states: [state([say('hi')])] });
     triggers.resetTouchState(rig.world);
     triggers.requestAction();
     await step();
@@ -403,7 +403,7 @@ describe('lifecycle', () => {
   it('the action key listener only attaches once and ignores presses while locked', async () => {
     const { EventBus, Events } = await import('@/utils/EventBus');
     rig.addPlayer(5, 5, 'down');
-    rig.add({ id: 'npc', col: 5, row: 6, pages: [page([say('hi')])] });
+    rig.add({ id: 'npc', col: 5, row: 6, states: [state([say('hi')])] });
     triggers.resetTouchState(rig.world);
     triggers.attach();
     triggers.attach();
@@ -437,7 +437,7 @@ describe('legacy Tiled interactables and legacy entities run identically', () =>
     const defs = legacyInteractableEntities(raw);
     expect(defs).toHaveLength(3);
     hydrateMapEntities(rig.world, defs, rig.expandCtx);
-    rig.runtime.pages.refreshAll();
+    rig.runtime.states.refreshAll();
     const player = rig.addPlayer(5, 5, 'right');
     triggers.resetTouchState(rig.world);
 
@@ -467,7 +467,7 @@ describe('legacy Tiled interactables and legacy entities run identically', () =>
       id: 'door', name: 'Door', x: 176, y: 224,
       components: { Transform: { x: 176, y: 224, depth: 5 }, Collider: { width: 32, height: 32, offsetX: 0, offsetY: 0, isSolid: false }, Interactable: { type: 'on_step', targetMap: 'market.json', targetX: 3, targetY: 4 } },
     }], rig.expandCtx);
-    rig.runtime.pages.refreshAll();
+    rig.runtime.states.refreshAll();
     const player = rig.addPlayer(4, 5);
     triggers.resetTouchState(rig.world);
     place(player, 5, 6);

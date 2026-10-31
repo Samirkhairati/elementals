@@ -31,7 +31,7 @@ export const Events = {
     // Event runtime
     /** Payload: `{ kind: 'switch' | 'variable' | 'selfSwitch' | 'reset'; id: string }`. */
     FLAGS_CHANGED: 'flags-changed',
-    /** Payload: `{ entity: string; map: string; pageId: string; blocking: boolean }`. */
+    /** Payload: `{ entity: string; map: string; stateId: string; blocking: boolean }`. */
     EVENT_STARTED: 'event-started',
     EVENT_ENDED: 'event-ended',
 } as const;

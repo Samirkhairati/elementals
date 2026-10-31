@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { makeRig, cmd, page, type Rig } from '@/test/rig';
+import { makeRig, cmd, state, type Rig } from '@/test/rig';
 import { EventInterpreter, YIELD_EVERY_COMMANDS } from './EventInterpreter';
 import { registerCommandHandler } from './commands';
 import { SpriteComponent } from '@/ecs/components/SpriteComponent';
@@ -105,7 +105,7 @@ describe('flow commands', () => {
 
   it('conditional supports self switch and hasItem conditions', async () => {
     rig.runtime.inventory.add('potion', 2);
-    const e = rig.add({ id: 'npcA', pages: [page([
+    const e = rig.add({ id: 'npcA', states: [state([
       cmd('setSelfSwitch', { key: 'C', value: true }),
       cmd('conditional', { conditions: [{ kind: 'selfSwitch', key: 'C', value: true }, { kind: 'hasItem', item: 'potion', qty: 2 }] }, {
         then: [cmd('setSwitch', { id: 's1', value: true })],
@@ -222,7 +222,7 @@ describe('state commands', () => {
   });
 
   it('setSelfSwitch targets the event\'s own entity on the current map', async () => {
-    const e = rig.add({ id: 'chest9', pages: [page([cmd('setSelfSwitch', { key: 'B', value: true })])] });
+    const e = rig.add({ id: 'chest9', states: [state([cmd('setSelfSwitch', { key: 'B', value: true })])] });
     await rig.runtime.start(e, 0)!.done;
     expect(rig.runtime.flags.getSelfSwitch('test', 'chest9', 'B')).toBe(true);
     expect(rig.runtime.flags.getSelfSwitch('test', 'chest9', 'A')).toBe(false);
@@ -236,7 +236,7 @@ describe('state commands', () => {
   });
 
   it('emit fires the custom event with payload, entity and map', async () => {
-    const e = rig.add({ id: 'lever', pages: [page([cmd('emit', { event: 'OPEN_GATE', payload: 'north' })])] });
+    const e = rig.add({ id: 'lever', states: [state([cmd('emit', { event: 'OPEN_GATE', payload: 'north' })])] });
     await rig.runtime.start(e, 0)!.done;
     expect(rig.emitted).toEqual([{ event: 'OPEN_GATE', payload: { payload: 'north', entity: 'lever', map: 'test' } }]);
   });
@@ -250,7 +250,7 @@ describe('state commands', () => {
 describe('character commands', () => {
   it('setFacing / faceTowards turn entities (target self, player, entity id)', async () => {
     const player = rig.addPlayer(5, 5);
-    const npc = rig.add({ id: 'npc1', col: 5, row: 3, movement: { controller: 'none' }, pages: [page([
+    const npc = rig.add({ id: 'npc1', col: 5, row: 3, movement: { controller: 'none' }, states: [state([
       cmd('faceTowards', { target: 'self', other: 'player' }),
       cmd('setFacing', { target: 'player', facing: 'left' }),
       cmd('setFacing', { target: { entity: 'npc2' }, facing: 'right' }),
@@ -274,13 +274,13 @@ describe('character commands', () => {
   });
 
   it('setVisible hides / shows a sprite', async () => {
-    const e = rig.add({ pages: [page([cmd('setVisible', { target: 'self', visible: false })])] });
+    const e = rig.add({ states: [state([cmd('setVisible', { target: 'self', visible: false })])] });
     await rig.runtime.start(e, 0)!.done;
     expect(rig.world.getComponent(e, SpriteComponent)!.visible).toBe(false);
   });
 
   it('changeSprite swaps the asset keeping facing; unknown assets warn and change nothing', async () => {
-    const e = rig.add({ sprite: { asset: 'characters/npc', facing: 'left' }, movement: { controller: 'none' }, pages: [page([
+    const e = rig.add({ sprite: { asset: 'characters/npc', facing: 'left' }, movement: { controller: 'none' }, states: [state([
       cmd('changeSprite', { target: 'self', asset: 'objects/chest', animation: '' }),
       cmd('changeSprite', { target: 'self', asset: 'objects/ghost', animation: '' }),
     ])] });
@@ -293,7 +293,7 @@ describe('character commands', () => {
   });
 
   it('playAnimation plays a named animation of an object asset and bumps the revision; unknown names warn', async () => {
-    const e = rig.add({ sprite: { asset: 'objects/chest' }, pages: [page([
+    const e = rig.add({ sprite: { asset: 'objects/chest' }, states: [state([
       cmd('playAnimation', { target: 'self', animation: 'open' }),
       cmd('playAnimation', { target: 'self', animation: 'nope' }),
     ])] });
@@ -305,7 +305,7 @@ describe('character commands', () => {
   });
 
   it('playAnimation on a character forces idle/walk/run', async () => {
-    const e = rig.add({ sprite: { asset: 'characters/player' }, movement: { controller: 'none' }, pages: [page([cmd('playAnimation', { target: 'self', animation: 'run' })])] });
+    const e = rig.add({ sprite: { asset: 'characters/player' }, movement: { controller: 'none' }, states: [state([cmd('playAnimation', { target: 'self', animation: 'run' })])] });
     await rig.runtime.start(e, 0)!.done;
     expect(rig.world.getComponent(e, AnimationComponent)!.forcedPhase).toBe('run');
   });
@@ -346,7 +346,7 @@ describe('character commands', () => {
   });
 
   it('target "self" resolves to the event entity', async () => {
-    const e = rig.add({ col: 4, row: 4, pages: [page([cmd('setFacing', { target: 'self', facing: 'up' })])] });
+    const e = rig.add({ col: 4, row: 4, states: [state([cmd('setFacing', { target: 'self', facing: 'up' })])] });
     await rig.runtime.start(e, 0)!.done;
     expect(rig.world.getComponent(e, AnimationComponent)!.direction).toBe('up');
     expect(rig.world.getComponent(e, TransformComponent)!.x).toBe(4 * 32 + 16);
@@ -442,8 +442,8 @@ describe('cancellation', () => {
   });
 
   it('cancel before the run started cancels at once', async () => {
-    const e = rig.add({ pages: [page([cmd('setSwitch', { id: 's1', value: true })])] });
-    const interpreter = new EventInterpreter(rig.world.getComponent(e, (await import('@/ecs/components/EventComponent')).EventComponent)!.pages[0].commands, {
+    const e = rig.add({ states: [state([cmd('setSwitch', { id: 's1', value: true })])] });
+    const interpreter = new EventInterpreter(rig.world.getComponent(e, (await import('@/ecs/components/EventComponent')).EventComponent)!.states[0].commands, {
       entity: e, entityId: 'x', getMapId: () => 'test', flags: rig.runtime.flags, inventory: rig.runtime.inventory, ui: rig.ui,
       clock: rig.runtime.clock, ops: rig.runtime.ops, maps: rig.maps, emit: () => {}, warn: () => {}, warnOnce: () => {}, random: () => 0,
     });

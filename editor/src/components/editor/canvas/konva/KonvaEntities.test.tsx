@@ -127,7 +127,7 @@ describe('KonvaEntities', () => {
   })
 
   it('badges: Event lightning for everyone with an Event, movement arrows for the selected mover, hidden with the toggle', () => {
-    const entities = [entity('e', 16, 32, { Event: { pages: [] } }), entity('m', 48, 32, { Movement: { controller: 'player' }, Event: { pages: [] } }), entity('p', 80, 32)]
+    const entities = [entity('e', 16, 32, { Event: { states: [] } }), entity('m', 48, 32, { Movement: { controller: 'player' }, Event: { states: [] } }), entity('p', 80, 32)]
     renderEntities(entities, { selectedEntityId: 'm', view: { badges: true } })
     runOverlay()
     const icons = drawn.badge.mock.calls.map((c) => c[1])
@@ -197,7 +197,7 @@ describe('KonvaEntities', () => {
 
   it('double-clicking an entity with an Event opens its event editor; others do nothing', () => {
     const onOpenEvent = vi.fn()
-    renderEntities([entity('ev', 16, 32, { Event: { pages: [] } }), entity('plain', 48, 32)], { onOpenEvent })
+    renderEntities([entity('ev', 16, 32, { Event: { states: [] } }), entity('plain', 48, 32)], { onOpenEvent })
     const ev = nodes().find((n) => n.props.x === 16)!
     const plain = nodes().find((n) => n.props.x === 48)!
     ev.props.onDblClick({ cancelBubble: false, evt: { button: 0 } })

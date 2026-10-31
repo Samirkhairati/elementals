@@ -1,7 +1,7 @@
 import type { MapData } from '@/types/editor'
 import type { EntityData } from '@/types/editor'
 
-/** Number of entities per sprite asset id (Sprite component + Event page appearance overrides). */
+/** Number of entities per sprite asset id (Sprite component + Event state appearance overrides). */
 export function countSpriteUsage(
   maps: Pick<MapData, 'fileName' | 'folderPath' | 'entities'>[],
   active?: { fileName: string; folderPath: string | null; entities: EntityData[] } | null,
@@ -18,8 +18,8 @@ export function countSpriteUsage(
       const used = new Set<string>()
       const sprite = e.components?.Sprite?.asset
       if (typeof sprite === 'string' && sprite) used.add(sprite)
-      const pages = e.components?.Event?.pages
-      if (Array.isArray(pages)) for (const p of pages) if (typeof p?.appearance?.asset === 'string' && p.appearance.asset) used.add(p.appearance.asset)
+      const states = e.components?.Event?.states
+      if (Array.isArray(states)) for (const p of states) if (typeof p?.appearance?.asset === 'string' && p.appearance.asset) used.add(p.appearance.asset)
       used.forEach(add)
     }
   }

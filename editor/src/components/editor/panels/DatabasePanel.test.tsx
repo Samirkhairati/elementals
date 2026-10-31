@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { SwitchDef, VariableDef } from '../../../../../shared/engine/types'
 import { createCommand } from '../../../../../shared/engine/commands'
-import { createDefaultEventPage } from '../../../../../shared/engine/components'
+import { createDefaultEventState } from '../../../../../shared/engine/components'
 import type { UsageMap } from '@/lib/databaseUsage'
 import { DatabasePanel } from './DatabasePanel'
 
@@ -14,15 +14,15 @@ const SWITCHES: SwitchDef[] = [
 const VARIABLES: VariableDef[] = [{ id: 'badges', name: 'Badges earned', initial: 2 }]
 
 function usageMaps(): UsageMap[] {
-  const a = createDefaultEventPage('Talk')
+  const a = createDefaultEventState('Talk')
   a.commands = [createCommand('setSwitch', { id: 'met', value: true })]
-  const b = createDefaultEventPage('After')
+  const b = createDefaultEventState('After')
   b.conditions = [{ kind: 'switch', id: 'met', value: true }]
-  const c = createDefaultEventPage('Gate')
+  const c = createDefaultEventState('Gate')
   c.commands = [createCommand('setVariable', { id: 'badges', op: 'add', operand: 'const', value: 1 })]
   return [
-    { fileName: 'town.json', name: 'Town', entities: [{ id: 'e1', name: 'Guard', components: { Event: { pages: [a, b] } } }] },
-    { fileName: 'cave.json', name: 'Cave', entities: [{ id: 'e2', name: 'Lever', components: { Event: { pages: [c] } } }] },
+    { fileName: 'town.json', name: 'Town', entities: [{ id: 'e1', name: 'Guard', components: { Event: { states: [a, b] } } }] },
+    { fileName: 'cave.json', name: 'Cave', entities: [{ id: 'e2', name: 'Lever', components: { Event: { states: [c] } } }] },
   ]
 }
 
@@ -100,16 +100,16 @@ describe('DatabasePanel', () => {
 
   it('counts events across ALL maps that reference an item', () => {
     render(<Harness />)
-    expect(within(switchRow('met')).getByRole('button', { name: '1 event' })).toBeInTheDocument() // two pages, one event
+    expect(within(switchRow('met')).getByRole('button', { name: '1 event' })).toBeInTheDocument() // two states, one event
     expect(within(switchRow('door')).getByText('unused')).toBeInTheDocument()
     expect(within(variableRow('badges')).getByRole('button', { name: '1 event' })).toBeInTheDocument() // lives in the other map
   })
 
   it('counts several events', () => {
     const maps = usageMaps()
-    const page = createDefaultEventPage('x')
-    page.conditions = [{ kind: 'switch', id: 'met', value: false }]
-    maps[1].entities = [...(maps[1].entities ?? []), { id: 'e3', name: 'Third', components: { Event: { pages: [page] } } }]
+    const state = createDefaultEventState('x')
+    state.conditions = [{ kind: 'switch', id: 'met', value: false }]
+    maps[1].entities = [...(maps[1].entities ?? []), { id: 'e3', name: 'Third', components: { Event: { states: [state] } } }]
     render(<Harness maps={maps} />)
     expect(within(switchRow('met')).getByRole('button', { name: '2 events' })).toBeInTheDocument()
   })

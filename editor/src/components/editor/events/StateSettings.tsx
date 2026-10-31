@@ -1,8 +1,8 @@
-// Everything about a page except its commands: name, trigger, conditions, solidity and appearance override.
+// Everything about a state except its commands: name, trigger, conditions, solidity and appearance override.
 
 import React, { useState } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
-import type { EventPage, EventTrigger, PageAppearance } from '../../../../../shared/engine/types'
+import type { EventState, EventTrigger, StateAppearance } from '../../../../../shared/engine/types'
 import { EVENT_TRIGGERS, TRIGGER_LABELS } from '../../../../../shared/engine/constants'
 import { ConditionsEditor } from './ConditionsEditor'
 import { FacingPicker, SpritePicker } from './pickers'
@@ -13,7 +13,7 @@ export const TRIGGER_HELP: Record<EventTrigger, string> = {
   action: 'Runs when the player presses the action button while facing this entity. Best for NPCs, signs and chests.',
   playerTouch: 'Runs when the player walks onto or into this entity. Best for doors, warps and trigger zones.',
   eventTouch: 'Runs when another entity (an NPC, for example) touches this one.',
-  autorun: 'Starts by itself as soon as the page is active and blocks the player until it finishes. It repeats, so end it with a switch or self switch or the game will lock up.',
+  autorun: 'Starts by itself as soon as the state is active and blocks the player until it finishes. It repeats, so end it with a switch or self switch or the game will lock up.',
   parallel: 'Runs in the background over and over without stopping the player. Use it for ambient effects and use sparingly.',
 }
 
@@ -26,10 +26,10 @@ function OverrideRow({ label, active, onToggle, children }: { label: string; act
   )
 }
 
-function AppearanceEditor({ appearance, onChange }: { appearance: PageAppearance; onChange: (a: PageAppearance) => void }) {
+function AppearanceEditor({ appearance, onChange }: { appearance: StateAppearance; onChange: (a: StateAppearance) => void }) {
   const env = useEventEnv()
   const ap = appearance ?? {}
-  const set = <K extends keyof PageAppearance>(key: K, value: PageAppearance[K] | undefined) => {
+  const set = <K extends keyof StateAppearance>(key: K, value: StateAppearance[K] | undefined) => {
     const next = { ...ap }
     if (value === undefined) delete next[key]
     else next[key] = value
@@ -39,7 +39,7 @@ function AppearanceEditor({ appearance, onChange }: { appearance: PageAppearance
   const animations = info?.meta.animations ? Object.keys(info.meta.animations) : []
   return (
     <div className="space-y-0.5" data-testid="appearance-editor">
-      <p className="text-[10px] text-muted-foreground">While this page is active, these replace the entity’s own Sprite settings. Anything not overridden stays as it is.</p>
+      <p className="text-[10px] text-muted-foreground">While this state is active, these replace the entity’s own Sprite settings. Anything not overridden stays as it is.</p>
       <OverrideRow label="Visibility" active={ap.visible !== undefined} onToggle={(on) => set('visible', on ? true : undefined)}>
         <select aria-label="Visibility while active" value={ap.visible === false ? 'hidden' : 'visible'} onChange={(e) => set('visible', e.target.value === 'visible')} className={selectClass}>
           <option value="visible">Visible</option>
@@ -75,16 +75,16 @@ function AppearanceEditor({ appearance, onChange }: { appearance: PageAppearance
   )
 }
 
-export function PageSettings({ page, onChange }: { page: EventPage; onChange: (patch: Partial<EventPage>) => void }) {
+export function StateSettings({ state, onChange }: { state: EventState; onChange: (patch: Partial<EventState>) => void }) {
   const [appearanceOpen, setAppearanceOpen] = useState(false)
-  const overrides = Object.keys(page.appearance ?? {}).length
+  const overrides = Object.keys(state.appearance ?? {}).length
   return (
-    <div className="grid gap-x-5 gap-y-2 p-3 lg:grid-cols-2 xl:grid-cols-3" data-testid="page-settings">
+    <div className="grid gap-x-5 gap-y-2 p-3 lg:grid-cols-2 xl:grid-cols-3" data-testid="state-settings">
       <div className="space-y-1">
-        <FieldRow label="Page name">{(id) => <DraftText id={id} value={page.name} placeholder="e.g. After the quest" onCommit={(name) => onChange({ name })} />}</FieldRow>
-        <FieldRow label="Trigger" help={TRIGGER_HELP[page.trigger]}>
+        <FieldRow label="State name">{(id) => <DraftText id={id} value={state.name} placeholder="e.g. After the quest" onCommit={(name) => onChange({ name })} />}</FieldRow>
+        <FieldRow label="Trigger" help={TRIGGER_HELP[state.trigger]}>
           {(id) => (
-            <select id={id} value={page.trigger} onChange={(e) => onChange({ trigger: e.target.value as EventTrigger })} className={selectClass}>
+            <select id={id} value={state.trigger} onChange={(e) => onChange({ trigger: e.target.value as EventTrigger })} className={selectClass}>
               {EVENT_TRIGGERS.map((t) => (
                 <option key={t} value={t}>
                   {TRIGGER_LABELS[t]}
@@ -97,7 +97,7 @@ export function PageSettings({ page, onChange }: { page: EventPage; onChange: (p
 
       <div className="space-y-1">
         <CheckRow
-          checked={page.faceOnInteract}
+          checked={state.faceOnInteract}
           onChange={(faceOnInteract) => onChange({ faceOnInteract })}
           label="Face player when triggered"
           help="The entity turns towards the player before its commands run."
@@ -106,7 +106,7 @@ export function PageSettings({ page, onChange }: { page: EventPage; onChange: (p
           {(id) => (
             <select
               id={id}
-              value={page.solid === null ? 'inherit' : page.solid ? 'solid' : 'nonsolid'}
+              value={state.solid === null ? 'inherit' : state.solid ? 'solid' : 'nonsolid'}
               onChange={(e) => onChange({ solid: e.target.value === 'inherit' ? null : e.target.value === 'solid' })}
               className={selectClass}
             >
@@ -128,7 +128,7 @@ export function PageSettings({ page, onChange }: { page: EventPage; onChange: (p
           </button>
           {appearanceOpen && (
             <div className="mt-1">
-              <AppearanceEditor appearance={page.appearance} onChange={(appearance) => onChange({ appearance })} />
+              <AppearanceEditor appearance={state.appearance} onChange={(appearance) => onChange({ appearance })} />
             </div>
           )}
         </div>
@@ -137,11 +137,11 @@ export function PageSettings({ page, onChange }: { page: EventPage; onChange: (p
       <div className="lg:col-span-2 xl:col-span-1">
         <SectionTitle>Conditions</SectionTitle>
         <ConditionsEditor
-          conditions={page.conditions}
+          conditions={state.conditions}
           onChange={(conditions) => onChange({ conditions })}
-          emptyHint="No conditions: this page is always eligible. When several pages qualify, the last one runs."
+          emptyHint="No conditions: this state is always eligible. When several states qualify, the last one runs."
         />
-        {page.conditions.length > 0 && <p className="mt-1 text-[10px] text-muted-foreground">The page is used while these hold. If a later page also qualifies, the later page wins.</p>}
+        {state.conditions.length > 0 && <p className="mt-1 text-[10px] text-muted-foreground">The state is used while these hold. If a later state also qualifies, the later state wins.</p>}
       </div>
     </div>
   )

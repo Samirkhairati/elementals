@@ -119,7 +119,7 @@ function legacyConvert(mapToExport: any, tilesets: TilesetInfo[]) {
     type: 'map',
     version: '1.10',
     width: mapToExport.width,
-    schemaVersion: 2,
+    schemaVersion: 3,
     entities: migrateMap(mapToExport).value.entities || [],
   }
   return JSON.stringify(tiledMap, null, 2)
@@ -285,7 +285,7 @@ describe('convertEditorMapToTiled: structure', () => {
   it('carries canonical entities over unchanged and stamps the schema version', () => {
     // Already canonical (Transform + Tag only): nothing to migrate.
     expect(tiled.entities).toEqual(SYNTHETIC.multiTilesetAndCollision.entities)
-    expect(tiled.schemaVersion).toBe(2)
+    expect(tiled.schemaVersion).toBe(3)
   })
 
   it('migrates legacy entities on export (the game only ever sees canonical components)', () => {
@@ -305,7 +305,7 @@ describe('convertEditorMapToTiled: structure', () => {
       ],
     }
     const out = convertEditorMapToTiled(legacy, [])
-    expect(out.schemaVersion).toBe(2)
+    expect(out.schemaVersion).toBe(3)
     expect(Object.keys(out.entities[0].components)).toEqual(['Transform', 'Event'])
     expect(JSON.stringify(out.entities)).not.toContain('Interactable')
     // idempotent: exporting the already exported entities changes nothing

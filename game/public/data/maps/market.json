@@ -1504,7 +1504,7 @@
   "type": "map",
   "version": "1.10",
   "width": 15,
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "entities": [
     {
       "id": "e41e2972-0204-45d2-885a-866dc195464a",
@@ -1525,10 +1525,10 @@
           "isSolid": true
         },
         "Event": {
-          "pages": [
+          "states": [
             {
               "id": "5d1d60ed-c7fa-45b4-beed-1f77300d5540",
-              "name": "Page 1",
+              "name": "State 1",
               "conditions": [],
               "trigger": "action",
               "commands": [

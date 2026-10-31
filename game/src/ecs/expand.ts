@@ -59,7 +59,7 @@ export function expandMovement(props: MovementProps, facing: SpriteProps["facing
  *                 graphic, an unknown asset warns and means no graphic
  *  - Collider  -> ColliderComponent
  *  - Movement  -> GridMovement (+ FreeMovement + PlayerControl for `player`, + AIWander for `wander`)
- *  - Event     -> EventComponent (pages; the page selector applies page overrides later)
+ *  - Event     -> EventComponent (states; the state selector applies state overrides later)
  *  - Tag       -> TagComponent
  *
  * An EntityInfo (editor id + name) is always added so event targets can find the entity.
@@ -104,7 +104,7 @@ export function expandEntity(entity: EngineEntity, ctx: ExpandContext = defaultE
 
   if (components.Event !== undefined) {
     const event = normalizeProps("Event", components.Event);
-    out.push(new EventComponent(event.pages, spriteProps, baseSolid));
+    out.push(new EventComponent(event.states, spriteProps, baseSolid));
   }
 
   if (components.Tag !== undefined) {

@@ -29,7 +29,7 @@ answers one question about the entity:
 * *GridMovement / FreeMovement / PlayerControl / AIWander*: whether the world moves tile-by-tile or freely
   is a **game-wide setting**, not a per-entity choice, and "player control" and "wander" are just two ways
   to drive movement. Now there is one **Movement** with a `controller`: `none | player | wander`.
-* *Interactable*: a hard-coded message/warp. Now it is an **Event** with pages and commands.
+* *Interactable*: a hard-coded message/warp. Now it is an **Event** with states and commands.
 
 ### Coordinates
 * Pixels in map space, tile = 32px. `Transform` is the **anchor**: bottom-centre of the entity's tile
@@ -52,10 +52,10 @@ load. Rules:
 |---|---|
 | `SpriteView` + `CharacterAnimation` | `Sprite`. `asset`: `characterKey` -> `characters/<key>`; else texture `<key>-walk` / `<key>-run` -> `characters/<key>`; any other texture -> `objects/<texture>`. `facing` = `CharacterAnimation.direction` (else Grid/FreeMovement direction, else `down`). `frame`, `flipX`, `visible` kept; `alpha` -> `opacity`; numeric `tint` -> `#rrggbb` (white = none). `originX/Y` and `movementType` are dropped. |
 | `GridMovement`, `FreeMovement`, `PlayerControl`, `AIWander` | `Movement`. `controller`: PlayerControl -> `player`, else AIWander -> `wander`, else `none`. `speed`: AIWander's own speed for `wander`, else Grid/FreeMovement speed (default 100). Wander radius/interval come from AIWander. `isMovementLocked` is dropped. |
-| `Interactable` | `Event` with one page. `on_step` -> trigger `playerTouch`, anything else -> `action`. Commands, in this order and only when set: `message` -> `showText`; `targetMap` -> `warp` (`targetX/targetY` are tile coordinates, a trailing `.json` is removed from the map id); `eventKey` -> `emit`. |
+| `Interactable` | `Event` with one state. `on_step` -> trigger `playerTouch`, anything else -> `action`. Commands, in this order and only when set: `message` -> `showText`; `targetMap` -> `warp` (`targetX/targetY` are tile coordinates, a trailing `.json` is removed from the map id); `eventKey` -> `emit`. |
 | `Transform`, `Collider`, `Tag`, unknown components | kept untouched. A missing `Transform` is created from `entity.x/y`; if both exist the Transform position wins and `entity.x/y` follow it. |
 
-Generated ids (page, commands) are deterministic (`deterministicId(entityId/...)`), so exporting the same legacy map
+Generated ids (state, commands) are deterministic (`deterministicId(entityId/...)`), so exporting the same legacy map
 twice gives byte-identical output and `npm run maps:check` has no spurious drift. Existing user data is never
 "fixed" (e.g. a 16x8 collider stays 16x8).
 
@@ -86,8 +86,8 @@ animation to create. `buildSpriteManifest(assets)` produces `data/sprites.json`
 
 ## 3. Events
 
-An **Event** component holds **pages** (RPG Maker model). The active page is the *last* page whose
-conditions all hold. A page has: conditions, a trigger, optional appearance override, and a **command tree**.
+An **Event** component holds **states** (RPG Maker calls them pages). The active state is the *last* state whose
+conditions all hold. A state has: conditions, a trigger, optional appearance override, and a **command tree**.
 
 * Triggers: `action`, `playerTouch`, `eventTouch`, `autorun`, `parallel`.
 * Conditions: `switch`, `variable`, `selfSwitch`, `hasItem`.
@@ -155,14 +155,14 @@ Game implementation notes (where the runtime is more specific than the catalog; 
 * `moveRoute`: blocked steps are skipped; `wait` false lets the route outlive the event; `speed` persists; `back` also turns the character.
 * `warp`: same map = teleport (no reload); other map = load it, which cancels every running event (commands after the warp do not run). A fade
   is faded back in on the new map. Unknown maps are skipped with a warning.
-* An event with no active page is hidden and not solid. Page overrides are applied when the active page changes, so a `changeSprite` lasts until then.
+* An event with no active state is hidden and not solid. State overrides are applied when the active state changes, so a `changeSprite` lasts until then.
 * Trigger rules (`action` lookup order, `playerTouch` on step end/bump, `autorun` restarts, `parallel` cancellation) are listed in game-runtime.md.
 
-Defaults for convenience (prefabs, `shared/engine/prefabs.ts`): NPC (wanders optionally, one action page with `showText`), Sign,
-Chest (two pages + self switch A), Door/Warp (`playerTouch` + `warp`), Trigger Zone (non-solid `playerTouch`),
-Item Ball (`giveItem`, then hidden by page 2), Trainer (placeholder `startBattle`). Prefabs use the sprite assets
+Defaults for convenience (prefabs, `shared/engine/prefabs.ts`): NPC (wanders optionally, one action state with `showText`), Sign,
+Chest (two states + self switch A), Door/Warp (`playerTouch` + `warp`), Trigger Zone (non-solid `playerTouch`),
+Item Ball (`giveItem`, then hidden by state 2), Trainer (placeholder `startBattle`). Prefabs use the sprite assets
 `characters/player`, `objects/sign`, `objects/chest` (frame 1 = open) and `objects/item-ball`; without those assets the
-entity simply has no graphic until one is picked. `instantiatePrefab(prefab, { x, y })` gives fresh entity/page/command ids.
+entity simply has no graphic until one is picked. `instantiatePrefab(prefab, { x, y })` gives fresh entity/state/command ids.
 
 ## 4. Editor UX principles
 * Every placed thing is visible and legible on the canvas: real sprite preview, a clear footprint
@@ -172,7 +172,7 @@ entity simply has no graphic until one is picked. `instantiatePrefab(prefab, { x
 * Inspector = one card per component with a coloured header, consistent 8px spacing scale, schema-driven
   fields, and *custom editors* where a form is not enough: Sprite (asset picker + live preview + animation
   playback + pivot/offset gizmo), Collider (mini diagram + Fit buttons), Movement (controller-dependent
-  fields), Event (pages + command list).
+  fields), Event (states + command list).
 * Switches/variables are managed in a Database panel and picked by name everywhere.
 * All editing goes through the existing pure state layer (history/undo, autosave); nothing writes files
   directly from components.
@@ -185,5 +185,5 @@ entity simply has no graphic until one is picked. `instantiatePrefab(prefab, { x
 * `editor/src/lib/componentRegistry.ts` — thin adapter over `shared/engine/components`.
 * `editor/src/components/editor/inspector/customEditors.tsx` — registry of custom component editors.
 * `game/src/ecs/*` — runtime; `expand.ts` expands editor components into runtime components (see [game-runtime.md](game-runtime.md)).
-* `game/src/events/*` — event runtime (interpreter, page selection, state, triggers).
+* `game/src/events/*` — event runtime (interpreter, state selection, state, triggers).
 * `scripts/sync-assets.mjs`, `scripts/export-maps.mjs` — project → game pipelines.

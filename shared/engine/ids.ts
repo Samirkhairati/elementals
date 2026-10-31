@@ -1,4 +1,4 @@
-// Id generation for entities, event pages and commands.
+// Id generation for entities, event states and commands.
 //
 // `newId()` is injectable so tests (and the game, if it wants) can make ids predictable.
 // `deterministicId(seed)` gives the same uuid-like id for the same seed; migration uses it so that

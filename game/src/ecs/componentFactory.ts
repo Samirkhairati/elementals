@@ -111,7 +111,7 @@ const FACTORIES: { [K in ComponentTypeName]: Factory<ComponentTypeMap[K]> } = {
 
   Movement: (d) => expandMovement(normalizeProps("Movement", d), "down")[0] as GridMovementComponent,
 
-  Event: (d) => new EventComponent(normalizeProps("Event", d).pages),
+  Event: (d) => new EventComponent(normalizeProps("Event", d).states),
 
   SpriteView: (d) => {
     const texture = str(d, "texture");

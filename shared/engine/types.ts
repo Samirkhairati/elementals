@@ -24,7 +24,7 @@ export type LegacyComponentType =
   | 'Interactable';
 
 /** Version written to `map.schemaVersion`. Maps without it are legacy (1). */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 // ── Component props ─────────────────────────────────────────────────────────────────────────────
 // Positions are pixels in map space. A tile is 32px. The Transform position is the entity's
@@ -95,7 +95,7 @@ export interface TagProps {
   color?: string;
 }
 
-// ── Events (RPG-Maker style pages + a command tree that maps 1:1 onto an event graph) ───────────
+// ── Events (RPG-Maker style states + a command tree that maps 1:1 onto an event graph) ───────────
 
 export type EventTrigger =
   | 'action' // player presses the action key facing/over the event
@@ -107,7 +107,7 @@ export type EventTrigger =
 export type ComparisonOp = '==' | '!=' | '>' | '>=' | '<' | '<=';
 export type SelfSwitchKey = 'A' | 'B' | 'C' | 'D';
 
-/** Conditions are AND-ed. A page is active when ALL its conditions hold. */
+/** Conditions are AND-ed. A state is active when ALL its conditions hold. */
 export type Condition =
   | { kind: 'switch'; id: string; value: boolean }
   | { kind: 'variable'; id: string; op: ComparisonOp; value: number }
@@ -130,8 +130,8 @@ export interface Command {
   branches?: Record<string, Command[]>;
 }
 
-export interface PageAppearance {
-  /** Override the Sprite while this page is active. Omitted fields keep the entity's Sprite. */
+export interface StateAppearance {
+  /** Override the Sprite while this state is active. Omitted fields keep the entity's Sprite. */
   visible?: boolean;
   asset?: string;
   animation?: string;
@@ -139,7 +139,7 @@ export interface PageAppearance {
   facing?: Facing;
 }
 
-export interface EventPage {
+export interface EventState {
   id: string;
   name: string;
   conditions: Condition[];
@@ -149,12 +149,12 @@ export interface EventPage {
   faceOnInteract: boolean;
   /** null = keep the Collider's isSolid. */
   solid: boolean | null;
-  appearance: PageAppearance;
+  appearance: StateAppearance;
 }
 
 export interface EventProps {
-  /** Pages are evaluated last-to-first; the LAST page whose conditions hold is the active one. */
-  pages: EventPage[];
+  /** States are evaluated last-to-first; the LAST state whose conditions hold is the active one. */
+  states: EventState[];
 }
 
 // ── Component schema (single source of truth for editor forms, defaults, validation) ────────────
@@ -321,12 +321,12 @@ export interface CommandIssue {
 
 export interface EntityIssue {
   entityId: string;
-  /** Dotted path inside the entity, e.g. `components.Event.pages[0].commands[1]`. */
+  /** Dotted path inside the entity, e.g. `components.Event.states[0].commands[1]`. */
   path: string;
   severity: IssueSeverity;
   message: string;
   code: string;
-  /** Set when the issue is about one command of an Event page. */
+  /** Set when the issue is about one command of an Event state. */
   commandId?: string;
 }
 

@@ -48,7 +48,7 @@ function buildRegistry(): Record<ComponentType, ComponentSchemaEntry> {
     registry[type] = {
       label: schema.label,
       singleton: schema.singleton,
-      // Event gets a real first page; everything else its schema defaults.
+      // Event gets a real first state; everything else its schema defaults.
       defaultProps: createDefaultComponent(type) as unknown as Record<string, any>,
       fields: schema.fields.map(toEditorField),
       description: schema.description,
@@ -74,7 +74,7 @@ export interface PresetPrefab {
   name: string
   description: string
   icon: string
-  /** A fresh deep copy on every access (new event page/command ids), ready to attach to an entity. */
+  /** A fresh deep copy on every access (new event state/command ids), ready to attach to an entity. */
   readonly components: Partial<Record<ComponentType, Record<string, any>>>
 }
 

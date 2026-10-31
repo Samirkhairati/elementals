@@ -6,10 +6,10 @@ import type {
   ComponentType,
   Condition,
   EngineEntity,
-  EventPage,
+  EventState,
   EventProps,
   FieldDef,
-  PageAppearance,
+  StateAppearance,
 } from './types.ts';
 import { EVENT_TRIGGERS, COMPARISON_OPS, SELF_SWITCH_KEYS, isFacing } from './constants.ts';
 import { cloneCommands } from './commands.ts';
@@ -24,7 +24,7 @@ export function isComponentType(value: unknown): value is ComponentType {
 
 // ── event defaults ──────────────────────────────────────────────────────────────────────────────
 
-export function createDefaultEventPage(name = 'Page 1'): EventPage {
+export function createDefaultEventState(name = 'State 1'): EventState {
   return {
     id: newId(),
     name,
@@ -37,9 +37,9 @@ export function createDefaultEventPage(name = 'Page 1'): EventPage {
   };
 }
 
-/** One `action` page with no commands. */
+/** One `action` state with no commands. */
 export function createDefaultEventProps(): EventProps {
-  return { pages: [createDefaultEventPage()] };
+  return { states: [createDefaultEventState()] };
 }
 
 // ── schemas ─────────────────────────────────────────────────────────────────────────────────────
@@ -143,13 +143,13 @@ export const COMPONENT_SCHEMAS: Record<ComponentType, ComponentSchema> = {
   Event: {
     type: 'Event',
     label: 'Event',
-    description: 'What happens when the player talks to, touches or approaches the entity (pages and commands).',
+    description: 'What happens when the player talks to, touches or approaches the entity (states and commands).',
     icon: 'zap',
     accent: 'blue',
     category: 'logic',
     singleton: true,
-    // `pages` is created fresh by createDefaultComponent / createDefaultEventProps; this value is only a shape hint.
-    defaultProps: { pages: [] },
+    // `states` is created fresh by createDefaultComponent / createDefaultEventProps; this value is only a shape hint.
+    defaultProps: { states: [] },
     fields: [],
   },
   Tag: {
@@ -243,12 +243,12 @@ function normalizeCondition(c: unknown): Condition | null {
   }
 }
 
-function normalizeCommandList(list: unknown): EventPage['commands'] {
+function normalizeCommandList(list: unknown): EventState['commands'] {
   if (!Array.isArray(list)) return [];
-  const out: EventPage['commands'] = [];
+  const out: EventState['commands'] = [];
   for (const raw of list) {
     if (!isRecord(raw) || typeof raw.type !== 'string') continue;
-    const cmd: EventPage['commands'][number] = {
+    const cmd: EventState['commands'][number] = {
       id: typeof raw.id === 'string' && raw.id ? raw.id : newId(),
       type: raw.type,
       params: isRecord(raw.params) ? cloneJson(raw.params) : {},
@@ -262,8 +262,8 @@ function normalizeCommandList(list: unknown): EventPage['commands'] {
   return out;
 }
 
-function normalizeAppearance(a: unknown): PageAppearance {
-  const out: PageAppearance = {};
+function normalizeAppearance(a: unknown): StateAppearance {
+  const out: StateAppearance = {};
   if (!isRecord(a)) return out;
   if (typeof a.visible === 'boolean') out.visible = a.visible;
   if (typeof a.asset === 'string') out.asset = a.asset;
@@ -273,15 +273,15 @@ function normalizeAppearance(a: unknown): PageAppearance {
   return out;
 }
 
-export function normalizeEventPage(page: unknown, index = 0): EventPage {
-  const p = isRecord(page) ? page : {};
+export function normalizeEventState(state: unknown, index = 0): EventState {
+  const p = isRecord(state) ? state : {};
   return {
     id: typeof p.id === 'string' && p.id ? p.id : newId(),
-    name: typeof p.name === 'string' ? p.name : `Page ${index + 1}`,
+    name: typeof p.name === 'string' ? p.name : `State ${index + 1}`,
     conditions: Array.isArray(p.conditions)
       ? p.conditions.map(normalizeCondition).filter((c): c is Condition => c !== null)
       : [],
-    trigger: (EVENT_TRIGGERS as readonly unknown[]).includes(p.trigger) ? (p.trigger as EventPage['trigger']) : 'action',
+    trigger: (EVENT_TRIGGERS as readonly unknown[]).includes(p.trigger) ? (p.trigger as EventState['trigger']) : 'action',
     commands: normalizeCommandList(p.commands),
     faceOnInteract: typeof p.faceOnInteract === 'boolean' ? p.faceOnInteract : true,
     solid: typeof p.solid === 'boolean' ? p.solid : null,
@@ -290,9 +290,11 @@ export function normalizeEventPage(page: unknown, index = 0): EventPage {
 }
 
 export function normalizeEventProps(props: unknown): EventProps {
-  const pages = isRecord(props) && Array.isArray(props.pages) ? props.pages : [];
-  if (pages.length === 0) return createDefaultEventProps();
-  return { pages: pages.map((p, i) => normalizeEventPage(p, i)) };
+  // `pages` is the schemaVersion 2 name of `states`; still accepted so un-migrated data loads.
+  const raw = isRecord(props) ? (Array.isArray(props.states) ? props.states : props.pages) : undefined;
+  const states = Array.isArray(raw) ? raw : [];
+  if (states.length === 0) return createDefaultEventProps();
+  return { states: states.map((p, i) => normalizeEventState(p, i)) };
 }
 
 /**
@@ -325,23 +327,23 @@ export function createDefaultComponent<T extends ComponentType>(type: T, overrid
 
 // ── entity cloning ──────────────────────────────────────────────────────────────────────────────
 
-/** Deep copy of Event props. With `freshIds` every page and command gets a new id. */
+/** Deep copy of Event props. With `freshIds` every state and command gets a new id. */
 export function cloneEventProps(event: EventProps, freshIds = false): EventProps {
   return {
-    pages: event.pages.map((page) => ({
-      ...cloneJson({ ...page, commands: [] as EventPage['commands'] }),
-      id: freshIds ? newId() : page.id,
-      commands: cloneCommands(page.commands, freshIds),
+    states: event.states.map((state) => ({
+      ...cloneJson({ ...state, commands: [] as EventState['commands'] }),
+      id: freshIds ? newId() : state.id,
+      commands: cloneCommands(state.commands, freshIds),
     })),
   };
 }
 
-/** Deep copy of an entity. With `freshIds` the entity id and all event page/command ids are regenerated. */
+/** Deep copy of an entity. With `freshIds` the entity id and all event state/command ids are regenerated. */
 export function cloneEntity<T extends EngineEntity>(entity: T, freshIds = false): T {
   const { components, ...rest } = entity;
   const copy = { ...cloneJson(rest), components: {} as T['components'] } as T;
   for (const [type, props] of Object.entries(components)) {
-    if (type === 'Event' && isRecord(props) && Array.isArray((props as { pages?: unknown }).pages)) {
+    if (type === 'Event' && isRecord(props) && Array.isArray((props as { states?: unknown }).states)) {
       (copy.components as Record<string, unknown>)[type] = cloneEventProps(props as unknown as EventProps, freshIds);
     } else {
       (copy.components as Record<string, unknown>)[type] = cloneJson(props);
