@@ -20,13 +20,14 @@ Options:
   --list        Print worktree, offset and ports, then exit (starts nothing).
   --dry-run     Print the exact commands and env that would be spawned, then exit.
   --json        With --list/--dry-run: machine-readable output.
+  --no-sync     Skip the asset sync (project/ -> game/public) that runs before the servers start.
   -h, --help    Show this help.
 
 Environment overrides (see AGENTS.md): PORT_OFFSET, GAME_PORT, PORT, WORKTREE_NAME.
 `;
 
 export function parseArgs(argv) {
-  const out = { offset: null, list: false, dryRun: false, json: false, help: false };
+  const out = { offset: null, list: false, dryRun: false, json: false, noSync: false, help: false };
   const parseOffset = (v) => {
     if (v === undefined || !/^\d+$/.test(String(v))) {
       throw new Error(`--offset requires a non-negative integer, got "${v ?? ''}"`);
@@ -40,6 +41,7 @@ export function parseArgs(argv) {
     else if (a === '--list') out.list = true;
     else if (a === '--dry-run') out.dryRun = true;
     else if (a === '--json') out.json = true;
+    else if (a === '--no-sync') out.noSync = true;
     else if (a === '-h' || a === '--help') out.help = true;
     else throw new Error(`Unknown argument: ${a}`);
   }

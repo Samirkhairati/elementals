@@ -1504,6 +1504,7 @@
   "type": "map",
   "version": "1.10",
   "width": 15,
+  "schemaVersion": 2,
   "entities": [
     {
       "id": "e41e2972-0204-45d2-885a-866dc195464a",
@@ -1523,10 +1524,28 @@
           "offsetY": 0,
           "isSolid": true
         },
-        "Interactable": {
-          "type": "on_interact",
-          "message": "The ancient sign is faded...",
-          "eventKey": ""
+        "Event": {
+          "pages": [
+            {
+              "id": "5d1d60ed-c7fa-45b4-beed-1f77300d5540",
+              "name": "Page 1",
+              "conditions": [],
+              "trigger": "action",
+              "commands": [
+                {
+                  "id": "270c6bff-d4a6-42e9-8fdc-455263a3d20a",
+                  "type": "showText",
+                  "params": {
+                    "speaker": "",
+                    "text": "The ancient sign is faded..."
+                  }
+                }
+              ],
+              "faceOnInteract": true,
+              "solid": null,
+              "appearance": {}
+            }
+          ]
         },
         "Tag": {
           "tag": "sign"

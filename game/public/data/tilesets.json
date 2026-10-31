@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "tilesets": [
+    {
+      "name": "beach_caves",
+      "file": "graphics/tilesets/beach_caves.png"
+    },
+    {
+      "name": "bush",
+      "file": "graphics/tilesets/bush.png"
+    },
+    {
+      "name": "collision",
+      "file": "graphics/tilesets/collision.png"
+    },
+    {
+      "name": "grass",
+      "file": "graphics/tilesets/grass.png"
+    },
+    {
+      "name": "house",
+      "file": "graphics/tilesets/house.png"
+    },
+    {
+      "name": "interior",
+      "file": "graphics/tilesets/interior.png"
+    },
+    {
+      "name": "outside",
+      "file": "graphics/tilesets/outside.png"
+    }
+  ]
+}

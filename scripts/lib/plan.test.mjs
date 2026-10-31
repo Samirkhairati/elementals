@@ -15,6 +15,12 @@ test('parseArgs: --offset forms, flags, and errors', () => {
   assert.throws(() => parseArgs(['--bogus']), /Unknown/);
 });
 
+test('parseArgs: --no-sync skips the asset sync (default: sync)', () => {
+  assert.equal(parseArgs([]).noSync, false);
+  assert.equal(parseArgs(['--no-sync']).noSync, true);
+  assert.equal(parseArgs(['--no-sync', '--offset', '2']).offset, 2);
+});
+
 test('npmCommand: npm.cmd via shell on win32, plain npm elsewhere', () => {
   assert.deepEqual(npmCommand('win32'), { command: 'npm.cmd', shell: true });
   assert.deepEqual(npmCommand('darwin'), { command: 'npm', shell: false });

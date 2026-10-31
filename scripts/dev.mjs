@@ -10,6 +10,35 @@ import { createSupervisor } from './lib/supervisor.mjs';
 const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const c = (code, s) => `\x1b[${code}m${s}\x1b[0m`;
 
+/**
+ * Regenerate game/public sprites, tilesets and data manifests from project/ (write mode). A broken
+ * project must not stop the dev servers (the editor is how you fix it): errors are shown loudly and
+ * the previously generated output stays in place.
+ */
+async function runAssetSync(rootDir) {
+  const log = (msg) => console.log(`${c(33, '[dev]')} ${msg}`);
+  try {
+    // Loaded lazily: --list / --dry-run / --help never need it.
+    const { syncAssets } = await import('./lib/assets.mjs');
+    const started = Date.now();
+    const result = syncAssets({
+      projectDir: path.join(rootDir, 'project'),
+      publicDir: path.join(rootDir, 'game', 'public'),
+      write: true,
+    });
+    if (result.plan.errors.length > 0) {
+      console.error(`${c(31, 'error')}: asset sync failed, using the previously generated output:`);
+      for (const e of result.plan.errors) console.error(`         ${e}`);
+      return;
+    }
+    const n = result.applied.length;
+    log(`assets synced in ${Date.now() - started}ms (${n === 0 ? 'up to date' : `${n} file(s) written`})`);
+    for (const d of result.differs) log(`note: game tileset ${d.rel} differs from project/tilesets (kept; run assets:sync -- --force)`);
+  } catch (err) {
+    console.error(`${c(31, 'error')}: asset sync crashed: ${err.message}`);
+  }
+}
+
 async function main() {
   let plan;
   try {
@@ -68,6 +97,12 @@ async function main() {
   console.log(`🎨  ${c(1, 'Electron Editor:')}   ${c(35, plan.urls.editor)} (Vite dev server)`);
   console.log(`⚡  ${c(33, `Port offset ${runtime.offset} (${describeSource(runtime)})`)}`);
   console.log('======================================================\n');
+
+  if (args.noSync) {
+    console.log(`${c(33, '[dev]')} asset sync skipped (--no-sync)`);
+  } else {
+    await runAssetSync(ROOT_DIR);
+  }
 
   const sup = createSupervisor({ log: (m) => console.log(`${c(33, '[dev]')} ${m}`) });
   sup.installSignalHandlers();
