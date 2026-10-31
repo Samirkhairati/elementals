@@ -77,13 +77,8 @@ export function drawFootprint(ctx: CanvasRenderingContext2D, x: number, y: numbe
   ctx.rect(x, y, w, h)
   ctx.fillStyle = `rgba(${rgb},${strong ? 0.5 : 0.38})`
   ctx.fill()
-  // Border widths are in map pixels, so they scale with the zoom like the entity does (never thinner than one
-  // screen pixel). A dark halo under the tint keeps pastel outlines readable on light tiles.
-  const line = Math.max(strong ? 2 : 1.5, 1 / scale)
-  ctx.lineWidth = line + Math.max(1, 1 / scale)
-  ctx.strokeStyle = 'rgba(0,0,0,0.5)'
-  ctx.stroke()
-  ctx.lineWidth = line
+  // Border width is in map pixels, so it scales with the zoom like the entity does (never thinner than one screen pixel).
+  ctx.lineWidth = Math.max(strong ? 2 : 1.5, 1 / scale)
   ctx.strokeStyle = `rgba(${rgb},1)`
   ctx.stroke()
 }
