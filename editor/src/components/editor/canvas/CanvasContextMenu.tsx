@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu'
-import { Plus, Sparkles, Copy, Trash2, Maximize2, Pipette, Palette, Check } from 'lucide-react'
+import { Plus, Sparkles, Copy, Trash2, Pipette, Palette, Check } from 'lucide-react'
 import { OVERLAY_COLORS } from '@/hooks/editor/canvas/canvasView'
 import { PRESET_PREFABS } from '@/lib/componentRegistry'
 import { EntityData, ComponentType } from '@/types/editor'
@@ -40,7 +40,6 @@ interface CanvasContextMenuProps {
   ) => void
   onDuplicateEntity?: (id: string) => void
   onDeleteEntity?: (id: string) => void
-  onStartResizeCollider?: (id: string) => void
   /** Sets the tint of an entity's area outline ('' = white). */
   onSetAreaColor?: (id: string, color: string) => void
   onSampleTile?: (tileX: number, tileY: number) => void
@@ -52,7 +51,6 @@ export function CanvasContextMenu({
   onCreateEntity,
   onDuplicateEntity,
   onDeleteEntity,
-  onStartResizeCollider,
   onSetAreaColor,
   onSampleTile,
 }: CanvasContextMenuProps) {
@@ -96,15 +94,6 @@ export function CanvasContextMenu({
               {target.entity.name}
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => {
-                onStartResizeCollider?.(target.entity!.id)
-                onClose()
-              }}
-            >
-              <Maximize2 className="w-3.5 h-3.5 mr-2 text-primary" />
-              Resize Collider
-            </DropdownMenuItem>
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>
                 <Palette className="w-3.5 h-3.5 mr-2" />

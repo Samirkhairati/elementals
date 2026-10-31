@@ -30,7 +30,6 @@ import { openEventEditor } from '@/lib/openEventEditor'
 
 const selectCanvasContext = (c: EditorContextValue) => ({
   spriteAssets: c.spriteAssets,
-  setActiveTool: c.setActiveTool,
 })
 
 interface MapCanvasProps {
@@ -111,7 +110,7 @@ export function MapCanvas({
 }: MapCanvasProps) {
   // Preload and cache tileset image textures
   const images = useTilesetImages(tilesets)
-  const { spriteAssets, setActiveTool } = useEditorSelector(selectCanvasContext)
+  const { spriteAssets } = useEditorSelector(selectCanvasContext)
   const view = useCanvasView()
   const colliderToolActive = activeTool === 'collider'
 
@@ -315,12 +314,6 @@ export function MapCanvas({
         onCreateEntity={(name, x, y, comps) => createEntity?.(name, x, y, comps)}
         onDuplicateEntity={duplicateEntity}
         onDeleteEntity={deleteEntity}
-        onStartResizeCollider={(id) => {
-          const entity = entities.find((e) => e.id === id)
-          if (entity && !entity.components.Collider) addComponent?.(id, 'Collider')
-          setSelectedEntityId?.(id)
-          setActiveTool('collider')
-        }}
         onSetAreaColor={(id, color) => {
           const hasTag = !!entities.find((e) => e.id === id)?.components.Tag
           handleUpdateTag(id, hasTag ? { color } : { tag: 'entity', color })
