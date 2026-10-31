@@ -42,6 +42,18 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
       if (panel && panel.group !== inspector.group) panel.group.api.setVisible(!focus);
     }
     inspector.group.api.setVisible(focus);
+    if (!focus) {
+      // Showing the groups again leaves the first two squeezed: split the column 40 / 40 / 20.
+      const resize = () => {
+        const total = api.height;
+        if (!(total > 0)) return;
+        api.getPanel('tilesets')?.api.setSize({ height: Math.round(total * 0.4) });
+        api.getPanel('preview')?.api.setSize({ height: Math.round(total * 0.4) });
+        api.getPanel('activeSelection')?.api.setSize({ height: Math.round(total * 0.2) });
+      };
+      resize();
+      if (typeof requestAnimationFrame !== 'undefined') requestAnimationFrame(resize);
+    }
   }, []);
 
   const buildDefaultLayout = useCallback((api: DockviewApi) => {
