@@ -345,7 +345,7 @@ function Canvas({ graph, onChange, selectedId, onSelect, issues, summaryContext,
       >
         <Background gap={16} />
         <Controls showInteractive={false} />
-        <MiniMap pannable zoomable className="!hidden md:!block" />
+        <MiniMap pannable zoomable style={{ width: 140, height: 90 }} className="!hidden xl:!block" />
       </ReactFlow>
 
       <div className="absolute left-2 top-2 z-10 flex items-center gap-1 rounded-md border border-border bg-background/90 p-1 shadow-sm" role="toolbar" aria-label="Graph tools">
