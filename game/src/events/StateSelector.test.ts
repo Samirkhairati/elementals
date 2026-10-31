@@ -6,11 +6,11 @@ import { GameFlags } from './GameFlags';
 import { Inventory } from './Inventory';
 import { makeRig, state, TEST_DB, type Rig } from '@/test/rig';
 import { SpriteComponent } from '@/ecs/components/SpriteComponent';
-import { AnimationComponent } from '@/ecs/components/AnimationComponent';
+import { AnimatorComponent } from '@/ecs/components/AnimatorComponent';
 import { ColliderComponent } from '@/ecs/components/ColliderComponent';
 import { GridMovementComponent } from '@/ecs/components/GridMovementComponent';
 import { EventComponent } from '@/ecs/components/EventComponent';
-import { spriteTextureKey, objectAnimKey } from '@shared/engine/index.ts';
+import { spriteTextureKey } from '@shared/engine/index.ts';
 
 function ctxOf(flags: GameFlags, inventory = new Inventory(), mapId = 'city', entityId = 'npc') {
   return { flags: flags, inventory, mapId, entityId };
@@ -138,18 +138,18 @@ describe('StateSelector: applying states', () => {
     expect(sprite.frame).toBe(0);
   });
 
-  it('swaps the asset (character -> object adds/removes the animation component)', () => {
+  it('swaps the asset (the animator follows the new character)', () => {
     const e = rig.add({
       sprite: { asset: 'characters/npc' },
       states: [state([]), state([], { conditions: [{ kind: 'switch', id: 's1', value: true }], appearance: { asset: 'objects/chest', frame: 2 } })],
     });
-    expect(rig.world.hasComponent(e, AnimationComponent)).toBe(true);
+    expect(rig.world.getComponent(e, AnimatorComponent)!.characterId).toBe('characters/npc');
     rig.runtime.flags.setSwitch('s1', true);
     rig.runtime.update(16);
     const sprite = rig.world.getComponent(e, SpriteComponent)!;
     expect(sprite.texture).toBe(spriteTextureKey('objects/chest', 'sheet'));
     expect(sprite.frame).toBe(2);
-    expect(rig.world.hasComponent(e, AnimationComponent)).toBe(false);
+    expect(rig.world.getComponent(e, AnimatorComponent)!.characterId).toBe('objects/chest');
   });
 
   it('a named animation of the asset plays as the sprite animation', () => {
@@ -157,10 +157,10 @@ describe('StateSelector: applying states', () => {
       sprite: { asset: 'objects/chest' },
       states: [state([]), state([], { conditions: [{ kind: 'switch', id: 's1', value: true }], appearance: { animation: 'shine' } })],
     });
-    expect(rig.world.getComponent(e, SpriteComponent)!.animKey).toBeUndefined();
+    expect(rig.world.getComponent(e, AnimatorComponent)!.explicitClip).toBeNull();
     rig.runtime.flags.setSwitch('s1', true);
     rig.runtime.update(16);
-    expect(rig.world.getComponent(e, SpriteComponent)!.animKey).toBe(objectAnimKey('objects/chest', 'shine'));
+    expect(rig.world.getComponent(e, AnimatorComponent)!.explicitClip).toBe('shine');
   });
 
   it('visible: false hides the sprite; facing turns the entity', () => {
@@ -174,7 +174,7 @@ describe('StateSelector: applying states', () => {
     rig.runtime.update(16);
     expect(rig.world.getComponent(e, SpriteComponent)!.visible).toBe(false);
     expect(rig.world.getComponent(e, GridMovementComponent)!.direction).toBe('left');
-    expect(rig.world.getComponent(e, AnimationComponent)!.direction).toBe('left');
+    expect(rig.world.getComponent(e, AnimatorComponent)!.facing).toBe('left');
   });
 
   it('solid override replaces Collider.isSolid and null keeps the authored value', () => {

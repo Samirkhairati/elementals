@@ -33,6 +33,8 @@ export interface StateSelectorDeps {
   sprites: SpriteRegistry;
   getMapId: () => string;
   warn?: (message: string) => void;
+  /** Runs after an entity's state appearance was applied (re-applies stored `changeSprite` overrides on top). */
+  afterApply?: (entity: Entity) => void;
 }
 
 /**
@@ -104,7 +106,10 @@ export class StateSelector {
     const app = state?.appearance ?? {};
     const base = ev.baseSprite;
     const hasSprite = world.hasComponent(entity, SpriteComponent);
-    if (!base && !app.asset) return; // nothing to draw and nothing to draw with
+    if (!base && !app.asset) {
+      this.deps.afterApply?.(entity);
+      return; // nothing to draw and nothing to draw with
+    }
 
     const authored: SpriteProps = base ?? createDefaultComponent("Sprite");
     const overridesAsset = typeof app.asset === "string" && app.asset !== "";
@@ -124,5 +129,6 @@ export class StateSelector {
       ok = applySpriteProps(world, entity, { ...wanted, asset: authored.asset, animation: authored.animation, frame: authored.frame }, this.deps.sprites, (m) => this.warn(m));
     }
     if (ok && (app.facing || !hasSprite)) setEntityFacing(world, entity, facing);
+    this.deps.afterApply?.(entity);
   }
 }

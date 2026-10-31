@@ -111,6 +111,7 @@ export const COMMAND_CATALOG: Record<string, CommandDef> = {
       { key: 'text', label: 'Text', kind: 'textarea', required: true, placeholder: 'What is said...' },
     ],
     defaultParams: { speaker: '', text: '' },
+    yields: true,
     status: 'implemented',
     summarize: (p) => {
       const text = trunc(str(p.text));
@@ -152,6 +153,7 @@ export const COMMAND_CATALOG: Record<string, CommandDef> = {
       if (p.cancel === 'branch') out.push({ id: 'cancel', label: 'Cancel' });
       return out;
     },
+    yields: true,
     status: 'implemented',
     summarize: (p) => {
       const labels = Array.isArray(p.options)
@@ -254,6 +256,7 @@ export const COMMAND_CATALOG: Record<string, CommandDef> = {
     icon: 'timer',
     params: [{ key: 'ms', label: 'Duration', kind: 'number', unit: 'ms', min: 0, max: 60000, step: 100 }],
     defaultParams: { ms: 500 },
+    yields: true,
     status: 'implemented',
     summarize: (p) => `Wait ${num(p.ms)} ms`,
   }),
@@ -390,6 +393,7 @@ export const COMMAND_CATALOG: Record<string, CommandDef> = {
       { key: 'wait', label: 'Wait until finished', kind: 'boolean', help: 'The event continues after the route ends.' },
     ],
     defaultParams: { target: 'self', steps: [], wait: true },
+    yields: true,
     status: 'implemented',
     summarize: (p, ctx) => `Move ${describeTarget(p.target, ctx)}: ${describeRoute(p.steps)}`,
   }),
@@ -414,8 +418,15 @@ export const COMMAND_CATALOG: Record<string, CommandDef> = {
       TARGET_FIELD,
       { key: 'asset', label: 'Sprite', kind: 'sprite', required: true },
       { key: 'animation', label: 'Animation', kind: 'text', help: ANIMATION_HELP, placeholder: 'optional' },
+      {
+        key: 'persist',
+        label: 'Lasts',
+        kind: 'select',
+        options: opts(['state', 'Until the event state changes'], ['map', 'Until the map changes'], ['forever', 'Forever (saved)']),
+        help: 'How long the change lasts. Forever is remembered in the save.',
+      },
     ],
-    defaultParams: { target: 'self', asset: '', animation: '' },
+    defaultParams: { target: 'self', asset: '', animation: '', persist: 'state' },
     status: 'implemented',
     summarize: (p, ctx) => `Sprite of ${describeTarget(p.target, ctx)} = ${named(ctx?.spriteName, str(p.asset))}`,
   }),
@@ -428,10 +439,63 @@ export const COMMAND_CATALOG: Record<string, CommandDef> = {
     params: [
       TARGET_FIELD,
       { key: 'animation', label: 'Animation', kind: 'text', required: true, help: ANIMATION_HELP, placeholder: 'e.g. open' },
+      { key: 'speed', label: 'Speed', kind: 'number', unit: '×', min: 0, max: 8, step: 0.25, help: '1× is the speed set in the sprite. 2× is twice as fast.' },
+      { key: 'wait', label: 'Wait until finished', kind: 'boolean', help: 'Pause this event until the animation finishes. Only works for animations that do not loop.' },
+      {
+        key: 'then',
+        label: 'Afterwards',
+        kind: 'select',
+        options: opts(['auto', 'Return to automatic'], ['hold', 'Stay on the last frame'], ['loop', 'Repeat']),
+        help: 'What happens after a one-time animation ends.',
+      },
     ],
-    defaultParams: { target: 'self', animation: '' },
+    // A node without `then` (made before it existed) keeps the old behaviour: the animation stays on its last frame.
+    defaultParams: { target: 'self', animation: '', speed: 1, wait: false, then: 'auto' },
     status: 'implemented',
-    summarize: (p, ctx) => `Play "${str(p.animation) || '(none)'}" on ${describeTarget(p.target, ctx)}`,
+    yields: (p) => p.wait === true,
+    summarize: (p, ctx) => `Play "${str(p.animation) || '(none)'}" on ${describeTarget(p.target, ctx)}${p.wait === true ? ' and wait' : ''}`,
+  }),
+  stopAnimation: def({
+    type: 'stopAnimation',
+    label: 'Stop Animation',
+    category: 'character',
+    description: 'Go back to the automatic animation of a character (idle, walk, run).',
+    icon: 'square',
+    params: [TARGET_FIELD],
+    defaultParams: { target: 'self' },
+    status: 'implemented',
+    summarize: (p, ctx) => `Stop the animation of ${describeTarget(p.target, ctx)}`,
+  }),
+  setAnimationSpeed: def({
+    type: 'setAnimationSpeed',
+    label: 'Set Animation Speed',
+    category: 'character',
+    description: 'Make a character\'s animations play faster or slower.',
+    icon: 'gauge',
+    params: [
+      TARGET_FIELD,
+      { key: 'value', label: 'Value', kind: 'number', min: 0, max: 60, step: 0.25, help: '1× is the speed set in the sprite. 2× is twice as fast, 0 freezes it.' },
+      { key: 'mode', label: 'Value is', kind: 'select', options: opts(['scale', 'Times the normal speed'], ['fps', 'Frames per second']) },
+      { key: 'clip', label: 'Only animation', kind: 'text', placeholder: 'all', help: 'Leave empty to change every animation of the character.' },
+    ],
+    defaultParams: { target: 'self', value: 1, mode: 'scale', clip: '' },
+    status: 'implemented',
+    summarize: (p, ctx) => {
+      const unit = p.mode === 'fps' ? ' fps' : '×';
+      const only = str(p.clip) ? ` (${str(p.clip)})` : '';
+      return `Animation speed of ${describeTarget(p.target, ctx)}${only} = ${num(p.value, 1)}${unit}`;
+    },
+  }),
+  setMoveSpeed: def({
+    type: 'setMoveSpeed',
+    label: 'Set Move Speed',
+    category: 'character',
+    description: 'Change how fast a character moves. Animations that follow movement speed adapt.',
+    icon: 'zap',
+    params: [TARGET_FIELD, { key: 'speed', label: 'Speed', kind: 'number', unit: 'px/s', min: 1, max: 1000, step: 10 }],
+    defaultParams: { target: 'self', speed: 100 },
+    status: 'implemented',
+    summarize: (p, ctx) => `Move speed of ${describeTarget(p.target, ctx)} = ${num(p.speed, 100)} px/s`,
   }),
   faceTowards: def({
     type: 'faceTowards',
@@ -476,6 +540,7 @@ export const COMMAND_CATALOG: Record<string, CommandDef> = {
       { key: 'ms', label: 'Duration', kind: 'number', unit: 'ms', min: 0, max: 10000, step: 50 },
     ],
     defaultParams: { mode: 'out', ms: 400 },
+    yields: true,
     status: 'implemented',
     summarize: (p) => `Fade ${p.mode === 'in' ? 'in' : 'out'} (${num(p.ms)} ms)`,
   }),
@@ -490,6 +555,7 @@ export const COMMAND_CATALOG: Record<string, CommandDef> = {
       { key: 'ms', label: 'Duration', kind: 'number', unit: 'ms', min: 0, max: 10000, step: 50 },
     ],
     defaultParams: { power: 3, ms: 500 },
+    yields: true,
     status: 'implemented',
     summarize: (p) => `Shake screen (power ${num(p.power, 3)}, ${num(p.ms)} ms)`,
   }),

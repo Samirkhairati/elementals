@@ -11,10 +11,8 @@ export interface SpriteComponentInit {
   alpha?: number;
   flipX?: boolean;
   tint?: number;
-  /** Sprite asset this graphic comes from (`characters/player`); '' for legacy raw textures. */
+  /** Character this graphic comes from (`characters/player`); '' for legacy raw textures. Animations live on the AnimatorComponent. */
   assetId?: string;
-  /** Phaser animation key played in a loop / once (object & animated assets). Static `frame` when unset. */
-  animKey?: string;
 }
 
 export class SpriteComponent {
@@ -30,9 +28,6 @@ export class SpriteComponent {
   public flipX: boolean;
   public tint?: number;
   public assetId: string;
-  public animKey?: string;
-  /** Bumped by `playAnimation` so the render bridge restarts an already playing animation. */
-  public animRevision: number = 0;
 
   constructor(init: SpriteComponentInit) {
     this.texture = init.texture;
@@ -47,7 +42,6 @@ export class SpriteComponent {
     this.flipX = init.flipX ?? false;
     this.tint = init.tint;
     this.assetId = init.assetId ?? "";
-    this.animKey = init.animKey;
   }
 }
 

@@ -9,7 +9,7 @@ import { makeRig, flush, type Rig } from '@/test/rig';
 import { TransformComponent } from '../components/TransformComponent';
 import { GridMovementComponent } from '../components/GridMovementComponent';
 import { MoveRouteComponent } from '../components/MoveRouteComponent';
-import { AnimationComponent } from '../components/AnimationComponent';
+import { AnimatorComponent } from '../components/AnimatorComponent';
 import { gameState } from '@/core/GameState';
 import { settingsStore } from '@/core/SettingsStore';
 import type { CollisionSystem } from '@/world/CollisionSystem';
@@ -146,13 +146,13 @@ describe('RouteSystem', () => {
     while (!done) {
       rig.world.update(16);
       await flush();
-      keys.push(rig.world.getComponent(npc, AnimationComponent)!.currentAnimKey);
+      keys.push(rig.world.getComponent(npc, AnimatorComponent)!.currentAnimKey);
     }
     const idle = characterAnimKey('characters/npc', 'idle', 'right');
     expect(keys.pop()).toBe(idle); // the frame in which the route ended
     expect(keys.length).toBeGreaterThan(10);
     expect(keys.every((k) => k === characterAnimKey('characters/npc', 'walk', 'right'))).toBe(true);
-    expect(rig.world.getComponent(npc, AnimationComponent)!.currentAnimKey).toBe(characterAnimKey('characters/npc', 'idle', 'right'));
+    expect(rig.world.getComponent(npc, AnimatorComponent)!.currentAnimKey).toBe(characterAnimKey('characters/npc', 'idle', 'right'));
   });
 
   it('wandering NPCs are driven by the route, not the AI, and resume wandering afterwards', async () => {

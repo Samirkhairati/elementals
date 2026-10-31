@@ -7,7 +7,7 @@ import { ColliderComponent } from './components/ColliderComponent';
 import { EventComponent } from './components/EventComponent';
 import { EntityInfoComponent } from './components/EntityInfoComponent';
 import { SpriteComponent } from './components/SpriteComponent';
-import { AnimationComponent } from './components/AnimationComponent';
+import { AnimatorComponent } from './components/AnimatorComponent';
 import { testSprites, firstCommand } from '@/test/helpers';
 import { SpriteRegistry } from '@/data/spriteRegistry';
 import type { ExpandContext } from './expand';
@@ -121,7 +121,7 @@ describe('hydrateMapEntities', () => {
 
   it('rolls back an entity whose expansion throws', () => {
     const w = new World();
-    const exploding = { sprites: { meta: () => { throw new Error('boom'); } }, warn: () => {} } as unknown as ExpandContext;
+    const exploding = { sprites: { character: () => { throw new Error('boom'); } }, warn: () => {} } as unknown as ExpandContext;
     const { entities, problems } = hydrateMapEntities(
       w,
       [{ id: 'x', components: { Transform: { x: 5, y: 5 }, Sprite: { asset: 'characters/player' } } }],
@@ -161,7 +161,9 @@ describe('hydrateMapEntities', () => {
     expect(problems).toEqual([]);
     expect(w.getComponent(entities[0], AIWanderComponent)).toMatchObject({ radius: 2, interval: 4000, speed: 60 });
     expect(w.getComponent(entities[0], SpriteComponent)).toMatchObject({ assetId: 'characters/npc' });
-    expect(w.getComponent(entities[0], AnimationComponent)).toMatchObject({ assetId: 'characters/npc', hasRun: false });
+    const animator = w.getComponent(entities[0], AnimatorComponent)!;
+    expect(animator).toMatchObject({ characterId: 'characters/npc', explicitClip: null });
+    expect(animator.def!.clips.run).toBeUndefined(); // no run sheet
     expect(firstCommand(w.getComponent(entities[0], EventComponent)!.states[0]).params.text).toBe('Hello traveler!');
   });
 });

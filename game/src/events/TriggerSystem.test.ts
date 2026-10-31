@@ -6,7 +6,7 @@ import { MovementSystem } from '@/ecs/systems/MovementSystem';
 import { SpatialSystem } from '@/ecs/systems/SpatialSystem';
 import { TransformComponent } from '@/ecs/components/TransformComponent';
 import { GridMovementComponent } from '@/ecs/components/GridMovementComponent';
-import { AnimationComponent } from '@/ecs/components/AnimationComponent';
+import { AnimatorComponent } from '@/ecs/components/AnimatorComponent';
 import { ColliderComponent } from '@/ecs/components/ColliderComponent';
 import { gameState } from '@/core/GameState';
 import { settingsStore } from '@/core/SettingsStore';
@@ -53,7 +53,7 @@ describe('action trigger', () => {
     triggers.requestAction();
     await step();
     expect(rig.ui.texts).toEqual([{ speaker: '', text: 'hi' }]);
-    expect(rig.world.getComponent(npc, AnimationComponent)!.direction).toBe('up');
+    expect(rig.world.getComponent(npc, AnimatorComponent)!.facing).toBe('up');
     expect(gameState.isInputLocked).toBe(true);
     expect(gameState.isLockedBy('event')).toBe(true);
     expect(player).toBeDefined();
@@ -102,7 +102,7 @@ describe('action trigger', () => {
     triggers.resetTouchState(rig.world);
     triggers.requestAction();
     await step();
-    expect(rig.world.getComponent(zone, AnimationComponent)!.direction).toBe('left');
+    expect(rig.world.getComponent(zone, AnimatorComponent)!.facing).toBe('left');
 
     rig.runtime.cancelAll();
     await flush();
@@ -111,7 +111,7 @@ describe('action trigger', () => {
     rig.world.getComponent(rig.world.query(GridMovementComponent)[0], GridMovementComponent)!.direction = 'left';
     triggers.requestAction();
     await step();
-    expect(rig.world.getComponent(proud, AnimationComponent)!.direction).toBe('left');
+    expect(rig.world.getComponent(proud, AnimatorComponent)!.facing).toBe('left');
   });
 
   it('only triggers action states; other triggers are ignored by the action key', async () => {

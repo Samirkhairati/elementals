@@ -55,7 +55,7 @@ export function expandMovement(props: MovementProps, facing: SpriteProps["facing
  * Expands one (already migrated) editor entity into the runtime components of the ECS:
  *
  *  - Transform -> TransformComponent
- *  - Sprite    -> SpriteComponent (+ AnimationComponent for `character` assets); an empty asset means no
+ *  - Sprite    -> SpriteComponent (+ AnimatorComponent); an empty asset means no
  *                 graphic, an unknown asset warns and means no graphic
  *  - Collider  -> ColliderComponent
  *  - Movement  -> GridMovement (+ FreeMovement + PlayerControl for `player`, + AIWander for `wander`)
@@ -84,7 +84,7 @@ export function expandEntity(entity: EngineEntity, ctx: ExpandContext = defaultE
       const built = buildSpriteComponents(spriteProps, ctx.sprites);
       if (built.ok) {
         out.push(built.value.sprite);
-        if (built.value.animation) out.push(built.value.animation);
+        out.push(built.value.animator);
       } else {
         ctx.warn(`[Sprite] entity "${entity.name ?? entity.id ?? "?"}": ${built.reason}; it will have no graphic`);
       }

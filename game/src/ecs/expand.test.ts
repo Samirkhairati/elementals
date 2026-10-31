@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { createDefaultComponent, objectAnimKey, spriteTextureKey, characterFrameIndex, type EngineEntity } from '@shared/engine/index.ts';
+import { createDefaultComponent, spriteTextureKey, characterFrameIndex, type EngineEntity } from '@shared/engine/index.ts';
 import { expandEntity, type ExpandContext } from './expand';
 import { createComponentFromData, ComponentDataError } from './componentFactory';
 import { spriteRegistry } from '@/data/spriteRegistry';
@@ -8,7 +8,7 @@ import { World } from './World';
 import { hydrateMapEntities, spawnPlayer } from './spawner';
 import { TransformComponent } from './components/TransformComponent';
 import { SpriteComponent } from './components/SpriteComponent';
-import { AnimationComponent } from './components/AnimationComponent';
+import { AnimatorComponent } from './components/AnimatorComponent';
 import { ColliderComponent } from './components/ColliderComponent';
 import { GridMovementComponent } from './components/GridMovementComponent';
 import { FreeMovementComponent } from './components/FreeMovementComponent';
@@ -44,7 +44,7 @@ describe('expandEntity', () => {
     expect(find(EntityInfoComponent)).toMatchObject({ editorId: 'e1', name: 'E1' });
   });
 
-  it('Sprite (character asset) -> SpriteComponent + AnimationComponent with the asset pivot, offsets, scale, flip, tint, opacity', () => {
+  it('Sprite (character asset) -> SpriteComponent + AnimatorComponent with the asset pivot, offsets, scale, flip, tint, opacity', () => {
     const { find } = expand({
       Sprite: createDefaultComponent('Sprite', {
         asset: 'characters/player', facing: 'left', offsetX: 3, offsetY: -2, scale: 2, flipX: true, tint: '#ff8800', opacity: 0.5, visible: false,
@@ -56,22 +56,24 @@ describe('expandEntity', () => {
       originX: 0.5, originY: 1, offsetX: 3, offsetY: -2, scale: 2, flipX: true, tint: 0xff8800, alpha: 0.5, visible: false,
     });
     expect(s.frame).toBe(characterFrameIndex(characterMeta(), 'left', 'idle', 0));
-    expect(find(AnimationComponent)).toMatchObject({ assetId: 'characters/player', direction: 'left', hasRun: true, forcedPhase: null });
+    expect(find(AnimatorComponent)).toMatchObject({ characterId: 'characters/player', facing: 'left', explicitClip: null });
+    expect(Object.keys(find(AnimatorComponent)!.def!.clips)).toEqual(['idle', 'walk', 'run']);
   });
 
   it('character Sprite with a forced animation name and an asset without run sheet', () => {
     const { find } = expand({ Sprite: createDefaultComponent('Sprite', { asset: 'characters/npc', animation: 'walk' }) });
-    expect(find(AnimationComponent)).toMatchObject({ forcedPhase: 'walk', hasRun: false });
+    expect(find(AnimatorComponent)).toMatchObject({ explicitClip: 'walk' });
+    expect(find(AnimatorComponent)!.def!.clips.run).toBeUndefined();
   });
 
-  it('Sprite (object asset): static frame or named animation, no AnimationComponent', () => {
+  it('Sprite (object asset): static frame or named animation as the explicit clip', () => {
     const still = expand({ Sprite: createDefaultComponent('Sprite', { asset: 'objects/chest', frame: 2 }) });
-    expect(still.find(SpriteComponent)).toMatchObject({ texture: spriteTextureKey('objects/chest', 'sheet'), frame: 2, animKey: undefined });
-    expect(still.find(AnimationComponent)).toBeUndefined();
+    expect(still.find(SpriteComponent)).toMatchObject({ texture: spriteTextureKey('objects/chest', 'sheet'), frame: 2 });
+    expect(still.find(AnimatorComponent)).toMatchObject({ explicitClip: null });
     const anim = expand({ Sprite: createDefaultComponent('Sprite', { asset: 'objects/chest', animation: 'shine' }) });
-    expect(anim.find(SpriteComponent)!.animKey).toBe(objectAnimKey('objects/chest', 'shine'));
+    expect(anim.find(AnimatorComponent)).toMatchObject({ explicitClip: 'shine' });
     const unknownAnim = expand({ Sprite: createDefaultComponent('Sprite', { asset: 'objects/chest', animation: 'nope' }) });
-    expect(unknownAnim.find(SpriteComponent)!.animKey).toBeUndefined();
+    expect(unknownAnim.find(AnimatorComponent)).toMatchObject({ explicitClip: null });
   });
 
   it('Sprite with an empty asset has no graphic and no warning; an unknown asset warns instead of crashing', () => {
@@ -160,7 +162,7 @@ describe('legacy maps through the spawner', () => {
     }], ctx);
     expect(problems).toEqual([]);
     const e = entities[0];
-    expect(w.getComponent(e, AnimationComponent)).toMatchObject({ assetId: 'characters/npc', direction: 'left' });
+    expect(w.getComponent(e, AnimatorComponent)).toMatchObject({ characterId: 'characters/npc', facing: 'left' });
     expect(w.getComponent(e, AIWanderComponent)).toMatchObject({ radius: 2, interval: 2500, speed: 55 });
     const state = w.getComponent(e, EventComponent)!.states[0];
     expect(commandTypes(state)).toEqual(['showText', 'emit']);

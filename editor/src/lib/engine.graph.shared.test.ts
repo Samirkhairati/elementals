@@ -23,6 +23,8 @@ import {
   findYieldlessCycles,
   getBranchDefs,
   getPortDefs,
+  isYieldingNode,
+  YIELDING_TYPES,
   layoutGraph,
   migrateMap,
   moveNode,
@@ -327,6 +329,21 @@ describe('validateGraph', () => {
   it('rejects a loop with nothing that waits', () => {
     const g = graphOf(node('s', 'start', { next: 'j' }), node('j', 'junction', { next: 'j' }))
     expect(codes(g)).toContain('cycle-without-wait@j')
+  })
+
+  it('the catalog `yields` flag may be a predicate: Play Animation yields only when it waits', () => {
+    expect([...YIELDING_TYPES].sort()).toEqual(['fadeScreen', 'moveRoute', 'showChoices', 'showText', 'shakeScreen', 'wait'].sort())
+    expect(isYieldingNode({ type: 'wait', params: {} })).toBe(true)
+    expect(isYieldingNode({ type: 'playAnimation', params: { wait: true } })).toBe(true)
+    expect(isYieldingNode({ type: 'playAnimation', params: { wait: false } })).toBe(false)
+    expect(isYieldingNode({ type: 'playAnimation', params: {} })).toBe(false)
+    expect(isYieldingNode({ type: 'setSwitch', params: {} })).toBe(false)
+    expect(isYieldingNode({ type: 'nope', params: {} })).toBe(false)
+
+    const loop = (wait: boolean) =>
+      graphOf(node('s', 'start', { next: 'p' }), node('p', 'playAnimation', { next: 'p' }, { target: 'self', animation: 'open', wait }))
+    expect(codes(loop(false))).toContain('cycle-without-wait@p')
+    expect(codes(loop(true))).not.toContain('cycle-without-wait@p')
   })
 
   it('checks command params and references like the tree validator does', () => {

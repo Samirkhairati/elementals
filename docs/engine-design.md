@@ -132,8 +132,9 @@ logs and skips it until the system exists)
 
 **Character**
 * ● `setFacing` {target, facing}; ● `moveRoute` {target, steps[], wait} (steps: up/down/left/right/forward/
-  back/turn/wait/speed); ● `setVisible` {target, visible}; ● `changeSprite` {target, asset, animation?};
-* ● `playAnimation` {target, animation}; ● `faceTowards` {target, other}.
+  back/turn/wait/speed); ● `setVisible` {target, visible}; ● `changeSprite` {target, asset, animation?, persist?: state|map|forever};
+* ● `playAnimation` {target, animation, speed?, wait?, then?}; ● `stopAnimation` {target}; ● `setAnimationSpeed` {target, value, mode, clip?};
+  ● `setMoveSpeed` {target, speed}; ● `faceTowards` {target, other}.
 
 **Map / screen**
 * ● `warp` {map, x, y, facing?, fade}; ● `fadeScreen` {mode: in|out, ms}; ● `shakeScreen` {power, ms};

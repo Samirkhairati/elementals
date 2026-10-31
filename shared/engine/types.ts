@@ -331,6 +331,11 @@ export interface CommandDef {
    */
   status: 'implemented' | 'planned';
   /**
+   * The command waits for time or input, so a cycle through it cannot freeze the game (event-graph
+   * `cycle-without-wait`). A function decides from the node's params (`playAnimation` yields only with `wait`).
+   */
+  yields?: boolean | ((params: Record<string, unknown>) => boolean);
+  /**
    * Short, human summary of the configured command for list rows. `ctx` (optional) lets the editor
    * show names instead of ids.
    */

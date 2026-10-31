@@ -1,5 +1,5 @@
-import { STRUCTURAL_TYPES, type EventState, type GraphNode, type SpriteAssetMeta, type SpriteManifestEntry } from "@shared/engine/index.ts";
-import { SpriteRegistry } from "@/data/spriteRegistry";
+import { STRUCTURAL_TYPES, filesBySheetKey, spriteMetaToCharacter, type EventState, type GraphNode, type SpriteAssetMeta, type SpriteManifestEntry } from "@shared/engine/index.ts";
+import { SpriteRegistry, type CharacterEntry } from "@/data/spriteRegistry";
 
 export function characterMeta(overrides: Partial<SpriteAssetMeta> = {}): SpriteAssetMeta {
   return {
@@ -34,11 +34,17 @@ export function objectMeta(overrides: Partial<SpriteAssetMeta> = {}): SpriteAsse
   };
 }
 
-export function manifestEntry(id: string, meta: SpriteAssetMeta): SpriteManifestEntry {
+/** An entry of the v1 `sprites.json` manifest (what `assets:sync` still writes). */
+export function legacyManifestEntry(id: string, meta: SpriteAssetMeta): SpriteManifestEntry {
   const files: Record<string, string> = {};
   const sheets = meta.kind === "character" ? Object.values(meta.character?.sheets ?? {}) : [meta.sheet ?? "sheet.png"];
   for (const f of sheets) files[f] = `graphics/sprites/${id}/${f}`;
   return { id, meta, files };
+}
+
+/** The same asset as a loaded character (v2 definition, URLs by sheet key). */
+export function manifestEntry(id: string, meta: SpriteAssetMeta): CharacterEntry {
+  return { id, def: spriteMetaToCharacter(id, meta), files: filesBySheetKey(meta, legacyManifestEntry(id, meta).files) };
 }
 
 /** A registry with `characters/player`, `characters/npc` (no run sheet), `objects/chest` and `objects/sign`. */
@@ -47,10 +53,10 @@ export function testSprites(): SpriteRegistry {
   registry.load({
     version: 1,
     sprites: [
-      manifestEntry("characters/player", characterMeta()),
-      manifestEntry("characters/npc", characterMeta({ character: { sheets: { walk: "walk.png" }, framesPerDirection: 4, idleFrame: 1, walkFps: 8, runFps: 12 } })),
-      manifestEntry("objects/chest", objectMeta()),
-      manifestEntry("objects/sign", objectMeta({ animations: {} })),
+      legacyManifestEntry("characters/player", characterMeta()),
+      legacyManifestEntry("characters/npc", characterMeta({ character: { sheets: { walk: "walk.png" }, framesPerDirection: 4, idleFrame: 1, walkFps: 8, runFps: 12 } })),
+      legacyManifestEntry("objects/chest", objectMeta()),
+      legacyManifestEntry("objects/sign", objectMeta({ animations: {} })),
     ],
   });
   return registry;

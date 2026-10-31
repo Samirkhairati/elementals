@@ -21,7 +21,7 @@ How the game (`game/src`) runs the data the editor writes. The data contract is 
 | Editor component | Runtime components |
 |---|---|
 | Transform | `TransformComponent` (+ always an `EntityInfoComponent` with the editor id/name, used by `{entity: id}` targets and self switches) |
-| Sprite | `SpriteComponent` (+ `AnimationComponent` for `character` assets). Empty asset = no graphic; unknown asset = warning and no graphic |
+| Sprite | `SpriteComponent` + `AnimatorComponent` (the character's v2 definition, facing, mode, explicit clip, `animSpeed`). Empty asset = no graphic; unknown asset = warning and no graphic |
 | Collider | `ColliderComponent` (32x32 default, bottom-centred on the anchor + offsets; the top edge is exclusive in `SpatialSystem`) |
 | Movement | `GridMovement`; `player` adds `FreeMovement` + `PlayerControl{canRun}`; `wander` adds `AIWander` |
 | Event | `EventComponent` (states, authored sprite/solid for state overrides) |
@@ -33,6 +33,7 @@ Legacy Tiled `interactables` object layers become entities with an `Interactable
 ## Event runtime (`game/src/events`)
 ```
 GameFlags         switches / variables / stages / local flags (mapId/entityId/name); notifies subscribers + EventBus; JSON snapshot
+AppearanceOverrides  `changeSprite` with persist map/forever, keyed mapId/entityId; separate from GameFlags; snapshot/restore for saves
 Inventory         in-memory item counts (hasItem, giveItem, removeItem)
 conditions.ts     evaluateCondition(s)
 StateSelector     active state = last state whose conditions hold; applies appearance + solid overrides when the state CHANGES
@@ -74,3 +75,16 @@ BusEventUI        EventUI over the EventBus -> DialogueHUD / ChoiceMenuHUD (UISc
 3. Reach the game only through `rt.ctx` (`ui`, `clock`, `ops`, `maps`, `flags`, `inventory`, `emit`, `warn`/`warnOnce`); add a method to the matching
    interface in `events/types.ts` (and its implementation: `BusEventUI`, `WorldEntityOps`, ...) when a new service is needed. Fakes for tests live in `test/rig.ts`.
 4. Test it with `makeRig()` (`events/EventInterpreter.test.ts` has an example per command); a handler that throws is logged and skipped.
+
+## Animation (`AnimatorComponent`, `AnimationSystem`, `RenderBridgeSystem`)
+Every sprite has a character (`SpriteRegistry` holds v2 `CharacterDef`s; the v1 `sprites.json` manifest is migrated on load,
+`shared/engine/characterMigrate.ts`). Texture keys `sprite:<id>:<sheetKey>`, animation keys `sprite:<id>:<clip>[-<facing>]`.
+
+* `AnimationSystem` (priority 400): facing / activity (idle, walk, run) / movement speed from the movement component; the clip is the
+  animator's `explicitClip` (`playAnimation`, `Sprite.animation`) or `resolveClip(def, mode, activity)` from the bindings; a mirrored facing
+  plays the source facing's animation with `flipX`; `timeScale = effectiveFps / authored fps` (follow-speed, `animSpeed`, per-play and per-clip speeds).
+* `RenderBridgeSystem` plays the key (restart when `revision` changes), applies `anims.timeScale`, XORs the mirror flip with `Sprite.flipX`, and
+  reports Phaser's `animationcomplete` to `completeClip` (`sprites/animatorOps.ts`), which resolves a waiting `playAnimation` and applies `then`.
+* Animations are registered once at the authored fps (`buildClipRegistrations`); speed changes never re-register.
+* Nodes: `playAnimation` {animation, speed, wait, then: auto|hold|loop} (a node saved without `then` holds the last frame, as before),
+  `stopAnimation`, `setAnimationSpeed` {value, mode: scale|fps, clip?}, `setMoveSpeed` {speed}, `changeSprite` {…, persist: state|map|forever}.

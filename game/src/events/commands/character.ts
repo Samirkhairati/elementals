@@ -2,7 +2,9 @@ import { ROUTE_STEP_TYPES, isFacing, type RouteStep } from "@shared/engine/index
 import type { Entity } from "@/ecs/Entity";
 import type { CommandRuntime } from "../types";
 import { registerCommandHandler } from "./registry";
-import { bool, facing, str, target, type Params } from "./params";
+import type { AfterClip } from "@/ecs/components/AnimatorComponent";
+import type { AppearancePersist } from "../AppearanceOverrides";
+import { bool, facing, num, str, target, type Params } from "./params";
 
 /** Resolves `params[key]` to an entity; warns (once per command) and returns undefined when it does not exist. */
 function resolveTarget(p: Params, key: string, rt: CommandRuntime, commandType: string): Entity | undefined {
@@ -79,20 +81,64 @@ registerCommandHandler("setVisible", (cmd, rt) => {
   if (entity !== undefined) rt.ctx.ops.setVisible(entity, bool(cmd.params, "visible", true));
 });
 
-registerCommandHandler("changeSprite", (cmd, rt) => {
-  const asset = str(cmd.params, "asset");
+const PERSISTS: readonly AppearancePersist[] = ["state", "map", "forever"];
+
+registerCommandHandler("changeSprite", (node, rt) => {
+  const asset = str(node.params, "asset");
   if (!asset) return rt.ctx.warn("[Event] changeSprite without a sprite; skipped");
-  const entity = resolveTarget(cmd.params, "target", rt, "changeSprite");
-  if (entity !== undefined) rt.ctx.ops.changeSprite(entity, asset, str(cmd.params, "animation"));
-});
-
-registerCommandHandler("playAnimation", (cmd, rt) => {
-  const animation = str(cmd.params, "animation");
-  if (!animation) return rt.ctx.warn("[Event] playAnimation without an animation; skipped");
-  const entity = resolveTarget(cmd.params, "target", rt, "playAnimation");
+  const entity = resolveTarget(node.params, "target", rt, "changeSprite");
   if (entity === undefined) return;
-  if (!rt.ctx.ops.playAnimation(entity, animation)) {
-    rt.ctx.warnOnce(`anim:${animation}`, `[Event] playAnimation: the sprite has no animation "${animation}"`);
-  }
+  const persist = PERSISTS.find((p) => p === node.params.persist) ?? "state";
+  rt.ctx.ops.changeSprite(entity, asset, str(node.params, "animation"), persist);
 });
 
+const AFTER: readonly AfterClip[] = ["auto", "hold", "loop"];
+
+/**
+ * playAnimation: plays a clip of the target's character. `speed` multiplies its speed for this play;
+ * `wait` pauses the event until a non-looping clip ended; `then` says what follows (return to automatic,
+ * stay on the last frame, repeat). A node saved before `then` existed keeps the old behaviour (hold).
+ */
+registerCommandHandler("playAnimation", async (node, rt) => {
+  const animation = str(node.params, "animation");
+  if (!animation) return rt.ctx.warn("[Event] playAnimation without an animation; skipped");
+  const entity = resolveTarget(node.params, "target", rt, "playAnimation");
+  if (entity === undefined) return;
+  const speed = num(node.params, "speed", 1);
+  const then = AFTER.find((a) => a === node.params.then) ?? "hold";
+  const handle = rt.ctx.ops.playAnimation(entity, animation, { speed: speed < 0 ? 1 : speed, then });
+  if (!handle) {
+    rt.ctx.warnOnce(`anim:${animation}`, `[Event] playAnimation: the sprite has no animation "${animation}"`);
+    return;
+  }
+  if (!bool(node.params, "wait", false)) return;
+  if (handle.done === null) {
+    rt.ctx.warnOnce(`anim-wait:${animation}`, `[Event] playAnimation: "${animation}" loops, so waiting for it would never finish; continuing`);
+    return;
+  }
+  await rt.guard(handle.done);
+});
+
+registerCommandHandler("stopAnimation", (node, rt) => {
+  const entity = resolveTarget(node.params, "target", rt, "stopAnimation");
+  if (entity !== undefined) rt.ctx.ops.stopAnimation(entity);
+});
+
+registerCommandHandler("setAnimationSpeed", (node, rt) => {
+  const entity = resolveTarget(node.params, "target", rt, "setAnimationSpeed");
+  if (entity === undefined) return;
+  const clip = str(node.params, "clip").trim();
+  rt.ctx.ops.setAnimationSpeed(entity, {
+    value: num(node.params, "value", 1),
+    mode: node.params.mode === "fps" ? "fps" : "scale",
+    ...(clip ? { clip } : {}),
+  });
+});
+
+registerCommandHandler("setMoveSpeed", (node, rt) => {
+  const entity = resolveTarget(node.params, "target", rt, "setMoveSpeed");
+  if (entity === undefined) return;
+  const speed = num(node.params, "speed", 0);
+  if (!(speed > 0)) return rt.ctx.warn("[Event] setMoveSpeed needs a speed above 0; skipped");
+  if (!rt.ctx.ops.setMoveSpeed(entity, speed)) rt.ctx.warnOnce("move-speed:none", "[Event] setMoveSpeed: the target cannot move; skipped");
+});

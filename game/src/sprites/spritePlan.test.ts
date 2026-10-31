@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { characterAnimKey, objectAnimKey, spriteTextureKey } from '@shared/engine/index.ts';
+import { buildAnimationRegistrations, characterAnimKey, objectAnimKey, spriteSheetRoles, spriteTextureKey, type SpriteAssetMeta } from '@shared/engine/index.ts';
 import { createPlannedAnimations, planSpriteLoads } from './spritePlan';
 import { applySpriteProps, hexToTint } from './spriteState';
-import { characterMeta, manifestEntry, objectMeta, testSprites } from '@/test/helpers';
+import { characterMeta, legacyManifestEntry, manifestEntry, objectMeta, testSprites } from '@/test/helpers';
+import { heroDef } from '@/test/characters';
 import { parseTilesetManifest } from '@/data/gameData';
 import { SpriteRegistry } from '@/data/spriteRegistry';
 import { parseBootParams } from '@/core/bootParams';
@@ -87,6 +88,92 @@ describe('planSpriteLoads (manifest-driven loading)', () => {
   });
 });
 
+describe('clip-based planning (v2 characters)', () => {
+  const hero = heroDef();
+  const entry = { id: 'characters/hero', def: hero, files: { walk: 'g/walk.png', run: 'g/run.png', attack: 'g/attack.png' } };
+
+  it('loads every sheet with its own frame size, margin and spacing', () => {
+    const big = { ...hero, sheets: { ...hero.sheets, attack: { ...hero.sheets.attack, frameWidth: 64, frameHeight: 64, margin: 2, spacing: 1 } } };
+    const plan = planSpriteLoads([{ ...entry, def: big }]);
+    expect(plan.problems).toEqual([]);
+    const by = Object.fromEntries(plan.sheets.map((s) => [s.textureKey, s]));
+    expect(by[spriteTextureKey('characters/hero', 'walk')]).toMatchObject({ url: 'g/walk.png', frameWidth: 32, frameHeight: 48, margin: 0, spacing: 0 });
+    expect(by[spriteTextureKey('characters/hero', 'attack')]).toMatchObject({ url: 'g/attack.png', frameWidth: 64, frameHeight: 64, margin: 2, spacing: 1 });
+  });
+
+  it('registers one animation per clip, per facing for directional clips and none for mirrored facings', () => {
+    const keys = planSpriteLoads([entry]).animations.map((a) => a.key);
+    expect(keys).toContain('sprite:characters/hero:attack-down');
+    expect(keys).toContain('sprite:characters/hero:attack-right');
+    expect(keys).not.toContain('sprite:characters/hero:attack-left'); // mirror: left = right flipped
+    expect(keys).toContain('sprite:characters/hero:sway'); // non-directional: no facing suffix
+    expect(keys.filter((k) => k.includes(':walk-'))).toHaveLength(4);
+  });
+
+  it('a clip on a sheet without a URL is left out and reported', () => {
+    const plan = planSpriteLoads([{ ...entry, files: { walk: 'g/walk.png', run: 'g/run.png' } }]);
+    expect(plan.problems).toHaveLength(1);
+    expect(plan.animations.some((a) => a.key.includes(':attack-'))).toBe(false);
+    expect(plan.animations.some((a) => a.key.includes(':walk-'))).toBe(true);
+  });
+
+  it('ping-pong clips are created with yoyo', () => {
+    const created: Array<Record<string, unknown>> = [];
+    const factory = { exists: () => false, create: (c: Record<string, unknown>) => created.push(c) };
+    const pp = { ...hero, clips: { sway: { ...hero.clips.sway, mode: 'pingpong' as const } }, bindings: {} };
+    createPlannedAnimations(factory as never, planSpriteLoads([{ ...entry, def: pp }]).animations);
+    expect(created[0]).toMatchObject({ key: 'sprite:characters/hero:sway', yoyo: true, repeat: -1 });
+  });
+});
+
+describe('golden: the real manifest plans exactly what the v1 code planned', () => {
+  const raw = JSON.parse(readFileSync(new URL('../../public/data/sprites.json', import.meta.url), 'utf8')) as { sprites: Array<{ id: string; meta: SpriteAssetMeta; files: Record<string, string> }> };
+  const registry = new SpriteRegistry();
+  registry.load(raw);
+  const plan = planSpriteLoads(registry.all());
+
+  it('has characters to compare', () => {
+    expect(raw.sprites.length).toBeGreaterThanOrEqual(10);
+    expect(registry.ids().sort()).toEqual(raw.sprites.map((s) => s.id).sort());
+  });
+
+  it('same texture keys, urls and frame configuration', () => {
+    const expected = raw.sprites.flatMap((s) =>
+      spriteSheetRoles(s.meta).map(({ role, file }) => ({
+        textureKey: spriteTextureKey(s.id, role), url: s.files[file], frameWidth: s.meta.frameWidth, frameHeight: s.meta.frameHeight, margin: s.meta.margin, spacing: s.meta.spacing,
+      })),
+    );
+    const byKey = (l: Array<{ textureKey: string }>) => Object.fromEntries(l.map((x) => [x.textureKey, x]));
+    expect(byKey(plan.sheets)).toEqual(byKey(expected));
+  });
+
+  it('same animation keys, texture keys, frames, fps and loop', () => {
+    const expected = raw.sprites.flatMap((s) => buildAnimationRegistrations(s.id, s.meta));
+    const byKey = (l: Array<{ key: string }>) => Object.fromEntries(l.map((x) => [x.key, x]));
+    expect(plan.animations).toHaveLength(expected.length);
+    expect(byKey(plan.animations)).toEqual(byKey(expected));
+  });
+});
+
+describe('SpriteRegistry (v1 and v2 manifests)', () => {
+  it('migrates v1 sprite assets on load and re-keys their files by sheet key', () => {
+    const r = new SpriteRegistry();
+    r.load({ version: 1, sprites: [legacyManifestEntry('characters/player', characterMeta())] });
+    const e = r.get('characters/player')!;
+    expect(e.def.version).toBe(2);
+    expect(e.files).toEqual({ walk: 'graphics/sprites/characters/player/walk.png', run: 'graphics/sprites/characters/player/run.png' });
+    expect(r.character('characters/player')).toBe(e.def);
+  });
+
+  it('accepts v2 entries in `characters`, and rejects invalid definitions', () => {
+    const r = new SpriteRegistry();
+    const bad = { ...heroDef(), facing: 'eight' };
+    const res = r.load({ characters: [{ id: 'characters/hero', def: heroDef(), files: {} }, { id: 'characters/bad', def: bad, files: {} }] });
+    expect(res.loaded).toEqual(['characters/hero']);
+    expect(res.skipped.map((s) => s.id)).toEqual(['characters/bad']);
+  });
+});
+
 describe('SpriteRegistry', () => {
   it('skips invalid entries without throwing', () => {
     const r = new SpriteRegistry();
@@ -110,7 +197,7 @@ describe('applySpriteProps', () => {
     const sprites = testSprites();
     const base = { asset: 'objects/chest', facing: 'down', animation: '', animSpeed: 1, frame: 0, offsetX: 0, offsetY: 0, scale: 1, flipX: false, tint: '', opacity: 1, visible: true } as const;
     expect(applySpriteProps(w, e, { ...base }, sprites)).toBe(true);
-    expect(w.getComponents(e)).toHaveLength(1);
+    expect(w.getComponents(e)).toHaveLength(2); // Sprite + Animator
     expect(applySpriteProps(w, e, { ...base, asset: '' }, sprites)).toBe(true);
     expect(w.getComponents(e)).toHaveLength(0);
     const warn: string[] = [];

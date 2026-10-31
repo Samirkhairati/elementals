@@ -1,6 +1,5 @@
 import {
   isFacing,
-  objectAnimKey,
   type CommandTarget,
   type Facing,
   type RouteStep,
@@ -11,14 +10,18 @@ import type { World } from "@/ecs/World";
 import type { Entity } from "@/ecs/Entity";
 import { TransformComponent } from "@/ecs/components/TransformComponent";
 import { SpriteComponent } from "@/ecs/components/SpriteComponent";
-import { AnimationComponent } from "@/ecs/components/AnimationComponent";
+import { AnimatorComponent } from "@/ecs/components/AnimatorComponent";
+import { FreeMovementComponent } from "@/ecs/components/FreeMovementComponent";
+import { AIWanderComponent } from "@/ecs/components/AIWanderComponent";
 import { GridMovementComponent } from "@/ecs/components/GridMovementComponent";
 import { PlayerControlComponent } from "@/ecs/components/PlayerControlComponent";
 import { EntityInfoComponent } from "@/ecs/components/EntityInfoComponent";
 import { MoveRouteComponent, type RouteRequest } from "@/ecs/components/MoveRouteComponent";
 import type { SpriteRegistry } from "@/data/spriteRegistry";
 import { applySpriteProps, getEntityFacing, setEntityFacing } from "@/sprites/spriteState";
-import type { EntityOps, RouteOutcome } from "./types";
+import { playClip, setClipSpeed, stopClip, type PlayHandle, type SpeedChange } from "@/sprites/animatorOps";
+import type { AppearanceOverrides, AppearancePersist } from "./AppearanceOverrides";
+import type { EntityOps, PlayAnimationOptions, RouteOutcome } from "./types";
 
 function tintToHex(tint: number | undefined): string {
   return tint === undefined ? "" : `#${(tint & 0xffffff).toString(16).padStart(6, "0")}`;
@@ -29,11 +32,21 @@ export class WorldEntityOps implements EntityOps {
   private readonly world: World;
   private readonly sprites: SpriteRegistry;
   private readonly warn: (message: string) => void;
+  private readonly appearance?: AppearanceOverrides;
+  private readonly getMapId: () => string;
 
-  constructor(world: World, sprites: SpriteRegistry, warn: (message: string) => void = (m) => console.warn(m)) {
+  constructor(
+    world: World,
+    sprites: SpriteRegistry,
+    warn: (message: string) => void = (m) => console.warn(m),
+    appearance?: AppearanceOverrides,
+    getMapId: () => string = () => "",
+  ) {
     this.world = world;
     this.sprites = sprites;
     this.warn = warn;
+    this.appearance = appearance;
+    this.getMapId = getMapId;
   }
 
   public findPlayer(): Entity | undefined {
@@ -122,15 +135,14 @@ export class WorldEntityOps implements EntityOps {
   /** The sprite props an entity currently shows (for edits that keep everything but the asset). */
   public readSpriteProps(entity: Entity): SpriteProps {
     const sprite = this.world.getComponent(entity, SpriteComponent);
-    const anim = this.world.getComponent(entity, AnimationComponent);
+    const animator = this.world.getComponent(entity, AnimatorComponent);
     const base = createDefaultComponent("Sprite");
     if (!sprite) return { ...base, facing: getEntityFacing(this.world, entity) ?? base.facing };
-    const named = sprite.animKey && sprite.assetId ? sprite.animKey.slice(objectAnimKey(sprite.assetId, "").length) : "";
     return {
       asset: sprite.assetId,
       facing: getEntityFacing(this.world, entity) ?? "down",
-      animation: anim?.forcedPhase ?? named,
-      animSpeed: 1,
+      animation: animator?.explicitClip ?? "",
+      animSpeed: animator?.animSpeed ?? 1,
       frame: typeof sprite.frame === "number" ? sprite.frame : 0,
       offsetX: sprite.offsetX,
       offsetY: sprite.offsetY,
@@ -142,7 +154,28 @@ export class WorldEntityOps implements EntityOps {
     };
   }
 
-  public changeSprite(entity: Entity, asset: string, animation: string): boolean {
+  public changeSprite(entity: Entity, asset: string, animation: string, persist: AppearancePersist = "state"): boolean {
+    const ok = this.swapCharacter(entity, asset, animation);
+    if (ok && persist !== "state" && this.appearance) {
+      const editorId = this.world.getComponent(entity, EntityInfoComponent)?.editorId;
+      if (editorId) {
+        const isPlayer = this.world.hasComponent(entity, PlayerControlComponent);
+        this.appearance.set(this.getMapId(), editorId, { asset, animation, persist }, persist === "forever" && isPlayer);
+      }
+    }
+    return ok;
+  }
+
+  /** Re-applies the stored override (map / forever) of an entity, e.g. after its event state changed or it spawned. */
+  public applyStoredAppearance(entity: Entity): boolean {
+    const editorId = this.world.getComponent(entity, EntityInfoComponent)?.editorId;
+    const stored = editorId ? this.appearance?.get(this.getMapId(), editorId) : undefined;
+    if (!stored) return false;
+    return this.swapCharacter(entity, stored.asset, stored.animation);
+  }
+
+  /** A character swap keeps facing, activity and mode; an explicit clip is dropped unless `animation` names one. */
+  private swapCharacter(entity: Entity, asset: string, animation: string): boolean {
     const current = this.readSpriteProps(entity);
     const facing = current.facing;
     const ok = applySpriteProps(this.world, entity, { ...current, asset, animation, frame: 0 }, this.sprites, this.warn);
@@ -150,22 +183,35 @@ export class WorldEntityOps implements EntityOps {
     return ok;
   }
 
-  public playAnimation(entity: Entity, animation: string): boolean {
-    const sprite = this.world.getComponent(entity, SpriteComponent);
-    if (!sprite) return false;
-    const meta = this.sprites.meta(sprite.assetId);
-    if (!meta) return false;
-    if (meta.kind === "character") {
-      const anim = this.world.getComponent(entity, AnimationComponent);
-      if (anim && (animation === "idle" || animation === "walk" || animation === "run")) {
-        anim.forcedPhase = animation;
-        return true;
-      }
-      return false;
-    }
-    if (!meta.animations || !Object.hasOwn(meta.animations, animation)) return false;
-    sprite.animKey = objectAnimKey(sprite.assetId, animation);
-    sprite.animRevision++;
+  public playAnimation(entity: Entity, animation: string, options: PlayAnimationOptions = {}): PlayHandle | null {
+    const animator = this.world.getComponent(entity, AnimatorComponent);
+    return animator ? playClip(animator, animation, options) : null;
+  }
+
+  public stopAnimation(entity: Entity): boolean {
+    const animator = this.world.getComponent(entity, AnimatorComponent);
+    if (!animator) return false;
+    stopClip(animator);
+    return true;
+  }
+
+  public setAnimationSpeed(entity: Entity, change: SpeedChange): boolean {
+    const animator = this.world.getComponent(entity, AnimatorComponent);
+    if (!animator) return false;
+    setClipSpeed(animator, change);
+    return true;
+  }
+
+  public setMoveSpeed(entity: Entity, speed: number): boolean {
+    if (!Number.isFinite(speed) || speed <= 0) return false;
+    const grid = this.world.getComponent(entity, GridMovementComponent);
+    const free = this.world.getComponent(entity, FreeMovementComponent);
+    if (!grid && !free) return false;
+    if (grid) grid.speed = speed;
+    if (free) free.speed = speed;
+    // A wandering NPC applies its own speed to the grid on every step.
+    const wander = this.world.getComponent(entity, AIWanderComponent);
+    if (wander) wander.speed = speed;
     return true;
   }
 }

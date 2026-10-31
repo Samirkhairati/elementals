@@ -3,10 +3,10 @@ import { makeRig, cmd, state, type Rig } from '@/test/rig';
 import { EventInterpreter, YIELD_EVERY_COMMANDS } from './EventInterpreter';
 import { registerCommandHandler } from './commands';
 import { SpriteComponent } from '@/ecs/components/SpriteComponent';
-import { AnimationComponent } from '@/ecs/components/AnimationComponent';
+import { AnimatorComponent } from '@/ecs/components/AnimatorComponent';
 import { GridMovementComponent } from '@/ecs/components/GridMovementComponent';
 import { TransformComponent } from '@/ecs/components/TransformComponent';
-import { objectAnimKey, spriteTextureKey, type EventGraph, type GraphNode } from '@shared/engine/index.ts';
+import { spriteTextureKey, type EventGraph, type GraphNode } from '@shared/engine/index.ts';
 import { gameState } from '@/core/GameState';
 
 let rig: Rig;
@@ -320,7 +320,7 @@ describe('character commands', () => {
     await rig.runtime.start(npc, 0)!.done;
     expect(rig.world.getComponent(npc, GridMovementComponent)!.direction).toBe('down'); // player is south of npc1
     expect(rig.world.getComponent(player, GridMovementComponent)!.direction).toBe('left');
-    expect(rig.world.getComponent(other, AnimationComponent)!.direction).toBe('right');
+    expect(rig.world.getComponent(other, AnimatorComponent)!.facing).toBe('right');
   });
 
   it('a missing target warns once and the event continues', async () => {
@@ -349,26 +349,26 @@ describe('character commands', () => {
     const s = rig.world.getComponent(e, SpriteComponent)!;
     expect(s.assetId).toBe('objects/chest');
     expect(s.texture).toBe(spriteTextureKey('objects/chest', 'sheet'));
-    expect(rig.world.hasComponent(e, AnimationComponent)).toBe(false);
+    expect(rig.world.getComponent(e, AnimatorComponent)).toMatchObject({ characterId: 'objects/chest', facing: 'left' });
     expect(rig.warnings.some((w) => w.includes('objects/ghost'))).toBe(true);
   });
 
-  it('playAnimation plays a named animation of an object asset and bumps the revision; unknown names warn', async () => {
+  it('playAnimation plays a named clip of an object asset and restarts it (revision); unknown names warn', async () => {
     const e = rig.add({ sprite: { asset: 'objects/chest' }, states: [state([
       cmd('playAnimation', { target: 'self', animation: 'open' }),
       cmd('playAnimation', { target: 'self', animation: 'nope' }),
     ])] });
-    const s = rig.world.getComponent(e, SpriteComponent)!;
+    const a = rig.world.getComponent(e, AnimatorComponent)!;
     await rig.runtime.start(e, 0)!.done;
-    expect(s.animKey).toBe(objectAnimKey('objects/chest', 'open'));
-    expect(s.animRevision).toBe(1);
+    expect(a.explicitClip).toBe('open');
+    expect(a.revision).toBe(1);
     expect(rig.warnings.some((w) => w.includes('no animation "nope"'))).toBe(true);
   });
 
   it('playAnimation on a character forces idle/walk/run', async () => {
     const e = rig.add({ sprite: { asset: 'characters/player' }, movement: { controller: 'none' }, states: [state([cmd('playAnimation', { target: 'self', animation: 'run' })])] });
     await rig.runtime.start(e, 0)!.done;
-    expect(rig.world.getComponent(e, AnimationComponent)!.forcedPhase).toBe('run');
+    expect(rig.world.getComponent(e, AnimatorComponent)!.explicitClip).toBe('run');
   });
 
   it('moveRoute passes normalised steps to the movement system and waits (or not) per `wait`', async () => {
@@ -409,7 +409,7 @@ describe('character commands', () => {
   it('target "self" resolves to the event entity', async () => {
     const e = rig.add({ col: 4, row: 4, states: [state([cmd('setFacing', { target: 'self', facing: 'up' })])] });
     await rig.runtime.start(e, 0)!.done;
-    expect(rig.world.getComponent(e, AnimationComponent)!.direction).toBe('up');
+    expect(rig.world.getComponent(e, AnimatorComponent)!.facing).toBe('up');
     expect(rig.world.getComponent(e, TransformComponent)!.x).toBe(4 * 32 + 16);
   });
 });

@@ -139,7 +139,8 @@ describe('ParamForm: every FieldKind has a real control', () => {
     expect(screen.getByRole('option', { name: /Hero/ })).toBeInTheDocument()
     expect(screen.queryByRole('option', { name: /No sprite/ })).not.toBeInTheDocument()
     fireEvent.change(screen.getByRole('textbox', { name: 'Search' }), { target: { value: 'chest' } })
-    expect(screen.getAllByRole('option')).toHaveLength(1)
+    // the form's own selects (e.g. Lasts) also expose options, so count only the picker's results
+    expect(within(screen.getByRole('dialog', { name: 'Choose a sprite' })).getAllByRole('option')).toHaveLength(1)
     fireEvent.click(screen.getByRole('option', { name: /Chest/ }))
     expect(onPatch).toHaveBeenCalledWith({ asset: 'objects/chest' })
     expect(screen.queryByRole('dialog', { name: 'Choose a sprite' })).not.toBeInTheDocument()

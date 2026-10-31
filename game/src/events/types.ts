@@ -1,5 +1,7 @@
 import type { CommandTarget, CommonEvent, Facing, GraphNode, RouteStep } from "@shared/engine/index.ts";
 import type { Entity } from "@/ecs/Entity";
+import type { PlayHandle, PlayOptions, SpeedChange } from "@/sprites/animatorOps";
+import type { AppearancePersist } from "./AppearanceOverrides";
 import type { GameFlags } from "./GameFlags";
 import type { Inventory } from "./Inventory";
 
@@ -36,6 +38,8 @@ export interface EventClock {
   nextFrame(signal: AbortSignal): Promise<void>;
 }
 
+export type PlayAnimationOptions = PlayOptions;
+
 export interface RouteOutcome {
   completed: boolean;
   blocked: number;
@@ -51,10 +55,23 @@ export interface EntityOps {
   /** Runs the route; resolves when it ended. With `signal` aborting the route is cancelled. */
   moveRoute(entity: Entity, steps: RouteStep[], signal?: AbortSignal): Promise<RouteOutcome>;
   setVisible(entity: Entity, visible: boolean): boolean;
-  /** false (with a warning issued by the implementation) when the asset is unknown. */
-  changeSprite(entity: Entity, asset: string, animation: string): boolean;
-  /** false when the entity has no such animation. */
-  playAnimation(entity: Entity, animation: string): boolean;
+  /**
+   * Swaps the character of an entity. false (with a warning issued by the implementation) when the asset is
+   * unknown. `persist` says how long the change lasts: until the event state changes (default), until the
+   * map changes, or forever (kept in the AppearanceOverrides store).
+   */
+  changeSprite(entity: Entity, asset: string, animation: string, persist?: AppearancePersist): boolean;
+  /**
+   * Plays a clip of the entity's character. null when it has no such clip. `done` resolves when a
+   * non-looping clip ended and is null for one that never does.
+   */
+  playAnimation(entity: Entity, animation: string, options?: PlayAnimationOptions): PlayHandle | null;
+  /** Back to the automatic animation. false when the entity has no animator. */
+  stopAnimation(entity: Entity): boolean;
+  /** `setAnimationSpeed`: false when the entity has no animator. */
+  setAnimationSpeed(entity: Entity, change: SpeedChange): boolean;
+  /** `setMoveSpeed` (px/s): false when the entity cannot move. */
+  setMoveSpeed(entity: Entity, speed: number): boolean;
 }
 
 export interface WarpRequest {

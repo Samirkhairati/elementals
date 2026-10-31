@@ -9,7 +9,7 @@ export * from "./components/ColliderComponent";
 export * from "./components/GridMovementComponent";
 export * from "./components/FreeMovementComponent";
 export * from "./components/PlayerControlComponent";
-export * from "./components/AnimationComponent";
+export * from "./components/AnimatorComponent";
 export * from "./components/InteractableComponent";
 export * from "./components/AIWanderComponent";
 export * from "./components/EntityInfoComponent";

@@ -12,7 +12,7 @@ import { ColliderComponent } from './components/ColliderComponent';
 import { GridMovementComponent } from './components/GridMovementComponent';
 import { FreeMovementComponent } from './components/FreeMovementComponent';
 import { PlayerControlComponent } from './components/PlayerControlComponent';
-import { AnimationComponent } from './components/AnimationComponent';
+import { AnimatorComponent } from './components/AnimatorComponent';
 import { InteractableComponent } from './components/InteractableComponent';
 import { AIWanderComponent } from './components/AIWanderComponent';
 import { TagComponent } from './components/TagComponent';
@@ -132,10 +132,10 @@ describe('createComponentFromData: values', () => {
 
   it('CharacterAnimation: requires characterKey, validates enums', () => {
     const a = createComponentFromData('CharacterAnimation', { characterKey: 'npc', direction: 'right', movementType: 'run' });
-    expect(a).toBeInstanceOf(AnimationComponent);
-    expect(a).toMatchObject({ assetId: 'characters/npc', direction: 'right', movementType: 'run' });
+    expect(a).toBeInstanceOf(AnimatorComponent);
+    expect(a).toMatchObject({ characterId: 'characters/npc', facing: 'right', movementType: 'run' });
     const d = createComponentFromData('CharacterAnimation', { characterKey: 'npc', direction: 'x', movementType: 'fly' });
-    expect(d).toMatchObject({ direction: 'down', movementType: 'walk' });
+    expect(d).toMatchObject({ facing: 'down', movementType: 'walk' });
     expect(() => createComponentFromData('CharacterAnimation', {})).toThrow(ComponentDataError);
   });
 

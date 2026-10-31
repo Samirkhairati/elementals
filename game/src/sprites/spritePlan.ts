@@ -1,10 +1,5 @@
-import {
-  buildAnimationRegistrations,
-  spriteSheetRoles,
-  spriteTextureKey,
-  type AnimationRegistration,
-  type SpriteManifestEntry,
-} from "@shared/engine/index.ts";
+import { buildClipRegistrations, spriteTextureKey, type AnimationRegistration } from "@shared/engine/index.ts";
+import type { CharacterEntry } from "@/data/spriteRegistry";
 
 /** One spritesheet texture to load. */
 export interface SheetLoad {
@@ -20,41 +15,42 @@ export interface SheetLoad {
 export interface SpriteLoadPlan {
   sheets: SheetLoad[];
   animations: AnimationRegistration[];
-  /** Assets whose sheet file has no URL in the manifest (skipped, reported). */
+  /** Characters whose sheet has no URL in the manifest (skipped, reported). */
   problems: string[];
 }
 
 /**
- * Pure planning step of manifest-driven sprite loading: which textures to load (key = `sprite:<id>:<role>`,
- * role `walk`/`run` for characters and `sheet` otherwise) and which animations to create afterwards.
- * Animations whose texture could not be planned are left out.
+ * Pure planning step of manifest-driven sprite loading: which textures to load (one per sheet of every
+ * character, each with its own frame size; key = `sprite:<id>:<sheetKey>`) and which animations to create
+ * afterwards (one per clip, and per facing for directional clips). Animations whose texture could not be
+ * planned are left out.
  */
-export function planSpriteLoads(entries: readonly SpriteManifestEntry[]): SpriteLoadPlan {
+export function planSpriteLoads(entries: readonly CharacterEntry[]): SpriteLoadPlan {
   const sheets: SheetLoad[] = [];
   const animations: AnimationRegistration[] = [];
   const problems: string[] = [];
 
   for (const entry of entries) {
-    const { id, meta, files } = entry;
+    const { id, def, files } = entry;
     const available = new Set<string>();
-    for (const { role, file } of spriteSheetRoles(meta)) {
-      const url = files[file];
+    for (const [key, sheet] of Object.entries(def.sheets)) {
+      const url = files[key];
       if (!url) {
-        problems.push(`sprite "${id}": no URL for sheet "${file}" (${role})`);
+        problems.push(`sprite "${id}": no URL for sheet "${key}" (${sheet.image})`);
         continue;
       }
-      const textureKey = spriteTextureKey(id, role);
+      const textureKey = spriteTextureKey(id, key);
       available.add(textureKey);
       sheets.push({
         textureKey,
         url,
-        frameWidth: meta.frameWidth,
-        frameHeight: meta.frameHeight,
-        margin: meta.margin,
-        spacing: meta.spacing,
+        frameWidth: sheet.frameWidth,
+        frameHeight: sheet.frameHeight,
+        margin: sheet.margin,
+        spacing: sheet.spacing,
       });
     }
-    for (const anim of buildAnimationRegistrations(id, meta)) {
+    for (const anim of buildClipRegistrations(id, def)) {
       if (available.has(anim.textureKey)) animations.push(anim);
     }
   }
@@ -70,6 +66,7 @@ export interface AnimationFactory {
     frames: { key: string; frame: number }[];
     frameRate: number;
     repeat: number;
+    yoyo?: boolean;
   }): unknown;
 }
 
@@ -83,6 +80,7 @@ export function createPlannedAnimations(anims: AnimationFactory, planned: readon
       frames: a.frames.map((frame) => ({ key: a.textureKey, frame })),
       frameRate: a.fps,
       repeat: a.loop ? -1 : 0,
+      ...(a.yoyo ? { yoyo: true } : {}),
     });
     created.push(a.key);
   }

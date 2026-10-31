@@ -6,6 +6,7 @@ import { hydrateMapEntities } from "@/ecs/spawner";
 import { gameState } from "@/core/GameState";
 import { EventRuntime } from "@/events/EventRuntime";
 import type { ChoicesRequest, EventUI, MapService, WarpRequest } from "@/events/types";
+import type { SpriteRegistry } from "@/data/spriteRegistry";
 import { testSprites } from "./helpers";
 
 export const flush = () => new Promise<void>((resolve) => setImmediate(resolve));
@@ -151,9 +152,9 @@ export function makeEntityDef(o: EntityOptions = {}): EngineEntity {
 }
 
 /** A World + EventRuntime with fake UI / maps and the test sprite registry. */
-export function makeRig(options: { random?: () => number } = {}) {
+export function makeRig(options: { random?: () => number; sprites?: SpriteRegistry } = {}) {
   const world = new World();
-  const sprites = testSprites();
+  const sprites = options.sprites ?? testSprites();
   const ui = new FakeUI();
   const maps = new FakeMaps();
   const warnings: string[] = [];

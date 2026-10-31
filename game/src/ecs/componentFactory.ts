@@ -4,7 +4,7 @@ import { ColliderComponent } from "./components/ColliderComponent";
 import { GridMovementComponent } from "./components/GridMovementComponent";
 import { FreeMovementComponent } from "./components/FreeMovementComponent";
 import { PlayerControlComponent } from "./components/PlayerControlComponent";
-import { AnimationComponent } from "./components/AnimationComponent";
+import { AnimatorComponent } from "./components/AnimatorComponent";
 import { TagComponent } from "./components/TagComponent";
 import { InteractableComponent } from "./components/InteractableComponent";
 import { AIWanderComponent } from "./components/AIWanderComponent";
@@ -36,7 +36,7 @@ export interface ComponentTypeMap {
   GridMovement: GridMovementComponent;
   FreeMovement: FreeMovementComponent;
   PlayerControl: PlayerControlComponent;
-  CharacterAnimation: AnimationComponent;
+  CharacterAnimation: AnimatorComponent;
   Interactable: InteractableComponent;
   AIWander: AIWanderComponent;
 }
@@ -154,14 +154,16 @@ const FACTORIES: { [K in ComponentTypeName]: Factory<ComponentTypeMap[K]> } = {
   CharacterAnimation: (d) => {
     const characterKey = str(d, "characterKey");
     if (!characterKey) throw new ComponentDataError("CharacterAnimation", 'missing required string "characterKey"');
-    return new AnimationComponent(
-      defined({
-        // Legacy `characterKey` -> sprite asset id (same rule as shared migrateEntity).
-        assetId: `characters/${characterKey}`,
-        direction: oneOf(d, "direction", DIRECTIONS),
-        movementType: oneOf(d, "movementType", MOVEMENT_TYPES),
-      }),
-    );
+    // Legacy `characterKey` -> character id (same rule as shared migrateEntity).
+    const characterId = `characters/${characterKey}`;
+    const animator = new AnimatorComponent({
+      characterId,
+      def: spriteRegistry.character(characterId) ?? null,
+      facing: oneOf(d, "direction", DIRECTIONS),
+    });
+    const movementType = oneOf(d, "movementType", MOVEMENT_TYPES);
+    if (movementType) animator.movementType = movementType;
+    return animator;
   },
 
   Interactable: (d) =>

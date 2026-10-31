@@ -7,6 +7,7 @@ import { ColliderComponent } from "@/ecs/components/ColliderComponent";
 import type { SpriteRegistry } from "@/data/spriteRegistry";
 import { gameState } from "@/core/GameState";
 import { EventBus, Events } from "@/utils/EventBus";
+import { AppearanceOverrides } from "./AppearanceOverrides";
 import { GameFlags } from "./GameFlags";
 import { Inventory } from "./Inventory";
 import { GameClock } from "./GameClock";
@@ -62,6 +63,8 @@ export interface RunningEvent {
 export class EventRuntime {
   public readonly flags: GameFlags;
   public readonly inventory = new Inventory();
+  /** `changeSprite` overrides that outlive an event state (map / forever). Not part of the flags. */
+  public readonly appearance = new AppearanceOverrides();
   public readonly clock = new GameClock();
   public readonly ops: WorldEntityOps;
   public readonly states: StateSelector;
@@ -93,7 +96,7 @@ export class EventRuntime {
     this.random = options.random ?? Math.random;
     this.commonEvent = options.commonEvent ?? (() => undefined);
     this.flags = new GameFlags(options.database);
-    this.ops = new WorldEntityOps(this.world, options.sprites, (m) => this.warn(m));
+    this.ops = new WorldEntityOps(this.world, options.sprites, (m) => this.warn(m), this.appearance, () => this.mapId);
     this.states = new StateSelector({
       world: this.world,
       flags: this.flags,
@@ -101,6 +104,7 @@ export class EventRuntime {
       sprites: options.sprites,
       getMapId: () => this.mapId,
       warn: (m) => this.warn(m),
+      afterApply: (entity) => this.ops.applyStoredAppearance(entity),
     });
     this.disposers.push(this.flags.subscribe(() => (this.dirty = true)));
     this.disposers.push(this.inventory.subscribe(() => (this.dirty = true)));
@@ -157,7 +161,10 @@ export class EventRuntime {
     this.cancelAll();
     this.mapId = mapId;
     this.dirty = false;
+    this.appearance.onMapChanged();
     this.states.refreshAll();
+    // Entities without an Event (the player) are not visited by the state selector.
+    for (const [entity] of this.world.view(EntityInfoComponent)) this.ops.applyStoredAppearance(entity);
   }
 
   /** Forces a state re-evaluation on the next update. */

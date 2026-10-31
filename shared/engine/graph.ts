@@ -14,7 +14,7 @@ import type {
   PortDef,
   ValidationContext,
 } from './types.ts';
-import { getBranchDefs, getCommandDef, validateCommandParams } from './commands.ts';
+import { COMMAND_CATALOG, getBranchDefs, getCommandDef, validateCommandParams } from './commands.ts';
 import { newId, type IdFn } from './ids.ts';
 import { cloneJson, deepEqual, isRecord } from './util.ts';
 
@@ -33,7 +33,16 @@ export const TREE_ONLY_TYPES: readonly string[] = ['loop', 'breakLoop', 'exitEve
  * Commands that wait for time or input, so a cycle through one of them cannot freeze the game.
  * A cycle made only of other nodes is rejected by validation (`cycle-without-wait`).
  */
-export const YIELDING_TYPES: readonly string[] = ['showText', 'showChoices', 'wait', 'moveRoute', 'fadeScreen', 'shakeScreen'];
+export const YIELDING_TYPES: readonly string[] = Object.values(COMMAND_CATALOG)
+  .filter((d) => d.yields === true)
+  .map((d) => d.type);
+
+/** Whether a node waits: its catalog `yields` flag, evaluated against the node's params when it is a predicate. */
+export function isYieldingNode(node: Pick<GraphNode, 'type' | 'params'>): boolean {
+  const yields = getCommandDef(node.type)?.yields;
+  if (typeof yields === 'function') return yields(isRecord(node.params) ? node.params : {});
+  return yields === true;
+}
 
 export const NEXT_PORT = 'next';
 const NEXT: PortDef = { id: NEXT_PORT, label: '' };
@@ -373,7 +382,7 @@ export function reachableFromStart(graph: EventGraph): Set<string> {
 }
 
 /**
- * Ids of nodes that sit on a cycle containing no yielding node (see YIELDING_TYPES): such a loop would
+ * Ids of nodes that sit on a cycle containing no yielding node (see isYieldingNode): such a loop would
  * spin without ever waiting. Only nodes reachable from `start` are considered.
  */
 export function findYieldlessCycles(graph: EventGraph): Set<string> {
@@ -381,7 +390,7 @@ export function findYieldlessCycles(graph: EventGraph): Set<string> {
   const live = reachableFromStart(graph);
   const eligible = (id: string): boolean => {
     const n = byId.get(id);
-    return !!n && live.has(id) && !YIELDING_TYPES.includes(n.type);
+    return !!n && live.has(id) && !isYieldingNode(n);
   };
   const bad = new Set<string>();
   const state = new Map<string, 1 | 2>(); // 1 = on the DFS stack, 2 = done
