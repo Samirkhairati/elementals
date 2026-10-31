@@ -1,6 +1,6 @@
 import type { Command, CommandTarget, Facing, RouteStep } from "@shared/engine/index.ts";
 import type { Entity } from "@/ecs/Entity";
-import type { EventState } from "./EventState";
+import type { GameFlags } from "./GameFlags";
 import type { Inventory } from "./Inventory";
 
 /** What a command (or list of commands) tells its parent to do next. */
@@ -74,7 +74,7 @@ export interface EventContext {
   entityId: string;
   /** Current map id (re-read on every command; a warp changes it). */
   getMapId(): string;
-  state: EventState;
+  flags: GameFlags;
   inventory: Inventory;
   ui: EventUI;
   clock: EventClock;

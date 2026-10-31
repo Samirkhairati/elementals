@@ -12,7 +12,7 @@ import { SpriteComponent } from "@/ecs/components/SpriteComponent";
 import type { SpriteRegistry } from "@/data/spriteRegistry";
 import { applySpriteProps, getEntityFacing, setEntityFacing } from "@/sprites/spriteState";
 import { evaluateConditions, type ConditionContext } from "./conditions";
-import type { EventState } from "./EventState";
+import type { GameFlags } from "./GameFlags";
 import type { Inventory } from "./Inventory";
 
 /**
@@ -28,7 +28,7 @@ export function selectActivePage(pages: readonly EventPage[], ctx: ConditionCont
 
 export interface PageSelectorDeps {
   world: World;
-  state: EventState;
+  flags: GameFlags;
   inventory: Inventory;
   sprites: SpriteRegistry;
   getMapId: () => string;
@@ -62,7 +62,7 @@ export class PageSelector {
   public conditionContext(entity: Entity): ConditionContext {
     const info = this.deps.world.getComponent(entity, EntityInfoComponent);
     return {
-      state: this.deps.state,
+      flags: this.deps.flags,
       inventory: this.deps.inventory,
       mapId: this.deps.getMapId(),
       entityId: info?.editorId ?? `entity#${entity}`,

@@ -7,7 +7,7 @@ import { ColliderComponent } from "@/ecs/components/ColliderComponent";
 import type { SpriteRegistry } from "@/data/spriteRegistry";
 import { gameState } from "@/core/GameState";
 import { EventBus, Events } from "@/utils/EventBus";
-import { EventState } from "./EventState";
+import { GameFlags } from "./GameFlags";
 import { Inventory } from "./Inventory";
 import { GameClock } from "./GameClock";
 import { PageSelector } from "./PageSelector";
@@ -58,7 +58,7 @@ export interface RunningEvent {
  *  - `cancelAll` (map switch) cancels every interpreter and releases the lock immediately.
  */
 export class EventRuntime {
-  public readonly state: EventState;
+  public readonly flags: GameFlags;
   public readonly inventory = new Inventory();
   public readonly clock = new GameClock();
   public readonly ops: WorldEntityOps;
@@ -88,17 +88,17 @@ export class EventRuntime {
     this.emitEvent = options.emit ?? ((event, payload) => void EventBus.emit(event, payload));
     this.warnFn = options.warn ?? ((m) => console.warn(m));
     this.random = options.random ?? Math.random;
-    this.state = new EventState(options.database);
+    this.flags = new GameFlags(options.database);
     this.ops = new WorldEntityOps(this.world, options.sprites, (m) => this.warn(m));
     this.pages = new PageSelector({
       world: this.world,
-      state: this.state,
+      flags: this.flags,
       inventory: this.inventory,
       sprites: options.sprites,
       getMapId: () => this.mapId,
       warn: (m) => this.warn(m),
     });
-    this.disposers.push(this.state.subscribe(() => (this.dirty = true)));
+    this.disposers.push(this.flags.subscribe(() => (this.dirty = true)));
     this.disposers.push(this.inventory.subscribe(() => (this.dirty = true)));
   }
 
@@ -240,7 +240,7 @@ export class EventRuntime {
       entity,
       entityId,
       getMapId: () => this.mapId,
-      state: this.state,
+      flags: this.flags,
       inventory: this.inventory,
       ui: this.ui,
       clock: this.clock,

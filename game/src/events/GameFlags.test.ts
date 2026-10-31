@@ -1,17 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { EventState } from './EventState';
+import { GameFlags } from './GameFlags';
 import { Inventory } from './Inventory';
 import { GameClock } from './GameClock';
 import { EventBus, Events } from '@/utils/EventBus';
 import { TEST_DB } from '@/test/rig';
 
-describe('EventState', () => {
+describe('GameFlags', () => {
   beforeEach(() => {
-    EventBus.removeAllListeners(Events.EVENT_STATE_CHANGED);
+    EventBus.removeAllListeners(Events.FLAGS_CHANGED);
   });
 
   it('initialises switches to false and variables to their initial value from the database', () => {
-    const s = new EventState(TEST_DB);
+    const s = new GameFlags(TEST_DB);
     expect(s.getSwitch('s1')).toBe(false);
     expect(s.getVariable('v2')).toBe(5);
     expect(s.hasSwitch('s1')).toBe(true);
@@ -19,17 +19,17 @@ describe('EventState', () => {
   });
 
   it('unknown ids read as false / 0', () => {
-    const s = new EventState(TEST_DB);
+    const s = new GameFlags(TEST_DB);
     expect(s.getSwitch('ghost')).toBe(false);
     expect(s.getVariable('ghost')).toBe(0);
   });
 
   it('notifies subscribers and the EventBus once per real change', () => {
-    const s = new EventState(TEST_DB);
+    const s = new GameFlags(TEST_DB);
     const local = vi.fn();
     const bus = vi.fn();
     s.subscribe(local);
-    EventBus.on(Events.EVENT_STATE_CHANGED, bus);
+    EventBus.on(Events.FLAGS_CHANGED, bus);
 
     s.setSwitch('s1', true);
     s.setSwitch('s1', true); // unchanged: silent
@@ -47,7 +47,7 @@ describe('EventState', () => {
   });
 
   it('unsubscribe stops notifications; non-finite variable values are ignored', () => {
-    const s = new EventState(TEST_DB);
+    const s = new GameFlags(TEST_DB);
     const l = vi.fn();
     const off = s.subscribe(l);
     off();
@@ -58,7 +58,7 @@ describe('EventState', () => {
   });
 
   it('self switches are per map + entity + key', () => {
-    const s = new EventState(TEST_DB);
+    const s = new GameFlags(TEST_DB);
     s.setSelfSwitch('city', 'a', 'A', true);
     expect(s.getSelfSwitch('city', 'a', 'A')).toBe(true);
     expect(s.getSelfSwitch('city', 'a', 'B')).toBe(false);
@@ -69,7 +69,7 @@ describe('EventState', () => {
   });
 
   it('reset() restores the database values and notifies', () => {
-    const s = new EventState(TEST_DB);
+    const s = new GameFlags(TEST_DB);
     s.setSwitch('s1', true);
     s.setVariable('v2', 99);
     s.setSelfSwitch('city', 'a', 'C', true);
@@ -83,13 +83,13 @@ describe('EventState', () => {
   });
 
   it('serialises to JSON and loads back', () => {
-    const a = new EventState(TEST_DB);
+    const a = new GameFlags(TEST_DB);
     a.setSwitch('s2', true);
     a.setVariable('v1', 7);
     a.setSelfSwitch('market', 'chest', 'A', true);
     const snapshot = JSON.parse(JSON.stringify(a.toJSON()));
 
-    const b = new EventState(TEST_DB);
+    const b = new GameFlags(TEST_DB);
     b.load(snapshot);
     expect(b.getSwitch('s2')).toBe(true);
     expect(b.getVariable('v1')).toBe(7);

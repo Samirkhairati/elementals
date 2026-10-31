@@ -127,7 +127,7 @@ describe('action trigger', () => {
     rig.addPlayer(5, 5, 'down');
     rig.add({ id: 'npc', col: 5, row: 6, pages: [page([say('one')]), page([say('two')], { conditions: [{ kind: 'switch', id: 's1', value: true }] })] });
     triggers.resetTouchState(rig.world);
-    rig.runtime.state.setSwitch('s1', true);
+    rig.runtime.flags.setSwitch('s1', true);
     triggers.requestAction();
     await step();
     expect(rig.ui.texts[0].text).toBe('two');
@@ -212,22 +212,22 @@ describe('playerTouch', () => {
     rig.add({ id: 'door', col: 6, row: 5, sprite: false, collider: { isSolid: false }, pages: [page([cmd('setVariable', { id: 'v1', op: 'add', operand: 'const', value: 1 })], { trigger: 'playerTouch' })] });
     triggers.resetTouchState(rig.world);
     await step();
-    expect(rig.runtime.state.getVariable('v1')).toBe(0);
+    expect(rig.runtime.flags.getVariable('v1')).toBe(0);
 
     place(player, 6, 5);
     await step();
     await step();
-    expect(rig.runtime.state.getVariable('v1')).toBe(1);
+    expect(rig.runtime.flags.getVariable('v1')).toBe(1);
     await step();
     await step();
-    expect(rig.runtime.state.getVariable('v1')).toBe(1); // standing still does not re-fire
+    expect(rig.runtime.flags.getVariable('v1')).toBe(1); // standing still does not re-fire
 
     place(player, 7, 5);
     await step();
     place(player, 6, 5);
     await step();
     await step();
-    expect(rig.runtime.state.getVariable('v1')).toBe(2);
+    expect(rig.runtime.flags.getVariable('v1')).toBe(2);
   });
 
   it('does not fire for the tile the player spawned / was warped onto', async () => {
@@ -236,7 +236,7 @@ describe('playerTouch', () => {
     triggers.resetTouchState(rig.world);
     await step();
     await step();
-    expect(rig.runtime.state.getSwitch('s1')).toBe(false);
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(false);
   });
 
   it('fires when a step ends on the trigger even if the player chains straight into the next step', async () => {
@@ -252,7 +252,7 @@ describe('playerTouch', () => {
     const grid = rig.world.getComponent(player, GridMovementComponent)!;
     grid.pendingDirection = 'right'; // key held the whole way
     grid.holdDuration = 100;
-    for (let i = 0; i < 40 && !rig.runtime.state.getSwitch('s1'); i++) {
+    for (let i = 0; i < 40 && !rig.runtime.flags.getSwitch('s1'); i++) {
       // the lock only starts once the event runs, so keep the intent while unlocked
       if (!gameState.isInputLocked) {
         grid.pendingDirection = 'right';
@@ -260,7 +260,7 @@ describe('playerTouch', () => {
       }
       await step(16);
     }
-    expect(rig.runtime.state.getSwitch('s1')).toBe(true);
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(true);
     // fired when the first step ended on column 6 (the player was already walking on to column 7)
     const t = rig.world.getComponent(player, TransformComponent)!;
     expect(t.x).toBeGreaterThanOrEqual(6 * 32 + 16);
@@ -276,11 +276,11 @@ describe('playerTouch', () => {
     grid.pendingDirection = 'right';
     grid.holdDuration = 10;
     await step();
-    expect(rig.runtime.state.getSwitch('s1')).toBe(false); // hold threshold not reached
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(false); // hold threshold not reached
     grid.holdDuration = 100;
     await step();
     await step();
-    expect(rig.runtime.state.getSwitch('s1')).toBe(true);
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(true);
   });
 });
 
@@ -292,11 +292,11 @@ describe('eventTouch', () => {
     triggers.resetTouchState(rig.world);
     await step();
     await step();
-    expect(rig.runtime.state.getSwitch('s1')).toBe(false);
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(false);
     place(walker, 8, 8);
     await step();
     await step();
-    expect(rig.runtime.state.getSwitch('s1')).toBe(true);
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(true);
   });
 });
 
@@ -321,9 +321,9 @@ describe('autorun', () => {
     rig.ui.dismiss();
     await flush();
     await step();
-    expect(rig.runtime.state.getVariable('v1')).toBe(1);
+    expect(rig.runtime.flags.getVariable('v1')).toBe(1);
     expect(rig.ui.texts).toHaveLength(2); // restarted: the page is still active
-    rig.runtime.state.setSelfSwitch('test', 'cutscene', 'A', true); // switch it off
+    rig.runtime.flags.setSelfSwitch('test', 'cutscene', 'A', true); // switch it off
     rig.ui.dismiss();
     await flush();
     await step();
@@ -340,11 +340,11 @@ describe('autorun', () => {
     await step();
     rig.add({ id: 'auto', col: 0, row: 0, sprite: false, collider: false, pages: [page([cmd('setSwitch', { id: 's1', value: true })], { trigger: 'autorun' })] });
     await step();
-    expect(rig.runtime.state.getSwitch('s1')).toBe(false);
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(false);
     rig.ui.dismiss();
     await flush();
     await step();
-    expect(rig.runtime.state.getSwitch('s1')).toBe(true);
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(true);
   });
 });
 
@@ -354,7 +354,7 @@ describe('parallel', () => {
     rig.add({ id: 'par', col: 0, row: 0, sprite: false, collider: false, pages: [page([cmd('setVariable', { id: 'v1', op: 'add', operand: 'const', value: 1 }), cmd('wait', { ms: 32 })], { trigger: 'parallel' })] });
     triggers.resetTouchState(rig.world);
     for (let i = 0; i < 10; i++) await step(16);
-    expect(rig.runtime.state.getVariable('v1')).toBeGreaterThanOrEqual(3);
+    expect(rig.runtime.flags.getVariable('v1')).toBeGreaterThanOrEqual(3);
     expect(gameState.isInputLocked).toBe(false);
   });
 
@@ -367,7 +367,7 @@ describe('parallel', () => {
     triggers.resetTouchState(rig.world);
     await step();
     expect(rig.runtime.isRunning(par)).toBe(true);
-    rig.runtime.state.setSwitch('s1', true);
+    rig.runtime.flags.setSwitch('s1', true);
     await step();
     await step();
     expect(rig.runtime.isRunning(par)).toBe(false);

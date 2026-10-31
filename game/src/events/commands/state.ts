@@ -8,8 +8,8 @@ registerCommandHandler("setSwitch", (cmd, rt) => {
     rt.ctx.warn("[Event] setSwitch without a switch; skipped");
     return;
   }
-  if (!rt.ctx.state.hasSwitch(id)) rt.ctx.warnOnce(`switch:${id}`, `[Event] switch "${id}" is not in the database`);
-  rt.ctx.state.setSwitch(id, bool(cmd.params, "value", true));
+  if (!rt.ctx.flags.hasSwitch(id)) rt.ctx.warnOnce(`switch:${id}`, `[Event] switch "${id}" is not in the database`);
+  rt.ctx.flags.setSwitch(id, bool(cmd.params, "value", true));
 });
 
 /**
@@ -25,12 +25,12 @@ registerCommandHandler("setVariable", (cmd, rt) => {
     ctx.warn("[Event] setVariable without a variable; skipped");
     return;
   }
-  if (!ctx.state.hasVariable(id)) ctx.warnOnce(`variable:${id}`, `[Event] variable "${id}" is not in the database`);
+  if (!ctx.flags.hasVariable(id)) ctx.warnOnce(`variable:${id}`, `[Event] variable "${id}" is not in the database`);
 
   let operand: number;
   switch (str(p, "operand", "const")) {
     case "variable":
-      operand = ctx.state.getVariable(str(p, "sourceId"));
+      operand = ctx.flags.getVariable(str(p, "sourceId"));
       break;
     case "random": {
       let min = Math.trunc(num(p, "min", 0));
@@ -43,27 +43,27 @@ registerCommandHandler("setVariable", (cmd, rt) => {
       operand = num(p, "value", 0);
   }
 
-  const current = ctx.state.getVariable(id);
+  const current = ctx.flags.getVariable(id);
   switch (str(p, "op", "set")) {
     case "add":
-      ctx.state.setVariable(id, current + operand);
+      ctx.flags.setVariable(id, current + operand);
       break;
     case "sub":
-      ctx.state.setVariable(id, current - operand);
+      ctx.flags.setVariable(id, current - operand);
       break;
     case "mul":
-      ctx.state.setVariable(id, current * operand);
+      ctx.flags.setVariable(id, current * operand);
       break;
     case "div":
       if (operand === 0) ctx.warn(`[Event] setVariable "${id}": division by zero ignored`);
-      else ctx.state.setVariable(id, Math.trunc(current / operand));
+      else ctx.flags.setVariable(id, Math.trunc(current / operand));
       break;
     case "mod":
       if (operand === 0) ctx.warn(`[Event] setVariable "${id}": modulo by zero ignored`);
-      else ctx.state.setVariable(id, current % operand);
+      else ctx.flags.setVariable(id, current % operand);
       break;
     default:
-      ctx.state.setVariable(id, operand);
+      ctx.flags.setVariable(id, operand);
   }
 });
 
@@ -73,7 +73,7 @@ registerCommandHandler("setSelfSwitch", (cmd, rt) => {
     rt.ctx.warn(`[Event] setSelfSwitch: unknown self switch "${key}"; skipped`);
     return;
   }
-  rt.ctx.state.setSelfSwitch(rt.ctx.getMapId(), rt.ctx.entityId, key, bool(cmd.params, "value", true));
+  rt.ctx.flags.setSelfSwitch(rt.ctx.getMapId(), rt.ctx.entityId, key, bool(cmd.params, "value", true));
 });
 
 registerCommandHandler("giveItem", (cmd, rt) => {

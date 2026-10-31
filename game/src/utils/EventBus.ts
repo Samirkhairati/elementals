@@ -30,7 +30,7 @@ export const Events = {
 
     // Event runtime
     /** Payload: `{ kind: 'switch' | 'variable' | 'selfSwitch' | 'reset'; id: string }`. */
-    EVENT_STATE_CHANGED: 'event-state-changed',
+    FLAGS_CHANGED: 'flags-changed',
     /** Payload: `{ entity: string; map: string; pageId: string; blocking: boolean }`. */
     EVENT_STARTED: 'event-started',
     EVENT_ENDED: 'event-ended',

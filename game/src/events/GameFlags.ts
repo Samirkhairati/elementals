@@ -1,14 +1,14 @@
 import type { GameDatabase, SelfSwitchKey } from "@shared/engine/index.ts";
 import { EventBus, Events } from "@/utils/EventBus";
 
-export type StateChange =
+export type FlagChange =
   | { kind: "switch"; id: string; value: boolean }
   | { kind: "variable"; id: string; value: number }
   | { kind: "selfSwitch"; id: string; value: boolean }
   | { kind: "reset"; id: "" };
 
 /** Serialisable snapshot (JSON-safe) for a future save system. */
-export interface EventStateSnapshot {
+export interface GameFlagsSnapshot {
   switches: Record<string, boolean>;
   variables: Record<string, number>;
   /** Keys are `<mapId>/<entityId>/<A-D>`. */
@@ -19,18 +19,18 @@ export function selfSwitchKey(mapId: string, entityId: string, key: SelfSwitchKe
   return `${mapId}/${entityId}/${key}`;
 }
 
-type Listener = (change: StateChange) => void;
+type Listener = (change: FlagChange) => void;
 
 /**
  * Global event state: switches (booleans), variables (numbers) and per-event self switches A-D.
  *
  *  - initialised from the database manifest (switches false, variables `initial`);
  *  - unknown ids are tolerated (switch false / variable 0 until set);
- *  - every change notifies subscribers and emits `Events.EVENT_STATE_CHANGED` on the EventBus;
+ *  - every change notifies subscribers and emits `Events.FLAGS_CHANGED` on the EventBus;
  *    unchanged writes are silent;
  *  - self switches belong to `mapId/entityId` and survive map switches; `reset()` clears everything.
  */
-export class EventState {
+export class GameFlags {
   private switches = new Map<string, boolean>();
   private variables = new Map<string, number>();
   private selfSwitches = new Map<string, boolean>();
@@ -99,7 +99,7 @@ export class EventState {
 
   // ── persistence ───────────────────────────────────────────────────────────────────────────────
 
-  public toJSON(): EventStateSnapshot {
+  public toJSON(): GameFlagsSnapshot {
     return {
       switches: Object.fromEntries(this.switches),
       variables: Object.fromEntries(this.variables),
@@ -108,7 +108,7 @@ export class EventState {
   }
 
   /** Restores a snapshot (values for ids the database does not list are kept too). */
-  public load(snapshot: Partial<EventStateSnapshot> | null | undefined): void {
+  public load(snapshot: Partial<GameFlagsSnapshot> | null | undefined): void {
     this.reset(undefined, false);
     for (const [k, v] of Object.entries(snapshot?.switches ?? {})) if (typeof v === "boolean") this.switches.set(k, v);
     for (const [k, v] of Object.entries(snapshot?.variables ?? {})) if (typeof v === "number" && Number.isFinite(v)) this.variables.set(k, v);
@@ -123,8 +123,8 @@ export class EventState {
     return () => this.listeners.delete(listener);
   }
 
-  private emit(change: StateChange): void {
+  private emit(change: FlagChange): void {
     for (const l of [...this.listeners]) l(change);
-    EventBus.emit(Events.EVENT_STATE_CHANGED, change);
+    EventBus.emit(Events.FLAGS_CHANGED, change);
   }
 }

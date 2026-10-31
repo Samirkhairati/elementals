@@ -8,7 +8,7 @@ registerCommandHandler("conditional", (cmd, rt) => {
   const conditions = Array.isArray(cmd.params.conditions) ? (cmd.params.conditions as Condition[]) : [];
   const { ctx } = rt;
   const holds = evaluateConditions(conditions, {
-    state: ctx.state,
+    flags: ctx.flags,
     inventory: ctx.inventory,
     mapId: ctx.getMapId(),
     entityId: ctx.entityId,

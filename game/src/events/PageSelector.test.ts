@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import type { ComparisonOp, Condition } from '@shared/engine/index.ts';
 import { selectActivePage } from './PageSelector';
 import { evaluateCondition, compareNumbers } from './conditions';
-import { EventState } from './EventState';
+import { GameFlags } from './GameFlags';
 import { Inventory } from './Inventory';
 import { makeRig, page, TEST_DB, type Rig } from '@/test/rig';
 import { SpriteComponent } from '@/ecs/components/SpriteComponent';
@@ -12,15 +12,15 @@ import { GridMovementComponent } from '@/ecs/components/GridMovementComponent';
 import { EventComponent } from '@/ecs/components/EventComponent';
 import { spriteTextureKey, objectAnimKey } from '@shared/engine/index.ts';
 
-function ctxOf(state: EventState, inventory = new Inventory(), mapId = 'city', entityId = 'npc') {
-  return { state, inventory, mapId, entityId };
+function ctxOf(state: GameFlags, inventory = new Inventory(), mapId = 'city', entityId = 'npc') {
+  return { flags: state, inventory, mapId, entityId };
 }
 
 describe('conditions', () => {
-  let state: EventState;
+  let state: GameFlags;
   let inv: Inventory;
   beforeEach(() => {
-    state = new EventState(TEST_DB);
+    state = new GameFlags(TEST_DB);
     inv = new Inventory();
   });
 
@@ -69,7 +69,7 @@ describe('conditions', () => {
 
 describe('selectActivePage', () => {
   it('last page whose conditions all hold wins; pages without conditions always hold', () => {
-    const state = new EventState(TEST_DB);
+    const state = new GameFlags(TEST_DB);
     const pages = [
       page([]),
       page([], { conditions: [{ kind: 'switch', id: 's1', value: true }] }),
@@ -85,7 +85,7 @@ describe('selectActivePage', () => {
   });
 
   it('is -1 when no page holds', () => {
-    const state = new EventState(TEST_DB);
+    const state = new GameFlags(TEST_DB);
     const pages = [page([], { conditions: [{ kind: 'switch', id: 's1', value: true }] })];
     expect(selectActivePage(pages, ctxOf(state))).toBe(-1);
     expect(selectActivePage([], ctxOf(state))).toBe(-1);
@@ -109,13 +109,13 @@ describe('PageSelector: applying pages', () => {
     const sprite = rig.world.getComponent(chest, SpriteComponent)!;
     expect(sprite.frame).toBe(0);
 
-    rig.runtime.state.setSwitch('s1', true);
+    rig.runtime.flags.setSwitch('s1', true);
     rig.runtime.update(16);
     expect(rig.world.getComponent(chest, EventComponent)!.activePage).toBe(1);
     expect(rig.world.getComponent(chest, SpriteComponent)).toBe(sprite); // same component, updated in place
     expect(sprite.frame).toBe(1);
 
-    rig.runtime.state.setSwitch('s1', false);
+    rig.runtime.flags.setSwitch('s1', false);
     rig.runtime.update(16);
     expect(sprite.frame).toBe(0);
   });
@@ -126,7 +126,7 @@ describe('PageSelector: applying pages', () => {
       pages: [page([]), page([], { conditions: [{ kind: 'switch', id: 's1', value: true }], appearance: { asset: 'objects/chest', frame: 2 } })],
     });
     expect(rig.world.hasComponent(e, AnimationComponent)).toBe(true);
-    rig.runtime.state.setSwitch('s1', true);
+    rig.runtime.flags.setSwitch('s1', true);
     rig.runtime.update(16);
     const sprite = rig.world.getComponent(e, SpriteComponent)!;
     expect(sprite.texture).toBe(spriteTextureKey('objects/chest', 'sheet'));
@@ -140,7 +140,7 @@ describe('PageSelector: applying pages', () => {
       pages: [page([]), page([], { conditions: [{ kind: 'switch', id: 's1', value: true }], appearance: { animation: 'shine' } })],
     });
     expect(rig.world.getComponent(e, SpriteComponent)!.animKey).toBeUndefined();
-    rig.runtime.state.setSwitch('s1', true);
+    rig.runtime.flags.setSwitch('s1', true);
     rig.runtime.update(16);
     expect(rig.world.getComponent(e, SpriteComponent)!.animKey).toBe(objectAnimKey('objects/chest', 'shine'));
   });
@@ -152,7 +152,7 @@ describe('PageSelector: applying pages', () => {
       pages: [page([]), page([], { conditions: [{ kind: 'switch', id: 's1', value: true }], appearance: { visible: false, facing: 'left' } })],
     });
     expect(rig.world.getComponent(e, SpriteComponent)!.visible).toBe(true);
-    rig.runtime.state.setSwitch('s1', true);
+    rig.runtime.flags.setSwitch('s1', true);
     rig.runtime.update(16);
     expect(rig.world.getComponent(e, SpriteComponent)!.visible).toBe(false);
     expect(rig.world.getComponent(e, GridMovementComponent)!.direction).toBe('left');
@@ -166,10 +166,10 @@ describe('PageSelector: applying pages', () => {
     });
     const collider = rig.world.getComponent(e, ColliderComponent)!;
     expect(collider.isSolid).toBe(true);
-    rig.runtime.state.setSwitch('s1', true);
+    rig.runtime.flags.setSwitch('s1', true);
     rig.runtime.update(16);
     expect(collider.isSolid).toBe(false);
-    rig.runtime.state.setSwitch('s1', false);
+    rig.runtime.flags.setSwitch('s1', false);
     rig.runtime.update(16);
     expect(collider.isSolid).toBe(true);
 
@@ -200,7 +200,7 @@ describe('PageSelector: applying pages', () => {
     expect(rig.world.getComponent(e, EventComponent)!.activePage).toBe(-1);
     expect(rig.world.getComponent(e, SpriteComponent)!.visible).toBe(false);
     expect(rig.world.getComponent(e, ColliderComponent)!.isSolid).toBe(false);
-    rig.runtime.state.setSwitch('s1', true);
+    rig.runtime.flags.setSwitch('s1', true);
     rig.runtime.update(16);
     expect(rig.world.getComponent(e, SpriteComponent)!.visible).toBe(true);
     expect(rig.world.getComponent(e, ColliderComponent)!.isSolid).toBe(true);
@@ -217,11 +217,11 @@ describe('PageSelector: applying pages', () => {
       ],
     });
     const sprite = rig.world.getComponent(e, SpriteComponent)!;
-    rig.runtime.state.setSelfSwitch('test', 'chest1', 'A', true);
+    rig.runtime.flags.setSelfSwitch('test', 'chest1', 'A', true);
     rig.runtime.update(16);
     expect(sprite.frame).toBe(1);
     sprite.frame = 7; // a runtime tweak survives while the page stays active
-    rig.runtime.state.setSwitch('s2', true);
+    rig.runtime.flags.setSwitch('s2', true);
     rig.runtime.update(16);
     expect(sprite.frame).toBe(7);
     rig.runtime.inventory.add('key');

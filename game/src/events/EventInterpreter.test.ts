@@ -25,10 +25,10 @@ describe('dialogue commands', () => {
     ])!;
     await rig.advance();
     expect(rig.ui.texts).toEqual([{ speaker: 'Elder', text: 'Hello' }]);
-    expect(rig.runtime.state.getSwitch('s1')).toBe(false); // still waiting
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(false); // still waiting
     rig.ui.dismiss();
     await run.done;
-    expect(rig.runtime.state.getSwitch('s1')).toBe(true);
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(true);
   });
 
   it('showText with neither speaker nor text is skipped', async () => {
@@ -47,8 +47,8 @@ describe('dialogue commands', () => {
     ])!;
     await run.done;
     expect(rig.ui.choices[0]).toEqual({ options: ['Yes', 'No'], allowCancel: false });
-    expect(rig.runtime.state.getSwitch('s1')).toBe(false);
-    expect(rig.runtime.state.getSwitch('s2')).toBe(true);
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(false);
+    expect(rig.runtime.flags.getSwitch('s2')).toBe(true);
   });
 
   const cancelCases: Array<['none' | 'last' | 'branch', string, string]> = [
@@ -66,7 +66,7 @@ describe('dialogue commands', () => {
     ])!;
     await run.done;
     expect(rig.ui.choices[0].allowCancel).toBe(true);
-    expect(rig.runtime.state.getVariable('v1')).toBe(branch === 'cancel' ? 3 : 2);
+    expect(rig.runtime.flags.getVariable('v1')).toBe(branch === 'cancel' ? 3 : 2);
   });
 
   it('cancel "none" never offers cancelling', async () => {
@@ -80,13 +80,13 @@ describe('dialogue commands', () => {
     const run = rig.runCommands([cmd('showChoices', { options: [], cancel: 'none' }), cmd('setSwitch', { id: 's1', value: true })])!;
     await run.done;
     expect(rig.warnings.some((w) => w.includes('no options'))).toBe(true);
-    expect(rig.runtime.state.getSwitch('s1')).toBe(true);
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(true);
   });
 });
 
 describe('flow commands', () => {
   it('conditional: then / else, all conditions must hold, empty list holds', async () => {
-    rig.runtime.state.setSwitch('s1', true);
+    rig.runtime.flags.setSwitch('s1', true);
     const mk = (conditions: unknown[], target: string) =>
       cmd('conditional', { conditions }, {
         then: [cmd('setSwitch', { id: target, value: true })],
@@ -98,9 +98,9 @@ describe('flow commands', () => {
       mk([], 'intro_done'),
     ])!;
     await run.done;
-    expect(rig.runtime.state.getSwitch('s2')).toBe(true); // all hold
-    expect(rig.runtime.state.getVariable('v1')).toBe(1); // second went to else
-    expect(rig.runtime.state.getSwitch('intro_done')).toBe(true); // empty list -> then
+    expect(rig.runtime.flags.getSwitch('s2')).toBe(true); // all hold
+    expect(rig.runtime.flags.getVariable('v1')).toBe(1); // second went to else
+    expect(rig.runtime.flags.getSwitch('intro_done')).toBe(true); // empty list -> then
   });
 
   it('conditional supports self switch and hasItem conditions', async () => {
@@ -112,7 +112,7 @@ describe('flow commands', () => {
       }),
     ])] });
     await rig.runtime.start(e, 0)!.done;
-    expect(rig.runtime.state.getSwitch('s1')).toBe(true);
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(true);
   });
 
   it('loop repeats until breakLoop; nested loops break only the inner one', async () => {
@@ -128,9 +128,9 @@ describe('flow commands', () => {
     ])!;
     await rig.advance(200);
     await run.done;
-    expect(rig.runtime.state.getVariable('v1')).toBe(3);
-    expect(rig.runtime.state.getVariable('v3')).toBe(30);
-    expect(rig.runtime.state.getSwitch('s1')).toBe(true);
+    expect(rig.runtime.flags.getVariable('v1')).toBe(3);
+    expect(rig.runtime.flags.getVariable('v3')).toBe(30);
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(true);
   });
 
   it('exitEvent stops the whole event, even from inside loops and branches', async () => {
@@ -140,22 +140,22 @@ describe('flow commands', () => {
     ])!;
     await rig.advance(100);
     expect(await run.done).toBe('completed');
-    expect(rig.runtime.state.getSwitch('s1')).toBe(false);
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(false);
   });
 
   it('breakLoop outside of a loop warns and continues', async () => {
     const run = rig.runCommands([cmd('breakLoop'), cmd('setSwitch', { id: 's1', value: true })])!;
     await run.done;
     expect(rig.warnings.some((w) => w.includes('breakLoop outside'))).toBe(true);
-    expect(rig.runtime.state.getSwitch('s1')).toBe(true);
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(true);
   });
 
   it('wait pauses for game time; comment does nothing', async () => {
     const run = rig.runCommands([cmd('comment', { text: 'hi' }), cmd('wait', { ms: 500 }), cmd('setSwitch', { id: 's1', value: true })])!;
     await rig.advance(300);
-    expect(rig.runtime.state.getSwitch('s1')).toBe(false);
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(false);
     await rig.advance(300);
-    expect(rig.runtime.state.getSwitch('s1')).toBe(true);
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(true);
     expect(run.interpreter.finished).toBe(true);
   });
 
@@ -176,20 +176,20 @@ describe('state commands', () => {
     setup?.();
     const run = rig.runCommands([cmd('setVariable', { id: 'v1', op: 'set', operand: 'const', value: 0, ...params })])!;
     await run.done;
-    return rig.runtime.state.getVariable('v1');
+    return rig.runtime.flags.getVariable('v1');
   }
 
   it('setSwitch on/off', async () => {
     await rig.runCommands([cmd('setSwitch', { id: 's1', value: true }), cmd('setSwitch', { id: 's2', value: false })])!.done;
-    expect(rig.runtime.state.getSwitch('s1')).toBe(true);
-    expect(rig.runtime.state.getSwitch('s2')).toBe(false);
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(true);
+    expect(rig.runtime.flags.getSwitch('s2')).toBe(false);
   });
 
   it('setVariable: every operation with a constant', async () => {
-    rig.runtime.state.setVariable('v1', 10);
+    rig.runtime.flags.setVariable('v1', 10);
     const apply = async (op: string, value: number) => {
       await rig.runCommands([cmd('setVariable', { id: 'v1', op, operand: 'const', value })])!.done;
-      return rig.runtime.state.getVariable('v1');
+      return rig.runtime.flags.getVariable('v1');
     };
     expect(await apply('set', 7)).toBe(7);
     expect(await apply('add', 3)).toBe(10);
@@ -200,7 +200,7 @@ describe('state commands', () => {
   });
 
   it('division and modulo by zero leave the variable unchanged and warn', async () => {
-    rig.runtime.state.setVariable('v1', 9);
+    rig.runtime.flags.setVariable('v1', 9);
     expect(await runVar({ op: 'div', value: 0 })).toBe(9);
     expect(await runVar({ op: 'mod', value: 0 })).toBe(9);
     expect(rig.warnings.filter((w) => w.includes('by zero'))).toHaveLength(2);
@@ -217,15 +217,15 @@ describe('state commands', () => {
     const highRig = makeRig({ random: () => 0.999999 });
     await lowRig.runCommands([cmd('setVariable', { id: 'v1', op: 'set', operand: 'random', min: 3, max: 6 })])!.done;
     await highRig.runCommands([cmd('setVariable', { id: 'v1', op: 'set', operand: 'random', min: 6, max: 3 })])!.done;
-    expect(lowRig.runtime.state.getVariable('v1')).toBe(3);
-    expect(highRig.runtime.state.getVariable('v1')).toBe(6);
+    expect(lowRig.runtime.flags.getVariable('v1')).toBe(3);
+    expect(highRig.runtime.flags.getVariable('v1')).toBe(6);
   });
 
   it('setSelfSwitch targets the event\'s own entity on the current map', async () => {
     const e = rig.add({ id: 'chest9', pages: [page([cmd('setSelfSwitch', { key: 'B', value: true })])] });
     await rig.runtime.start(e, 0)!.done;
-    expect(rig.runtime.state.getSelfSwitch('test', 'chest9', 'B')).toBe(true);
-    expect(rig.runtime.state.getSelfSwitch('test', 'chest9', 'A')).toBe(false);
+    expect(rig.runtime.flags.getSelfSwitch('test', 'chest9', 'B')).toBe(true);
+    expect(rig.runtime.flags.getSelfSwitch('test', 'chest9', 'A')).toBe(false);
   });
 
   it('giveItem / removeItem work on the in-memory inventory', async () => {
@@ -270,7 +270,7 @@ describe('character commands', () => {
     ])!;
     await run.done;
     expect(rig.warnings.filter((w) => w.includes('ghost'))).toHaveLength(1);
-    expect(rig.runtime.state.getSwitch('s1')).toBe(true);
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(true);
   });
 
   it('setVisible hides / shows a sprite', async () => {
@@ -324,14 +324,14 @@ describe('character commands', () => {
     await rig.advance();
     expect(calls[0].steps).toEqual([{ type: 'up' }, { type: 'turn', value: 'left' }, { type: 'wait', value: 100 }]);
     expect(calls[0].hasSignal).toBe(true);
-    expect(rig.runtime.state.getSwitch('s1')).toBe(false);
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(false);
     resolveRoute!();
     await waiting.done;
-    expect(rig.runtime.state.getSwitch('s1')).toBe(true);
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(true);
 
     const fire = rig.runCommands([cmd('moveRoute', { target: 'self', steps: [{ type: 'down' }], wait: false }), cmd('setSwitch', { id: 's2', value: true })])!;
     await fire.done; // does not wait
-    expect(rig.runtime.state.getSwitch('s2')).toBe(true);
+    expect(rig.runtime.flags.getSwitch('s2')).toBe(true);
     expect(calls[1].hasSignal).toBe(false);
   });
 
@@ -391,7 +391,7 @@ describe('planned and unknown commands', () => {
       cmd('setSwitch', { id: 's1', value: true }),
     ])!;
     expect(await run.done).toBe('completed');
-    expect(rig.runtime.state.getSwitch('s1')).toBe(true);
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(true);
     const planWarnings = rig.warnings.filter((w) => w.includes('not implemented yet'));
     expect(planWarnings).toHaveLength(planned.length);
     for (const t of planned) expect(planWarnings.filter((w) => w.includes(`"${t}"`))).toHaveLength(1);
@@ -405,15 +405,15 @@ describe('planned and unknown commands', () => {
     const run = rig.runCommands([cmd('explode'), cmd('setSwitch', { id: 's1', value: true })])!;
     expect(await run.done).toBe('completed');
     expect(rig.warnings.some((w) => w.includes('kaboom'))).toBe(true);
-    expect(rig.runtime.state.getSwitch('s1')).toBe(true);
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(true);
   });
 
   it('custom commands can be registered (docs: Adding a command)', async () => {
     registerCommandHandler('testSetV3', (command, rt) => {
-      rt.ctx.state.setVariable('v3', Number(command.params.value));
+      rt.ctx.flags.setVariable('v3', Number(command.params.value));
     });
     await rig.runCommands([cmd('testSetV3', { value: 42 })])!.done;
-    expect(rig.runtime.state.getVariable('v3')).toBe(42);
+    expect(rig.runtime.flags.getVariable('v3')).toBe(42);
   });
 });
 
@@ -424,7 +424,7 @@ describe('cancellation', () => {
     expect(rig.ui.waitingText).toBe(true);
     run.interpreter.cancel();
     expect(await run.done).toBe('cancelled');
-    expect(rig.runtime.state.getSwitch('s1')).toBe(false);
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(false);
   });
 
   it('cancel during wait and during showChoices', async () => {
@@ -438,18 +438,18 @@ describe('cancellation', () => {
     await rig.advance();
     choosing.interpreter.cancel();
     expect(await choosing.done).toBe('cancelled');
-    expect(rig.runtime.state.getSwitch('s2')).toBe(false);
+    expect(rig.runtime.flags.getSwitch('s2')).toBe(false);
   });
 
   it('cancel before the run started cancels at once', async () => {
     const e = rig.add({ pages: [page([cmd('setSwitch', { id: 's1', value: true })])] });
     const interpreter = new EventInterpreter(rig.world.getComponent(e, (await import('@/ecs/components/EventComponent')).EventComponent)!.pages[0].commands, {
-      entity: e, entityId: 'x', getMapId: () => 'test', state: rig.runtime.state, inventory: rig.runtime.inventory, ui: rig.ui,
+      entity: e, entityId: 'x', getMapId: () => 'test', flags: rig.runtime.flags, inventory: rig.runtime.inventory, ui: rig.ui,
       clock: rig.runtime.clock, ops: rig.runtime.ops, maps: rig.maps, emit: () => {}, warn: () => {}, warnOnce: () => {}, random: () => 0,
     });
     interpreter.cancel();
     expect(await interpreter.run()).toBe('cancelled');
-    expect(rig.runtime.state.getSwitch('s1')).toBe(false);
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(false);
   });
 
   it('cancelAll (map switch) cancels every interpreter and releases the input lock immediately', async () => {
