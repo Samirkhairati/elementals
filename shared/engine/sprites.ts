@@ -308,6 +308,8 @@ export interface AnimationRegistration {
   frames: number[];
   fps: number;
   loop: boolean;
+  /** Ping-pong playback (frames forward, then back). Absent for the v1 kinds. */
+  yoyo?: boolean;
 }
 
 /**

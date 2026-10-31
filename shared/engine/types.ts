@@ -48,6 +48,8 @@ export interface SpriteProps {
    * other assets: name of an animation from the asset (looping autoplay); '' = static `frame`.
    */
   animation: string;
+  /** Multiplies the effective fps of the playing animation (events change it at runtime). 0 pauses. */
+  animSpeed: number;
   /** Static frame index when no animation plays (non-character assets). */
   frame: number;
   /** Pixel offset of the graphic from the Transform anchor. */

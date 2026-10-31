@@ -130,6 +130,7 @@ export class WorldEntityOps implements EntityOps {
       asset: sprite.assetId,
       facing: getEntityFacing(this.world, entity) ?? "down",
       animation: anim?.forcedPhase ?? named,
+      animSpeed: 1,
       frame: typeof sprite.frame === "number" ? sprite.frame : 0,
       offsetX: sprite.offsetX,
       offsetY: sprite.offsetY,

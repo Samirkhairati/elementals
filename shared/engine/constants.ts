@@ -5,6 +5,9 @@ import type { ComparisonOp, Controller, EventTrigger, Facing, RouteStepType, Sel
 /** Tile edge in pixels. */
 export const TILE_SIZE = 32;
 
+/** Movement speed factor while running (MovementSystem, and the reference speed of run animations). */
+export const RUN_SPEED_MULTIPLIER = 1.5;
+
 /** Sheet row order of character sprites: down, left, right, up. */
 export const FACINGS: readonly Facing[] = ['down', 'left', 'right', 'up'];
 export const CONTROLLERS: readonly Controller[] = ['none', 'player', 'wander'];

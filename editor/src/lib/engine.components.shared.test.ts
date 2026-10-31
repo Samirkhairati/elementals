@@ -81,7 +81,7 @@ describe('defaults', () => {
     expect(createDefaultComponent('Transform')).toEqual({ x: 0, y: 0, depth: 10 })
     expect(createDefaultComponent('Collider')).toEqual({ width: 32, height: 32, offsetX: 0, offsetY: 0, isSolid: true })
     expect(createDefaultComponent('Sprite')).toEqual({
-      asset: '', facing: 'down', animation: '', frame: 0, offsetX: 0, offsetY: 0, scale: 1, flipX: false, tint: '', opacity: 1, visible: true,
+      asset: '', facing: 'down', animation: '', animSpeed: 1, frame: 0, offsetX: 0, offsetY: 0, scale: 1, flipX: false, tint: '', opacity: 1, visible: true,
     })
     expect(createDefaultComponent('Movement')).toMatchObject({ controller: 'none', speed: 100 })
     expect(createDefaultComponent('Tag')).toEqual({ tag: 'entity', icon: '', color: '' })

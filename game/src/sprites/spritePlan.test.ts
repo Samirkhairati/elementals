@@ -108,7 +108,7 @@ describe('applySpriteProps', () => {
     const w = new World();
     const e = w.createEntity();
     const sprites = testSprites();
-    const base = { asset: 'objects/chest', facing: 'down', animation: '', frame: 0, offsetX: 0, offsetY: 0, scale: 1, flipX: false, tint: '', opacity: 1, visible: true } as const;
+    const base = { asset: 'objects/chest', facing: 'down', animation: '', animSpeed: 1, frame: 0, offsetX: 0, offsetY: 0, scale: 1, flipX: false, tint: '', opacity: 1, visible: true } as const;
     expect(applySpriteProps(w, e, { ...base }, sprites)).toBe(true);
     expect(w.getComponents(e)).toHaveLength(1);
     expect(applySpriteProps(w, e, { ...base, asset: '' }, sprites)).toBe(true);

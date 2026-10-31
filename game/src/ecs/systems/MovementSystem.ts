@@ -1,3 +1,4 @@
+import { RUN_SPEED_MULTIPLIER } from "@shared/engine/index.ts";
 import { System } from "../System";
 import type { World } from "../World";
 import type { Entity } from "../Entity";
@@ -86,7 +87,7 @@ export class MovementSystem extends System {
     const isLocked = gameState.isInputLocked && !routed;
 
     if (grid.isMoving) {
-      const speed = grid.movementType === MovementType.RUN ? grid.speed * 1.5 : grid.speed;
+      const speed = grid.movementType === MovementType.RUN ? grid.speed * RUN_SPEED_MULTIPLIER : grid.speed;
       const stepDist = speed * (delta / 1000);
       grid.progress += stepDist / GAME_CONSTANTS.TILE_SIZE;
 
@@ -169,7 +170,7 @@ export class MovementSystem extends System {
     }
 
     free.isMoving = true;
-    const speed = free.isRunning ? free.speed * 1.5 : free.speed;
+    const speed = free.isRunning ? free.speed * RUN_SPEED_MULTIPLIER : free.speed;
     const dist = speed * (delta / 1000);
 
     const len = Math.hypot(free.vx, free.vy);

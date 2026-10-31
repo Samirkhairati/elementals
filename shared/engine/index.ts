@@ -12,3 +12,6 @@ export * from './sprites.ts';
 export * from './database.ts';
 export * from './common.ts';
 export * from './prefabs.ts';
+export * from './characters.ts';
+export * from './characterMigrate.ts';
+export * from './profiles.ts';

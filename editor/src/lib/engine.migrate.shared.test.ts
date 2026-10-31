@@ -57,7 +57,7 @@ describe('legacy project maps (fixtures from git history)', () => {
     expect(full.components.Transform).toEqual({ x: 48, y: 192, depth: 10 })
     expect(full.components.Collider).toEqual({ width: 16, height: 8, offsetX: 0, offsetY: 0, isSolid: true }) // user data kept
     expect(full.components.Sprite).toEqual({
-      asset: 'characters/player', facing: 'down', animation: '', frame: 0, offsetX: 0, offsetY: 0, scale: 1, flipX: false, tint: '', opacity: 1, visible: true,
+      asset: 'characters/player', facing: 'down', animation: '', animSpeed: 1, frame: 0, offsetX: 0, offsetY: 0, scale: 1, flipX: false, tint: '', opacity: 1, visible: true,
     })
     expect(full.components.Movement).toEqual({ controller: 'player', speed: 100, canRun: true, wanderRadius: 3, wanderInterval: 4000 })
     // empty Interactable -> an Event with one empty action state

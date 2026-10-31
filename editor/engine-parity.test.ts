@@ -4,7 +4,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { defaultSpriteMeta, validateSpriteMeta as sharedValidateSpriteMeta } from '../shared/engine/sprites';
+import { defaultSpriteMeta, previewFrame, validateSpriteMeta as sharedValidateSpriteMeta } from '../shared/engine/sprites';
+import { clipFrameAt, clipFrames, effectiveFps, resolveClip } from '../shared/engine/characters';
+import { migrateCharacter } from '../shared/engine/characterMigrate';
+import { FACINGS } from '../shared/engine/constants';
+import type { SpriteAssetMeta } from '../shared/engine/types';
 import { normalizeDatabase as sharedNormalizeDatabase, validateDatabase as sharedValidateDatabase } from '../shared/engine/database';
 import { makePng, makeTempDirTracker } from './electron/__testutils__/helpers';
 import { normalizeDatabase, validateDatabase } from './electron/ipc/databaseStore';
@@ -110,5 +114,49 @@ describe('the committed project data passes both validators', () => {
     const raw = JSON.parse(fs.readFileSync(path.join(REPO, 'project', 'database.json'), 'utf8'));
     expect(sharedValidateDatabase(raw)).toMatchObject({ ok: true, warnings: [] });
     expect(validateDatabase(raw)).toEqual([]);
+  });
+});
+
+describe('character v2 rules agree with the v1 preview the editor still uses', () => {
+  // The v1 preview (previewFrame) and the v2 clip maths must show the same frame for the same facing,
+  // animation and time, so migrated characters look identical in the editor preview and in the game.
+  const spritesDir = path.join(REPO, 'project', 'sprites');
+  const metas = fs
+    .readdirSync(spritesDir, { recursive: true, encoding: 'utf8' })
+    .filter((f) => f.endsWith('sprite.json'))
+    .map((f) => [path.dirname(f).split(path.sep).join('/'), JSON.parse(fs.readFileSync(path.join(spritesDir, f), 'utf8')) as SpriteAssetMeta] as const);
+  const ticks = [0, 40, 99, 100, 125, 126, 250, 333, 500, 999, 1000, 2400];
+
+  it.each(metas.map(([id, meta]) => [id, meta] as [string, SpriteAssetMeta]))('%s', (id, meta) => {
+    const migrated = migrateCharacter(id, meta);
+    if (!migrated.ok) throw new Error(migrated.errors.join('; '));
+    const def = migrated.value;
+    for (const facing of FACINGS) {
+      for (const animation of meta.kind === 'character' ? ['', 'idle', 'walk', 'run'] : ['', ...Object.keys(meta.animations ?? {})]) {
+        const activity = animation === 'walk' || animation === 'run' ? animation : 'idle';
+        const clipName = meta.kind === 'character' ? resolveClip(def, 'normal', activity) : animation === '' ? null : animation;
+        for (const tick of ticks) {
+          const v1 = previewFrame(meta, { facing, animation, frame: 0 }, tick, 4096);
+          if (clipName === null) {
+            expect(v1.frameIndex).toBe(def.still?.frame ?? 0);
+            continue;
+          }
+          const clip = def.clips[clipName];
+          const frames = clipFrames(clip, facing)!.frames;
+          expect(clipFrameAt(clip, frames, tick)).toBe(v1.frameIndex);
+          expect(v1.sheetRole).toBe(clip.sheet);
+        }
+      }
+    }
+  });
+
+  it('effectiveFps without follow-speed or animSpeed is the v1 fixed fps for any entity speed', () => {
+    for (const [id, meta] of metas) {
+      const m = migrateCharacter(id, meta);
+      if (!m.ok) throw new Error('unexpected');
+      for (const clip of Object.values(m.value.clips)) {
+        for (const speed of [0, 50, 100, 150, 1e6]) expect(effectiveFps(clip, speed, 1)).toBe(clip.fps);
+      }
+    }
   });
 });
