@@ -25,3 +25,21 @@ export function fakePng(extra = 'payload'): Buffer {
 export function listDir(dir: string): string[] {
   return fs.readdirSync(dir).sort();
 }
+
+/** A PNG with a valid signature + IHDR chunk of the given pixel size (no image data; enough for header readers). */
+export function makePng(width: number, height: number): Buffer {
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8;
+  ihdr[9] = 6;
+  const len = Buffer.alloc(4);
+  len.writeUInt32BE(ihdr.length);
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    len,
+    Buffer.from('IHDR'),
+    ihdr,
+    Buffer.alloc(4), // CRC is not checked by the header readers
+  ]);
+}

@@ -3,8 +3,8 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { setupMenu } from './menu.js';
-import { registerTilesetHandlers } from './ipc/tilesetHandlers.js';
-import { registerMapHandlers } from './ipc/mapHandlers.js';
+import { registerProjectHandlers } from './ipc/projectHandlers.js';
+import { projectDirs } from './ipc/projectApi.js';
 import { getWorktreeName } from './worktreeName.js';
 import { isAllowedNavigation, parsePort } from './devServer.js';
 
@@ -20,16 +20,19 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // dist-electron/ lives in editor/, which lives in the repo root
 const REPO_ROOT = path.resolve(__dirname, '../..');
-// The project directory is located beside the 'editor' folder
-const PROJECT_DIR = path.join(REPO_ROOT, 'project');
-const MAPS_DIR = path.join(PROJECT_DIR, 'maps');
-const TILESETS_DIR = path.join(PROJECT_DIR, 'tilesets');
+// The project directory is located beside the 'editor' folder. ELEMENTALS_PROJECT_DIR points the
+// editor at another copy of it (QA, experiments) without touching the real authored data.
+const PROJECT_DIR = process.env.ELEMENTALS_PROJECT_DIR
+  ? path.resolve(process.env.ELEMENTALS_PROJECT_DIR)
+  : path.join(REPO_ROOT, 'project');
+const { mapsDir: MAPS_DIR, tilesetsDir: TILESETS_DIR, spritesDir: SPRITES_DIR } = projectDirs(PROJECT_DIR);
 const DIST_DIR = path.join(__dirname, '../dist');
 
 function ensureDirectories(): void {
   // recursive mkdir is a no-op for existing directories and also creates PROJECT_DIR
   fs.mkdirSync(MAPS_DIR, { recursive: true });
   fs.mkdirSync(TILESETS_DIR, { recursive: true });
+  fs.mkdirSync(SPRITES_DIR, { recursive: true });
 }
 
 function createWindow(): void {
@@ -82,8 +85,7 @@ app.whenReady().then(() => {
     });
   }
   ensureDirectories();
-  registerTilesetHandlers(TILESETS_DIR);
-  registerMapHandlers(MAPS_DIR);
+  registerProjectHandlers(PROJECT_DIR);
   createWindow();
 
   app.on('activate', () => {

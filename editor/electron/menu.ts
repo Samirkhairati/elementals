@@ -76,6 +76,15 @@ export function setupMenu(win: BrowserWindow) {
                   label: 'Active Selection',
                   click: () => win.webContents.send('dockview-toggle-panel', 'activeSelection'),
                 },
+                { type: 'separator' },
+                {
+                  label: 'Database (switches & variables)',
+                  click: () => win.webContents.send('dockview-toggle-panel', 'database'),
+                },
+                {
+                  label: 'Sprites',
+                  click: () => win.webContents.send('dockview-toggle-panel', 'sprites'),
+                },
               ],
             },
             { type: 'separator' },

@@ -22,6 +22,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   renameMap: (folderPath: string | null, fileName: string, newName: string) => ipcRenderer.invoke('rename-map', folderPath, fileName, newName),
   moveMap: (fileName: string, oldFolder: string | null, newFolder: string | null) => ipcRenderer.invoke('move-map', fileName, oldFolder, newFolder),
   exportMap: (jsonData: string, defaultName: string) => ipcRenderer.invoke('export-map', jsonData, defaultName),
+  getSprites: () => ipcRenderer.invoke('get-sprites'),
+  pickSpriteFile: () => ipcRenderer.invoke('pick-sprite-file'),
+  importSprite: (sourcePath: string, options: unknown) => ipcRenderer.invoke('import-sprite', sourcePath, options),
+  saveSpriteMeta: (id: string, meta: unknown) => ipcRenderer.invoke('save-sprite-meta', id, meta),
+  renameSprite: (id: string, newId: string) => ipcRenderer.invoke('rename-sprite', id, newId),
+  deleteSprite: (id: string) => ipcRenderer.invoke('delete-sprite', id),
+  getDatabase: () => ipcRenderer.invoke('get-database'),
+  saveDatabase: (database: unknown) => ipcRenderer.invoke('save-database', database),
   onTogglePanel: (callback: (panelId: string) => void) => {
     const handler = (_event: unknown, panelId: string) => callback(panelId);
     ipcRenderer.on('dockview-toggle-panel', handler);
