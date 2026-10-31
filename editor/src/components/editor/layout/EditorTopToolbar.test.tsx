@@ -26,18 +26,14 @@ const base = (over: Record<string, any> = {}) => ({
 })
 
 describe('EditorTopToolbar', () => {
-  it('has a Collider tool next to the paint tools', () => {
-    const c = base()
-    renderWithEditor(<EditorTopToolbar />, c as any)
-    const btn = screen.getByRole('button', { name: /Collider Tool \(C\)/ })
-    expect(btn).toHaveAttribute('aria-pressed', 'false')
-    fireEvent.click(btn)
-    expect(c.setActiveTool).toHaveBeenCalledWith('collider')
+  it('has no Collider tool: colliders are edited from the Properties panel only', () => {
+    renderWithEditor(<EditorTopToolbar />, base() as any)
+    expect(screen.queryByRole('button', { name: /Collider Tool/ })).toBeNull()
   })
 
   it('marks the active tool', () => {
-    renderWithEditor(<EditorTopToolbar />, base({ activeTool: 'collider' }) as any)
-    expect(screen.getByRole('button', { name: /Collider Tool/ })).toHaveAttribute('aria-pressed', 'true')
+    renderWithEditor(<EditorTopToolbar />, base({ activeTool: 'eraser' }) as any)
+    expect(screen.getByRole('button', { name: /Eraser Tool/ })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('button', { name: /Brush Tool/ })).toHaveAttribute('aria-pressed', 'false')
   })
 
@@ -56,7 +52,7 @@ describe('EditorTopToolbar', () => {
 
   it('disables map tools without a map but keeps the View toggles usable', () => {
     renderWithEditor(<EditorTopToolbar />, base({ activeMap: null }) as any)
-    expect(screen.getByRole('button', { name: /Collider Tool/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /Brush Tool/ })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'View sprites' })).toBeEnabled()
     expect(screen.getByText('No map focused')).toBeInTheDocument()
   })

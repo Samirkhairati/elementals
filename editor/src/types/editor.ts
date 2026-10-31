@@ -96,7 +96,7 @@ export interface TilesetData {
   dataUrl: string
 }
 
-export type ActiveTool = 'brush' | 'eraser' | 'rectangle' | 'bucket' | 'collider'
+export type ActiveTool = 'brush' | 'eraser' | 'rectangle' | 'bucket'
 export type PaintMode = 'discontinuous' | 'continuous' | 'random'
 
 export interface DebugInfo {

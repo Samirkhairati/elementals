@@ -302,9 +302,6 @@ export function useCanvasInteraction({
         }
       }
 
-      // The collider tool never paints tiles: drawing happens on the entity layer (KonvaColliderEditor).
-      if (e.evt.button === 0 && activeToolRef.current === 'collider') return
-
       // If an entity was selected, clicking elsewhere on the canvas should ONLY deselect on the first
       // click and NOT start painting immediately!
       if (e.evt.button === 0 && selectedEntityId) {

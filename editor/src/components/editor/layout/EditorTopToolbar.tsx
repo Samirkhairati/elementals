@@ -17,7 +17,6 @@ import {
   Image as ImageIcon,
   Type,
   Zap,
-  BoxSelect,
 } from 'lucide-react'
 import { useEditorSelector, type EditorContextValue } from './EditorContext'
 import { ShortcutsDialog } from '../dialogs/ShortcutsDialog'
@@ -142,8 +141,6 @@ function MapToolbar() {
           {tool('eraser', 'Eraser Tool (E)', <Eraser />)}
           {tool('rectangle', 'Rectangle Fill Tool (M)', <Square />)}
           {tool('bucket', 'Paint Bucket Tool (G)', <PaintBucket />)}
-          <div className="mx-0.5 h-4 w-px bg-border/60" />
-          {tool('collider', 'Collider Tool (C): draw or move the selected entity’s collider', <BoxSelect />)}
         </ToolGroup>
 
         <Divider />

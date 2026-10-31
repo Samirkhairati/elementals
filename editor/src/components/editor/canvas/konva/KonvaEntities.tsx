@@ -25,7 +25,6 @@ import {
 import { drawResolvedSprite, resolveSprite, useSpriteImagesVersion } from '@/lib/spriteImages'
 import type { CanvasViewSettings } from '@/hooks/editor/canvas/canvasView'
 import { overlayRgb } from '@/hooks/editor/canvas/canvasView'
-import { KonvaColliderEditor } from './KonvaColliderEditor'
 import {
   EVENT_RGB,
   MOVE_RGB,
@@ -50,13 +49,11 @@ interface KonvaEntitiesProps {
   activeMap: MapData
   snapToGrid?: boolean
   snapEntityPos?: (x: number, y: number) => { x: number; y: number }
-  onUpdateCollider?: (entityId: string, patch: ColliderPatch & { isSolid?: boolean }) => void
   onRightClickEntity?: (entity: EntityData, clientX: number, clientY: number) => void
   showEntities?: boolean
   entityFolders?: EntityFolder[]
   spriteAssets?: Record<string, SpriteAssetInfo>
   view: CanvasViewSettings
-  colliderToolActive?: boolean
   /** Double-click on an entity that has an Event. */
   onOpenEvent?: (entityId: string) => void
 }
@@ -282,18 +279,15 @@ export const KonvaEntities = React.memo(function KonvaEntities({
   activeMap,
   snapToGrid = true,
   snapEntityPos = (x, y) => ({ x: Math.floor(x / 32) * 32 + 16, y: Math.floor((y - 16) / 32 + 1) * 32 }),
-  onUpdateCollider,
   onRightClickEntity,
   showEntities = true,
   entityFolders = [],
   spriteAssets = EMPTY_ASSETS,
   view,
-  colliderToolActive = false,
   onOpenEvent,
 }: KonvaEntitiesProps) {
   const imagesVersion = useSpriteImagesVersion()
   const visuals = useRef<Visuals>({ hoverId: null, dragId: null, dragX: 0, dragY: 0 })
-  const liveRect = useRef<GeoRect | null>(null)
 
   const mapWidthPx = activeMap.width * 32
   const mapHeightPx = activeMap.height * 32
@@ -305,11 +299,6 @@ export const KonvaEntities = React.memo(function KonvaEntities({
   }, [entities, entityFolders, spriteAssets])
 
   const selected = useMemo(() => infos.find((i) => i.id === selectedEntityId) ?? null, [infos, selectedEntityId])
-
-  const handleCommitCollider = useCallback(
-    (id: string, patch: ColliderPatch & { isSolid?: boolean }) => onUpdateCollider?.(id, patch),
-    [onUpdateCollider],
-  )
 
   if (showEntities === false) return null
 
@@ -325,9 +314,8 @@ export const KonvaEntities = React.memo(function KonvaEntities({
             info={info}
             imagesVersion={imagesVersion}
             showSprites={view.sprites}
-            // In collider-tool mode the selected entity lets presses through so the collider can be drawn over it.
-            listening={!(colliderToolActive && isSelected)}
-            draggable={!colliderToolActive}
+            listening
+            draggable
             mapWidthPx={mapWidthPx}
             mapHeightPx={mapHeightPx}
             snapToGrid={snapToGrid}
@@ -380,9 +368,7 @@ export const KonvaEntities = React.memo(function KonvaEntities({
             const ay = v.dragId === selected.id ? v.dragY : selected.entity.y
             if (selected.controller === 'wander') drawWanderRing(ctx, ax, ay, selected.wanderRadius, s)
             drawSelectionFrame(ctx, translateRect(selected.bounds, ax, ay), s)
-            if (liveRect.current === null) {
-              drawFootprint(ctx, ax + selected.foot.x, ay + selected.foot.y, selected.foot.w, selected.foot.h, selected.rgb, s, true)
-            }
+            drawFootprint(ctx, ax + selected.foot.x, ay + selected.foot.y, selected.foot.w, selected.foot.h, selected.rgb, s, true)
             drawAnchorCross(ctx, ax, ay, s)
           }
 
@@ -423,15 +409,6 @@ export const KonvaEntities = React.memo(function KonvaEntities({
         }}
       />
 
-      <KonvaColliderEditor
-        entity={colliderEntity}
-        toolActive={colliderToolActive}
-        rgb={selected?.rgb ?? '255,255,255'}
-        mapWidthPx={mapWidthPx}
-        mapHeightPx={mapHeightPx}
-        onCommit={handleCommitCollider}
-        liveRef={liveRect}
-      />
     </Group>
   )
 })

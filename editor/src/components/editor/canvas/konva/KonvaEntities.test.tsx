@@ -32,7 +32,6 @@ vi.mock('./entityDraw', async (orig) => ({
   drawHoverFrame: drawn.hover,
   drawPlaceholder: drawn.placeholder,
 }))
-vi.mock('./KonvaColliderEditor', () => ({ KonvaColliderEditor: (p: any) => <div data-testid="collider-editor" data-tool={String(p.toolActive)} data-rgb={p.rgb} data-entity={p.entity?.id ?? ''} /> }))
 
 import { KonvaEntities } from './KonvaEntities'
 import { makeEntity, makeMap } from '@/test/helpers'
@@ -180,15 +179,9 @@ describe('KonvaEntities', () => {
     expect(drawn.placeholder.mock.calls.map((c) => c[3])).toEqual([1, 0.5])
   })
 
-  it('selected entities can be dragged; in collider-tool mode nothing drags and the selected one lets presses through', () => {
+  it('entities can be dragged and receive presses', () => {
     renderEntities([entity('a', 16, 32), entity('b', 48, 32)], { selectedEntityId: 'a' })
     expect(nodes().every((n) => n.props.draggable === true && n.props.listening === true)).toBe(true)
-    renderEntities([entity('a', 16, 32), entity('b', 48, 32)], { selectedEntityId: 'a', colliderToolActive: true })
-    const a = nodes().find((n) => n.props.x === 16)!
-    const b = nodes().find((n) => n.props.x === 48)!
-    expect(a.props.draggable).toBe(false)
-    expect(a.props.listening).toBe(false)
-    expect(b.props.listening).toBe(true)
   })
 
   it('moving an entity reports a snapped, clamped position once on drop', () => {
@@ -212,15 +205,6 @@ describe('KonvaEntities', () => {
     plain.props.onDblClick({ cancelBubble: false })
     plain.props.onDblTap({ cancelBubble: false })
     expect(onOpenEvent).toHaveBeenCalledTimes(1)
-  })
-
-  it('passes the collider-editing state to the collider editor', () => {
-    const { getByTestId } = renderEntities([entity('a', 16, 32, { Collider: { width: 32, height: 32 } })], { selectedEntityId: 'a', colliderToolActive: true, })
-    const ed = getByTestId('collider-editor')
-    expect(ed.dataset.entity).toBe('a')
-    expect(ed.dataset.tool).toBe('true')
-    // the area is always editable, whatever the "Colliders" view toggle says
-    expect(ed.dataset.rgb).toBe('255,255,255')
   })
 
   it("tints each entity's area with its Tag colour (unknown or empty = white)", () => {

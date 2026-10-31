@@ -27,9 +27,6 @@ export function ShortcutsDialog({ open, onClose }: { open: boolean, onClose: () 
             <div className="font-medium">Paint Bucket</div>
             <div className="text-muted-foreground">G</div>
             
-            <div className="font-medium">Collider Tool</div>
-            <div className="text-muted-foreground">C (drag: Shift free, Alt from centre, Esc cancel)</div>
-
             <div className="font-medium">Isolate Layer Visibility</div>
             <div className="text-muted-foreground">Shift + Click (Eye Icon)</div>
             

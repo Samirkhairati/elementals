@@ -25,7 +25,6 @@ import { DebugStatusBadge } from './DebugStatusBadge'
 import { PendingEntityPlacement } from '@/hooks/editor/useEntityPlacement'
 import { useCanvasView } from '@/hooks/editor/canvas/canvasView'
 import { useEditorSelector, type EditorContextValue } from '@/components/editor/layout/EditorContext'
-import type { ColliderPatch } from '@/lib/entityVisuals'
 import { openEventEditor } from '@/lib/openEventEditor'
 
 const selectCanvasContext = (c: EditorContextValue) => ({
@@ -112,7 +111,6 @@ export function MapCanvas({
   const images = useTilesetImages(tilesets)
   const { spriteAssets } = useEditorSelector(selectCanvasContext)
   const view = useCanvasView()
-  const colliderToolActive = activeTool === 'collider'
 
   // Viewport, zoom, pan, and stage coordinate translation
   const {
@@ -174,17 +172,6 @@ export function MapCanvas({
     setSelectedEntityId,
   })
 
-  const handleUpdateCollider = useCallback(
-    (entityId: string, patch: ColliderPatch & { isSolid?: boolean }) => {
-      if (updateComponentProps) {
-        updateComponentProps(entityId, 'Collider', patch)
-        return
-      }
-      for (const [key, value] of Object.entries(patch)) updateComponentProp?.(entityId, 'Collider', key, value)
-    },
-    [updateComponentProp, updateComponentProps]
-  )
-
   const handleUpdateTag = useCallback(
     (entityId: string, patch: Record<string, any>) => {
       if (updateComponentProps) updateComponentProps(entityId, 'Tag', patch)
@@ -206,7 +193,7 @@ export function MapCanvas({
             ? 'cursor-grabbing'
             : isSpaceDown
               ? 'cursor-grab'
-              : pendingPlacement || colliderToolActive
+              : pendingPlacement
                 ? 'cursor-crosshair'
                 : ''
         }`}
@@ -263,13 +250,11 @@ export function MapCanvas({
                 activeMap={activeMap}
                 snapToGrid={snapToGrid}
                 snapEntityPos={snapEntityPos}
-                onUpdateCollider={handleUpdateCollider}
                 onRightClickEntity={handleRightClickEntity}
                 showEntities={showEntities}
                 entityFolders={entityFolders}
                 spriteAssets={spriteAssets}
                 view={view}
-                colliderToolActive={colliderToolActive}
                 onOpenEvent={openEventEditor}
               />
 
@@ -286,14 +271,6 @@ export function MapCanvas({
         ) : (
           <div className="h-full w-full flex items-center justify-center text-muted-foreground font-mono text-xs tracking-wider opacity-50">
             Select or create a map to start editing
-          </div>
-        )}
-
-        {colliderToolActive && activeMap && (
-          <div className="pointer-events-none absolute left-1/2 top-3 z-40 max-w-[92%] -translate-x-1/2 truncate whitespace-nowrap rounded-md border border-border bg-black/80 px-3 py-1 text-ed-label text-white shadow-lg" data-testid="collider-tool-hint">
-            {selectedEntityId
-              ? 'Collider tool: drag to draw · drag the box to move it · Shift free · Alt from centre · Esc cancels'
-              : 'Collider tool: click an entity to select it, then drag to draw its collider'}
           </div>
         )}
 
