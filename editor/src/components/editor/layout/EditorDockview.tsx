@@ -21,6 +21,7 @@ const selectDockInputs = (c: EditorContextValue) => ({
   activeMap: c.activeMap,
   onSelectMap: c.onSelectMap,
   onClearActiveMap: c.onClearActiveMap,
+  entityFocus: !!c.selectedEntityId,
 });
 
 export function EditorDockview() {
@@ -40,6 +41,7 @@ export function EditorDockview() {
     activeMap: parentCtx.activeMap,
     onSelectMap: parentCtx.onSelectMap,
     onClearActiveMap: parentCtx.onClearActiveMap,
+    entityFocus: parentCtx.entityFocus,
   });
 
   const layoutValue = useMemo(

@@ -1,5 +1,5 @@
 import React from 'react'
-import { Plus } from 'lucide-react'
+import { ArrowLeft, Plus } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,7 +13,7 @@ import { COMPONENT_REGISTRY } from '@/lib/componentRegistry'
 import { COMPONENT_TYPES } from '../../../../../shared/engine/components'
 import { entityIconName, pxToTile, summarizeEntity, tileToPxClamped } from '@/lib/entityVisuals'
 import { ComponentCard } from './entity/ComponentCard'
-import { Badge, EdButton, Field, NumberField, TextField } from '../ui/controls'
+import { Badge, EdButton, Field, NumberField, ReadoutField, TextField } from '../ui/controls'
 import { accentVar, NamedIcon } from '../ui/icons'
 import { SpriteThumb } from '../sprites/SpriteThumb'
 import { useEditorSelector, type EditorContextValue } from '../layout/EditorContext'
@@ -31,6 +31,8 @@ interface PropertiesPanelProps {
   updateComponentProp?: (entityId: string, type: ComponentType, key: string, value: unknown) => void
   updateComponentProps?: (entityId: string, type: ComponentType, patch: PropBag) => void
   deleteEntity?: (id: string) => void
+  /** Leave the entity inspector (clears the selection, which brings the other sidebar panels back). */
+  onBack?: () => void
 }
 
 const selectSpriteAssets = (c: EditorContextValue) => c.spriteAssets
@@ -98,6 +100,7 @@ export function PropertiesPanel({
   removeComponent,
   updateComponentProp,
   updateComponentProps,
+  onBack,
 }: PropertiesPanelProps) {
   const map = useEditorSelector(selectMapSize)
   const selectedEntity = selectedEntityId ? entities.find((e) => e.id === selectedEntityId) : null
@@ -110,6 +113,13 @@ export function PropertiesPanel({
 
     return (
       <div className="flex w-full flex-col gap-3 text-left" data-testid="entity-inspector">
+        {onBack && (
+          <button type="button" onClick={onBack} className="ed-btn self-start" data-size="sm" aria-label="Back to layers">
+            <ArrowLeft />
+            Back to layers
+          </button>
+        )}
+
         {/* Entity header */}
         <section className="ed-card">
           <div className="flex items-center gap-3 p-3">
@@ -128,7 +138,7 @@ export function PropertiesPanel({
             </div>
           </div>
           <div className="flex flex-col gap-2 border-t border-border/40 bg-background/30 p-3">
-            <Field label="Tile" hint="Column and row of the tile the entity stands on">
+            <Field label="Tile" info="Column and row of the tile the entity stands on.">
               <div className="flex w-full items-center gap-2">
                 <NumberField
                   value={tile.col}
@@ -154,9 +164,9 @@ export function PropertiesPanel({
                 />
               </div>
             </Field>
-            <div className="ed-hint" data-testid="pixel-readout">
-              Anchor {selectedEntity.x}, {selectedEntity.y} px
-            </div>
+            <ReadoutField label="Anchor" info="Where the entity stands, in pixels: the bottom-centre of its tile. It follows from Tile and is not edited directly." testId="pixel-readout">
+              {selectedEntity.x}, {selectedEntity.y} px
+            </ReadoutField>
           </div>
         </section>
 

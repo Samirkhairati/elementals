@@ -8,10 +8,12 @@ interface UseDockviewLayoutOptions {
   activeMap?: MapData | null;
   onSelectMap?: (m: MapData) => void;
   onClearActiveMap?: () => void;
+  /** An entity is selected: the Properties panel takes over the whole left sidebar. */
+  entityFocus?: boolean;
 }
 
 export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
-  const { maps = [], activeMap = null, onSelectMap, onClearActiveMap } = options;
+  const { maps = [], activeMap = null, onSelectMap, onClearActiveMap, entityFocus = false } = options;
 
   const optionsRef = useRef({ maps, activeMap, onSelectMap, onClearActiveMap });
   useEffect(() => {
@@ -236,6 +238,32 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
     }
   }, [updateOpenPanels]);
 
+  /** The "no map" placeholder tab, added when the last map tab goes away. */
+  const ensureEmptyCanvas = useCallback((api: DockviewApi) => {
+    if (api.getPanel('empty_canvas')) return;
+    const rightRef =
+      api.getPanel('tilesets') ||
+      api.getPanel('preview') ||
+      api.getPanel('activeSelection');
+    const leftRef =
+      api.getPanel('properties') ||
+      api.getPanel('entities') ||
+      api.getPanel('layers') ||
+      api.getPanel('maps');
+
+    api.addPanel({
+      id: 'empty_canvas',
+      component: 'emptyCanvas',
+      title: 'MAP',
+      params: {},
+      position: rightRef
+        ? { referencePanel: rightRef, direction: 'left' }
+        : leftRef
+        ? { referencePanel: leftRef, direction: 'right' }
+        : undefined,
+    });
+  }, []);
+
   const onReady = useCallback((event: DockviewReadyEvent) => {
     const api = event.api;
     apiRef.current = api;
@@ -276,62 +304,42 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
 
     api.onDidRemovePanel((panel) => {
       updateOpenPanels();
-      if (isMapPanelId(panel.id)) {
-        const parsed = parseMapPanelId(panel.id);
-        const currentActive = optionsRef.current.activeMap;
-        if (
-          parsed &&
-          currentActive &&
-          currentActive.fileName === parsed.fileName &&
-          (currentActive.folderPath || null) === parsed.folderPath
-        ) {
-          const remainingMapPanels = api.panels.filter((p) => isMapPanelId(p.id));
-          if (remainingMapPanels.length > 0) {
-            const nextPanel = remainingMapPanels[0];
-            const nextParsed = parseMapPanelId(nextPanel.id);
-            if (nextParsed) {
-              const nextMap = optionsRef.current.maps?.find(
-                (m) =>
-                  m.fileName === nextParsed.fileName &&
-                  (m.folderPath || null) === nextParsed.folderPath
-              );
-              if (nextMap) {
-                optionsRef.current.onSelectMap?.(nextMap);
-              }
-            }
-            nextPanel.api.setActive();
-          } else {
-            optionsRef.current.onClearActiveMap?.();
-            if (!api.getPanel('empty_canvas')) {
-              const rightRef =
-                api.getPanel('tilesets') ||
-                api.getPanel('preview') ||
-                api.getPanel('activeSelection');
-              const leftRef =
-                api.getPanel('properties') ||
-                api.getPanel('entities') ||
-                api.getPanel('layers') ||
-                api.getPanel('maps');
+      if (!isMapPanelId(panel.id)) return;
+      const parsed = parseMapPanelId(panel.id);
+      const currentActive = optionsRef.current.activeMap;
+      const wasActive =
+        !!parsed &&
+        !!currentActive &&
+        currentActive.fileName === parsed.fileName &&
+        (currentActive.folderPath || null) === parsed.folderPath;
+      const remainingMapPanels = api.panels.filter((p) => isMapPanelId(p.id));
 
-              api.addPanel({
-                id: 'empty_canvas',
-                component: 'emptyCanvas',
-                title: 'MAP',
-                params: {},
-                position: rightRef
-                  ? { referencePanel: rightRef, direction: 'left' }
-                  : leftRef
-                  ? { referencePanel: leftRef, direction: 'right' }
-                  : undefined,
-              });
-            }
+      if (wasActive && remainingMapPanels.length > 0) {
+        const nextPanel = remainingMapPanels[0];
+        const nextParsed = parseMapPanelId(nextPanel.id);
+        if (nextParsed) {
+          const nextMap = optionsRef.current.maps?.find(
+            (m) =>
+              m.fileName === nextParsed.fileName &&
+              (m.folderPath || null) === nextParsed.folderPath
+          );
+          if (nextMap) {
+            optionsRef.current.onSelectMap?.(nextMap);
           }
         }
+        nextPanel.api.setActive();
+        return;
+      }
+
+      if (remainingMapPanels.length === 0) {
+        if (wasActive) optionsRef.current.onClearActiveMap?.();
+        // The map may already have been deactivated (deleted) before its tab went away: still leave a placeholder.
+        ensureEmptyCanvas(api);
       }
     });
 
     updateOpenPanels();
-  }, [buildDefaultLayout, updateOpenPanels]);
+  }, [buildDefaultLayout, updateOpenPanels, ensureEmptyCanvas]);
 
   // Sync activeMap tab when the active map *identity* changes from outside
   // (content edits produce a new activeMap object on every stroke and must not re-run this).
@@ -343,6 +351,33 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
       openMapTab(current);
     }
   }, [activeMapFile, activeMapFolder, openMapTab]);
+
+  // A map that disappears from the project (deleted, or its folder was) closes its tab. Only maps that were
+  // in the previous list count, so the empty list before the first load never closes anything.
+  const knownMapIds = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const api = apiRef.current;
+    const present = new Set(maps.map((m) => getMapPanelId(m.folderPath || null, m.fileName)));
+    const gone = [...knownMapIds.current].filter((id) => !present.has(id));
+    knownMapIds.current = present;
+    if (!api) return;
+    for (const id of gone) {
+      const panel = api.getPanel(id);
+      if (panel) panel.api.close();
+    }
+  }, [maps]);
+
+  // Entity selected: the Properties panel replaces the rest of the left sidebar (maps, layers, entities) until the
+  // selection ends. Re-applied when panels open/close so a reset layout or reopened panel follows the same rule.
+  useEffect(() => {
+    const api = apiRef.current;
+    const props = api?.getPanel('properties');
+    if (!api || !props) return;
+    for (const id of ['maps', 'layers', 'entities']) {
+      const panel = api.getPanel(id);
+      if (panel && panel.group !== props.group) panel.group.api.setVisible(!entityFocus);
+    }
+  }, [entityFocus, openPanels]);
 
   const openPanel = useCallback((id: PanelId | string) => {
     if (!apiRef.current) return;
@@ -543,29 +578,25 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
         }
         break;
       }
-      case 'database':
-      case 'sprites': {
-        // On-demand panels: open as a tab next to the Tileset Browser (right column).
-        const title = id === 'database' ? 'DATABASE' : 'SPRITES';
-        const refRight =
-          api.getPanel('tilesets') || api.getPanel('preview') || api.getPanel('activeSelection') ||
-          api.getPanel(id === 'database' ? 'sprites' : 'database');
+      case 'database': {
+        // On-demand panel: opens as a tab next to the Tileset Browser (right column).
+        const refRight = api.getPanel('tilesets') || api.getPanel('preview') || api.getPanel('activeSelection');
         if (refRight) {
           api.addPanel({
             id,
             component: id,
-            title,
+            title: 'DATABASE',
             position: { referencePanel: refRight, direction: 'within' }
           });
         } else if (firstMapPanel) {
           api.addPanel({
             id,
             component: id,
-            title,
+            title: 'DATABASE',
             position: { referencePanel: firstMapPanel, direction: 'right' }
           });
         } else {
-          api.addPanel({ id, component: id, title });
+          api.addPanel({ id, component: id, title: 'DATABASE' });
         }
         break;
       }

@@ -20,7 +20,7 @@ export function TilesetsActions() {
       </button>
       <button
         onClick={() => ctx.handlePickFile(null)}
-        className="flex items-center gap-1 text-xs font-medium font-mono bg-primary text-primary-foreground px-3 py-1.5 rounded-md hover:opacity-90 transition-opacity shadow-sm"
+        className="flex items-center gap-1 text-xs font-medium bg-primary text-primary-foreground px-3 py-1.5 rounded-md hover:opacity-90 transition-opacity shadow-sm"
       >
         <Plus className="w-3.5 h-3.5" /> Add
       </button>

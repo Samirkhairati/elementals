@@ -396,7 +396,7 @@ export function EntitiesPanel({
           </div>
         </ContextMenuTrigger>
 
-        <ContextMenuContent className="w-48 font-mono text-xs">
+        <ContextMenuContent className="w-48 text-xs">
           {entity.components.Event && (
             <ContextMenuItem
               onClick={() => {
@@ -428,7 +428,7 @@ export function EntitiesPanel({
                 <FolderInput className="w-3.5 h-3.5 mr-2 text-muted-foreground" />
                 Move to Folder
               </ContextMenuSubTrigger>
-              <ContextMenuSubContent className="w-44 font-mono text-xs">
+              <ContextMenuSubContent className="w-44 text-xs">
                 <ContextMenuItem
                   disabled={!entity.folder}
                   onClick={() => moveEntityToFolder?.(entity.id, null)}
@@ -597,7 +597,7 @@ export function EntitiesPanel({
                       </div>
                     </ContextMenuTrigger>
 
-                    <ContextMenuContent className="w-48 font-mono text-xs">
+                    <ContextMenuContent className="w-48 text-xs">
                       {renderNewEntityMenuItems(folder.id)}
                       <ContextMenuSeparator />
                       <ContextMenuItem onClick={() => startEditingFolder(folder)}>
@@ -647,7 +647,7 @@ export function EntitiesPanel({
           </div>
         </ContextMenuTrigger>
 
-        <ContextMenuContent className="w-48 font-mono text-xs">
+        <ContextMenuContent className="w-48 text-xs">
           {renderNewEntityMenuItems(null)}
           <ContextMenuSeparator />
           <ContextMenuItem onClick={() => createEntityFolder?.()}>

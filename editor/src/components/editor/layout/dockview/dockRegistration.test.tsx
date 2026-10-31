@@ -5,11 +5,9 @@ import type { DockviewApi, DockviewReadyEvent } from 'dockview-react'
 
 // Konva needs a real canvas; the dock registration does not care about the map canvas itself.
 vi.mock('@/components/editor/canvas/MapCanvas', () => ({ MapCanvas: () => null }))
-// The Sprites panel belongs to another agent (it may be a placeholder); the wrapper just renders it.
-vi.mock('@/components/editor/panels/SpritesPanel', () => ({ SpritesPanel: () => <div data-testid="sprites-panel" /> }))
 
 import { ALL_PANELS, DEFAULT_PANEL_IDS } from './types'
-import { DatabaseWrapper, SpritesWrapper, dockviewComponents } from './PanelWrappers'
+import { DatabaseWrapper, dockviewComponents } from './PanelWrappers'
 import { useDockviewLayout } from './useDockviewLayout'
 import { EditorProvider, type EditorBaseContextValue } from '../EditorContext'
 import type { IDockviewPanelProps } from 'dockview-react'
@@ -60,17 +58,14 @@ function mountLayout() {
 const DEFAULT_OPEN = ['empty_canvas', 'maps', 'layers', 'entities', 'properties', 'tilesets', 'preview', 'activeSelection']
 
 describe('panel registry', () => {
-  it('lists Database and Sprites in the right column with their shortcuts', () => {
+  it('lists the Database in the right column with its shortcut', () => {
     const database = ALL_PANELS.find((p) => p.id === 'database')
-    const sprites = ALL_PANELS.find((p) => p.id === 'sprites')
     expect(database).toEqual({ id: 'database', title: 'Database', column: 'right', shortcut: 'Alt+D' })
-    expect(sprites).toEqual({ id: 'sprites', title: 'Sprites', column: 'right', shortcut: 'Alt+S' })
   })
 
   it('keeps the default layout unchanged: the new panels are on demand only', () => {
     expect(DEFAULT_PANEL_IDS).toEqual(['maps', 'layers', 'entities', 'properties', 'canvas', 'tilesets', 'preview', 'activeSelection'])
     expect(DEFAULT_PANEL_IDS).not.toContain('database')
-    expect(DEFAULT_PANEL_IDS).not.toContain('sprites')
   })
 
   it('has a dockview component for every panel and unique ids and shortcuts', () => {
@@ -110,10 +105,6 @@ describe('panel wrappers', () => {
     expect((value as unknown as { addSwitch: ReturnType<typeof vi.fn> }).addSwitch).toHaveBeenCalledTimes(1)
   })
 
-  it('SpritesWrapper renders the Sprites panel', () => {
-    render(<SpritesWrapper {...props} />)
-    expect(screen.getByTestId('sprites-panel')).toBeInTheDocument()
-  })
 })
 
 describe('useDockviewLayout with the new panels', () => {
@@ -126,21 +117,16 @@ describe('useDockviewLayout with the new panels', () => {
     const { hook } = mountLayout()
     expect(hook.result.current.openPanels).toEqual(DEFAULT_OPEN)
     expect(hook.result.current.isPanelOpen('database')).toBe(false)
-    expect(hook.result.current.isPanelOpen('sprites')).toBe(false)
   })
 
-  it('opens Database and Sprites as tabs next to the Tileset Browser', () => {
+  it('opens the Database as a tab next to the Tileset Browser', () => {
     const { hook, addPanel, panels } = mountLayout()
     act(() => hook.result.current.openPanel('database'))
-    act(() => hook.result.current.openPanel('sprites'))
     const calls = addPanel.mock.calls.map((c) => c[0] as { id: string; component: string; title: string; position?: { referencePanel: unknown; direction: string } })
     const db = calls.find((c) => c.id === 'database')!
     expect(db).toMatchObject({ component: 'database', title: 'DATABASE', position: { direction: 'within' } })
     expect(db.position?.referencePanel).toBe(panels.get('tilesets'))
-    const sp = calls.find((c) => c.id === 'sprites')!
-    expect(sp).toMatchObject({ component: 'sprites', title: 'SPRITES', position: { direction: 'within' } })
-    expect(sp.position?.referencePanel).toBe(panels.get('tilesets'))
-    expect(hook.result.current.openPanels).toEqual(expect.arrayContaining(['database', 'sprites']))
+    expect(hook.result.current.openPanels).toEqual(expect.arrayContaining(['database']))
   })
 
   it('activates an already open panel instead of adding it twice', () => {
@@ -158,9 +144,6 @@ describe('useDockviewLayout with the new panels', () => {
     expect(hook.result.current.isPanelOpen('database')).toBe(true)
     act(() => hook.result.current.togglePanel('database'))
     expect(hook.result.current.isPanelOpen('database')).toBe(false)
-    act(() => hook.result.current.openPanel('sprites'))
-    act(() => hook.result.current.closePanel('sprites'))
-    expect(hook.result.current.isPanelOpen('sprites')).toBe(false)
   })
 
   it('still opens when the whole right column is gone', () => {
@@ -173,15 +156,11 @@ describe('useDockviewLayout with the new panels', () => {
     expect(panels.has('tilesets')).toBe(false)
     act(() => hook.result.current.openPanel('database'))
     expect(panels.has('database')).toBe(true)
-    // the second on-demand panel joins the first
-    act(() => hook.result.current.openPanel('sprites'))
-    expect(panels.has('sprites')).toBe(true)
   })
 
   it('reset layout restores the default layout (without the on-demand panels)', () => {
     const { hook } = mountLayout()
     act(() => hook.result.current.openPanel('database'))
-    act(() => hook.result.current.openPanel('sprites'))
     act(() => hook.result.current.closePanel('maps'))
     act(() => hook.result.current.resetLayout())
     expect(hook.result.current.openPanels).toEqual(DEFAULT_OPEN)
@@ -203,13 +182,13 @@ describe('useDockviewLayout with the new panels', () => {
     act(() => toggle?.('database'))
     expect(hook.result.current.isPanelOpen('database')).toBe(true)
     act(() => {
-      window.dispatchEvent(new CustomEvent('editor:toggle-panel', { detail: 'sprites' }))
+      window.dispatchEvent(new CustomEvent('editor:toggle-panel', { detail: 'database' }))
     })
-    expect(hook.result.current.isPanelOpen('sprites')).toBe(true)
+    expect(hook.result.current.isPanelOpen('database')).toBe(false) // toggled again
   })
 
   describe('keyboard shortcuts', () => {
-    it('Alt+D toggles Database, Alt+S toggles Sprites (by key code, so macOS Alt keys work)', () => {
+    it('Alt+D toggles Database (by key code, so macOS Alt keys work)', () => {
       const { hook } = mountLayout()
       const event = new KeyboardEvent('keydown', { key: '∂', code: 'KeyD', altKey: true, cancelable: true, bubbles: true })
       act(() => {
@@ -217,10 +196,6 @@ describe('useDockviewLayout with the new panels', () => {
       })
       expect(event.defaultPrevented).toBe(true)
       expect(hook.result.current.isPanelOpen('database')).toBe(true)
-      act(() => {
-        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ß', code: 'KeyS', altKey: true, bubbles: true }))
-      })
-      expect(hook.result.current.isPanelOpen('sprites')).toBe(true)
       act(() => {
         window.dispatchEvent(new KeyboardEvent('keydown', { key: '∂', code: 'KeyD', altKey: true, bubbles: true }))
       })

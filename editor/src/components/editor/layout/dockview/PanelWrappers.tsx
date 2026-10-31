@@ -11,7 +11,6 @@ import { TilesetsPanel } from '@/components/editor/panels/TilesetsPanel';
 import { TilesetPreview } from '@/components/editor/panels/TilesetPreview';
 import { ActiveSelectionPanel } from '@/components/editor/panels/ActiveSelectionPanel';
 import { DatabasePanel } from '@/components/editor/panels/DatabasePanel';
-import { SpritesPanel } from '@/components/editor/panels/SpritesPanel';
 import { MapCanvas } from '@/components/editor/canvas/MapCanvas';
 
 // Stable no-op used as a placeholder for callbacks on inactive canvases.
@@ -48,7 +47,7 @@ export function MapsWrapper(_props: IDockviewPanelProps) {
   return (
     <div
       onClick={() => ctx.setFocusedDomain('maps')}
-      className="flex-1 overflow-y-auto p-2 font-mono text-xs min-h-0 bg-sidebar-background h-full"
+      className="flex-1 overflow-y-auto p-2 text-xs min-h-0 bg-sidebar-background h-full"
     >
       <MapsPanel
         maps={ctx.maps}
@@ -94,7 +93,7 @@ export function LayersWrapper(_props: IDockviewPanelProps) {
   return (
     <div
       onClick={() => ctx.setFocusedDomain('layers')}
-      className="flex-1 overflow-y-auto p-2 font-mono text-xs min-h-0 bg-sidebar-background h-full"
+      className="flex-1 overflow-y-auto p-2 text-xs min-h-0 bg-sidebar-background h-full"
     >
       <LayersPanel
         hasActiveMap={ctx.hasActiveMap}
@@ -145,7 +144,7 @@ export function EntitiesWrapper(_props: IDockviewPanelProps) {
   return (
     <div
       onClick={() => ctx.setFocusedDomain('entities')}
-      className="flex-1 overflow-y-auto p-2 font-mono text-xs min-h-0 bg-sidebar-background h-full"
+      className="flex-1 overflow-y-auto p-2 text-xs min-h-0 bg-sidebar-background h-full"
     >
       <EntitiesPanel
         hasActiveMap={ctx.hasActiveMap}
@@ -187,12 +186,14 @@ const selectProperties = (c: EditorContextValue) => ({
   handleUpdateComponentProp: c.handleUpdateComponentProp,
   handleUpdateComponentProps: c.handleUpdateComponentProps,
   handleDeleteEntity: c.handleDeleteEntity,
+  setSelectedEntityId: c.setSelectedEntityId,
 });
 
 export function PropertiesWrapper(_props: IDockviewPanelProps) {
   const ctx = useEditorSelector(selectProperties);
   return (
-    <div className="flex-1 overflow-auto p-2 flex flex-col items-center justify-start text-xs text-muted-foreground text-center min-h-0 bg-card/40 h-full">
+    // A plain block that scrolls vertically: a flex column here let the inspector shrink instead of scroll.
+    <div className="h-full min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain p-2 text-xs text-muted-foreground bg-card/40" data-testid="properties-scroll">
       <PropertiesPanel
         layers={ctx.layers}
         activeLayerId={ctx.activeLayerId}
@@ -206,6 +207,7 @@ export function PropertiesWrapper(_props: IDockviewPanelProps) {
         updateComponentProp={ctx.handleUpdateComponentProp}
         updateComponentProps={ctx.handleUpdateComponentProps}
         deleteEntity={ctx.handleDeleteEntity}
+        onBack={() => ctx.setSelectedEntityId(null)}
       />
     </div>
   );
@@ -330,7 +332,7 @@ export function CanvasWrapper(props: IDockviewPanelProps) {
 
 export function EmptyCanvasWrapper(_props: IDockviewPanelProps) {
   return (
-    <div className="flex-1 h-full w-full flex flex-col items-center justify-center bg-[#1a1a1a] text-muted-foreground font-mono text-xs select-none p-8 text-center">
+    <div className="flex-1 h-full w-full flex flex-col items-center justify-center bg-[#1a1a1a] text-muted-foreground text-xs select-none p-8 text-center">
       <div className="p-5 rounded-xl bg-card/40 border border-border/40 shadow-sm max-w-sm flex flex-col items-center gap-2">
         <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center text-primary mb-1">
           <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -370,7 +372,7 @@ export function TilesetsWrapper(_props: IDockviewPanelProps) {
   const ctx = useEditorSelector(selectTilesets);
   return (
     <div
-      className="flex-1 overflow-y-auto p-2 font-mono text-xs min-h-0 bg-sidebar-background h-full"
+      className="flex-1 overflow-y-auto p-2 text-xs min-h-0 bg-sidebar-background h-full"
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => ctx.handleDrop(e, null)}
     >
@@ -462,7 +464,7 @@ const selectDatabase = (c: EditorContextValue) => ({
 export function DatabaseWrapper(_props: IDockviewPanelProps) {
   const ctx = useEditorSelector(selectDatabase);
   return (
-    <div className="flex-1 overflow-y-auto p-2 font-mono text-xs min-h-0 bg-sidebar-background h-full">
+    <div className="flex-1 overflow-y-auto p-2 text-xs min-h-0 bg-sidebar-background h-full">
       <DatabasePanel
         switches={ctx.switches}
         variables={ctx.variables}
@@ -479,14 +481,6 @@ export function DatabaseWrapper(_props: IDockviewPanelProps) {
   );
 }
 
-export function SpritesWrapper(_props: IDockviewPanelProps) {
-  return (
-    <div className="flex-1 overflow-y-auto font-mono text-xs min-h-0 bg-sidebar-background h-full">
-      <SpritesPanel />
-    </div>
-  );
-}
-
 export const dockviewComponents = {
   maps: MapsWrapper,
   layers: LayersWrapper,
@@ -498,5 +492,4 @@ export const dockviewComponents = {
   preview: PreviewWrapper,
   activeSelection: ActiveSelectionWrapper,
   database: DatabaseWrapper,
-  sprites: SpritesWrapper,
 };

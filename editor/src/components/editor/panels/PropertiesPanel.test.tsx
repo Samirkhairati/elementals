@@ -31,7 +31,7 @@ describe('PropertiesPanel entity inspector', () => {
     setup({})
     expect(screen.getAllByLabelText('Tile column')[0]).toHaveValue('2')
     expect(screen.getAllByLabelText('Tile row')[0]).toHaveValue('3')
-    expect(screen.getByTestId('pixel-readout')).toHaveTextContent('Anchor 80, 128 px')
+    expect(screen.getByTestId('pixel-readout')).toHaveTextContent('80, 128 px')
   })
 
   it('moving by tile snaps to the tile anchor and clamps to the map', () => {
