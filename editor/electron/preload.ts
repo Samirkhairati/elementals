@@ -1,9 +1,11 @@
 // The preload runs as CommonJS inside the sandboxed preload loader (see sandbox note in main.ts).
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
   ping: () => ipcRenderer.invoke('ping'),
+  // Absolute path of a file dropped onto the window (File.path no longer exists in sandboxed renderers).
+  getPathForFile: (file: File) => webUtils.getPathForFile(file),
   getTilesets: () => ipcRenderer.invoke('get-tilesets'),
   pickTilesetFile: () => ipcRenderer.invoke('pick-tileset-file'),
   importTileset: (source: string, name: string, folder: string | null) => ipcRenderer.invoke('import-tileset', source, name, folder),
@@ -28,6 +30,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveSpriteMeta: (id: string, meta: unknown) => ipcRenderer.invoke('save-sprite-meta', id, meta),
   renameSprite: (id: string, newId: string) => ipcRenderer.invoke('rename-sprite', id, newId),
   deleteSprite: (id: string) => ipcRenderer.invoke('delete-sprite', id),
+  createSpriteFolder: (parentId: string | null, name: string) => ipcRenderer.invoke('create-sprite-folder', parentId, name),
+  renameSpriteFolder: (folderId: string, newName: string) => ipcRenderer.invoke('rename-sprite-folder', folderId, newName),
+  moveSpriteFolder: (folderId: string, newParentId: string | null) => ipcRenderer.invoke('move-sprite-folder', folderId, newParentId),
+  deleteSpriteFolder: (folderId: string) => ipcRenderer.invoke('delete-sprite-folder', folderId),
   getDatabase: () => ipcRenderer.invoke('get-database'),
   saveDatabase: (database: unknown) => ipcRenderer.invoke('save-database', database),
   onTogglePanel: (callback: (panelId: string) => void) => {

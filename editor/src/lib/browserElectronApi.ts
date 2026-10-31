@@ -93,12 +93,21 @@ export function createBrowserElectronApi(): ElectronAPI {
       return { success: result.success, error: result.error }
     },
     // sprites + database
+    getPathForFile: async (file: File) => {
+      const staged = await stageUpload(file.name, new Uint8Array(await file.arrayBuffer()))
+      if (!staged.success || typeof staged.sourcePath !== 'string') throw new Error(staged.error ?? 'Could not stage the dropped file')
+      return staged.sourcePath
+    },
     getSprites: () => c('get-sprites'),
     pickSpriteFile: () => pickPng(),
     importSprite: (sourcePath: string, options: unknown) => c('import-sprite', sourcePath, options),
     saveSpriteMeta: (id: string, meta: unknown) => c('save-sprite-meta', id, meta),
     renameSprite: (id: string, newId: string) => c('rename-sprite', id, newId),
     deleteSprite: (id: string) => c('delete-sprite', id),
+    createSpriteFolder: (parentId: string | null, name: string) => c('create-sprite-folder', parentId, name),
+    renameSpriteFolder: (folderId: string, newName: string) => c('rename-sprite-folder', folderId, newName),
+    moveSpriteFolder: (folderId: string, newParentId: string | null) => c('move-sprite-folder', folderId, newParentId),
+    deleteSpriteFolder: (folderId: string) => c('delete-sprite-folder', folderId),
     getDatabase: () => c('get-database'),
     saveDatabase: (database: unknown) => c('save-database', database),
     // There is no native menu in a browser.

@@ -95,6 +95,14 @@ export function createProjectChannels(projectDir: string): Record<string, Channe
     'rename-sprite': (id: string, newId: string) =>
       toResult(() => spriteStore.renameSprite(spritesDir, spriteCache, id, newId)),
     'delete-sprite': (id: string) => toResult(() => spriteStore.deleteSprite(spritesDir, spriteCache, id)),
+    'create-sprite-folder': (parentId: string | null, name: string) =>
+      toResult(() => spriteStore.createSpriteFolder(spritesDir, parentId ?? null, name)),
+    'rename-sprite-folder': (folderId: string, newName: string) =>
+      toResult(() => spriteStore.renameSpriteFolder(spritesDir, spriteCache, folderId, newName)),
+    'move-sprite-folder': (folderId: string, newParentId: string | null) =>
+      toResult(() => spriteStore.moveSpriteFolder(spritesDir, spriteCache, folderId, newParentId ?? null)),
+    'delete-sprite-folder': (folderId: string) =>
+      toResult(() => spriteStore.deleteSpriteFolder(spritesDir, spriteCache, folderId)),
 
     // ── database ──
     'get-database': () => toResult(() => databaseStore.getDatabase(root)),

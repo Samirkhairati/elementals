@@ -41,12 +41,18 @@ interface ElectronAPI {
   renameMap: (folderPath: string | null, fileName: string, newName: string) => Promise<{ success: boolean; error?: string }>;
   moveMap: (fileName: string, oldFolder: string | null, newFolder: string | null) => Promise<{ success: boolean; error?: string }>;
   exportMap: (jsonData: string, defaultName: string) => Promise<{ success: boolean; canceled?: boolean; filePath?: string; error?: string }>;
-  getSprites: () => Promise<({ success: true; assets: SpriteAssetInfo[]; warnings: { file: string; error: string }[] }) | IpcFailure>;
+  /** Absolute path of a dropped file. The browser harness stages the bytes and returns the staged path. */
+  getPathForFile: (file: File) => string | Promise<string>;
+  getSprites: () => Promise<({ success: true; assets: SpriteAssetInfo[]; folders: string[]; warnings: { file: string; error: string }[] }) | IpcFailure>;
   pickSpriteFile: () => Promise<({ success: true; sourcePath: string; defaultName: string }) | IpcFailure>;
   importSprite: (sourcePath: string, options: ImportSpriteOptions) => Promise<({ success: true; asset: SpriteAssetInfo }) | IpcFailure>;
   saveSpriteMeta: (id: string, meta: SpriteAssetMeta) => Promise<({ success: true; meta: SpriteAssetMeta }) | IpcFailure>;
   renameSprite: (id: string, newId: string) => Promise<({ success: true; id: string }) | IpcFailure>;
   deleteSprite: (id: string) => Promise<({ success: true }) | IpcFailure>;
+  createSpriteFolder: (parentId: string | null, name: string) => Promise<({ success: true; folderId: string }) | IpcFailure>;
+  renameSpriteFolder: (folderId: string, newName: string) => Promise<({ success: true; folderId: string }) | IpcFailure>;
+  moveSpriteFolder: (folderId: string, newParentId: string | null) => Promise<({ success: true; folderId: string }) | IpcFailure>;
+  deleteSpriteFolder: (folderId: string) => Promise<({ success: true }) | IpcFailure>;
   getDatabase: () => Promise<({ success: true; database: GameDatabase }) | IpcFailure>;
   saveDatabase: (database: GameDatabase) => Promise<({ success: true; database: GameDatabase }) | IpcFailure>;
   onTogglePanel?: (callback: (panelId: string) => void) => () => void;

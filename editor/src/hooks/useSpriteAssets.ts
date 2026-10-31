@@ -13,6 +13,8 @@ export interface UseSpriteAssets {
   assets: Record<string, SpriteAssetInfo>
   /** The same assets sorted by id (stable between renders while nothing changes). */
   list: SpriteAssetInfo[]
+  /** Every folder under project/sprites (ids like `characters/npcs`), empty ones included, sorted. */
+  folders: string[]
   loading: boolean
   /** Last load/operation failure, or null. */
   error: string | null
@@ -28,10 +30,16 @@ export interface UseSpriteAssets {
   /** Rename and/or move to a new id (directory path). Refuses to overwrite. */
   rename: (id: string, newId: string) => Promise<OpResult<{ id: string }>>
   remove: (id: string) => Promise<OpResult>
+  /** Folder operations mirror the directories under project/sprites. Renaming / moving changes the ids of the sprites inside. */
+  createFolder: (parentId: string | null, name: string) => Promise<OpResult<{ folderId: string }>>
+  renameFolder: (folderId: string, newName: string) => Promise<OpResult<{ folderId: string }>>
+  moveFolder: (folderId: string, newParentId: string | null) => Promise<OpResult<{ folderId: string }>>
+  deleteFolder: (folderId: string) => Promise<OpResult>
 }
 
 interface State {
   assets: Record<string, SpriteAssetInfo>
+  folders: string[]
   loading: boolean
   error: string | null
   warnings: SpriteWarning[]
@@ -44,7 +52,7 @@ const api = () => window.electronAPI
  * the main process' answer, so the state always mirrors what is on disk.
  */
 export function useSpriteAssets(): UseSpriteAssets {
-  const [state, setState] = useState<State>({ assets: {}, loading: true, error: null, warnings: [] })
+  const [state, setState] = useState<State>({ assets: {}, folders: [], loading: true, error: null, warnings: [] })
   // Latest-wins guard for async loads; bumped on unmount so late answers are ignored.
   const [requests] = useState(() => ({ latest: 0 }))
 
@@ -53,7 +61,7 @@ export function useSpriteAssets(): UseSpriteAssets {
     setState((s) => ({ ...s, loading: true }))
     const result = await runIpc(
       () => api()?.getSprites(),
-      (r) => ({ assets: r.assets ?? [], warnings: r.warnings ?? [] })
+      (r) => ({ assets: r.assets ?? [], folders: r.folders ?? [], warnings: r.warnings ?? [] })
     )
     if (id !== requests.latest) return // a newer reload (or unmount) superseded this one
     if (!result.ok) {
@@ -62,6 +70,7 @@ export function useSpriteAssets(): UseSpriteAssets {
     }
     setState({
       assets: Object.fromEntries(result.assets.map((a) => [a.id, a])),
+      folders: result.folders,
       loading: false,
       error: null,
       warnings: result.warnings,
@@ -158,6 +167,55 @@ export function useSpriteAssets(): UseSpriteAssets {
     [setFailure]
   )
 
+  // Folder operations can change the ids of many sprites at once, so they re-read the project afterwards.
+  const createFolder = useCallback<UseSpriteAssets['createFolder']>(
+    async (parentId, name) => {
+      const result = await runIpc(
+        () => api()?.createSpriteFolder(parentId, name),
+        (r) => ({ folderId: r.folderId })
+      )
+      if (result.ok) await reload()
+      return setFailure(result) as OpResult<{ folderId: string }>
+    },
+    [reload, setFailure]
+  )
+
+  const renameFolder = useCallback<UseSpriteAssets['renameFolder']>(
+    async (folderId, newName) => {
+      const result = await runIpc(
+        () => api()?.renameSpriteFolder(folderId, newName),
+        (r) => ({ folderId: r.folderId })
+      )
+      if (result.ok) await reload()
+      return setFailure(result) as OpResult<{ folderId: string }>
+    },
+    [reload, setFailure]
+  )
+
+  const moveFolder = useCallback<UseSpriteAssets['moveFolder']>(
+    async (folderId, newParentId) => {
+      const result = await runIpc(
+        () => api()?.moveSpriteFolder(folderId, newParentId),
+        (r) => ({ folderId: r.folderId })
+      )
+      if (result.ok) await reload()
+      return setFailure(result) as OpResult<{ folderId: string }>
+    },
+    [reload, setFailure]
+  )
+
+  const deleteFolder = useCallback<UseSpriteAssets['deleteFolder']>(
+    async (folderId) => {
+      const result = await runIpc(
+        () => api()?.deleteSpriteFolder(folderId),
+        () => ({})
+      )
+      if (result.ok) await reload()
+      return setFailure(result)
+    },
+    [reload, setFailure]
+  )
+
   const list = useMemo(
     () => Object.values(state.assets).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
     [state.assets]
@@ -170,6 +228,7 @@ export function useSpriteAssets(): UseSpriteAssets {
   return {
     assets: state.assets,
     list,
+    folders: state.folders,
     loading: state.loading,
     error: state.error,
     warnings: state.warnings,
@@ -180,5 +239,9 @@ export function useSpriteAssets(): UseSpriteAssets {
     saveMeta,
     rename,
     remove,
+    createFolder,
+    renameFolder,
+    moveFolder,
+    deleteFolder,
   }
 }

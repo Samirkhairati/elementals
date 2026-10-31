@@ -3,11 +3,15 @@ import path from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { listDir, makePng, makeTempDirTracker } from '../__testutils__/helpers';
 import {
+  createSpriteFolder,
   deleteSprite,
+  deleteSpriteFolder,
   getSprite,
   importSprite,
   listSprites,
+  moveSpriteFolder,
   renameSprite,
+  renameSpriteFolder,
   saveSpriteMeta,
   type SpriteCache,
 } from './spriteStore';
@@ -79,7 +83,7 @@ afterEach(() => tmp.cleanup());
 
 describe('listSprites', () => {
   it('returns [] for a missing directory', () => {
-    expect(listSprites(path.join(root, 'nope'), cache)).toEqual({ assets: [], warnings: [] });
+    expect(listSprites(path.join(root, 'nope'), cache)).toEqual({ assets: [], folders: [], warnings: [] });
   });
 
   it('lists assets sorted by id with meta and sheet data URLs', () => {
@@ -240,11 +244,14 @@ describe('saveSpriteMeta', () => {
 });
 
 describe('renameSprite', () => {
-  it('renames and moves an asset, creating folders and pruning empty ones', () => {
+  it('renames and moves an asset, creating folders and leaving the emptied one in place', () => {
     seedHero();
     expect(renameSprite(sprites, cache, 'characters/hero', 'npcs/town/hero')).toEqual({ id: 'npcs/town/hero' });
-    expect(fs.existsSync(path.join(sprites, 'characters'))).toBe(false);
-    expect(listSprites(sprites, cache).assets.map((a) => a.id)).toEqual(['npcs/town/hero']);
+    // folders are managed by the user now: an emptied folder stays until it is deleted
+    expect(fs.existsSync(path.join(sprites, 'characters'))).toBe(true);
+    const listing = listSprites(sprites, cache);
+    expect(listing.assets.map((a) => a.id)).toEqual(['npcs/town/hero']);
+    expect(listing.folders).toEqual(['characters', 'npcs', 'npcs/town']);
   });
 
   it('keeps non-empty parent folders', () => {
@@ -283,11 +290,12 @@ describe('renameSprite', () => {
 });
 
 describe('deleteSprite', () => {
-  it('removes the asset directory and empty parents', () => {
+  it('removes the asset directory but keeps its folder', () => {
     seedHero();
     seedBall();
     deleteSprite(sprites, cache, 'characters/hero');
-    expect(fs.existsSync(path.join(sprites, 'characters'))).toBe(false);
+    expect(fs.existsSync(path.join(sprites, 'characters/hero'))).toBe(false);
+    expect(fs.existsSync(path.join(sprites, 'characters'))).toBe(true);
     expect(listSprites(sprites, cache).assets.map((a) => a.id)).toEqual(['objects/ball']);
   });
 
@@ -311,5 +319,67 @@ describe('deleteSprite', () => {
     fs.symlinkSync(outside, path.join(sprites, 'evil'));
     expect(() => deleteSprite(sprites, cache, 'evil')).toThrow(/escapes/);
     expect(fs.existsSync(path.join(outside, 'keep.txt'))).toBe(true);
+  });
+});
+
+describe('sprite folders', () => {
+  it('lists plain folders (empty ones too) but not asset directories', () => {
+    seedHero();
+    seedBall();
+    fs.mkdirSync(path.join(sprites, 'npcs/town'), { recursive: true });
+    fs.mkdirSync(path.join(sprites, 'characters/hero/extra')); // inside an asset: not a folder
+    expect(listSprites(sprites, cache).folders).toEqual(['characters', 'npcs', 'npcs/town', 'objects']);
+  });
+
+  it('creates folders below the root or another folder', () => {
+    expect(createSpriteFolder(sprites, null, 'npcs')).toEqual({ folderId: 'npcs' });
+    expect(createSpriteFolder(sprites, 'npcs', 'town')).toEqual({ folderId: 'npcs/town' });
+    expect(fs.statSync(path.join(sprites, 'npcs/town')).isDirectory()).toBe(true);
+    expect(listSprites(sprites, cache).folders).toEqual(['npcs', 'npcs/town']);
+  });
+
+  it('refuses bad, duplicate and misplaced folders', () => {
+    seedHero();
+    createSpriteFolder(sprites, null, 'npcs');
+    expect(() => createSpriteFolder(sprites, null, 'npcs')).toThrow(/already exists/);
+    expect(() => createSpriteFolder(sprites, null, 'a b')).toThrow(/letters, digits/);
+    expect(() => createSpriteFolder(sprites, null, 'a/b')).toThrow(/letters, digits/);
+    expect(() => createSpriteFolder(sprites, null, '..')).toThrow();
+    expect(() => createSpriteFolder(sprites, 'missing', 'x')).toThrow(/does not exist/);
+    expect(() => createSpriteFolder(sprites, 'characters/hero', 'x')).toThrow(/sprite/);
+  });
+
+  it('renames a folder, which changes the ids of the sprites inside', () => {
+    seedHero();
+    expect(renameSpriteFolder(sprites, cache, 'characters', 'people')).toEqual({ folderId: 'people' });
+    expect(listSprites(sprites, cache).assets.map((a) => a.id)).toEqual(['people/hero']);
+    expect(() => renameSpriteFolder(sprites, cache, 'people/hero', 'x')).toThrow(/sprite/);
+    createSpriteFolder(sprites, null, 'other');
+    expect(() => renameSpriteFolder(sprites, cache, 'other', 'people')).toThrow(/already exists/);
+  });
+
+  it('moves a folder below another one and refuses to move it into itself', () => {
+    seedHero();
+    createSpriteFolder(sprites, null, 'npcs');
+    expect(moveSpriteFolder(sprites, cache, 'characters', 'npcs')).toEqual({ folderId: 'npcs/characters' });
+    expect(listSprites(sprites, cache).assets.map((a) => a.id)).toEqual(['npcs/characters/hero']);
+    expect(moveSpriteFolder(sprites, cache, 'npcs/characters', null)).toEqual({ folderId: 'characters' });
+    expect(() => moveSpriteFolder(sprites, cache, 'npcs', 'npcs')).toThrow(/into itself/);
+    createSpriteFolder(sprites, 'npcs', 'inner');
+    expect(() => moveSpriteFolder(sprites, cache, 'npcs', 'npcs/inner')).toThrow(/into itself/);
+    createSpriteFolder(sprites, 'npcs', 'characters');
+    expect(() => moveSpriteFolder(sprites, cache, 'characters', 'npcs')).toThrow(/already exists/);
+  });
+
+  it('deletes a folder with its sprites and drops them from the cache', () => {
+    seedHero();
+    seedBall();
+    listSprites(sprites, cache);
+    deleteSpriteFolder(sprites, cache, 'characters');
+    expect(fs.existsSync(path.join(sprites, 'characters'))).toBe(false);
+    expect(listSprites(sprites, cache).assets.map((a) => a.id)).toEqual(['objects/ball']);
+    expect(() => deleteSpriteFolder(sprites, cache, 'characters')).toThrow(/does not exist/);
+    expect(() => deleteSpriteFolder(sprites, cache, 'objects/ball')).toThrow(/sprite/);
+    expect(() => deleteSpriteFolder(sprites, cache, '..')).toThrow();
   });
 });

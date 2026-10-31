@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { atomicWriteJsonSync } from './atomicWrite.js';
-import { pathExists, walkTree, type ListWarning } from './folderOps.js';
+import { createFolder, deleteFolder, pathExists, renameFolder, walkTree, type ListWarning } from './folderOps.js';
 import { resolveInside, resolveStrictlyInside } from './pathSafety.js';
 import { assertPngFile, readPngSizeFromFile } from './pngHeader.js';
 import {
@@ -38,6 +38,8 @@ export interface SpriteAssetInfo {
 
 export interface SpriteListing {
   assets: SpriteAssetInfo[];
+  /** Every plain folder (ids, "/"-separated, sorted), empty ones included. Asset directories are not folders. */
+  folders: string[];
   warnings: ListWarning[];
 }
 
@@ -107,7 +109,7 @@ export function listSprites(spritesDir: string, cache: SpriteCache): SpriteListi
   const assets: SpriteAssetInfo[] = [];
   const live = new Set<string>();
 
-  walkTree(
+  const walked = walkTree(
     spritesDir,
     ({ name, fullPath, folderPath }) => {
       if (name !== SPRITE_META_FILE) return;
@@ -131,7 +133,19 @@ export function listSprites(spritesDir: string, cache: SpriteCache): SpriteListi
 
   assets.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   cache.retainOnly(live);
-  return { assets, warnings };
+
+  // A walked directory is a folder unless it is (or lies inside) an asset directory.
+  const assetDirs = new Set(walkedAssetDirs(spritesDir, walked));
+  const folders = walked
+    .map(toId)
+    .filter((id) => !id.split('/').some((_, i, parts) => assetDirs.has(parts.slice(0, i + 1).join('/'))))
+    .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  return { assets, folders, warnings };
+}
+
+/** Ids (relative dirs) among `walked` that hold a sprite.json. */
+function walkedAssetDirs(spritesDir: string, walked: string[]): string[] {
+  return walked.filter((rel) => pathExists(path.join(spritesDir, rel, SPRITE_META_FILE))).map(toId);
 }
 
 export function getSprite(spritesDir: string, cache: SpriteCache, id: string): { asset: SpriteAssetInfo } {
@@ -228,19 +242,6 @@ export function saveSpriteMeta(spritesDir: string, id: string, meta: unknown): {
   return { meta: clean };
 }
 
-/** Remove now-empty parent directories of `dir` up to (not including) `spritesDir`. */
-function pruneEmptyParents(spritesDir: string, dir: string): void {
-  const root = path.resolve(spritesDir);
-  for (let parent = path.dirname(dir); parent !== root && parent.startsWith(root + path.sep); parent = path.dirname(parent)) {
-    try {
-      if (fs.readdirSync(parent).length > 0) return;
-      fs.rmdirSync(parent);
-    } catch {
-      return;
-    }
-  }
-}
-
 function containsNestedAsset(dir: string): boolean {
   const warnings: ListWarning[] = [];
   let nested = false;
@@ -279,7 +280,6 @@ export function renameSprite(spritesDir: string, cache: SpriteCache, id: string,
   fs.mkdirSync(path.dirname(to), { recursive: true });
   fs.renameSync(from, to);
   cache.invalidateTree(from);
-  pruneEmptyParents(spritesDir, from);
   return { id: newId };
 }
 
@@ -288,6 +288,76 @@ export function deleteSprite(spritesDir: string, cache: SpriteCache, id: string)
   if (containsNestedAsset(dir)) throw new Error(`Sprite "${id}" contains other sprites; delete those first`);
   fs.rmSync(dir, { recursive: true, force: true });
   cache.invalidateTree(dir);
-  pruneEmptyParents(spritesDir, dir);
 }
 
+
+// ── folders ─────────────────────────────────────────────────────────────────────────────────────
+
+function assertFolderSegment(name: unknown): string {
+  if (typeof name !== 'string' || !isValidSpriteId(name) || name.includes('/')) {
+    throw new Error('Folder names use letters, digits, "_" and "-" only');
+  }
+  return name;
+}
+
+/** The folder must exist, be a plain directory (no sprite.json) and not live inside an asset. */
+function resolveFolderDir(spritesDir: string, folderId: string): string {
+  assertSpriteId(folderId);
+  const dir = resolveStrictlyInside(spritesDir, [folderId]);
+  assertNotInsideAsset(spritesDir, folderId.split('/'));
+  if (!pathExists(dir)) throw new Error(`Folder "${folderId}" does not exist.`);
+  if (pathExists(path.join(dir, SPRITE_META_FILE))) throw new Error(`"${folderId}" is a sprite, not a folder`);
+  return dir;
+}
+
+/** Throws when any of the directories named by `parts` (the folder itself included) holds a sprite.json. */
+function assertNotInsideAsset(spritesDir: string, parts: string[]): void {
+  for (let i = 1; i <= parts.length; i++) {
+    const dir = resolveInside(spritesDir, parts.slice(0, i));
+    if (pathExists(path.join(dir, SPRITE_META_FILE))) {
+      throw new Error(`Cannot use the sprite "${parts.slice(0, i).join('/')}" as a folder`);
+    }
+  }
+}
+
+/** Create `<parent>/<name>` (parent null = the sprites root). Returns the new folder's id. */
+export function createSpriteFolder(spritesDir: string, parentId: string | null, name: string): { folderId: string } {
+  assertFolderSegment(name);
+  if (parentId) resolveFolderDir(spritesDir, parentId);
+  fs.mkdirSync(spritesDir, { recursive: true });
+  const { folderPath } = createFolder(spritesDir, parentId, name);
+  return { folderId: toId(folderPath) };
+}
+
+/** Rename a folder in place; every sprite inside gets a new id. */
+export function renameSpriteFolder(spritesDir: string, cache: SpriteCache, folderId: string, newName: string): { folderId: string } {
+  assertFolderSegment(newName);
+  const from = resolveFolderDir(spritesDir, folderId);
+  const { newFolderPath } = renameFolder(spritesDir, folderId, newName);
+  cache.invalidateTree(from);
+  return { folderId: toId(newFolderPath) };
+}
+
+/** Move a folder (and everything in it) below another folder (null = the root). Refuses to overwrite. */
+export function moveSpriteFolder(spritesDir: string, cache: SpriteCache, folderId: string, newParentId: string | null): { folderId: string } {
+  const from = resolveFolderDir(spritesDir, folderId);
+  if (newParentId !== null) {
+    resolveFolderDir(spritesDir, newParentId);
+    if (newParentId === folderId || newParentId.startsWith(`${folderId}/`)) throw new Error('A folder cannot be moved into itself');
+  }
+  const leaf = folderId.split('/').pop()!;
+  const newId = newParentId ? `${newParentId}/${leaf}` : leaf;
+  if (newId === folderId) return { folderId };
+  const to = resolveStrictlyInside(spritesDir, [newId]);
+  if (pathExists(to)) throw new Error(`"${newId}" already exists`);
+  fs.renameSync(from, to);
+  cache.invalidateTree(from);
+  return { folderId: newId };
+}
+
+/** Delete a folder with everything in it (sprites included). The root cannot be deleted. */
+export function deleteSpriteFolder(spritesDir: string, cache: SpriteCache, folderId: string): void {
+  const dir = resolveFolderDir(spritesDir, folderId);
+  deleteFolder(spritesDir, folderId);
+  cache.invalidateTree(dir);
+}
