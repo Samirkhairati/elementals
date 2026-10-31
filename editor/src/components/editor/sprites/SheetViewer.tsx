@@ -1,8 +1,33 @@
 // A sprite sheet with its frame grid on top: numbered frames, selectable frames and an optional draggable
 // pivot. Used by the import dialog (live grid while the author types a frame size) and the Sprites panel.
 
-import React, { useMemo, useRef } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ZoomControls } from '../ui/controls'
 import { sheetGrid } from '../../../../../shared/engine/sprites'
+
+const MIN_ZOOM = 0.5
+const MAX_ZOOM = 16
+const clampZoom = (z: number) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z))
+
+/** Zoom of a sheet view: follows `fit` until the user zooms (buttons, Ctrl/Cmd + scroll), and `reset` goes back to it. */
+export function useSheetZoom(fit: number) {
+  const [user, setUser] = useState<number | null>(null)
+  const zoom = user ?? fit
+  const set = useCallback((z: number) => setUser(clampZoom(z)), [])
+  return {
+    zoom,
+    fitted: user === null,
+    setZoom: set,
+    zoomIn: () => set(zoom * 1.25),
+    zoomOut: () => set(zoom / 1.25),
+    reset: () => setUser(null),
+  }
+}
+
+/** The zoom buttons for a `useSheetZoom` (readout, +/- and Fit). */
+export function SheetZoomControls({ z, className }: { z: ReturnType<typeof useSheetZoom>; className?: string }) {
+  return <ZoomControls className={className} zoom={z.zoom} fitted={z.fitted} onZoomIn={z.zoomIn} onZoomOut={z.zoomOut} onFit={z.reset} />
+}
 
 export interface SheetViewerProps {
   src: string
@@ -27,6 +52,8 @@ export interface SheetViewerProps {
   /** Override the column count (character sheets use framesPerDirection). */
   columns?: number
   maxHeight?: number
+  /** Ctrl/Cmd + scroll (or a pinch) asks for this zoom. */
+  onZoomChange?: (zoom: number) => void
 }
 
 export function frameIndexAt(
@@ -62,8 +89,24 @@ export function SheetViewer({
   rowLabels,
   columns: columnsOverride,
   maxHeight = 320,
+  onZoomChange,
 }: SheetViewerProps) {
   const surfaceRef = useRef<HTMLDivElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const zoomRef = useRef(zoom)
+  zoomRef.current = zoom
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el || !onZoomChange) return
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return
+      e.preventDefault()
+      onZoomChange(zoomRef.current * Math.exp(-e.deltaY * 0.01))
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [onZoomChange])
   const grid = useMemo(
     () => sheetGrid({ frameWidth: Math.max(1, frameWidth), frameHeight: Math.max(1, frameHeight), margin, spacing }, imageWidth, imageHeight),
     [frameWidth, frameHeight, margin, spacing, imageWidth, imageHeight],
@@ -124,7 +167,7 @@ export function SheetViewer({
   const numbered = showNumbers && total <= 400 && frameWidth * zoom >= 14
 
   return (
-    <div className="ed-checker overflow-auto rounded-md border border-border" style={{ maxHeight }} data-testid="sheet-viewer">
+    <div ref={scrollRef} className="ed-checker overflow-auto rounded-md border border-border" style={{ maxHeight }} data-testid="sheet-viewer">
       <div ref={surfaceRef} className="relative" style={{ width: w, height: h }} onClick={handleClick}>
         <img src={src} alt="" draggable={false} className="ed-pixelated absolute left-0 top-0 max-w-none" style={{ width: w, height: h }} />
         <svg className="absolute left-0 top-0" width={w} height={h} shapeRendering="crispEdges">

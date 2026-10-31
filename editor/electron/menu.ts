@@ -81,10 +81,6 @@ export function setupMenu(win: BrowserWindow) {
                   label: 'Database (switches & variables)',
                   click: () => win.webContents.send('dockview-toggle-panel', 'database'),
                 },
-                {
-                  label: 'Sprites',
-                  click: () => win.webContents.send('dockview-toggle-panel', 'sprites'),
-                },
               ],
             },
             { type: 'separator' },

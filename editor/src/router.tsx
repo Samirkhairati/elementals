@@ -2,6 +2,7 @@ import { createRouter, createRoute, createHashHistory } from '@tanstack/react-ro
 import { rootRoute } from '@/routes/__root'
 import { IndexPage } from '@/routes/index'
 import { EditorPage } from '@/routes/editor'
+import { AssetsPage } from '@/routes/assets'
 import { SettingsPage } from '@/routes/settings'
 
 const indexRoute = createRoute({
@@ -16,13 +17,19 @@ const editorRoute = createRoute({
   component: EditorPage,
 })
 
+const assetsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/assets',
+  component: AssetsPage,
+})
+
 const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/settings',
   component: SettingsPage,
 })
 
-const routeTree = rootRoute.addChildren([indexRoute, editorRoute, settingsRoute])
+const routeTree = rootRoute.addChildren([indexRoute, editorRoute, assetsRoute, settingsRoute])
 const hashHistory = createHashHistory()
 
 export const router = createRouter({

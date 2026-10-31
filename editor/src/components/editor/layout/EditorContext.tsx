@@ -168,6 +168,7 @@ export interface EditorBaseContextValue
   // Sprite assets (project/sprites)
   spriteAssets: Sprites['assets']
   spriteList: Sprites['list']
+  spriteFolders: Sprites['folders']
   spriteWarnings: Sprites['warnings']
   getSpriteAsset: Sprites['getAsset']
   reloadSprites: Sprites['reload']
@@ -176,6 +177,10 @@ export interface EditorBaseContextValue
   saveSpriteMeta: Sprites['saveMeta']
   renameSprite: Sprites['rename']
   removeSprite: Sprites['remove']
+  createSpriteFolder: Sprites['createFolder']
+  renameSpriteFolder: Sprites['renameFolder']
+  moveSpriteFolder: Sprites['moveFolder']
+  deleteSpriteFolder: Sprites['deleteFolder']
 
   // Game database (project/database.json): global switches and variables
   database: Db['database']

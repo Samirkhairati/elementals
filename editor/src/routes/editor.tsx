@@ -416,6 +416,7 @@ export function EditorPage() {
     // Sprite assets
     spriteAssets: sprites.assets,
     spriteList: sprites.list,
+    spriteFolders: sprites.folders,
     spriteWarnings: sprites.warnings,
     getSpriteAsset: sprites.getAsset,
     reloadSprites: sprites.reload,
@@ -424,6 +425,10 @@ export function EditorPage() {
     saveSpriteMeta: sprites.saveMeta,
     renameSprite: sprites.rename,
     removeSprite: sprites.remove,
+    createSpriteFolder: sprites.createFolder,
+    renameSpriteFolder: sprites.renameFolder,
+    moveSpriteFolder: sprites.moveFolder,
+    deleteSpriteFolder: sprites.deleteFolder,
 
     // Game database
     database: db.database,
@@ -440,8 +445,9 @@ export function EditorPage() {
     removeVariable: db.removeVariable,
     reloadDatabase: db.reload,
   }), [
-    sprites.assets, sprites.list, sprites.warnings, sprites.getAsset, sprites.reload, sprites.pickFile,
+    sprites.assets, sprites.list, sprites.folders, sprites.warnings, sprites.getAsset, sprites.reload, sprites.pickFile,
     sprites.importSprite, sprites.saveMeta, sprites.rename, sprites.remove,
+    sprites.createFolder, sprites.renameFolder, sprites.moveFolder, sprites.deleteFolder,
     db.database, db.switches, db.variables, db.getSwitch, db.getVariable, db.addSwitch, db.renameSwitch,
     db.removeSwitch, db.addVariable, db.renameVariable, db.setVariableInitial, db.removeVariable, db.reload,
     focusedDomain, setFocusedDomain,

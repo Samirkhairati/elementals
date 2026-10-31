@@ -37,17 +37,14 @@ describe('View > Appearance > Select Tabs', () => {
   setupMenu({ webContents: { send } } as never)
   const template = built.template as Item[]
 
-  it('has entries for the Database and Sprites panels', () => {
+  it('has an entry for the Database panel', () => {
     const tabs = ['View', 'Appearance', 'Select Tabs']
     expect(find(template, ...tabs, 'Database (switches & variables)')).toBeDefined()
-    expect(find(template, ...tabs, 'Sprites')).toBeDefined()
   })
 
   it('toggles the panels through the existing dockview-toggle-panel channel', () => {
     find(template, 'View', 'Appearance', 'Select Tabs', 'Database (switches & variables)')?.click?.()
-    find(template, 'View', 'Appearance', 'Select Tabs', 'Sprites')?.click?.()
     expect(send).toHaveBeenCalledWith('dockview-toggle-panel', 'database')
-    expect(send).toHaveBeenCalledWith('dockview-toggle-panel', 'sprites')
   })
 
   it('keeps the existing entries and Reset Layout', () => {

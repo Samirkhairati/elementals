@@ -10,7 +10,8 @@ import { FileImage, Loader2, TriangleAlert } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useEditorSelector, type EditorContextValue } from '../layout/EditorContext'
 import { EdButton, Field, NumberField, Segmented, TextField } from '../ui/controls'
-import { SheetViewer } from './SheetViewer'
+import { SheetViewer, SheetZoomControls, useSheetZoom } from './SheetViewer'
+import { fileBaseName, isFileDrag, pathOfDroppedFile, pngFilesOf } from '@/lib/droppedFiles'
 import { checkSheetDimensions, defaultSpriteMeta, sheetGrid } from '../../../../../shared/engine/sprites'
 import type { SpriteKind } from '../../../../../shared/engine/types'
 
@@ -25,8 +26,10 @@ export function slugifySpriteName(name: string): string {
   )
 }
 
-export function defaultSpriteId(kind: SpriteKind, name: string): string {
-  return `${kind === 'character' ? 'characters' : 'objects'}/${slugifySpriteName(name)}`
+/** Default id for a new sprite: inside `folder` when the import was started from one, else characters/ or objects/. */
+export function defaultSpriteId(kind: SpriteKind, name: string, folder = ''): string {
+  const base = folder || (kind === 'character' ? 'characters' : 'objects')
+  return `${base}/${slugifySpriteName(name)}`
 }
 
 const KIND_OPTIONS = [
@@ -62,9 +65,13 @@ interface ImportSpriteDialogProps {
   onOpenChange: (open: boolean) => void
   /** Called with the new asset id after a successful import. */
   onImported?: (assetId: string) => void
+  /** Folder (sprite id path, '' = root) the new asset goes into by default. */
+  folder?: string
+  /** A PNG that is already chosen (e.g. dropped onto the Assets panel): loaded as soon as the dialog opens. */
+  initialSource?: { path: string; name: string } | null
 }
 
-export function ImportSpriteDialog({ open, onOpenChange, onImported }: ImportSpriteDialogProps) {
+export function ImportSpriteDialog({ open, onOpenChange, onImported, folder = '', initialSource = null }: ImportSpriteDialogProps) {
   const ctx = useEditorSelector(selectImport)
   const [source, setSource] = useState<{ path: string; name: string } | null>(null)
   const [draft, setDraft] = useState<Draft | null>(null)
@@ -109,6 +116,29 @@ export function ImportSpriteDialog({ open, onOpenChange, onImported }: ImportSpr
     setFrameH(meta.frameHeight)
   }
 
+  /** Import `sourcePath` once as a throw-away draft so the real pixels can be shown. */
+  const loadSource = async (sourcePath: string, defaultName: string) => {
+    await dropDraft()
+    const draftId = `import-preview-${Math.random().toString(36).slice(2, 8)}`
+    try {
+      const res = await window.electronAPI.importSprite(sourcePath, { id: draftId, name: defaultName, kind: 'object' })
+      if (!res.success) throw new Error(res.error)
+      const url = Object.values(res.asset.sheets)[0]
+      if (!url) throw new Error('The imported sheet has no image')
+      const size = await loadImageSize(url)
+      const d: Draft = { id: res.asset.id, url, width: size.width, height: size.height }
+      draftRef.current = d
+      setDraft(d)
+      setSource({ path: sourcePath, name: defaultName })
+      setName(defaultName)
+      setIdOverride(null)
+      applyKindDefaults(kind, d)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+    setBusy(null)
+  }
+
   const choose = async () => {
     setError(null)
     setBusy('picking')
@@ -122,25 +152,35 @@ export function ImportSpriteDialog({ open, onOpenChange, onImported }: ImportSpr
       setBusy(null) // cancelled
       return
     }
-    await dropDraft()
-    const draftId = `import-preview-${Math.random().toString(36).slice(2, 8)}`
-    try {
-      const res = await window.electronAPI.importSprite(picked.sourcePath, { id: draftId, name: picked.defaultName, kind: 'object' })
-      if (!res.success) throw new Error(res.error)
-      const url = Object.values(res.asset.sheets)[0]
-      if (!url) throw new Error('The imported sheet has no image')
-      const size = await loadImageSize(url)
-      const d: Draft = { id: res.asset.id, url, width: size.width, height: size.height }
-      draftRef.current = d
-      setDraft(d)
-      setSource({ path: picked.sourcePath, name: picked.defaultName })
-      setName(picked.defaultName)
-      setIdOverride(null)
-      applyKindDefaults(kind, d)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+    await loadSource(picked.sourcePath, picked.defaultName)
+  }
+
+  // A file handed in by the opener (drag and drop) is loaded once per opening.
+  const initialKey = open && initialSource ? initialSource.path : null
+  useEffect(() => {
+    if (!initialKey || !initialSource) return
+    setError(null)
+    setBusy('picking')
+    void loadSource(initialSource.path, initialSource.name)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialKey])
+
+  const dropFile = async (e: React.DragEvent) => {
+    if (!isFileDrag(e.dataTransfer)) return
+    e.preventDefault()
+    const file = pngFilesOf(e.dataTransfer)[0]
+    if (!file) {
+      setError('Only PNG sheets can be imported')
+      return
     }
-    setBusy(null)
+    setError(null)
+    setBusy('picking')
+    try {
+      await loadSource(await pathOfDroppedFile(file), fileBaseName(file))
+    } catch (err) {
+      setBusy(null)
+      setError(err instanceof Error ? err.message : String(err))
+    }
   }
 
   const changeKind = (k: SpriteKind) => {
@@ -148,7 +188,7 @@ export function ImportSpriteDialog({ open, onOpenChange, onImported }: ImportSpr
     applyKindDefaults(k, draft)
   }
 
-  const id = idOverride ?? defaultSpriteId(kind, name)
+  const id = idOverride ?? defaultSpriteId(kind, name, folder)
   const idError = !SPRITE_ID_PATTERN.test(id)
     ? 'Use letters, digits, - and _, separated by /'
     : ctx.spriteAssets[id]
@@ -163,7 +203,7 @@ export function ImportSpriteDialog({ open, onOpenChange, onImported }: ImportSpr
     return { meta, grid, warnings }
   }, [draft, kind, name, frameW, frameH])
 
-  const zoom = draft ? Math.max(1, Math.min(6, Math.floor(480 / Math.max(draft.width, 1)))) : 1
+  const sheetZoom = useSheetZoom(draft ? Math.max(1, Math.min(6, Math.floor(480 / Math.max(draft.width, 1)))) : 1)
   const canImport = !!source && !!draft && !idError && frameW >= 1 && frameH >= 1 && busy === null && !!preview && preview.grid.count > 0
 
   const doImport = async () => {
@@ -183,7 +223,12 @@ export function ImportSpriteDialog({ open, onOpenChange, onImported }: ImportSpr
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[88vh] max-w-3xl flex-col gap-0 overflow-hidden p-0" aria-describedby="import-sprite-desc">
+      <DialogContent
+        className="flex max-h-[88vh] max-w-3xl flex-col gap-0 overflow-hidden p-0"
+        aria-describedby="import-sprite-desc"
+        onDragOver={(e) => isFileDrag(e.dataTransfer) && e.preventDefault()}
+        onDrop={dropFile}
+      >
         <DialogHeader className="border-b border-border px-4 py-3 text-left">
           <DialogTitle className="text-ed-title">Import sprite</DialogTitle>
           <DialogDescription id="import-sprite-desc" className="ed-hint">
@@ -237,13 +282,17 @@ export function ImportSpriteDialog({ open, onOpenChange, onImported }: ImportSpr
           <div className="flex min-w-0 flex-1 flex-col gap-2">
             {draft && preview ? (
               <>
+                <div className="flex justify-end">
+                  <SheetZoomControls z={sheetZoom} />
+                </div>
                 <SheetViewer
                   src={draft.url}
                   imageWidth={draft.width}
                   imageHeight={draft.height}
                   frameWidth={Math.max(1, frameW)}
                   frameHeight={Math.max(1, frameH)}
-                  zoom={zoom}
+                  zoom={sheetZoom.zoom}
+                  onZoomChange={sheetZoom.setZoom}
                   maxHeight={380}
                   columns={kind === 'character' ? preview.meta.character?.framesPerDirection : undefined}
                   rowLabels={kind === 'character' ? ['↓ down', '← left', '→ right', '↑ up'] : undefined}
@@ -259,7 +308,7 @@ export function ImportSpriteDialog({ open, onOpenChange, onImported }: ImportSpr
               <div className="ed-empty rounded-md border border-dashed border-border">
                 <FileImage className="h-6 w-6 opacity-50" />
                 <span>No sheet chosen yet</span>
-                <span className="ed-hint">PNG sheets only</span>
+                <span className="ed-hint">PNG sheets only · or drop one here</span>
               </div>
             )}
           </div>

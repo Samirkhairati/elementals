@@ -8,8 +8,8 @@ import { FACINGS } from '../../../../../shared/engine/constants'
 import { sheetGrid, spriteSheetRoles } from '../../../../../shared/engine/sprites'
 import { getSpriteImageSize, useSpriteImagesVersion } from '@/lib/spriteImages'
 import { useEditorSelector, type EditorContextValue } from '../layout/EditorContext'
-import { Badge, EdButton, Field, IconButton, NumberField, Segmented, TextField, Toggle, useAnimationClock } from '../ui/controls'
-import { SheetViewer } from './SheetViewer'
+import { Badge, EdButton, Field, IconButton, InfoTip, NumberField, Segmented, TextField, Toggle, useAnimationClock } from '../ui/controls'
+import { SheetViewer, SheetZoomControls, useSheetZoom } from './SheetViewer'
 import { SpriteMiniPreview } from './SpriteMiniPreview'
 import {
   appendFrame,
@@ -144,7 +144,6 @@ export function SpriteEditor({ asset, usage, onIdChanged }: SpriteEditorProps) {
   const ctx = useEditorSelector(selectEditor)
   const [draft, setDraft] = useState<SpriteAssetMeta>(() => cloneMeta(asset.meta))
   const [sheetFile, setSheetFile] = useState<string>('')
-  const [zoom, setZoom] = useState<number | 'fit'>('fit')
   const [picking, setPicking] = useState<string | null>(null)
   const [idDraft, setIdDraft] = useState(asset.id)
   const [busy, setBusy] = useState(false)
@@ -183,7 +182,7 @@ export function SpriteEditor({ asset, usage, onIdChanged }: SpriteEditorProps) {
   const dirty = isDraftDirty(draft, asset.meta)
   const isCharacter = draft.kind === 'character'
   const grid = size ? sheetGrid(draft, size.width, size.height) : null
-  const effectiveZoom = zoom === 'fit' ? (size ? Math.max(1, Math.min(6, Math.floor(300 / Math.max(1, size.width)))) : 1) : zoom
+  const sheetZoom = useSheetZoom(size ? Math.max(1, Math.min(6, Math.floor(300 / Math.max(1, size.width)))) : 1)
 
   const patch = (p: Partial<SpriteAssetMeta>) => setDraft((d) => ({ ...d, ...p }))
   const patchChar = (p: Partial<NonNullable<SpriteAssetMeta['character']>>) =>
@@ -289,17 +288,18 @@ export function SpriteEditor({ asset, usage, onIdChanged }: SpriteEditorProps) {
       {/* Sheet */}
       <section className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-2">
-          <div className="ed-section-title">Sheet {size ? `· ${size.width}×${size.height}px` : ''}</div>
+          <div className="flex items-center gap-1">
+            <span className="ed-section-title">Sheet</span>
+            {size && <span className="ed-mono text-ed-label text-muted-foreground">{size.width}×{size.height}px</span>}
+            <InfoTip>
+              Drag the purple dot to move the pivot: the point of the frame that stands on the entity&apos;s anchor. Ctrl/⌘ + scroll or the buttons zoom; Fit resets.
+            </InfoTip>
+          </div>
           <div className="flex items-center gap-2">
+            <SheetZoomControls z={sheetZoom} />
             {roles.length > 1 && (
               <Segmented aria-label="Sheet" value={activeSheet} onChange={setSheetFile} options={roles.map((r) => ({ value: r.file, label: r.role }))} />
             )}
-            <Segmented
-              aria-label="Sheet zoom"
-              value={zoom === 'fit' ? 'fit' : String(zoom)}
-              onChange={(v) => setZoom(v === 'fit' ? 'fit' : Number(v))}
-              options={[{ value: 'fit', label: 'Fit' }, ...[1, 2, 3, 4, 6].map((z) => ({ value: String(z), label: `${z}×` }))]}
-            />
           </div>
         </div>
         {sheetUrl && size ? (
@@ -311,7 +311,8 @@ export function SpriteEditor({ asset, usage, onIdChanged }: SpriteEditorProps) {
             frameHeight={draft.frameHeight}
             margin={draft.margin}
             spacing={draft.spacing}
-            zoom={effectiveZoom}
+            zoom={sheetZoom.zoom}
+            onZoomChange={sheetZoom.setZoom}
             highlight={highlight}
             onFrameClick={picking ? onFrameClick : undefined}
             pivot={{ x: draft.pivotX, y: draft.pivotY }}
@@ -324,7 +325,6 @@ export function SpriteEditor({ asset, usage, onIdChanged }: SpriteEditorProps) {
           <div className="ed-empty rounded-md border border-dashed border-border py-8">{sheetUrl ? 'Decoding sheet…' : 'No sheet image found'}</div>
         )}
         {picking && <div className="ed-hint">Click frames on the sheet to add them to “{picking}”.</div>}
-        <div className="ed-hint">Drag the purple dot to move the pivot: the point of the frame that stands on the entity&apos;s anchor.</div>
       </section>
 
       {/* Frames */}
