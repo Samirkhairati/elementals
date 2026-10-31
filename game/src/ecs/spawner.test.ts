@@ -4,7 +4,12 @@ import { hydrateMapEntities, spawnPlayer } from './spawner';
 import { World } from './World';
 import { TransformComponent } from './components/TransformComponent';
 import { ColliderComponent } from './components/ColliderComponent';
-import { InteractableComponent } from './components/InteractableComponent';
+import { EventComponent } from './components/EventComponent';
+import { EntityInfoComponent } from './components/EntityInfoComponent';
+import { SpriteComponent } from './components/SpriteComponent';
+import { AnimationComponent } from './components/AnimationComponent';
+import { testSprites } from '@/test/helpers';
+import type { ExpandContext } from './expand';
 import { TagComponent } from './components/TagComponent';
 import { AIWanderComponent } from './components/AIWanderComponent';
 import { PlayerControlComponent } from './components/PlayerControlComponent';
@@ -12,6 +17,8 @@ import { GridMovementComponent } from './components/GridMovementComponent';
 import { GAME_CONSTANTS } from '@/constants/game';
 
 let warn: ReturnType<typeof vi.spyOn>;
+const sprites = testSprites();
+const ctx: ExpandContext = { sprites, warn: (m) => console.warn(m) };
 beforeEach(() => {
   warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
@@ -56,13 +63,17 @@ describe('spawnPlayer', () => {
 describe('hydrateMapEntities', () => {
   it('hydrates a well-formed entity', () => {
     const w = new World();
-    const { entities, problems } = hydrateMapEntities(w, [SIGN]);
+    const { entities, problems } = hydrateMapEntities(w, [SIGN], ctx);
     expect(problems).toEqual([]);
     expect(entities).toHaveLength(1);
     const e = entities[0];
     expect(w.getComponent(e, TransformComponent)).toMatchObject({ x: 336, y: 128, depth: 0 });
     expect(w.getComponent(e, ColliderComponent)).toMatchObject({ width: 32, height: 32, isSolid: true });
-    expect(w.getComponent(e, InteractableComponent)).toMatchObject({ type: 'on_interact', message: 'The ancient sign is faded...' });
+    const event = w.getComponent(e, EventComponent)!;
+    expect(event.pages).toHaveLength(1);
+    expect(event.pages[0]).toMatchObject({ trigger: 'action' });
+    expect(event.pages[0].commands[0]).toMatchObject({ type: 'showText', params: { text: 'The ancient sign is faded...' } });
+    expect(w.getComponent(e, EntityInfoComponent)).toMatchObject({ editorId: 'e41e2972', name: 'Sign / Inspectable' });
     expect(w.getComponent(e, TagComponent)?.tag).toBe('sign');
   });
 
@@ -89,62 +100,68 @@ describe('hydrateMapEntities', () => {
       'nope',
       42,
       { id: 'a', components: 'not-an-object' },
-      { id: 'b', components: { SpriteView: {} } }, // missing texture -> throws inside factory
+      { id: 'b', components: { SpriteView: {} } }, // legacy sprite without texture: migrated to "no graphic"
       SIGN,
       { name: 'Ghost', components: { Transform: { x: 1, y: 2 }, Warp: { a: 1 } } }, // unknown comp, entity kept
     ];
-    const { entities, problems } = hydrateMapEntities(w, defs);
+    const { entities, problems } = hydrateMapEntities(w, defs, ctx);
 
-    expect(problems.map((p) => p.index)).toEqual([0, 1, 2, 3, 4, 6]);
-    expect(problems[4].message).toMatch(/texture/);
-    expect(problems[5].entity).toBe('Ghost');
-    expect(problems[5].message).toMatch(/Unknown component type: Warp/);
+    expect(problems.map((p) => p.index)).toEqual([0, 1, 2, 3, 6]);
+    expect(problems[4].entity).toBe('Ghost');
+    expect(problems[4].message).toMatch(/Unknown component type: Warp/);
     expect(warn).toHaveBeenCalledTimes(problems.length);
 
-    // SIGN and Ghost survive; the entity that threw midway was destroyed (no orphan)
-    expect(entities).toHaveLength(2);
+    // b, SIGN and Ghost survive
+    expect(entities).toHaveLength(3);
     expect(w.getAllEntities()).toEqual(entities);
-    expect(w.getComponent(entities[0], TagComponent)?.tag).toBe('sign');
-    expect(w.getComponent(entities[1], TransformComponent)).toMatchObject({ x: 1, y: 2 });
+    expect(w.getComponent(entities[1], TagComponent)?.tag).toBe('sign');
+    expect(w.getComponent(entities[2], TransformComponent)).toMatchObject({ x: 1, y: 2 });
   });
 
-  it('rolls back an entity whose component throws after others were added', () => {
+  it('rolls back an entity whose expansion throws', () => {
     const w = new World();
-    const { entities, problems } = hydrateMapEntities(w, [
-      { id: 'x', components: { Transform: { x: 5, y: 5 }, CharacterAnimation: {} } },
-    ]);
+    const exploding = { sprites: { meta: () => { throw new Error('boom'); } }, warn: () => {} } as unknown as ExpandContext;
+    const { entities, problems } = hydrateMapEntities(
+      w,
+      [{ id: 'x', components: { Transform: { x: 5, y: 5 }, Sprite: { asset: 'characters/player' } } }],
+      exploding,
+    );
     expect(entities).toEqual([]);
     expect(problems).toHaveLength(1);
+    expect(problems[0].message).toBe('boom');
     expect(w.getAllEntities()).toEqual([]);
     expect(w.query(TransformComponent)).toEqual([]);
   });
 
   it('allows an entity without components (as the original loop did)', () => {
     const w = new World();
-    const { entities, problems } = hydrateMapEntities(w, [{ id: 'empty' }]);
+    const { entities, problems } = hydrateMapEntities(w, [{ id: 'empty' }], ctx);
     expect(problems).toEqual([]);
     expect(entities).toHaveLength(1);
   });
 
-  it('hydrates an editor NPC prefab including AIWander', () => {
+  it('hydrates a legacy editor NPC (migrated on the way in) including AIWander', () => {
     const w = new World();
     const { entities, problems } = hydrateMapEntities(w, [
       {
         name: 'NPC',
         components: {
           Transform: { x: 48, y: 64, depth: 10 },
-          SpriteView: { texture: 'player-walk', frame: 0, originX: 0.5, originY: 1.0, visible: true, alpha: 1.0, flipX: false },
+          SpriteView: { texture: 'npc-walk', frame: 0, originX: 0.5, originY: 1.0, visible: true, alpha: 1.0, flipX: false },
           Collider: { width: 16, height: 8, offsetX: 0, offsetY: 0, isSolid: true },
           GridMovement: { speed: 80, direction: 'down' },
-          CharacterAnimation: { characterKey: 'player', direction: 'down', movementType: 'walk' },
+          CharacterAnimation: { characterKey: 'npc', direction: 'down', movementType: 'walk' },
           Interactable: { type: 'on_interact', message: 'Hello traveler!', eventKey: '' },
           AIWander: { radius: 2, interval: 4000, speed: 60 },
           Tag: { tag: 'npc' },
         },
       },
-    ]);
+    ], ctx);
     expect(problems).toEqual([]);
     expect(w.getComponent(entities[0], AIWanderComponent)).toMatchObject({ radius: 2, interval: 4000, speed: 60 });
+    expect(w.getComponent(entities[0], SpriteComponent)).toMatchObject({ assetId: 'characters/npc' });
+    expect(w.getComponent(entities[0], AnimationComponent)).toMatchObject({ assetId: 'characters/npc', hasRun: false });
+    expect(w.getComponent(entities[0], EventComponent)!.pages[0].commands[0].params.text).toBe('Hello traveler!');
   });
 });
 
@@ -159,7 +176,8 @@ describe('real map files', () => {
   it.each(files)('%s: entities (if any) hydrate with zero problems', (file) => {
     const data = JSON.parse(readFileSync(new URL(file, dir), 'utf8'));
     const w = new World();
-    const { entities, problems } = hydrateMapEntities(w, data.entities);
+    const problems0: string[] = [];
+    const { entities, problems } = hydrateMapEntities(w, data.entities, { sprites, warn: (m) => problems0.push(m) });
     expect(problems).toEqual([]);
     expect(entities).toHaveLength(Array.isArray(data.entities) ? data.entities.length : 0);
   });

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { COMPONENT_TYPES, LEGACY_COMPONENT_TYPES } from '@shared/engine/index.ts';
 import {
   createComponentFromData,
   COMPONENT_TYPE_NAMES,
@@ -21,36 +21,25 @@ import { TagComponent } from './components/TagComponent';
 const MINIMAL_PROPS: Record<string, Record<string, unknown>> = {
   SpriteView: { texture: 'tex' },
   CharacterAnimation: { characterKey: 'player' },
+  Sprite: { asset: '' },
 };
 
-/**
- * The editor's `ComponentType` union is the source of truth for names in map JSON.
- * Parse it straight from the editor source so the two cannot drift silently.
- */
-function editorComponentTypes(): string[] {
-  const file = new URL('../../../editor/src/types/editor.ts', import.meta.url);
-  const text = readFileSync(file, 'utf8');
-  const match = text.match(/export type ComponentType\s*=([^]*?)\n\n/);
-  if (!match) throw new Error('Could not find ComponentType union in editor/src/types/editor.ts');
-  return [...match[1].matchAll(/'([A-Za-z]+)'/g)].map((m) => m[1]);
-}
-
 describe('createComponentFromData: type coverage', () => {
-  it('handles every ComponentType declared by the editor (and nothing else)', () => {
-    const editorTypes = editorComponentTypes();
-    expect(editorTypes.length).toBeGreaterThanOrEqual(10);
-    expect([...COMPONENT_TYPE_NAMES].sort()).toEqual([...editorTypes].sort());
-    for (const type of editorTypes) {
+  it('handles exactly the shared COMPONENT_TYPES plus the legacy names', () => {
+    const expected = [...COMPONENT_TYPES, ...LEGACY_COMPONENT_TYPES].sort();
+    expect([...COMPONENT_TYPE_NAMES].sort()).toEqual(expected);
+    expect(expected).toHaveLength(13);
+    for (const type of expected) {
       const c = createComponentFromData(type, MINIMAL_PROPS[type] ?? {});
       expect(c, type).not.toBeNull();
     }
   });
 
-  it('pins the expected editor names (guards the parser above)', () => {
+  it('pins the expected names', () => {
     expect([...COMPONENT_TYPE_NAMES].sort()).toEqual(
       [
-        'Transform', 'SpriteView', 'Collider', 'GridMovement', 'FreeMovement',
-        'PlayerControl', 'CharacterAnimation', 'Interactable', 'AIWander', 'Tag',
+        'Transform', 'Sprite', 'Collider', 'Movement', 'Event', 'Tag',
+        'SpriteView', 'GridMovement', 'FreeMovement', 'PlayerControl', 'CharacterAnimation', 'Interactable', 'AIWander',
       ].sort(),
     );
   });
@@ -98,7 +87,7 @@ describe('createComponentFromData: values', () => {
 
   it('tolerates non-object props (null, undefined, arrays, strings)', () => {
     for (const bad of [null, undefined, [], 'x', 5]) {
-      expect(createComponentFromData('Collider', bad)).toMatchObject({ width: 16, height: 8, isSolid: true });
+      expect(createComponentFromData('Collider', bad)).toMatchObject({ width: 32, height: 32, isSolid: true });
     }
   });
 
@@ -144,7 +133,7 @@ describe('createComponentFromData: values', () => {
   it('CharacterAnimation: requires characterKey, validates enums', () => {
     const a = createComponentFromData('CharacterAnimation', { characterKey: 'npc', direction: 'right', movementType: 'run' });
     expect(a).toBeInstanceOf(AnimationComponent);
-    expect(a).toMatchObject({ characterKey: 'npc', direction: 'right', movementType: 'run' });
+    expect(a).toMatchObject({ assetId: 'characters/npc', direction: 'right', movementType: 'run' });
     const d = createComponentFromData('CharacterAnimation', { characterKey: 'npc', direction: 'x', movementType: 'fly' });
     expect(d).toMatchObject({ direction: 'down', movementType: 'walk' });
     expect(() => createComponentFromData('CharacterAnimation', {})).toThrow(ComponentDataError);

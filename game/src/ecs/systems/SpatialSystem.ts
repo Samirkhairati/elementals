@@ -44,7 +44,8 @@ export class SpatialSystem extends System {
       const top = transform.y + collider.offsetY - collider.height;
       const bottom = transform.y + collider.offsetY;
 
-      if (x >= left && x <= right && y >= top && y <= bottom) {
+      // The top edge is exclusive: a one-tile (32px) box must not block the bottom-centre of the tile above it.
+      if (x >= left && x <= right && y > top && y <= bottom) {
         return false;
       }
     }

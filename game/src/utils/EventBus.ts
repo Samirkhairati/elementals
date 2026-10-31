@@ -8,6 +8,7 @@ export const Events = {
     // Input Events
     INPUT_UI_DIRECTION: 'input-ui-direction',
     INPUT_ACTION: 'input-action',
+    INPUT_CANCEL: 'input-cancel',
     MENU_TOGGLED: 'menu-toggled',
     
     // Game State Events
@@ -18,6 +19,19 @@ export const Events = {
     INPUT_LOCK_CHANGED: 'input-lock-changed',
     
     // UI Events
+    /** Payload: a plain string (legacy) or `{ speaker?: string; text: string }`. */
     SHOW_DIALOGUE: 'show-dialogue',
     DIALOGUE_CLOSED: 'dialogue-closed',
+    /** Payload: `{ id: number; options: string[]; allowCancel: boolean }`. */
+    SHOW_CHOICES: 'show-choices',
+    /** Payload: `(id: number, index: number)`; index -1 = cancelled. Closes the menu when emitted by the runtime on abort. */
+    CHOICE_SELECTED: 'choice-selected',
+    HIDE_CHOICES: 'hide-choices',
+
+    // Event runtime
+    /** Payload: `{ kind: 'switch' | 'variable' | 'selfSwitch' | 'reset'; id: string }`. */
+    EVENT_STATE_CHANGED: 'event-state-changed',
+    /** Payload: `{ entity: string; map: string; pageId: string; blocking: boolean }`. */
+    EVENT_STARTED: 'event-started',
+    EVENT_ENDED: 'event-ended',
 } as const;

@@ -8,6 +8,11 @@ import { AnimationComponent } from "./components/AnimationComponent";
 import { TagComponent } from "./components/TagComponent";
 import { InteractableComponent } from "./components/InteractableComponent";
 import { AIWanderComponent } from "./components/AIWanderComponent";
+import { EventComponent } from "./components/EventComponent";
+import { expandMovement } from "./expand";
+import { spriteRegistry } from "@/data/spriteRegistry";
+import { buildSpriteComponents } from "@/sprites/spriteState";
+import { normalizeProps } from "@shared/engine/index.ts";
 import { Direction, MovementType } from "@/utils/Direction";
 
 /**
@@ -18,16 +23,22 @@ export type ComponentData = Record<string, unknown>;
 
 /** Maps each component type name (identical to the editor's `ComponentType`) to its runtime class. */
 export interface ComponentTypeMap {
+  // Canonical engine components (schemaVersion 2). Sprite / Movement / Event expand to several runtime
+  // components in the spawner (see expand.ts); the factory returns the primary one.
   Transform: TransformComponent;
-  SpriteView: SpriteComponent;
+  Sprite: SpriteComponent;
   Collider: ColliderComponent;
+  Movement: GridMovementComponent;
+  Event: EventComponent;
+  Tag: TagComponent;
+  // Legacy names (schemaVersion 1); maps are migrated before they get here.
+  SpriteView: SpriteComponent;
   GridMovement: GridMovementComponent;
   FreeMovement: FreeMovementComponent;
   PlayerControl: PlayerControlComponent;
   CharacterAnimation: AnimationComponent;
   Interactable: InteractableComponent;
   AIWander: AIWanderComponent;
-  Tag: TagComponent;
 }
 
 export type ComponentTypeName = keyof ComponentTypeMap;
@@ -88,6 +99,20 @@ const FACTORIES: { [K in ComponentTypeName]: Factory<ComponentTypeMap[K]> } = {
   Transform: (d) =>
     new TransformComponent(defined({ x: num(d, "x"), y: num(d, "y"), depth: num(d, "depth") })),
 
+  Sprite: (d) => {
+    const props = normalizeProps("Sprite", d);
+    // Empty asset = no graphic (a valid, invisible sprite); an unknown asset is an error for direct callers
+    // (the spawner reports it as a warning and leaves the graphic out instead).
+    if (props.asset === "") return new SpriteComponent({ texture: "", visible: false });
+    const built = buildSpriteComponents(props, spriteRegistry);
+    if (!built.ok) throw new ComponentDataError("Sprite", built.reason);
+    return built.value.sprite;
+  },
+
+  Movement: (d) => expandMovement(normalizeProps("Movement", d), "down")[0] as GridMovementComponent,
+
+  Event: (d) => new EventComponent(normalizeProps("Event", d).pages),
+
   SpriteView: (d) => {
     const texture = str(d, "texture");
     if (!texture) throw new ComponentDataError("SpriteView", 'missing required string "texture"');
@@ -131,7 +156,8 @@ const FACTORIES: { [K in ComponentTypeName]: Factory<ComponentTypeMap[K]> } = {
     if (!characterKey) throw new ComponentDataError("CharacterAnimation", 'missing required string "characterKey"');
     return new AnimationComponent(
       defined({
-        characterKey,
+        // Legacy `characterKey` -> sprite asset id (same rule as shared migrateEntity).
+        assetId: `characters/${characterKey}`,
         direction: oneOf(d, "direction", DIRECTIONS),
         movementType: oneOf(d, "movementType", MOVEMENT_TYPES),
       }),
@@ -156,7 +182,7 @@ const FACTORIES: { [K in ComponentTypeName]: Factory<ComponentTypeMap[K]> } = {
   Tag: (d) => new TagComponent(str(d, "tag") || "entity"),
 };
 
-/** All component type names understood by the factory (kept identical to the editor's `ComponentType`). */
+/** All component type names understood by the factory: the shared `COMPONENT_TYPES` plus the legacy names. */
 export const COMPONENT_TYPE_NAMES = Object.keys(FACTORIES) as ComponentTypeName[];
 
 export function isComponentTypeName(type: string): type is ComponentTypeName {

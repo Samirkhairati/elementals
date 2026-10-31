@@ -1,11 +1,6 @@
-export const TILESETS = [
-    "beach_caves",
-    "bush",
-    "grass",
-    "house",
-    "interior",
-    "outside"
-];
+// Tilesets, sprites and database are NOT listed here: they come from the generated manifests under
+// public/data (sprites.json, tilesets.json, database.json), loaded by the Boot/Preloader scenes.
+// Only the maps are discovered by the bundler (file base name = map id).
 
 const mapFiles = import.meta.glob('../../public/data/maps/*.json');
 

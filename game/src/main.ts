@@ -6,11 +6,16 @@ import { GAME_CONSTANTS } from '@/constants/game';
 import { Game, type Types } from "phaser";
 
 import { UIScene } from '@/scenes/UIScene';
+import { bootParams } from '@/core/bootParams';
+import { settingsStore } from '@/core/SettingsStore';
+
+// URL params: ?renderer=canvas (browsers where WebGL fails), ?map=<id>, ?debug=1
+if (bootParams.debug) settingsStore.setDebugEnabled(true);
 
 //  Find out more information about the Game Config at:
 //  https://newdocs.phaser.io/docs/3.70.0/Phaser.Types.Core.GameConfig
 const config: Types.Core.GameConfig = {
-    type: Phaser.AUTO,
+    type: bootParams.renderer === 'canvas' ? Phaser.CANVAS : bootParams.renderer === 'webgl' ? Phaser.WEBGL : Phaser.AUTO,
     parent: 'game-container',
     backgroundColor: GAME_CONSTANTS.DEFAULT_BG_COLOR,
     pixelArt: true,

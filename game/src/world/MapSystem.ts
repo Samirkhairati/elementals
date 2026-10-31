@@ -1,7 +1,7 @@
 import { Scene } from "phaser";
 import { GAME_CONSTANTS } from "@/constants/game";
 import { settingsStore } from "@/core/SettingsStore";
-import { TILESETS } from "@/constants/assets";
+import { gameData } from "@/data/gameData";
 import {
   MapParser,
   TilesetManager,
@@ -30,8 +30,9 @@ export class MapSystem {
   }
 
   private registerTilesets() {
-    TILESETS.forEach(key => {
-      this.tilesetManager.registerTileset(key, key);
+    // Tiled tileset name = Phaser texture key, for every tileset listed in data/tilesets.json
+    gameData.tilesets.forEach(({ name }) => {
+      this.tilesetManager.registerTileset(name, name);
     });
   }
 

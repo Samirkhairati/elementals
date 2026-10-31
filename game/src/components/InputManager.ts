@@ -1,7 +1,7 @@
 import { Scene, Input, type Types } from 'phaser';
 import { EventBus, Events } from '@/utils/EventBus';
 import { settingsStore } from '@/core/SettingsStore';
-import { Direction } from '@/utils/AnimationManager';
+import { Direction } from '@/utils/Direction';
 import type { InputSnapshot } from '@/input/InputSnapshot';
 
 export class InputManager {
@@ -42,6 +42,9 @@ export class InputManager {
             ) {
                 if (event.repeat) return;
                 EventBus.emit(Events.INPUT_ACTION);
+            } else if (key === 'ESCAPE' || key === 'BACKSPACE') {
+                if (event.repeat) return;
+                EventBus.emit(Events.INPUT_CANCEL);
             } else if (['ARROWUP', 'ARROWDOWN', 'ARROWLEFT', 'ARROWRIGHT'].includes(key)) {
                 // Let the HUD Manager know for navigation
                 EventBus.emit(Events.INPUT_UI_DIRECTION, key);

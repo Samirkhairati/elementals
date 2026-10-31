@@ -9,6 +9,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      '@shared': fileURLToPath(new URL('../shared', import.meta.url)),
     },
   },
   define: {
@@ -20,5 +21,7 @@ export default defineConfig({
     // Fail loudly on a collision instead of silently moving to another port
     // (the dev banner would then print the wrong URL).
     strictPort: true,
+    // shared/ (engine data contract) lives outside the game package root.
+    fs: { allow: [fileURLToPath(new URL('..', import.meta.url))] },
   }
 });

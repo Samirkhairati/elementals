@@ -183,14 +183,25 @@ describe('MovementSystem grid movement', () => {
     expect(gameState.playerPosition).toMatchObject({ worldX: px(8), worldY: py(7), gridX: 8, gridY: 7, direction: Direction.UP });
   });
 
-  it('skips grid entities when tile-based movement is off', () => {
+  it('skips the grid of entities that also have free movement when tile-based movement is off', () => {
+    const { world } = makeSystems();
+    settingsStore.tileBasedMovement = false;
+    const { grid, e } = addGridEntity(world, 5, 5);
+    world.addComponent(e, new FreeMovementComponent());
+    grid.pendingDirection = Direction.RIGHT;
+    grid.holdDuration = 100;
+    world.update(16);
+    expect(grid.isMoving).toBe(false);
+  });
+
+  it('still steps grid-only entities (NPCs, move routes) when tile-based movement is off', () => {
     const { world } = makeSystems();
     settingsStore.tileBasedMovement = false;
     const { grid } = addGridEntity(world, 5, 5);
     grid.pendingDirection = Direction.RIGHT;
     grid.holdDuration = 100;
     world.update(16);
-    expect(grid.isMoving).toBe(false);
+    expect(grid.isMoving).toBe(true);
   });
 
   it('run speed is 1.5x', () => {

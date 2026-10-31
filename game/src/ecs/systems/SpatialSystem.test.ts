@@ -37,7 +37,8 @@ describe('SpatialSystem.isWalkable', () => {
     addBox(w, 100, 100, { width: 16, height: 8 });
     const s = new SpatialSystem(stubCollision().collision);
     expect(s.isWalkable(100, 100, undefined, w)).toBe(false);
-    expect(s.isWalkable(92, 92, undefined, w)).toBe(false); // inclusive corner
+    expect(s.isWalkable(92, 93, undefined, w)).toBe(false); // left/right/bottom edges are inclusive
+    expect(s.isWalkable(92, 92, undefined, w)).toBe(true); // the top edge is exclusive
     expect(s.isWalkable(108, 100, undefined, w)).toBe(false);
     expect(s.isWalkable(109, 100, undefined, w)).toBe(true);
     expect(s.isWalkable(100, 101, undefined, w)).toBe(true);
@@ -78,6 +79,19 @@ describe('SpatialSystem.isWalkable', () => {
     const { collision } = stubCollision(() => false);
     const s = new SpatialSystem(collision);
     expect(s.isWalkable(1, 1, undefined, w)).toBe(false);
+  });
+});
+
+describe('SpatialSystem one-tile colliders', () => {
+  it('a 32x32 solid does not block the bottom-centre of the tile above it, but blocks its own tile', () => {
+    const w = new World();
+    addBox(w, 48, 64, { width: 32, height: 32 }); // tile (1,1): x 32..64, y 32..64
+    const s = new SpatialSystem(stubCollision().collision);
+    expect(s.isWalkable(48, 64, undefined, w)).toBe(false); // own tile
+    expect(s.isWalkable(48, 32, undefined, w)).toBe(true); // tile above (0 + bottom-centre)
+    expect(s.isWalkable(48, 96, undefined, w)).toBe(true); // tile below
+    expect(s.isWalkable(16, 64, undefined, w)).toBe(true); // tile left
+    expect(s.isWalkable(80, 64, undefined, w)).toBe(true); // tile right
   });
 });
 

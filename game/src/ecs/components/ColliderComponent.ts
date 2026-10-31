@@ -6,6 +6,10 @@ export interface ColliderComponentInit {
   isSolid?: boolean;
 }
 
+/**
+ * Box bottom-centred on the Transform anchor, shifted by the offsets (+y is down).
+ * Default: one tile (32x32), solid.
+ */
 export class ColliderComponent {
   public width: number;
   public height: number;
@@ -14,8 +18,8 @@ export class ColliderComponent {
   public isSolid: boolean;
 
   constructor(init?: ColliderComponentInit) {
-    this.width = init?.width ?? 16;
-    this.height = init?.height ?? 8;
+    this.width = init?.width ?? 32;
+    this.height = init?.height ?? 32;
     this.offsetX = init?.offsetX ?? 0;
     this.offsetY = init?.offsetY ?? 0;
     this.isSolid = init?.isSolid ?? true;

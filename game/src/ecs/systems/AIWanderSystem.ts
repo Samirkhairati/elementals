@@ -5,6 +5,7 @@ import { TransformComponent } from "../components/TransformComponent";
 import { GridMovementComponent } from "../components/GridMovementComponent";
 import { AIWanderComponent } from "../components/AIWanderComponent";
 import { PlayerControlComponent } from "../components/PlayerControlComponent";
+import { MoveRouteComponent } from "../components/MoveRouteComponent";
 import { Direction, MovementType } from "@/utils/Direction";
 import { GAME_CONSTANTS } from "@/constants/game";
 import { settingsStore } from "@/core/SettingsStore";
@@ -63,6 +64,8 @@ export class AIWanderSystem extends System {
     for (const [entity, transform, grid, wander] of world.view(TransformComponent, GridMovementComponent, AIWanderComponent)) {
       // The player is never AI driven, even if someone attached the component to it.
       if (world.hasComponent(entity, PlayerControlComponent)) continue;
+      // An entity walking a move route is driven by the route, not by the AI.
+      if (world.getComponent(entity, MoveRouteComponent)?.active) continue;
 
       // Any intent issued last frame has been consumed by MovementSystem (or rejected) by now.
       grid.pendingDirection = null;

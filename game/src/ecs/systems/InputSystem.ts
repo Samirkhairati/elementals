@@ -3,6 +3,7 @@ import type { World } from "../World";
 import { PlayerControlComponent } from "../components/PlayerControlComponent";
 import { GridMovementComponent } from "../components/GridMovementComponent";
 import { FreeMovementComponent } from "../components/FreeMovementComponent";
+import { MoveRouteComponent } from "../components/MoveRouteComponent";
 import type { InputSnapshot } from "@/input/InputSnapshot";
 import { gameState } from "@/core/GameState";
 import { MovementType } from "@/utils/Direction";
@@ -21,6 +22,9 @@ export class InputSystem extends System {
 
     for (const [entity, control] of controlledEntities) {
       control.isMovementLocked = isLocked;
+
+      // A move route (cutscene) owns the player's movement; input is ignored while it runs.
+      if (world.getComponent(entity, MoveRouteComponent)?.active) continue;
 
       const grid = world.getComponent(entity, GridMovementComponent);
       const free = world.getComponent(entity, FreeMovementComponent);
@@ -41,14 +45,14 @@ export class InputSystem extends System {
       if (grid) {
         grid.pendingDirection = snapshot.direction;
         grid.holdDuration = snapshot.holdDuration;
-        grid.movementType = snapshot.isRunning ? MovementType.RUN : MovementType.WALK;
+        grid.movementType = snapshot.isRunning && control.canRun ? MovementType.RUN : MovementType.WALK;
       }
 
       if (free) {
         free.vx = snapshot.vector.x;
         free.vy = snapshot.vector.y;
-        free.isRunning = snapshot.isRunning;
-        free.movementType = snapshot.isRunning ? MovementType.RUN : MovementType.WALK;
+        free.isRunning = snapshot.isRunning && control.canRun;
+        free.movementType = free.isRunning ? MovementType.RUN : MovementType.WALK;
         if (snapshot.direction) {
           free.direction = snapshot.direction;
         }

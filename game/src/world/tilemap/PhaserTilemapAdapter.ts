@@ -59,7 +59,8 @@ export class PhaserTilemapAdapter {
 
         if (phaserLayer) {
           phaserLayer.setAlpha(layerData.opacity ?? 1);
-          phaserLayer.setVisible(layerData.visible ?? true);
+          // The collision layer is data for the CollisionSystem, never drawn.
+          phaserLayer.setVisible(layerData.name !== "collision" && (layerData.visible ?? true));
 
           // Handle custom z-depth property for layering
           const zProp = layerData.properties?.find((p: any) => p.name === "z");

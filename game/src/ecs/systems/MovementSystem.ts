@@ -5,6 +5,7 @@ import { TransformComponent } from "../components/TransformComponent";
 import { GridMovementComponent } from "../components/GridMovementComponent";
 import { FreeMovementComponent } from "../components/FreeMovementComponent";
 import { PlayerControlComponent } from "../components/PlayerControlComponent";
+import { MoveRouteComponent } from "../components/MoveRouteComponent";
 import { SpatialSystem } from "./SpatialSystem";
 import { Direction, MovementType } from "@/utils/Direction";
 import { GAME_CONSTANTS } from "@/constants/game";
@@ -51,17 +52,25 @@ export class MovementSystem extends System {
   public update(world: World, delta: number): void {
     const isTileBased = settingsStore.tileBasedMovement;
 
-    if (isTileBased) {
-      const gridEntities = world.view(TransformComponent, GridMovementComponent);
-      for (const [entity, transform, grid] of gridEntities) {
-        this.updateGridMovement(entity, transform, grid, delta, world);
+    // Grid movement runs in tile mode for everyone. In free mode it still runs for entities that have
+    // no free movement (NPCs) and for entities walking a move route (the route needs tile steps).
+    for (const [entity, transform, grid] of world.view(TransformComponent, GridMovementComponent)) {
+      const routed = this.isRouted(world, entity);
+      if (isTileBased || routed || !world.hasComponent(entity, FreeMovementComponent)) {
+        this.updateGridMovement(entity, transform, grid, delta, world, routed);
       }
-    } else {
-      const freeEntities = world.view(TransformComponent, FreeMovementComponent);
-      for (const [entity, transform, free] of freeEntities) {
+    }
+
+    if (!isTileBased) {
+      for (const [entity, transform, free] of world.view(TransformComponent, FreeMovementComponent)) {
+        if (this.isRouted(world, entity)) continue;
         this.updateFreeMovement(entity, transform, free, delta, world);
       }
     }
+  }
+
+  private isRouted(world: World, entity: Entity): boolean {
+    return world.getComponent(entity, MoveRouteComponent)?.active ?? false;
   }
 
   private updateGridMovement(
@@ -69,10 +78,12 @@ export class MovementSystem extends System {
     transform: TransformComponent,
     grid: GridMovementComponent,
     delta: number,
-    world: World
+    world: World,
+    routed: boolean = false
   ): void {
     const isPlayer = world.hasComponent(entity, PlayerControlComponent);
-    const isLocked = gameState.isInputLocked;
+    // A running event locks player input, but must still be able to walk its own move routes.
+    const isLocked = gameState.isInputLocked && !routed;
 
     if (grid.isMoving) {
       const speed = grid.movementType === MovementType.RUN ? grid.speed * 1.5 : grid.speed;
