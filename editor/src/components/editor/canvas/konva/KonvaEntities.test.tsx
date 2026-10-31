@@ -86,9 +86,9 @@ describe('KonvaEntities', () => {
     expect(nodes()).toHaveLength(0)
   })
 
-  it('draws a faint area for every entity (its collider, else its tile) when "Colliders" is on, and none when off', () => {
+  it('always draws an area for every visible entity (its collider, else its tile), but not for hidden ones', () => {
     const entities = [entity('a', 16, 32, { Collider: { width: 32, height: 32, offsetX: 0, offsetY: 0, isSolid: true } }), entity('b', 48, 32, { Collider: { width: 16, height: 8, isSolid: false } }), entity('c', 80, 32)]
-    renderEntities(entities, { view: { colliders: true } })
+    renderEntities(entities)
     runOverlay()
     expect(drawn.footprint).toHaveBeenCalledTimes(3)
     // (ctx, x, y, w, h, rgb, scale, strong): the collider's box, the 16x8 trigger, and the tile of the entity without a collider
@@ -100,17 +100,17 @@ describe('KonvaEntities', () => {
     expect(drawn.footprint.mock.calls.every((c) => c[5] === '255,255,255' && c[7] === false)).toBe(true)
 
     drawn.footprint.mockClear()
-    renderEntities(entities, { view: { colliders: false } })
-    runOverlay()
-    expect(drawn.footprint).not.toHaveBeenCalled()
-  })
-
-  it('shows the selected entity prominently: strong footprint, frame, anchor, and always its collider even with "Colliders" off', () => {
-    const entities = [entity('a', 16, 32, { Collider: { width: 32, height: 32, offsetX: 0, offsetY: 0, isSolid: true } }), entity('b', 48, 32, { Collider: { width: 32, height: 32 } })]
-    renderEntities(entities, { selectedEntityId: 'a', view: { colliders: false } })
+    renderEntities([{ ...entities[0], visible: false }, entities[1]])
     runOverlay()
     expect(drawn.footprint).toHaveBeenCalledTimes(1)
-    expect(drawn.footprint.mock.calls[0][7]).toBe(true)
+  })
+
+  it('shows the selected entity prominently: strong footprint, frame, anchor, and always its area', () => {
+    const entities = [entity('a', 16, 32, { Collider: { width: 32, height: 32, offsetX: 0, offsetY: 0, isSolid: true } }), entity('b', 48, 32, { Collider: { width: 32, height: 32 } })]
+    renderEntities(entities, { selectedEntityId: 'a' })
+    runOverlay()
+    expect(drawn.footprint).toHaveBeenCalledTimes(2)
+    expect(drawn.footprint.mock.calls.filter((c) => c[7] === true)).toHaveLength(1) // only the selected one is strong
     expect(drawn.frame).toHaveBeenCalledTimes(1)
     expect(drawn.anchor).toHaveBeenCalledTimes(1)
   })
@@ -215,7 +215,7 @@ describe('KonvaEntities', () => {
   })
 
   it('passes the collider-editing state to the collider editor', () => {
-    const { getByTestId } = renderEntities([entity('a', 16, 32, { Collider: { width: 32, height: 32 } })], { selectedEntityId: 'a', colliderToolActive: true, view: { colliders: false } })
+    const { getByTestId } = renderEntities([entity('a', 16, 32, { Collider: { width: 32, height: 32 } })], { selectedEntityId: 'a', colliderToolActive: true, })
     const ed = getByTestId('collider-editor')
     expect(ed.dataset.entity).toBe('a')
     expect(ed.dataset.tool).toBe('true')

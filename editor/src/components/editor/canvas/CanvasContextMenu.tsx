@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu'
-import { Plus, Sparkles, Copy, Trash2, Maximize2, Pipette, Palette } from 'lucide-react'
+import { Plus, Sparkles, Copy, Trash2, Maximize2, Pipette, Palette, Check } from 'lucide-react'
 import { OVERLAY_COLORS } from '@/hooks/editor/canvas/canvasView'
 import { PRESET_PREFABS } from '@/lib/componentRegistry'
 import { EntityData, ComponentType } from '@/types/editor'
@@ -110,25 +110,21 @@ export function CanvasContextMenu({
                 <Palette className="w-3.5 h-3.5 mr-2" />
                 Area colour
               </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="w-auto p-2">
-                <div className="flex items-center gap-1.5" role="radiogroup" aria-label="Area colour">
-                  {OVERLAY_COLORS.map((c) => (
-                    <button
-                      key={c.id || 'white'}
-                      type="button"
-                      role="radio"
-                      aria-checked={(target.entity!.components.Tag?.color ?? '') === c.id}
-                      aria-label={c.label}
-                      title={c.label}
-                      onClick={() => {
-                        onSetAreaColor?.(target.entity!.id, c.id)
-                        onClose()
-                      }}
-                      className="h-5 w-5 rounded-full border border-black/40 aria-checked:ring-2 aria-checked:ring-primary aria-checked:ring-offset-1 aria-checked:ring-offset-background"
-                      style={{ background: `rgb(${c.rgb})` }}
-                    />
-                  ))}
-                </div>
+              <DropdownMenuSubContent className="w-40">
+                {OVERLAY_COLORS.map((c) => (
+                  <DropdownMenuItem
+                    key={c.id || 'white'}
+                    aria-label={`Area colour ${c.label}`}
+                    onSelect={() => {
+                      onSetAreaColor?.(target.entity!.id, c.id)
+                      onClose()
+                    }}
+                  >
+                    <span className="mr-2 h-3 w-3 rounded-full border border-black/40" style={{ background: `rgb(${c.rgb})` }} />
+                    {c.label}
+                    {(target.entity!.components.Tag?.color ?? '') === c.id && <Check className="ml-auto h-3.5 w-3.5" />}
+                  </DropdownMenuItem>
+                ))}
               </DropdownMenuSubContent>
             </DropdownMenuSub>
             <DropdownMenuItem

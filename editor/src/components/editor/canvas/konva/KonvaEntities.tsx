@@ -357,17 +357,15 @@ export const KonvaEntities = React.memo(function KonvaEntities({
           const bottom = stage ? top + stage.height() / s : mapHeightPx
           const v = visuals.current
 
-          // 1) faint footprints of every entity
-          if (view.colliders) {
-            for (let i = 0; i < infos.length; i++) {
-              const info = infos[i]
-              if (info.id === selectedEntityId) continue
-              const ax = info.id === v.dragId ? v.dragX : info.entity.x
-              const ay = info.id === v.dragId ? v.dragY : info.entity.y
-              const f = info.foot
-              if (ax + f.x + f.w < left || ax + f.x > right || ay + f.y + f.h < top || ay + f.y > bottom) continue
-              drawFootprint(ctx, ax + f.x, ay + f.y, f.w, f.h, info.rgb, s, false)
-            }
+          // 1) the area of every visible entity (hidden entities and folders are not in `infos`)
+          for (let i = 0; i < infos.length; i++) {
+            const info = infos[i]
+            if (info.id === selectedEntityId) continue
+            const ax = info.id === v.dragId ? v.dragX : info.entity.x
+            const ay = info.id === v.dragId ? v.dragY : info.entity.y
+            const f = info.foot
+            if (ax + f.x + f.w < left || ax + f.x > right || ay + f.y + f.h < top || ay + f.y > bottom) continue
+            drawFootprint(ctx, ax + f.x, ay + f.y, f.w, f.h, info.rgb, s, false)
           }
 
           // 2) hover

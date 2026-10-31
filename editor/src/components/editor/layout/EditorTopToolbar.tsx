@@ -88,7 +88,6 @@ function ToolButton({ title, active, disabled, onClick, children, label, tone }:
 
 const VIEW_TOGGLES: { key: CanvasViewToggle; title: string; icon: React.ReactNode }[] = [
   { key: 'sprites', title: 'Sprites: draw real graphics (off: placeholder tiles)', icon: <ImageIcon /> },
-  { key: 'colliders', title: 'Entity areas: outline of every entity', icon: <ScanLine /> },
   { key: 'labels', title: 'Labels: names of all entities when zoomed in', icon: <Type /> },
   { key: 'badges', title: 'Event badges: lightning on entities with an Event', icon: <Zap /> },
 ]

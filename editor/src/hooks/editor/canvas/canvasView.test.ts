@@ -26,12 +26,12 @@ describe('canvas view settings', () => {
 
   it('toggles one flag and notifies subscribers', () => {
     const { result } = renderHook(() => useCanvasView())
-    expect(result.current.colliders).toBe(true)
-    act(() => toggleCanvasView('colliders'))
-    expect(result.current.colliders).toBe(false)
+    expect(result.current.labels).toBe(true)
+    act(() => toggleCanvasView('labels'))
+    expect(result.current.labels).toBe(false)
     expect(result.current.sprites).toBe(true)
-    act(() => toggleCanvasView('colliders'))
-    expect(result.current.colliders).toBe(true)
+    act(() => toggleCanvasView('labels'))
+    expect(result.current.labels).toBe(true)
   })
 
   it('persists to localStorage and survives it being unavailable', () => {

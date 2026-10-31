@@ -41,11 +41,11 @@ describe('EditorTopToolbar', () => {
     expect(screen.getByRole('button', { name: /Brush Tool/ })).toHaveAttribute('aria-pressed', 'false')
   })
 
-  it('has a View group that toggles sprites / colliders / labels / event badges', () => {
+  it('has a View group that toggles sprites / labels / event badges', () => {
     renderWithEditor(<EditorTopToolbar />, base() as any)
     const group = screen.getByRole('group', { name: 'View' })
-    expect(group.querySelectorAll('button')).toHaveLength(4)
-    for (const key of ['sprites', 'colliders', 'labels', 'badges'] as const) {
+    expect(group.querySelectorAll('button')).toHaveLength(3)
+    for (const key of ['sprites', 'labels', 'badges'] as const) {
       const btn = screen.getByRole('button', { name: `View ${key}` })
       expect(btn).toHaveAttribute('aria-pressed', 'true')
       fireEvent.click(btn)

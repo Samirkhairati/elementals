@@ -20,20 +20,19 @@ export function overlayRgb(id: unknown): string {
 }
 
 /** The on/off switches of the View group (everything in the settings except the overlay colour). */
-export type CanvasViewToggle = 'sprites' | 'colliders' | 'labels' | 'badges'
+export type CanvasViewToggle = 'sprites' | 'labels' | 'badges'
 
 export interface CanvasViewSettings {
   /** Draw real sprites (off = placeholder tiles only). */
   sprites: boolean
   /** Draw collider footprints for every entity (the selected one is always shown). */
-  colliders: boolean
   /** Draw name labels for every entity at high zoom (hover and selection always show one). */
   labels: boolean
   /** Event (lightning) badges on entities that have an Event. */
   badges: boolean
 }
 
-export const DEFAULT_CANVAS_VIEW: CanvasViewSettings = { sprites: true, colliders: true, labels: true, badges: true }
+export const DEFAULT_CANVAS_VIEW: CanvasViewSettings = { sprites: true, labels: true, badges: true }
 
 const STORAGE_KEY = 'elementals.canvasView'
 
@@ -44,7 +43,6 @@ function load(): CanvasViewSettings {
     const parsed = JSON.parse(raw) as Partial<CanvasViewSettings>
     return {
       sprites: parsed.sprites !== false,
-      colliders: parsed.colliders !== false,
       labels: parsed.labels !== false,
       badges: parsed.badges !== false,
     }
@@ -62,7 +60,7 @@ export function getCanvasView(): CanvasViewSettings {
 
 export function setCanvasView(patch: Partial<CanvasViewSettings>) {
   const next = { ...state, ...patch }
-  if (next.sprites === state.sprites && next.colliders === state.colliders && next.labels === state.labels && next.badges === state.badges) return
+  if (next.sprites === state.sprites && next.labels === state.labels && next.badges === state.badges) return
   state = next
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
