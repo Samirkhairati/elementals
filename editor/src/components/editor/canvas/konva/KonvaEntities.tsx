@@ -201,7 +201,8 @@ const KonvaEntityNode = React.memo(function KonvaEntityNode({
       }}
       onClick={(e) => {
         e.cancelBubble = true
-        setSelectedEntityId(entity.id)
+        // Only the left button selects (the middle button pans the canvas).
+        if (e.evt.button === 0) setSelectedEntityId(entity.id)
       }}
       onTap={(e) => {
         e.cancelBubble = true
@@ -209,7 +210,7 @@ const KonvaEntityNode = React.memo(function KonvaEntityNode({
       }}
       onDblClick={(e) => {
         e.cancelBubble = true
-        if (info.hasEvent) onOpenEvent?.(entity.id)
+        if (e.evt.button === 0 && info.hasEvent) onOpenEvent?.(entity.id)
       }}
       onDblTap={(e) => {
         e.cancelBubble = true

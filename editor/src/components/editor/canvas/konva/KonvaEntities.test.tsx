@@ -200,9 +200,9 @@ describe('KonvaEntities', () => {
     renderEntities([entity('ev', 16, 32, { Event: { pages: [] } }), entity('plain', 48, 32)], { onOpenEvent })
     const ev = nodes().find((n) => n.props.x === 16)!
     const plain = nodes().find((n) => n.props.x === 48)!
-    ev.props.onDblClick({ cancelBubble: false })
+    ev.props.onDblClick({ cancelBubble: false, evt: { button: 0 } })
     expect(onOpenEvent).toHaveBeenCalledWith('ev')
-    plain.props.onDblClick({ cancelBubble: false })
+    plain.props.onDblClick({ cancelBubble: false, evt: { button: 0 } })
     plain.props.onDblTap({ cancelBubble: false })
     expect(onOpenEvent).toHaveBeenCalledTimes(1)
   })
@@ -214,5 +214,15 @@ describe('KonvaEntities', () => {
     expect(byX[0]).toBe('160,235,196')
     expect(byX[32]).toBe('255,255,255')
     expect(byX[64]).toBe('255,255,255')
+  })
+
+  it('only the left button selects on click; the middle button (pan) does not', () => {
+    const setSelectedEntityId = vi.fn()
+    renderEntities([entity('a', 16, 32)], { setSelectedEntityId })
+    const n = nodes()[0]
+    n.props.onClick({ cancelBubble: false, evt: { button: 1 } })
+    expect(setSelectedEntityId).not.toHaveBeenCalled()
+    n.props.onClick({ cancelBubble: false, evt: { button: 0 } })
+    expect(setSelectedEntityId).toHaveBeenCalledWith('a')
   })
 })
