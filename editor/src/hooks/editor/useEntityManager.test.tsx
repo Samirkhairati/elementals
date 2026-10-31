@@ -5,6 +5,7 @@ import type { MapData } from '@/types/editor'
 import { createSaveQueue } from '@/lib/saveQueue'
 import { useMapAutosave } from '@/hooks/useMapAutosave'
 import { makeEntity, makeMap } from '@/test/helpers'
+import { PRESET_PREFABS } from '@/lib/componentRegistry'
 import { useEntityManager } from './useEntityManager'
 
 const wrapper = ({ children }: { children: ReactNode }) => <StrictMode>{children}</StrictMode>
@@ -48,6 +49,43 @@ describe('useEntityManager (StrictMode)', () => {
     act(() => vi.advanceTimersByTime(300))
     expect(save).toHaveBeenCalledTimes(1)
     expect(save.mock.calls[0][0].entities).toHaveLength(3)
+  })
+
+  it('createEntity from a prefab puts Transform at the placement, with fresh event ids', () => {
+    const { result } = setup()
+    const chest = PRESET_PREFABS.find((p) => p.id === 'chest')!
+    act(() => result.current.manager.createEntity('Chest', 80, 96, chest.components))
+    const created = result.current.manager.entities[2]
+    expect(created.x).toBe(80)
+    expect(created.components.Transform).toMatchObject({ x: 80, y: 96 })
+    expect(created.components.Event?.pages).toHaveLength(2)
+    expect(created.components.Sprite).toMatchObject({ asset: 'objects/chest' })
+  })
+
+  it('addComponent creates schema defaults (Event gets a first page, Collider is one tile)', () => {
+    const { result } = setup()
+    act(() => result.current.manager.addComponent('a', 'Event'))
+    act(() => result.current.manager.addComponent('a', 'Collider'))
+    act(() => result.current.manager.addComponent('b', 'Event'))
+    const [a, b] = result.current.manager.entities
+    expect(a.components.Event?.pages).toHaveLength(1)
+    expect(a.components.Event?.pages[0]).toMatchObject({ trigger: 'action', commands: [] })
+    expect(a.components.Collider).toMatchObject({ width: 32, height: 32, isSolid: true })
+    expect(b.components.Event?.pages[0].id).not.toBe(a.components.Event?.pages[0].id)
+    // singleton: adding twice keeps the first
+    const before = result.current.manager.entities[0].components.Event
+    act(() => result.current.manager.addComponent('a', 'Event'))
+    expect(result.current.manager.entities[0].components.Event).toBe(before)
+  })
+
+  it('duplicateEntity gives the copy its own event page ids', () => {
+    const { result } = setup()
+    act(() => result.current.manager.addComponent('a', 'Event'))
+    act(() => result.current.manager.duplicateEntity('a'))
+    const [a, copy] = result.current.manager.entities
+    expect(copy.name).toBe('a Copy')
+    expect(copy.components.Event?.pages[0].id).not.toBe(a.components.Event?.pages[0].id)
+    expect(copy.components.Event?.pages).toHaveLength(1)
   })
 
   it('createEntity names blank entities "Entity N" and honours the folder', () => {

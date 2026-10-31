@@ -8,6 +8,8 @@ import type { useGridSettings } from '@/hooks/editor/useGridSettings'
 import type { useEntityPlacement } from '@/hooks/editor/useEntityPlacement'
 import type { useTilesetManager } from '@/hooks/editor/useTilesetManager'
 import type { usePaintTools } from '@/hooks/usePaintTools'
+import type { useSpriteAssets } from '@/hooks/useSpriteAssets'
+import type { useDatabase } from '@/hooks/useDatabase'
 import type { LayerType, MapData } from '@/types/editor'
 
 // ── Value type ──────────────────────────────────────────────────────────────
@@ -21,6 +23,8 @@ type GridSettings = ReturnType<typeof useGridSettings>
 type Placement = ReturnType<typeof useEntityPlacement>
 type TilesetManager = ReturnType<typeof useTilesetManager>
 type PaintTools = ReturnType<typeof usePaintTools>
+type Sprites = ReturnType<typeof useSpriteAssets>
+type Db = ReturnType<typeof useDatabase>
 
 export type FocusedDomain = 'maps' | 'layers' | 'entities' | 'tilesets' | null
 
@@ -160,6 +164,33 @@ export interface EditorBaseContextValue
 
   // Placement (wrapped to create the entity)
   commitPlacement: (x: number, y: number) => void
+
+  // Sprite assets (project/sprites)
+  spriteAssets: Sprites['assets']
+  spriteList: Sprites['list']
+  spriteWarnings: Sprites['warnings']
+  getSpriteAsset: Sprites['getAsset']
+  reloadSprites: Sprites['reload']
+  pickSpriteFile: Sprites['pickFile']
+  importSprite: Sprites['importSprite']
+  saveSpriteMeta: Sprites['saveMeta']
+  renameSprite: Sprites['rename']
+  removeSprite: Sprites['remove']
+
+  // Game database (project/database.json): global switches and variables
+  database: Db['database']
+  switches: Db['switches']
+  variables: Db['variables']
+  getSwitch: Db['getSwitch']
+  getVariable: Db['getVariable']
+  addSwitch: Db['addSwitch']
+  renameSwitch: Db['renameSwitch']
+  removeSwitch: Db['removeSwitch']
+  addVariable: Db['addVariable']
+  renameVariable: Db['renameVariable']
+  setVariableInitial: Db['setVariableInitial']
+  removeVariable: Db['removeVariable']
+  reloadDatabase: Db['reload']
 }
 
 /** Fields contributed by the Dockview layout (see `EditorDockview`). */

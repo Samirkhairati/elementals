@@ -1,6 +1,6 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { DockviewApi, DockviewReadyEvent } from 'dockview-react';
-import { PanelId, getMapPanelId, isMapPanelId, parseMapPanelId } from './types';
+import { ALL_PANELS, PanelId, getMapPanelId, isMapPanelId, parseMapPanelId } from './types';
 import { MapData } from '@/types/editor';
 
 interface UseDockviewLayoutOptions {
@@ -543,6 +543,32 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
         }
         break;
       }
+      case 'database':
+      case 'sprites': {
+        // On-demand panels: open as a tab next to the Tileset Browser (right column).
+        const title = id === 'database' ? 'DATABASE' : 'SPRITES';
+        const refRight =
+          api.getPanel('tilesets') || api.getPanel('preview') || api.getPanel('activeSelection') ||
+          api.getPanel(id === 'database' ? 'sprites' : 'database');
+        if (refRight) {
+          api.addPanel({
+            id,
+            component: id,
+            title,
+            position: { referencePanel: refRight, direction: 'within' }
+          });
+        } else if (firstMapPanel) {
+          api.addPanel({
+            id,
+            component: id,
+            title,
+            position: { referencePanel: firstMapPanel, direction: 'right' }
+          });
+        } else {
+          api.addPanel({ id, component: id, title });
+        }
+        break;
+      }
       case 'canvas': {
         if (optionsRef.current.activeMap) {
           openMapTab(optionsRef.current.activeMap);
@@ -606,14 +632,31 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
       resetLayout();
     };
 
+    // Alt+<letter> toggles the panel that lists that shortcut (see ALL_PANELS). Uses `code`, because Alt
+    // changes `key` on macOS, and runs before the editor's single-key tool shortcuts.
+    const handleShortcut = (e: KeyboardEvent) => {
+      if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)) return;
+      const info = ALL_PANELS.find(
+        (p) => p.id !== 'canvas' && p.shortcut && e.code === `Key${p.shortcut.slice(-1).toUpperCase()}`
+      );
+      if (!info) return;
+      e.preventDefault();
+      e.stopPropagation();
+      togglePanel(info.id);
+    };
+
     window.addEventListener('editor:toggle-panel', handleCustomToggle);
     window.addEventListener('editor:reset-layout', handleCustomReset);
+    window.addEventListener('keydown', handleShortcut, true);
 
     return () => {
       unsubToggle?.();
       unsubReset?.();
       window.removeEventListener('editor:toggle-panel', handleCustomToggle);
       window.removeEventListener('editor:reset-layout', handleCustomReset);
+      window.removeEventListener('keydown', handleShortcut, true);
     };
   }, [togglePanel, resetLayout]);
 

@@ -1,3 +1,19 @@
+import type { GameDatabase, SpriteAssetInfo, SpriteAssetMeta, SpriteKind } from '../../../shared/engine/types';
+
+/** Result of every project-data call: `success: false` carries a readable `error`. */
+type IpcFailure = { success: false; error: string; canceled?: boolean };
+
+interface ImportSpriteOptions {
+  /** Explicit asset id (directory path under project/sprites); wins over `name`. */
+  id?: string;
+  /** Display name; the id is derived from it (`characters/<slug>` / `objects/<slug>`) when no id is given. */
+  name?: string;
+  kind: SpriteKind;
+  /** Default: the whole image (object/animated) or a quarter of it (character, 4 x 4 grid). */
+  frameWidth?: number;
+  frameHeight?: number;
+}
+
 interface TilesetData {
   name: string;
   fileName: string;
@@ -25,6 +41,14 @@ interface ElectronAPI {
   renameMap: (folderPath: string | null, fileName: string, newName: string) => Promise<{ success: boolean; error?: string }>;
   moveMap: (fileName: string, oldFolder: string | null, newFolder: string | null) => Promise<{ success: boolean; error?: string }>;
   exportMap: (jsonData: string, defaultName: string) => Promise<{ success: boolean; canceled?: boolean; filePath?: string; error?: string }>;
+  getSprites: () => Promise<({ success: true; assets: SpriteAssetInfo[]; warnings: { file: string; error: string }[] }) | IpcFailure>;
+  pickSpriteFile: () => Promise<({ success: true; sourcePath: string; defaultName: string }) | IpcFailure>;
+  importSprite: (sourcePath: string, options: ImportSpriteOptions) => Promise<({ success: true; asset: SpriteAssetInfo }) | IpcFailure>;
+  saveSpriteMeta: (id: string, meta: SpriteAssetMeta) => Promise<({ success: true; meta: SpriteAssetMeta }) | IpcFailure>;
+  renameSprite: (id: string, newId: string) => Promise<({ success: true; id: string }) | IpcFailure>;
+  deleteSprite: (id: string) => Promise<({ success: true }) | IpcFailure>;
+  getDatabase: () => Promise<({ success: true; database: GameDatabase }) | IpcFailure>;
+  saveDatabase: (database: GameDatabase) => Promise<({ success: true; database: GameDatabase }) | IpcFailure>;
   onTogglePanel?: (callback: (panelId: string) => void) => () => void;
   onResetLayout?: (callback: () => void) => () => void;
 }
@@ -35,4 +59,4 @@ declare global {
   }
 }
 
-export {};
+export type { ImportSpriteOptions };

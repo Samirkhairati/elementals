@@ -12,7 +12,7 @@ export function ActiveSelectionPanel({ tileSelection, tilesets }: ActiveSelectio
   const [isPanning, setIsPanning] = useState(false)
 
   if (!tileSelection) {
-    return <div className="text-xs text-muted-foreground text-center font-mono w-full h-full flex items-center justify-center">No tiles selected</div>
+    return <div className="ed-empty">No tiles selected</div>
   }
 
   const handleWheel = (e: React.WheelEvent) => {

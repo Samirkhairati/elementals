@@ -15,6 +15,8 @@ import { useLayerManager } from '@/hooks/editor/useLayerManager'
 import { useEntityManager } from '@/hooks/editor/useEntityManager'
 import { useEditorDialogs } from '@/hooks/editor/useEditorDialogs'
 import { useGridSettings } from '@/hooks/editor/useGridSettings'
+import { useSpriteAssets } from '@/hooks/useSpriteAssets'
+import { useDatabase } from '@/hooks/useDatabase'
 import { useEntityPlacement } from '@/hooks/editor/useEntityPlacement'
 import { exportMap } from '@/hooks/useExportMap'
 
@@ -109,6 +111,10 @@ export function EditorPage() {
 
   // ── Grid & Snapping Settings ──────────────────────────────────────────────
   const gridSettings = useGridSettings()
+
+  // ── Project assets & game database ───────────────────────────────────────
+  const sprites = useSpriteAssets()
+  const db = useDatabase()
 
   // ── Entity Placement Mode ─────────────────────────────────────────────────
   const entityPlacement = useEntityPlacement()
@@ -406,7 +412,38 @@ export function EditorPage() {
     setTilesetSelectionCurrent: tilesetManager.setTilesetSelectionCurrent,
     hoverTile: tilesetManager.hoverTile,
     setHoverTile: tilesetManager.setHoverTile,
+
+    // Sprite assets
+    spriteAssets: sprites.assets,
+    spriteList: sprites.list,
+    spriteWarnings: sprites.warnings,
+    getSpriteAsset: sprites.getAsset,
+    reloadSprites: sprites.reload,
+    pickSpriteFile: sprites.pickFile,
+    importSprite: sprites.importSprite,
+    saveSpriteMeta: sprites.saveMeta,
+    renameSprite: sprites.rename,
+    removeSprite: sprites.remove,
+
+    // Game database
+    database: db.database,
+    switches: db.switches,
+    variables: db.variables,
+    getSwitch: db.getSwitch,
+    getVariable: db.getVariable,
+    addSwitch: db.addSwitch,
+    renameSwitch: db.renameSwitch,
+    removeSwitch: db.removeSwitch,
+    addVariable: db.addVariable,
+    renameVariable: db.renameVariable,
+    setVariableInitial: db.setVariableInitial,
+    removeVariable: db.removeVariable,
+    reloadDatabase: db.reload,
   }), [
+    sprites.assets, sprites.list, sprites.warnings, sprites.getAsset, sprites.reload, sprites.pickFile,
+    sprites.importSprite, sprites.saveMeta, sprites.rename, sprites.remove,
+    db.database, db.switches, db.variables, db.getSwitch, db.getVariable, db.addSwitch, db.renameSwitch,
+    db.removeSwitch, db.addVariable, db.renameVariable, db.setVariableInitial, db.removeVariable, db.reload,
     focusedDomain, setFocusedDomain,
     gridSettings.showGrid, gridSettings.setShowGrid, gridSettings.toggleShowGrid,
     gridSettings.snapToGrid, gridSettings.setSnapToGrid, gridSettings.toggleSnapToGrid,

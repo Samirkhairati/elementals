@@ -2,7 +2,7 @@ import { StrictMode, type ReactNode } from 'react'
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { mapSaveQueue } from '@/lib/saveQueue'
-import { installElectronAPI, makeLayer, makeMap, uninstallElectronAPI } from '@/test/helpers'
+import { installElectronAPI, makeEntity, makeLayer, makeMap, uninstallElectronAPI } from '@/test/helpers'
 import { useMapManager } from './useMapManager'
 
 const wrapper = ({ children }: { children: ReactNode }) => <StrictMode>{children}</StrictMode>
@@ -38,6 +38,54 @@ describe('useMapManager', () => {
     expect(result.current.activeMap).toBe(map)
     expect(onMapSelected).toHaveBeenCalledTimes(1)
     expect(onMapSelected).toHaveBeenCalledWith(map.layers, map.entities)
+  })
+
+  it('onSelectMap migrates legacy entities and stamps schemaVersion 2', () => {
+    const onMapSelected = vi.fn()
+    const legacy = makeMap({
+      schemaVersion: undefined,
+      entities: [
+        makeEntity('sign', {
+          components: { Transform: { x: 0, y: 0, depth: 10 }, Interactable: { type: 'on_interact', message: 'hello', eventKey: '' } },
+        } as never),
+      ],
+    })
+    delete (legacy as { schemaVersion?: number }).schemaVersion
+    const { result } = renderHook(() => useMapManager({ onMapSelected }), { wrapper })
+    act(() => result.current.onSelectMap(legacy))
+    const active = result.current.activeMap!
+    expect(active.schemaVersion).toBe(2)
+    expect(Object.keys(active.entities![0].components)).toEqual(['Transform', 'Event'])
+    expect(active.entities![0].components.Event!.pages[0].commands[0]).toMatchObject({ type: 'showText', params: { text: 'hello' } })
+    expect(legacy.entities![0].components).toHaveProperty('Interactable') // input untouched
+    expect(onMapSelected).toHaveBeenCalledWith(active.layers, active.entities)
+  })
+
+  it('loadMaps migrates every map it loads', async () => {
+    const legacy = {
+      ...makeMap({ fileName: 'old.json' }),
+      entities: [makeEntity('p', { components: { Transform: { x: 0, y: 0 }, PlayerControl: {}, SpriteView: { texture: 'player-walk' } } } as never)],
+    }
+    delete (legacy as { schemaVersion?: number }).schemaVersion
+    installElectronAPI({ getMaps: () => Promise.resolve({ success: true, folders: [], maps: [legacy] }) })
+    const { result } = renderHook(() => useMapManager(), { wrapper })
+    await act(async () => {
+      await result.current.loadMaps()
+    })
+    const loaded = result.current.maps[0]
+    expect(loaded.schemaVersion).toBe(2)
+    expect(loaded.entities![0].components.Movement).toMatchObject({ controller: 'player' })
+    expect(loaded.entities![0].components.Sprite).toMatchObject({ asset: 'characters/player' })
+  })
+
+  it('already canonical maps are used as they are (same object, no churn)', async () => {
+    const map = makeMap({ entities: [makeEntity('a')] })
+    installElectronAPI({ getMaps: () => Promise.resolve({ success: true, folders: [], maps: [map] }) })
+    const { result } = renderHook(() => useMapManager(), { wrapper })
+    await act(async () => {
+      await result.current.loadMaps()
+    })
+    expect(result.current.maps[0]).toBe(map)
   })
 
   it('flushes pending autosaves before deleting a map, and clears the active map afterwards', async () => {

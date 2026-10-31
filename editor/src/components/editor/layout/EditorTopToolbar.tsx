@@ -13,9 +13,16 @@ import {
   Stamp,
   Info,
   Map as MapIcon,
+  ScanLine,
+  Image as ImageIcon,
+  Type,
+  Zap,
+  BoxSelect,
 } from 'lucide-react'
 import { useEditorSelector, type EditorContextValue } from './EditorContext'
 import { ShortcutsDialog } from '../dialogs/ShortcutsDialog'
+import { toggleCanvasView, useCanvasView, type CanvasViewSettings } from '@/hooks/editor/canvas/canvasView'
+import { IconButton } from '../ui/controls'
 
 export type EditorViewMode = 'map' | 'behaviour-graph' | 'lighting' | 'dialogue'
 
@@ -40,216 +47,147 @@ const selectToolbar = (c: EditorContextValue) => ({
   toggleSnapToGrid: c.toggleSnapToGrid,
 })
 
+/** A bordered group of icon buttons (28px high, 24px buttons, 14px icons). */
+function ToolGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div role="group" aria-label={label} className="flex items-center gap-0.5 rounded-md border border-sidebar-border bg-muted/40 p-0.5">
+      {children}
+    </div>
+  )
+}
+
+function Divider() {
+  return <div className="h-5 w-px bg-border/60" />
+}
+
+interface ToolButtonProps {
+  title: string
+  active?: boolean
+  disabled?: boolean
+  onClick: () => void
+  children: React.ReactNode
+  label?: string
+  tone?: 'solid'
+}
+
+function ToolButton({ title, active, disabled, onClick, children, label, tone }: ToolButtonProps) {
+  return (
+    <IconButton
+      title={title}
+      aria-label={label ?? title}
+      aria-pressed={active}
+      disabled={disabled}
+      active={active}
+      onClick={onClick}
+      className={active ? (tone === 'solid' ? '!bg-solid !text-white' : '!bg-primary !text-primary-foreground') : undefined}
+    >
+      {children}
+    </IconButton>
+  )
+}
+
+const VIEW_TOGGLES: { key: keyof CanvasViewSettings; title: string; icon: React.ReactNode }[] = [
+  { key: 'sprites', title: 'Sprites: draw real graphics (off: placeholder tiles)', icon: <ImageIcon /> },
+  { key: 'colliders', title: 'Colliders: footprint of every entity', icon: <ScanLine /> },
+  { key: 'labels', title: 'Labels: names of all entities when zoomed in', icon: <Type /> },
+  { key: 'badges', title: 'Event badges: lightning on entities with an Event', icon: <Zap /> },
+]
+
 function MapToolbar() {
   const ctx = useEditorSelector(selectToolbar)
+  const view = useCanvasView()
   const [infoOpen, setInfoOpen] = useState(false)
 
   const hasActiveMap = ctx.hasActiveMap
   const canUndo = hasActiveMap && ctx.historyIndex > 0
   const canRedo = hasActiveMap && ctx.historyIndex < ctx.historyLength - 1
 
+  const tool = (t: Parameters<typeof ctx.setActiveTool>[0], title: string, icon: React.ReactNode) => (
+    <ToolButton title={title} disabled={!hasActiveMap} active={ctx.activeTool === t} onClick={() => ctx.setActiveTool(t)}>
+      {icon}
+    </ToolButton>
+  )
+
   return (
-    <div className="flex items-center justify-between w-full h-full px-3">
-      {/* Left: Active Map Info Badge / Status */}
-      <div className="flex items-center gap-2 min-w-[200px]">
+    <div className="flex h-full w-full items-center justify-between gap-3 px-3">
+      {/* Left: active map */}
+      <div className="flex min-w-[160px] flex-1 items-center">
         {hasActiveMap ? (
-          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-muted/40 border border-sidebar-border rounded-md text-xs font-mono">
-            <MapIcon className="w-3.5 h-3.5 text-primary shrink-0" />
-            <span className="font-medium text-foreground truncate max-w-[140px]">
-              {ctx.mapLabel}
-            </span>
-            <span className="text-[10px] text-muted-foreground shrink-0">
-              ({ctx.mapWidth}×{ctx.mapHeight})
+          <div className="flex h-control items-center gap-2 rounded-md border border-sidebar-border bg-muted/40 px-2 text-ed-body">
+            <MapIcon className="ed-icon shrink-0 text-primary" />
+            <span className="max-w-[140px] truncate font-medium text-foreground">{ctx.mapLabel}</span>
+            <span className="shrink-0 text-ed-label text-muted-foreground">
+              {ctx.mapWidth}×{ctx.mapHeight}
             </span>
           </div>
         ) : (
-          <div className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono text-muted-foreground/60 italic">
-            No map focused
-          </div>
+          <span className="px-2 text-ed-body italic text-muted-foreground/60">No map focused</span>
         )}
       </div>
 
-      {/* Center: Main Painting & History Tools */}
+      {/* Centre: history, tools, modes, view */}
       <div className="flex items-center gap-3">
-        {/* History Group */}
-        <div className="flex items-center gap-0.5 bg-muted/40 p-0.5 rounded-md border border-sidebar-border">
-          <button
-            onClick={ctx.handleUndo}
-            disabled={!canUndo}
-            className={`p-1.5 rounded flex items-center justify-center transition-colors ${
-              !canUndo
-                ? 'opacity-40 cursor-not-allowed text-muted-foreground'
-                : 'hover:bg-muted text-foreground'
-            }`}
-            title="Undo (Ctrl+Z)"
-          >
-            <Undo className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={ctx.handleRedo}
-            disabled={!canRedo}
-            className={`p-1.5 rounded flex items-center justify-center transition-colors ${
-              !canRedo
-                ? 'opacity-40 cursor-not-allowed text-muted-foreground'
-                : 'hover:bg-muted text-foreground'
-            }`}
-            title="Redo (Ctrl+Y)"
-          >
-            <Redo className="w-3.5 h-3.5" />
-          </button>
-        </div>
+        <ToolGroup label="History">
+          <ToolButton title="Undo (Ctrl+Z)" disabled={!canUndo} onClick={ctx.handleUndo}>
+            <Undo />
+          </ToolButton>
+          <ToolButton title="Redo (Ctrl+Y)" disabled={!canRedo} onClick={ctx.handleRedo}>
+            <Redo />
+          </ToolButton>
+        </ToolGroup>
 
-        {/* Divider */}
-        <div className="w-px h-5 bg-border/60" />
+        <Divider />
 
-        {/* Tools Group */}
-        <div className="flex items-center gap-0.5 bg-muted/40 p-0.5 rounded-md border border-sidebar-border">
-          <button
-            disabled={!hasActiveMap}
-            onClick={() => ctx.setActiveTool('brush')}
-            className={`p-1.5 rounded flex items-center justify-center transition-colors ${
-              !hasActiveMap
-                ? 'opacity-40 cursor-not-allowed text-muted-foreground'
-                : ctx.activeTool === 'brush'
-                ? 'bg-primary text-primary-foreground shadow-sm'
-                : 'hover:bg-muted text-muted-foreground hover:text-foreground'
-            }`}
-            title="Brush Tool (B)"
-          >
-            <Brush className="w-3.5 h-3.5" />
-          </button>
-          <button
-            disabled={!hasActiveMap}
-            onClick={() => ctx.setActiveTool('eraser')}
-            className={`p-1.5 rounded flex items-center justify-center transition-colors ${
-              !hasActiveMap
-                ? 'opacity-40 cursor-not-allowed text-muted-foreground'
-                : ctx.activeTool === 'eraser'
-                ? 'bg-primary text-primary-foreground shadow-sm'
-                : 'hover:bg-muted text-muted-foreground hover:text-foreground'
-            }`}
-            title="Eraser Tool (E)"
-          >
-            <Eraser className="w-3.5 h-3.5" />
-          </button>
-          <button
-            disabled={!hasActiveMap}
-            onClick={() => ctx.setActiveTool('rectangle')}
-            className={`p-1.5 rounded flex items-center justify-center transition-colors ${
-              !hasActiveMap
-                ? 'opacity-40 cursor-not-allowed text-muted-foreground'
-                : ctx.activeTool === 'rectangle'
-                ? 'bg-primary text-primary-foreground shadow-sm'
-                : 'hover:bg-muted text-muted-foreground hover:text-foreground'
-            }`}
-            title="Rectangle Fill Tool (M)"
-          >
-            <Square className="w-3.5 h-3.5" />
-          </button>
-          <button
-            disabled={!hasActiveMap}
-            onClick={() => ctx.setActiveTool('bucket')}
-            className={`p-1.5 rounded flex items-center justify-center transition-colors ${
-              !hasActiveMap
-                ? 'opacity-40 cursor-not-allowed text-muted-foreground'
-                : ctx.activeTool === 'bucket'
-                ? 'bg-primary text-primary-foreground shadow-sm'
-                : 'hover:bg-muted text-muted-foreground hover:text-foreground'
-            }`}
-            title="Paint Bucket Tool (G)"
-          >
-            <PaintBucket className="w-3.5 h-3.5" />
-          </button>
-        </div>
+        <ToolGroup label="Tools">
+          {tool('brush', 'Brush Tool (B)', <Brush />)}
+          {tool('eraser', 'Eraser Tool (E)', <Eraser />)}
+          {tool('rectangle', 'Rectangle Fill Tool (M)', <Square />)}
+          {tool('bucket', 'Paint Bucket Tool (G)', <PaintBucket />)}
+          <div className="mx-0.5 h-4 w-px bg-border/60" />
+          {tool('collider', 'Collider Tool (C): draw or move the selected entity’s collider', <BoxSelect />)}
+        </ToolGroup>
 
-        {/* Divider */}
-        <div className="w-px h-5 bg-border/60" />
+        <Divider />
 
-        {/* Paint Mode Group */}
-        <div className="flex items-center gap-0.5 bg-muted/40 p-0.5 rounded-md border border-sidebar-border">
-          <button
-            disabled={!hasActiveMap}
-            onClick={() => ctx.setPaintMode('discontinuous')}
-            className={`p-1.5 rounded flex items-center justify-center transition-colors ${
-              !hasActiveMap
-                ? 'opacity-40 cursor-not-allowed text-muted-foreground'
-                : ctx.paintMode === 'discontinuous'
-                ? 'bg-primary text-primary-foreground shadow-sm'
-                : 'hover:bg-muted text-muted-foreground hover:text-foreground'
-            }`}
-            title="Discontinuous Mode (Single Stamp)"
-          >
-            <Stamp className="w-3.5 h-3.5" />
-          </button>
-          <button
-            disabled={!hasActiveMap}
-            onClick={() => ctx.setPaintMode('continuous')}
-            className={`p-1.5 rounded flex items-center justify-center transition-colors ${
-              !hasActiveMap
-                ? 'opacity-40 cursor-not-allowed text-muted-foreground'
-                : ctx.paintMode === 'continuous'
-                ? 'bg-primary text-primary-foreground shadow-sm'
-                : 'hover:bg-muted text-muted-foreground hover:text-foreground'
-            }`}
-            title="Continuous Mode (Grid Align / Repeat)"
-          >
-            <Grid className="w-3.5 h-3.5" />
-          </button>
-          <button
-            disabled={!hasActiveMap}
-            onClick={() => ctx.setPaintMode('random')}
-            className={`p-1.5 rounded flex items-center justify-center transition-colors ${
-              !hasActiveMap
-                ? 'opacity-40 cursor-not-allowed text-muted-foreground'
-                : ctx.paintMode === 'random'
-                ? 'bg-primary text-primary-foreground shadow-sm'
-                : 'hover:bg-muted text-muted-foreground hover:text-foreground'
-            }`}
-            title="Random Mode (Random Tile from Selection)"
-          >
-            <Shuffle className="w-3.5 h-3.5" />
-          </button>
-        </div>
+        <ToolGroup label="Paint mode">
+          <ToolButton title="Discontinuous Mode (Single Stamp)" disabled={!hasActiveMap} active={ctx.paintMode === 'discontinuous'} onClick={() => ctx.setPaintMode('discontinuous')}>
+            <Stamp />
+          </ToolButton>
+          <ToolButton title="Continuous Mode (Grid Align / Repeat)" disabled={!hasActiveMap} active={ctx.paintMode === 'continuous'} onClick={() => ctx.setPaintMode('continuous')}>
+            <Grid />
+          </ToolButton>
+          <ToolButton title="Random Mode (Random Tile from Selection)" disabled={!hasActiveMap} active={ctx.paintMode === 'random'} onClick={() => ctx.setPaintMode('random')}>
+            <Shuffle />
+          </ToolButton>
+        </ToolGroup>
 
-        {/* Divider */}
-        <div className="w-px h-5 bg-border/60" />
+        <Divider />
 
-        {/* View & Snapping Group */}
-        <div className="flex items-center gap-0.5 bg-muted/40 p-0.5 rounded-md border border-sidebar-border">
-          <button
-            onClick={ctx.toggleShowGrid}
-            className={`p-1.5 rounded flex items-center justify-center transition-colors ${
-              ctx.showGrid
-                ? 'bg-primary text-primary-foreground shadow-sm'
-                : 'hover:bg-muted text-muted-foreground hover:text-foreground'
-            }`}
-            title={ctx.showGrid ? 'Hide Grid Lines' : 'Show Grid Lines'}
-          >
-            <Grid3X3 className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={ctx.toggleSnapToGrid}
-            className={`p-1.5 rounded flex items-center justify-center transition-colors ${
-              ctx.snapToGrid
-                ? 'bg-primary text-primary-foreground shadow-sm'
-                : 'hover:bg-muted text-muted-foreground hover:text-foreground'
-            }`}
-            title={ctx.snapToGrid ? 'Disable Grid Snapping' : 'Enable Grid Snapping'}
-          >
-            <Magnet className="w-3.5 h-3.5" />
-          </button>
-        </div>
+        <ToolGroup label="Grid">
+          <ToolButton title={ctx.showGrid ? 'Hide Grid Lines' : 'Show Grid Lines'} label="Grid lines" active={ctx.showGrid} onClick={ctx.toggleShowGrid}>
+            <Grid3X3 />
+          </ToolButton>
+          <ToolButton title={ctx.snapToGrid ? 'Disable Grid Snapping' : 'Enable Grid Snapping'} label="Grid snapping" active={ctx.snapToGrid} onClick={ctx.toggleSnapToGrid}>
+            <Magnet />
+          </ToolButton>
+        </ToolGroup>
+
+        <Divider />
+
+        <ToolGroup label="View">
+          {VIEW_TOGGLES.map((t) => (
+            <ToolButton key={t.key} title={t.title} label={`View ${t.key}`} active={view[t.key]} onClick={() => toggleCanvasView(t.key)}>
+              {t.icon}
+            </ToolButton>
+          ))}
+        </ToolGroup>
       </div>
 
-      {/* Right: Info / Shortcuts Help */}
-      <div className="flex items-center justify-end min-w-[200px]">
-        <button
-          onClick={() => setInfoOpen(true)}
-          className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-          title="Keyboard Shortcuts & Info"
-        >
-          <Info className="w-4 h-4" />
-        </button>
+      {/* Right: shortcuts */}
+      <div className="flex min-w-[160px] flex-1 items-center justify-end">
+        <IconButton title="Keyboard Shortcuts & Info" aria-label="Keyboard shortcuts" onClick={() => setInfoOpen(true)}>
+          <Info />
+        </IconButton>
         <ShortcutsDialog open={infoOpen} onClose={() => setInfoOpen(false)} />
       </div>
     </div>
@@ -262,7 +200,7 @@ function MapToolbar() {
  */
 export function EditorTopToolbar({ mode = 'map' }: { mode?: EditorViewMode }) {
   return (
-    <header className="h-10 border-b border-sidebar-border bg-sidebar-background flex items-center shrink-0 z-20 select-none">
+    <header className="z-20 flex h-toolbar shrink-0 select-none items-center border-b border-sidebar-border bg-sidebar">
       {mode === 'map' && <MapToolbar />}
     </header>
   )

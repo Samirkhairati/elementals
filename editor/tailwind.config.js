@@ -48,6 +48,10 @@ export default {
   				DEFAULT: 'hsl(var(--card))',
   				foreground: 'hsl(var(--card-foreground))'
   			},
+  			solid: 'hsl(var(--solid) / <alpha-value>)',
+  			trigger: 'hsl(var(--trigger) / <alpha-value>)',
+  			success: 'hsl(var(--success) / <alpha-value>)',
+  			warning: 'hsl(var(--warning) / <alpha-value>)',
   			sidebar: {
   				DEFAULT: 'hsl(var(--sidebar-background))',
   				foreground: 'hsl(var(--sidebar-foreground))',
@@ -58,6 +62,28 @@ export default {
   				border: 'hsl(var(--sidebar-border))',
   				ring: 'hsl(var(--sidebar-ring))'
   			}
+  		},
+  		// Editor design tokens (see src/index.css): rows 28px / compact 24px, label column 88px, headers 32px / 40px.
+  		height: {
+  			row: 'var(--row-h)',
+  			'row-sm': 'var(--row-h-compact)',
+  			control: 'var(--control-h)',
+  			'control-sm': 'var(--control-h-compact)',
+  			'panel-header': 'var(--panel-header-h)',
+  			toolbar: 'var(--toolbar-h)'
+  		},
+  		minHeight: {
+  			row: 'var(--row-h)',
+  			control: 'var(--control-h)'
+  		},
+  		width: {
+  			label: 'var(--label-w)',
+  			icon: 'var(--icon-size)'
+  		},
+  		fontSize: {
+  			'ed-label': ['11px', '16px'],
+  			'ed-body': ['12px', '16px'],
+  			'ed-title': ['13px', '20px']
   		},
   		borderRadius: {
   			lg: 'var(--radius)',

@@ -7,6 +7,7 @@ import { collectUsedTilesetIds, convertEditorMapToTiled, serializeTiledMap } fro
 import { readPngSize } from '../../../shared/png'
 import { validateTiledMap } from '../../../shared/mapSchema'
 import type { EditorMap, TilesetInfo } from '../../../shared/mapTypes'
+import { migrateMap } from '../../../shared/engine/migrate'
 
 // ── Reference implementation ────────────────────────────────────────────────
 // Verbatim copy of the conversion that lived in hooks/useExportMap.ts before it moved to
@@ -118,7 +119,8 @@ function legacyConvert(mapToExport: any, tilesets: TilesetInfo[]) {
     type: 'map',
     version: '1.10',
     width: mapToExport.width,
-    entities: mapToExport.entities || [],
+    schemaVersion: 2,
+    entities: migrateMap(mapToExport).value.entities || [],
   }
   return JSON.stringify(tiledMap, null, 2)
 }
@@ -280,8 +282,37 @@ describe('convertEditorMapToTiled: structure', () => {
     expect(tiled.nextlayerid).toBe(7)
   })
 
-  it('carries entities over untouched', () => {
+  it('carries canonical entities over unchanged and stamps the schema version', () => {
+    // Already canonical (Transform + Tag only): nothing to migrate.
     expect(tiled.entities).toEqual(SYNTHETIC.multiTilesetAndCollision.entities)
+    expect(tiled.schemaVersion).toBe(2)
+  })
+
+  it('migrates legacy entities on export (the game only ever sees canonical components)', () => {
+    const legacy: any = {
+      name: 'old',
+      width: 2,
+      height: 2,
+      layers: [],
+      entities: [
+        {
+          id: 'e1',
+          name: 'Sign',
+          x: 48,
+          y: 64,
+          components: { Transform: { x: 48, y: 64, depth: 10 }, Interactable: { type: 'on_interact', message: 'hi', eventKey: '' } },
+        },
+      ],
+    }
+    const out = convertEditorMapToTiled(legacy, [])
+    expect(out.schemaVersion).toBe(2)
+    expect(Object.keys(out.entities[0].components)).toEqual(['Transform', 'Event'])
+    expect(JSON.stringify(out.entities)).not.toContain('Interactable')
+    // idempotent: exporting the already exported entities changes nothing
+    const again = convertEditorMapToTiled({ ...legacy, entities: out.entities } as any, [])
+    expect(serializeTiledMap(again)).toBe(serializeTiledMap(out))
+    // deterministic ids: two exports of the same legacy map are byte-identical
+    expect(serializeTiledMap(convertEditorMapToTiled(legacy, []))).toBe(serializeTiledMap(out))
   })
 
   it('output of a valid map passes validateTiledMap', () => {

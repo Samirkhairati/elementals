@@ -17,15 +17,15 @@ export function ImportTilesetDialog({ open, nameInput, setNameInput, onClose, on
           <DialogHeader>
             <DialogTitle>Import Tileset</DialogTitle>
           </DialogHeader>
-          <div className="py-4 space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Tileset Name</label>
+          <div className="flex flex-col gap-3 py-3">
+            <div className="flex flex-col gap-1">
+              <label className="ed-label">Tileset Name</label>
               <Input value={nameInput} onChange={e => setNameInput(e.target.value)} autoFocus />
             </div>
           </div>
-          <DialogFooter>
-            <button type="button" onClick={onClose} className="px-4 py-2 rounded-md hover:bg-muted text-sm font-medium">Cancel</button>
-            <button type="submit" className="px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium">Import</button>
+          <DialogFooter className="gap-2 sm:space-x-0">
+            <button type="button" onClick={onClose} className="ed-btn">Cancel</button>
+            <button type="submit" className="ed-btn" data-variant="primary">Import</button>
           </DialogFooter>
         </form>
       </DialogContent>

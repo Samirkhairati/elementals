@@ -43,8 +43,6 @@ interface UseCanvasInteractionProps {
   cancelPlacement?: () => void
   snapToGrid?: boolean
   snapEntityPos?: (rawX: number, rawY: number) => { x: number; y: number }
-  resizingColliderEntityId?: string | null
-  setResizingColliderEntityId?: (id: string | null) => void
   selectedEntityId?: string | null
   setSelectedEntityId?: (id: string | null) => void
 }
@@ -75,8 +73,6 @@ export function useCanvasInteraction({
   cancelPlacement,
   snapToGrid = true,
   snapEntityPos: _snapEntityPos,
-  resizingColliderEntityId = null,
-  setResizingColliderEntityId,
   selectedEntityId = null,
   setSelectedEntityId,
 }: UseCanvasInteractionProps) {
@@ -306,21 +302,14 @@ export function useCanvasInteraction({
         }
       }
 
-      // If an entity was selected or we were resizing collider, clicking elsewhere on the canvas
-      // should ONLY deselect on the first click and NOT start painting immediately!
-      if (e.evt.button === 0 && (selectedEntityId || resizingColliderEntityId)) {
-        if (selectedEntityId && setSelectedEntityId) {
-          setSelectedEntityId(null)
-        }
-        if (resizingColliderEntityId && setResizingColliderEntityId) {
-          setResizingColliderEntityId(null)
-        }
-        return
-      }
+      // The collider tool never paints tiles: drawing happens on the entity layer (KonvaColliderEditor).
+      if (e.evt.button === 0 && activeToolRef.current === 'collider') return
 
-      // Deselect collider resize mode if clicking elsewhere on canvas
-      if (resizingColliderEntityId && setResizingColliderEntityId) {
-        setResizingColliderEntityId(null)
+      // If an entity was selected, clicking elsewhere on the canvas should ONLY deselect on the first
+      // click and NOT start painting immediately!
+      if (e.evt.button === 0 && selectedEntityId) {
+        setSelectedEntityId?.(null)
+        return
       }
 
       // Right-click tile down: prepare for possible tile drag selection or single-click context menu
@@ -379,8 +368,6 @@ export function useCanvasInteraction({
       cancelPlacement,
       snapToGrid,
       stageRef,
-      resizingColliderEntityId,
-      setResizingColliderEntityId,
       selectedEntityId,
       setSelectedEntityId,
     ]

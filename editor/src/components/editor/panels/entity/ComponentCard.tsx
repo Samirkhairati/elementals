@@ -1,107 +1,110 @@
 import React, { useState } from 'react'
-import {
-  ChevronDown,
-  ChevronRight,
-  Trash2,
-  Move,
-  Image as ImageIcon,
-  BoxSelect,
-  Footprints,
-  Navigation,
-  Gamepad2,
-  Film,
-  MessageSquare,
-  Compass,
-  Tag as TagIcon,
-  Layers,
-} from 'lucide-react'
-import { ComponentType } from '@/types/editor'
-import { COMPONENT_REGISTRY } from '@/lib/componentRegistry'
+import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react'
+import { ComponentType, type PropBag } from '@/types/editor'
+import { COMPONENT_REGISTRY, isFieldVisible } from '@/lib/componentRegistry'
 import { ComponentFieldEditor } from './ComponentFieldEditor'
+import { CUSTOM_EDITORS } from '../../inspector/customEditors'
+import { TransformFields } from '../../inspector/TransformFields'
+import { IconButton } from '../../ui/controls'
+import { accentVar, NamedIcon } from '../../ui/icons'
 
 interface ComponentCardProps {
   type: ComponentType
-  props: Record<string, any>
-  onUpdateProp: (key: string, value: any) => void
+  props: PropBag
+  onUpdateProp: (key: string, value: unknown) => void
+  /** Several props as one history step (custom editors use it). Falls back to per-key updates. */
+  onUpdateProps?: (patch: PropBag) => void
+  entityId?: string
+  /** All components of the entity (custom editors may need siblings, e.g. Sprite + Collider). */
+  components?: Record<string, PropBag>
   onRemove: () => void
 }
 
-function getComponentIcon(type: ComponentType) {
+/** One-line summary shown in the collapsed header (and next to the title). */
+export function componentSummary(type: ComponentType, props: PropBag): string {
   switch (type) {
-    case 'Transform':
-      return <Move className="w-3.5 h-3.5 text-blue-400" />
-    case 'SpriteView':
-      return <ImageIcon className="w-3.5 h-3.5 text-emerald-400" />
+    case 'Sprite':
+      return props.asset ? String(props.asset) : 'no sprite'
     case 'Collider':
-      return <BoxSelect className="w-3.5 h-3.5 text-red-400" />
-    case 'GridMovement':
-      return <Footprints className="w-3.5 h-3.5 text-amber-400" />
-    case 'FreeMovement':
-      return <Navigation className="w-3.5 h-3.5 text-yellow-400" />
-    case 'PlayerControl':
-      return <Gamepad2 className="w-3.5 h-3.5 text-purple-400" />
-    case 'CharacterAnimation':
-      return <Film className="w-3.5 h-3.5 text-pink-400" />
-    case 'Interactable':
-      return <MessageSquare className="w-3.5 h-3.5 text-cyan-400" />
-    case 'AIWander':
-      return <Compass className="w-3.5 h-3.5 text-teal-400" />
+      return `${props.width ?? 32}×${props.height ?? 32} ${props.isSolid === false ? 'trigger' : 'solid'}`
+    case 'Movement':
+      return String(props.controller ?? 'none')
+    case 'Event': {
+      const pages = Array.isArray(props.pages) ? props.pages.length : 0
+      return `${pages} page${pages === 1 ? '' : 's'}`
+    }
     case 'Tag':
-      return <TagIcon className="w-3.5 h-3.5 text-orange-400" />
+      return String(props.tag ?? '')
     default:
-      return <Layers className="w-3.5 h-3.5 text-gray-400" />
+      return ''
   }
 }
 
-export function ComponentCard({ type, props, onUpdateProp, onRemove }: ComponentCardProps) {
+export function ComponentCard({ type, props, onUpdateProp, onUpdateProps, entityId = '', components = {}, onRemove }: ComponentCardProps) {
   const [isExpanded, setIsExpanded] = useState(true)
   const schema = COMPONENT_REGISTRY[type]
+  const CustomEditor = CUSTOM_EDITORS[type]
 
   if (!schema) return null
 
-  return (
-    <div className="rounded-md border border-border/70 bg-card/60 overflow-hidden text-left font-mono">
-      {/* Header */}
-      <div
-        onClick={() => setIsExpanded(prev => !prev)}
-        className="flex items-center justify-between px-2.5 py-1.5 bg-sidebar-accent/50 cursor-pointer select-none hover:bg-sidebar-accent/80 transition-none"
-      >
-        <div className="flex items-center gap-2">
-          {isExpanded ? (
-            <ChevronDown className="w-3.5 h-3.5 opacity-60 shrink-0" />
-          ) : (
-            <ChevronRight className="w-3.5 h-3.5 opacity-60 shrink-0" />
-          )}
-          <div className="shrink-0">{getComponentIcon(type)}</div>
-          <span className="text-xs font-medium text-foreground">{schema.label}</span>
-        </div>
+  const changeMany = (patch: PropBag) =>
+    onUpdateProps ? onUpdateProps(patch) : Object.entries(patch).forEach(([k, v]) => onUpdateProp(k, v))
+  const summary = componentSummary(type, props)
 
-        <button
-          type="button"
-          onClick={e => {
-            e.stopPropagation()
-            onRemove()
-          }}
-          className="p-1 rounded hover:bg-red-500/20 text-muted-foreground hover:text-red-400 opacity-60 hover:opacity-100 transition-none"
-          title={`Remove ${schema.label}`}
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-        </button>
+  return (
+    <section
+      className="ed-card text-left"
+      style={{ ['--card-accent' as string]: accentVar(schema.accent) }}
+      data-testid={`component-card-${type}`}
+    >
+      <div
+        role="button"
+        tabIndex={0}
+        aria-expanded={isExpanded}
+        aria-label={`${schema.label} component`}
+        onClick={() => setIsExpanded((prev) => !prev)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            setIsExpanded((prev) => !prev)
+          }
+        }}
+        className="ed-card-head cursor-default"
+      >
+        {isExpanded ? <ChevronDown className="ed-icon opacity-60" /> : <ChevronRight className="ed-icon opacity-60" />}
+        <NamedIcon name={schema.icon} className="ed-icon" />
+        <span className="shrink-0 text-ed-body font-medium text-foreground">{schema.label}</span>
+        {summary && <span className="min-w-0 flex-1 truncate text-ed-label font-normal text-muted-foreground">{summary}</span>}
+        {!summary && <span className="flex-1" />}
+        {!schema.required && (
+          <IconButton
+            tone="danger"
+            title={`Remove ${schema.label}`}
+            aria-label={`Remove ${schema.label}`}
+            onClick={(e) => {
+              e.stopPropagation()
+              onRemove()
+            }}
+          >
+            <Trash2 />
+          </IconButton>
+        )}
       </div>
 
-      {/* Body */}
-      {isExpanded && (
-        <div className="p-2.5 space-y-1.5 border-t border-border/40 bg-background/30">
-          {schema.fields.map(field => (
-            <ComponentFieldEditor
-              key={field.key}
-              field={field}
-              value={props[field.key]}
-              onChange={val => onUpdateProp(field.key, val)}
-            />
-          ))}
+      {(isExpanded || type === 'Event') && (
+        // The Event card stays mounted while collapsed: its dialog opens from window events (double-click on the canvas, "Edit event").
+        <div className="ed-card-body" hidden={!isExpanded}>
+          {CustomEditor ? (
+            <CustomEditor entityId={entityId} value={props} components={components} onChange={onUpdateProp} onChangeMany={changeMany} />
+          ) : type === 'Transform' ? (
+            <TransformFields value={props} onChange={onUpdateProp} onChangeMany={changeMany} />
+          ) : (
+            schema.fields
+              .filter((field) => isFieldVisible(field, props))
+              .map((field) => <ComponentFieldEditor key={field.key} field={field} value={props[field.key]} onChange={(val) => onUpdateProp(field.key, val)} />)
+          )}
         </div>
       )}
-    </div>
+    </section>
   )
 }

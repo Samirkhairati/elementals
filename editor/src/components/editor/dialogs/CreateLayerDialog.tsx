@@ -21,13 +21,13 @@ export function CreateLayerDialog({ open, name, type, setName, setType, onClose,
           <DialogHeader>
             <DialogTitle>New Layer</DialogTitle>
           </DialogHeader>
-          <div className="py-4 space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Layer Name</label>
+          <div className="flex flex-col gap-3 py-3">
+            <div className="flex flex-col gap-1">
+              <label className="ed-label">Layer Name</label>
               <Input value={name} onChange={e => setName(e.target.value)} autoFocus />
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Layer Type</label>
+            <div className="flex flex-col gap-1">
+              <label className="ed-label">Layer Type</label>
               <Select value={type} onValueChange={(v: LayerType) => setType(v)}>
                 <SelectTrigger>
                   <SelectValue />
@@ -41,9 +41,9 @@ export function CreateLayerDialog({ open, name, type, setName, setType, onClose,
               </Select>
             </div>
           </div>
-          <DialogFooter>
-            <button type="button" onClick={() => onClose(false)} className="px-4 py-2 rounded-md hover:bg-muted text-sm font-medium">Cancel</button>
-            <button type="submit" className="px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium">Create</button>
+          <DialogFooter className="gap-2 sm:space-x-0">
+            <button type="button" onClick={() => onClose(false)} className="ed-btn">Cancel</button>
+            <button type="submit" className="ed-btn" data-variant="primary">Create</button>
           </DialogFooter>
         </form>
       </DialogContent>

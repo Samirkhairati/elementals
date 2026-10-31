@@ -19,15 +19,15 @@ export function CollapsiblePanelHeader({
   return (
     <div
       onClick={onToggle}
-      className="h-10 border-b border-sidebar-border flex items-center justify-between px-3 shrink-0 bg-sidebar-background cursor-pointer hover:bg-sidebar-accent/50 transition-colors select-none"
+      className="ed-panel-head cursor-default justify-between hover:bg-sidebar-accent/50"
     >
-      <div className="flex items-center gap-1 text-sidebar-foreground/70">
-        {collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+      <div className="flex items-center gap-2">
+        {collapsed ? <ChevronRight className="ed-icon" /> : <ChevronDown className="ed-icon" />}
         {icon}
-        <h2 className="text-xs font-semibold font-mono tracking-wider uppercase ml-1">{title}</h2>
+        <h2>{title}</h2>
       </div>
       {actions && (
-        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
           {actions}
         </div>
       )}

@@ -1,3 +1,5 @@
+import type { ComponentSchema, ComponentType as EngineComponentType, FieldKind } from '../../../shared/engine/types'
+
 export type LayerType = 'tile' | 'collision' | 'terrain' | 'objects' | 'encounters'
 
 export interface Layer {
@@ -22,27 +24,26 @@ export interface TileSelection {
   tiles: (CopiedTile | null)[]
 }
 
-export type ComponentType =
-  | 'Transform'
-  | 'SpriteView'
-  | 'Collider'
-  | 'GridMovement'
-  | 'FreeMovement'
-  | 'PlayerControl'
-  | 'CharacterAnimation'
-  | 'Interactable'
-  | 'AIWander'
-  | 'Tag'
+// Component model comes from the shared engine (shared/engine); the editor-facing shapes below are thin
+// views over it so UI code keeps working with loose `Record<string, any>` props.
+export type ComponentType = EngineComponentType
 
+/** Form field as the (schema-driven) inspector renders it; derived from the shared `FieldDef`. */
 export interface ComponentFieldDef {
   key: string
   label: string
+  /** Shared `FieldKind`s are mapped onto the primitive editors: text -> string, facing -> select, ... */
   type: 'number' | 'string' | 'boolean' | 'select' | 'textarea'
+  /** The original shared kind (sprite, color, facing ...) for editors that want to specialise. */
+  kind: FieldKind
   options?: { label: string; value: string }[]
   min?: number
   max?: number
   step?: number
   placeholder?: string
+  help?: string
+  unit?: string
+  visibleWhen?: { key: string; in: (string | number | boolean)[] }
 }
 
 export interface ComponentSchemaEntry {
@@ -50,6 +51,12 @@ export interface ComponentSchemaEntry {
   singleton?: boolean
   defaultProps: Record<string, any>
   fields: ComponentFieldDef[]
+  description: string
+  /** lucide icon name (kebab-case), e.g. 'footprints' */
+  icon: string
+  accent: string
+  category: ComponentSchema['category']
+  required?: boolean
 }
 
 export interface EntityData {
@@ -78,6 +85,8 @@ export interface MapData {
   layers: Layer[]
   entities?: EntityData[]
   entityFolders?: EntityFolder[]
+  /** 2 = canonical engine components. Set when the map is loaded/migrated. */
+  schemaVersion?: number
 }
 
 export interface TilesetData {
@@ -87,7 +96,7 @@ export interface TilesetData {
   dataUrl: string
 }
 
-export type ActiveTool = 'brush' | 'eraser' | 'rectangle' | 'bucket'
+export type ActiveTool = 'brush' | 'eraser' | 'rectangle' | 'bucket' | 'collider'
 export type PaintMode = 'discontinuous' | 'continuous' | 'random'
 
 export interface DebugInfo {
@@ -102,3 +111,7 @@ export interface Pos {
   x: number
   y: number
 }
+
+/** Loosely typed props of one component (editor forms work with schema-driven, untyped values). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type PropBag = Record<string, any>

@@ -40,15 +40,15 @@ export function ConfirmDialog({ open, title, description, onClose, onConfirm }: 
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
-          <DialogDescription className="py-2 text-sm text-sidebar-foreground/80">
+          <DialogDescription className="py-1 text-ed-body text-sidebar-foreground/80">
             {description}
           </DialogDescription>
         </DialogHeader>
-        <DialogFooter className="mt-4 flex items-center justify-end gap-2">
+        <DialogFooter className="mt-2 flex items-center justify-end gap-2">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-md hover:bg-muted text-sm font-medium transition-colors"
+            className="ed-btn"
           >
             Cancel
           </button>
@@ -58,7 +58,7 @@ export function ConfirmDialog({ open, title, description, onClose, onConfirm }: 
               onConfirm()
               onClose()
             }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-destructive text-destructive-foreground hover:bg-destructive/90 text-sm font-medium transition-colors shadow-sm"
+            className="ed-btn" data-variant="primary" style={{ background: 'hsl(var(--solid))', color: 'white' }}
           >
             <span>Delete</span>
             <kbd className="pointer-events-none inline-flex h-6 select-none items-center gap-1 rounded bg-black/60 px-2 font-mono text-xs font-bold text-white border border-white/30 tracking-wider">

@@ -45,7 +45,7 @@ export function TilesetsPanel({
     const childrenTilesets = tilesets.filter(t => t.folderPath === currentPath)
 
     return (
-      <div className="space-y-1" style={{ paddingLeft: level === 0 ? 0 : 16 }}>
+      <div className="flex flex-col gap-0.5" style={{ paddingLeft: level === 0 ? 0 : 16 }}>
         {childrenFolders.map(folder => {
           const folderName = folder.split('/').pop() || folder
           const isExpanded = expandedFolders.has(folder)
@@ -57,24 +57,21 @@ export function TilesetsPanel({
           return (
             <div key={folder}>
               <div
-                className={`flex items-center group py-1 px-2 rounded-md cursor-pointer text-sm transition-colors ${isSelected ? 'bg-sidebar-accent font-medium text-sidebar-foreground ring-1 ring-sidebar-ring' : 'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`}
+                className="ed-row group"
+                data-selected={isSelected ? 'true' : undefined}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={(e) => handleDrop(e, folder)}
                 onClick={() => { setSelectedFolder(folder); toggleFolder(folder); }}
               >
-                <div className="flex-1 flex items-center">
-                  {isExpanded ? <ChevronDown className="w-4 h-4 mr-1 opacity-70" /> : <ChevronRight className="w-4 h-4 mr-1 opacity-70" />}
-                  <FolderIcon className="w-4 h-4 mr-2 text-primary" />
-                  <span>{folderName}</span>
-                </div>
-                <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity">
-                  <button onClick={(e) => { e.stopPropagation(); handlePickFile(folder); }} className="p-1 hover:bg-black/10 rounded" title="Add Tileset"><Plus className="w-3 h-3" /></button>
-                  <button onClick={(e) => { e.stopPropagation(); handleOpenCreateFolderDialog(folder); }} className="p-1 hover:bg-black/10 rounded" title="New Subfolder"><FolderPlus className="w-3 h-3" /></button>
-                  <button onClick={(e) => { e.stopPropagation(); setRenameInput(folderName); setRenameDialog({ open: true, type: 'folder', oldPath: folder }); }} className="p-1 hover:bg-black/10 rounded" title="Rename"><Edit2 className="w-3 h-3" /></button>
+                {isExpanded ? <ChevronDown className="text-muted-foreground" /> : <ChevronRight className="text-muted-foreground" />}
+                <FolderIcon className="text-primary" />
+                <span className="ed-row-label" title={folderName}>{folderName}</span>
+                <div className="ed-row-actions opacity-0 transition-opacity group-hover:opacity-100">
+                  <button onClick={(e) => { e.stopPropagation(); handlePickFile(folder); }} className="ed-iconbtn" title="Add Tileset" aria-label="Add tileset"><Plus /></button>
+                  <button onClick={(e) => { e.stopPropagation(); handleOpenCreateFolderDialog(folder); }} className="ed-iconbtn" title="New Subfolder" aria-label="New subfolder"><FolderPlus /></button>
+                  <button onClick={(e) => { e.stopPropagation(); setRenameInput(folderName); setRenameDialog({ open: true, type: 'folder', oldPath: folder }); }} className="ed-iconbtn" title="Rename" aria-label="Rename folder"><Edit2 /></button>
                   {isEmpty && (
-                    <button onClick={(e) => { e.stopPropagation(); handleDeleteFolder(folder); }} className="p-1 hover:bg-red-500/20 hover:text-red-400 rounded text-red-400" title="Delete Empty Folder (Delete key)">
-                      <Trash2 className="w-3 h-3" />
-                    </button>
+                    <button onClick={(e) => { e.stopPropagation(); handleDeleteFolder(folder); }} className="ed-iconbtn" data-tone="danger" title="Delete Empty Folder (Delete key)" aria-label="Delete folder"><Trash2 /></button>
                   )}
                 </div>
               </div>
@@ -96,15 +93,18 @@ export function TilesetsPanel({
               e.dataTransfer.setData('sourceFolder', String(t.folderPath))
             }}
             onClick={() => setActiveTileset(t)}
-            className={`flex items-center group py-1.5 px-2.5 rounded-md cursor-pointer text-sm ml-5 border ${activeTileset?.fileName === t.fileName ? 'bg-primary/30 text-primary-foreground font-medium border-primary/40' : 'border-transparent hover:bg-sidebar-accent text-sidebar-foreground'}`}
+            className="ed-row ed-indent group !w-[calc(100%-16px)]"
+            data-selected={activeTileset?.fileName === t.fileName ? 'true' : undefined}
           >
-            <LayoutGrid className="w-4 h-4 mr-2 opacity-80" />
-            <span className="flex-1 truncate">{t.name}</span>
+            <LayoutGrid className="opacity-80" />
+            <span className="ed-row-label" title={t.name}>{t.name}</span>
             <button
               onClick={(e) => { e.stopPropagation(); setRenameInput(t.name); setRenameDialog({ open: true, type: 'tileset', oldName: t.name, oldPath: t.fileName, targetFolder: t.folderPath }) }}
-              className="opacity-0 group-hover:opacity-100 block p-1 hover:bg-black/10 rounded transition-opacity"
+              className="ed-iconbtn opacity-0 transition-opacity group-hover:opacity-100"
+              title="Rename"
+              aria-label="Rename tileset"
             >
-              <Edit2 className="w-3 h-3" />
+              <Edit2 />
             </button>
           </div>
         ))}
@@ -114,19 +114,19 @@ export function TilesetsPanel({
 
   if (activeLayerType === 'collision') {
     return (
-      <div className="h-full flex flex-col items-center justify-center text-muted-foreground p-8 text-center space-y-2 font-mono">
-        <XSquare className="w-8 h-8 text-red-500/50 mb-2" />
-        <p className="text-sm text-red-400">Collision Layer</p>
-        <p className="text-xs">Select a tile layer to view tilesets.</p>
+      <div className="ed-empty">
+        <XSquare className="mb-1 h-6 w-6 text-red-500/50" />
+        <p className="text-red-400">Collision Layer</p>
+        <p className="ed-hint">Select a tile layer to view tilesets.</p>
       </div>
     )
   }
 
   if (folders.length === 0 && tilesets.length === 0) {
     return (
-      <div className="h-full flex flex-col items-center justify-center text-muted-foreground p-8 text-center space-y-2 font-mono">
-        <p className="text-sm">No tilesets yet.</p>
-        <p className="text-xs">Click Add to import your first spritesheet.</p>
+      <div className="ed-empty">
+        <p>No tilesets yet.</p>
+        <p className="ed-hint">Click Add to import your first spritesheet.</p>
       </div>
     )
   }

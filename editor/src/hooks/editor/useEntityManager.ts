@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { EntityData, ComponentType, MapData, EntityFolder } from '@/types/editor'
 import { COMPONENT_REGISTRY } from '@/lib/componentRegistry'
+import { cloneEntity, createDefaultComponent } from '../../../../shared/engine/components'
 import { useSyncedState } from '@/hooks/useSyncedState'
 
 interface UseEntityManagerOptions {
@@ -182,6 +183,8 @@ export function useEntityManager(options: UseEntityManagerOptions) {
             },
             ...(initialComponents || {}),
           }
+          // Entity position and Transform are one thing: prefabs carry a placeholder Transform.
+          defaultComponents.Transform = { ...defaultComponents.Transform, x, y }
 
           const newEntity: EntityData = {
             id: crypto.randomUUID(),
@@ -220,7 +223,8 @@ export function useEntityManager(options: UseEntityManagerOptions) {
             y: target.y + 16,
             visible: target.visible !== false,
             folder: target.folder || null,
-            components: JSON.parse(JSON.stringify(target.components)),
+            // fresh event page / command ids so the copy is independent of the original
+            components: cloneEntity(target as any, true).components as EntityData['components'],
           }
 
           if (cloned.components.Transform) {
@@ -308,7 +312,7 @@ export function useEntityManager(options: UseEntityManagerOptions) {
             return e
           }
 
-          const defaultProps = JSON.parse(JSON.stringify(schema.defaultProps))
+          const defaultProps = createDefaultComponent(type) as unknown as Record<string, any>
           if (type === 'Transform') {
             defaultProps.x = e.x
             defaultProps.y = e.y

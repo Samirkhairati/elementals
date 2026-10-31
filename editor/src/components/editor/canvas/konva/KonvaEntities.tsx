@@ -1,8 +1,45 @@
-import React, { useRef, useState } from 'react'
-import { Group, Rect, Text, Shape } from 'react-konva'
-import Konva from 'konva'
-import { EntityData, MapData, EntityFolder } from '@/types/editor'
-import { KonvaColliderTransformer } from './KonvaColliderTransformer'
+// Entities on the map canvas: real sprites (pixel-perfect), placeholders for entities without one, collider
+// footprints, badges, labels, hover and selection visuals, and the collider editor for the selected entity.
+//
+// Performance model (the earlier panning work must not regress):
+//  * Sprites are plain Konva shapes inside memoised nodes; they only re-render when their entity changes.
+//  * Everything that depends on zoom or pointer state (footprints, badges, labels, frames) is ONE overlay
+//    shape whose sceneFunc reads refs and the stage scale at draw time: no React state per mouse move.
+//  * The per-entity geometry is computed once per entities/assets change, not per frame.
+
+import React, { useCallback, useMemo, useRef } from 'react'
+import { Group, Rect, Shape } from 'react-konva'
+import { EntityData, EntityFolder, MapData } from '@/types/editor'
+import type { SpriteAssetInfo } from '../../../../../../shared/engine/types'
+import {
+  entityBounds,
+  colliderLocalRect,
+  entityIconName,
+  normalizeCollider,
+  sortByDepth,
+  summarizeEntity,
+  translateRect,
+  type ColliderPatch,
+  type Rect as GeoRect,
+} from '@/lib/entityVisuals'
+import { drawResolvedSprite, resolveSprite, useSpriteImagesVersion } from '@/lib/spriteImages'
+import type { CanvasViewSettings } from '@/hooks/editor/canvas/canvasView'
+import { KonvaColliderEditor } from './KonvaColliderEditor'
+import {
+  EVENT_RGB,
+  MOVE_RGB,
+  drawAnchorCross,
+  drawBadge,
+  drawFootprint,
+  drawHoverFrame,
+  drawLabel,
+  drawPlaceholder,
+  drawSelectionFrame,
+  drawWanderRing,
+} from './entityDraw'
+import { setStageCursor } from '../canvasUtils'
+
+const EMPTY_ASSETS: Record<string, SpriteAssetInfo> = {}
 
 interface KonvaEntitiesProps {
   entities: EntityData[]
@@ -10,236 +47,227 @@ interface KonvaEntitiesProps {
   setSelectedEntityId: (id: string | null) => void
   moveEntity: (id: string, x: number, y: number) => void
   activeMap: MapData
-  images: Record<string, HTMLImageElement>
   snapToGrid?: boolean
   snapEntityPos?: (x: number, y: number) => { x: number; y: number }
-  resizingColliderEntityId?: string | null
-  setResizingColliderEntityId?: (id: string | null) => void
-  onUpdateCollider?: (entityId: string, width: number, height: number, offsetX: number, offsetY: number) => void
-  onContextMenuEntity?: (entity: EntityData, clientX: number, clientY: number) => void
+  onUpdateCollider?: (entityId: string, patch: ColliderPatch & { isSolid?: boolean }) => void
   onRightClickEntity?: (entity: EntityData, clientX: number, clientY: number) => void
   showEntities?: boolean
   entityFolders?: EntityFolder[]
+  spriteAssets?: Record<string, SpriteAssetInfo>
+  view: CanvasViewSettings
+  colliderToolActive?: boolean
+  /** Double-click on an entity that has an Event. */
+  onOpenEvent?: (entityId: string) => void
 }
 
-interface KonvaEntityNodeProps {
+/** Per-entity geometry, derived once per entities/assets change. All rects are relative to the anchor. */
+interface EntityInfo {
   entity: EntityData
-  isSelected: boolean
-  isResizingCollider: boolean
+  id: string
+  asset: SpriteAssetInfo | undefined
+  bounds: GeoRect
+  foot: GeoRect | null
+  solid: boolean
+  hasEvent: boolean
+  controller: 'none' | 'player' | 'wander' | null
+  wanderRadius: number
+  spriteHidden: boolean
+  icon: string
+}
+
+function buildInfo(entity: EntityData, assets: Record<string, SpriteAssetInfo>): EntityInfo {
+  const sum = summarizeEntity(entity)
+  const sprite = entity.components.Sprite
+  const asset = sprite?.asset ? assets[sprite.asset] : undefined
+  const collider = entity.components.Collider ? normalizeCollider(entity.components.Collider) : null
+  const abs = entityBounds(entity, asset?.meta)
+  return {
+    entity,
+    id: entity.id,
+    asset,
+    bounds: translateRect(abs, -entity.x, -entity.y),
+    foot: collider ? colliderLocalRect(collider) : null,
+    solid: collider ? collider.isSolid : true,
+    hasEvent: sum.hasEvent,
+    controller: sum.controller,
+    wanderRadius: sum.wanderRadius,
+    spriteHidden: sum.spriteHidden,
+    icon: entityIconName(entity),
+  }
+}
+
+interface Visuals {
+  hoverId: string | null
+  dragId: string | null
+  dragX: number
+  dragY: number
+}
+
+// ── one entity ──────────────────────────────────────────────────────────────────────────────────
+
+interface KonvaEntityNodeProps {
+  info: EntityInfo
+  /** Bumped when a sheet image finished loading so the sprite re-resolves. */
+  imagesVersion: number
+  showSprites: boolean
+  listening: boolean
+  draggable: boolean
   mapWidthPx: number
   mapHeightPx: number
-  setSelectedEntityId: (id: string | null) => void
-  moveEntity: (id: string, x: number, y: number) => void
-  images: Record<string, HTMLImageElement>
   snapToGrid: boolean
   snapEntityPos: (x: number, y: number) => { x: number; y: number }
-  onUpdateCollider?: (entityId: string, width: number, height: number, offsetX: number, offsetY: number) => void
-  onContextMenuEntity?: (entity: EntityData, clientX: number, clientY: number) => void
+  visuals: React.MutableRefObject<Visuals>
+  setSelectedEntityId: (id: string | null) => void
+  moveEntity: (id: string, x: number, y: number) => void
   onRightClickEntity?: (entity: EntityData, clientX: number, clientY: number) => void
+  onOpenEvent?: (entityId: string) => void
 }
 
 const KonvaEntityNode = React.memo(function KonvaEntityNode({
-  entity,
-  isSelected,
-  isResizingCollider,
+  info,
+  imagesVersion,
+  showSprites,
+  listening,
+  draggable,
   mapWidthPx,
   mapHeightPx,
-  setSelectedEntityId,
-  moveEntity,
-  images,
   snapToGrid,
   snapEntityPos,
-  onUpdateCollider,
-  onContextMenuEntity: _onContextMenuEntity,
+  visuals,
+  setSelectedEntityId,
+  moveEntity,
   onRightClickEntity,
+  onOpenEvent,
 }: KonvaEntityNodeProps) {
-  const collider = entity.components.Collider
-  const interactable = entity.components.Interactable
-  const spriteView = entity.components.SpriteView
-  const [colliderNode, setColliderNode] = useState<Konva.Rect | null>(null)
+  const { entity, bounds } = info
+  const sprite = entity.components.Sprite
 
-  const colliderW = collider?.width || 32
-  const colliderH = collider?.height || 32
-  const colliderOffX = collider?.offsetX || 0
-  const colliderOffY = collider?.offsetY || 0
+  const resolved = useMemo(() => {
+    void imagesVersion
+    return showSprites && sprite && info.asset ? resolveSprite(info.asset, sprite, 0) : null
+  }, [showSprites, sprite, info.asset, imagesVersion])
+
+  const tone = info.hasEvent ? 'event' : info.foot && !info.solid ? 'trigger' : 'default'
+  const dim = info.spriteHidden
+
+  const clampSnap = (x: number, y: number) => {
+    const bx = Math.max(0, Math.min(mapWidthPx, x))
+    const by = Math.max(0, Math.min(mapHeightPx, y))
+    return snapToGrid ? snapEntityPos(bx, by) : { x: bx, y: by }
+  }
 
   return (
-    <Group>
-      {/* Collider Hitbox Overlay (when selected or resizing) */}
-      {(isSelected || isResizingCollider) && collider && (
-        <>
-          <Rect
-            ref={setColliderNode}
-            x={entity.x + colliderOffX - colliderW / 2}
-            y={entity.y + colliderOffY - colliderH}
-            width={colliderW}
-            height={colliderH}
-            fill="rgba(239, 68, 68, 0.2)"
-            stroke={isResizingCollider ? '#ef4444' : 'rgba(239, 68, 68, 0.8)'}
-            strokeWidth={isResizingCollider ? 1.5 : 1}
-            dash={isResizingCollider ? undefined : [3, 3]}
-            listening={isResizingCollider}
-          />
-
-          {isResizingCollider && (
-            <KonvaColliderTransformer
-              targetNode={colliderNode}
-              snapToGrid={snapToGrid}
-              baseEntityX={entity.x}
-              baseEntityY={entity.y}
-              onTransformEnd={(w, h, ox, oy) => {
-                onUpdateCollider?.(entity.id, w, h, ox, oy)
-              }}
-            />
-          )}
-        </>
-      )}
-
-      {/* Interactable Trigger Overlay (when selected) */}
-      {isSelected && !isResizingCollider && interactable && (
-        <Rect
-          x={entity.x - 16}
-          y={entity.y - 32}
-          width={32}
-          height={32}
-          fill="rgba(34, 211, 238, 0.15)"
-          stroke="rgba(34, 211, 238, 0.7)"
-          strokeWidth={1}
-          dash={[3, 3]}
-          listening={false}
-        />
-      )}
-
-      {/* Draggable Entity Marker */}
-      <Group
-        x={entity.x}
-        y={entity.y}
-        draggable={!isResizingCollider}
-        onDragStart={e => {
+    <Group
+      x={entity.x}
+      y={entity.y}
+      listening={listening}
+      draggable={draggable}
+      onDragStart={(e) => {
+        e.cancelBubble = true
+        setSelectedEntityId(entity.id)
+        visuals.current.dragId = entity.id
+        visuals.current.dragX = entity.x
+        visuals.current.dragY = entity.y
+        setStageCursor(e.target.getStage(), 'grabbing')
+      }}
+      onDragMove={(e) => {
+        e.cancelBubble = true
+        const p = clampSnap(e.target.x(), e.target.y())
+        e.target.x(p.x)
+        e.target.y(p.y)
+        visuals.current.dragX = p.x
+        visuals.current.dragY = p.y
+      }}
+      onDragEnd={(e) => {
+        e.cancelBubble = true
+        const p = clampSnap(e.target.x(), e.target.y())
+        e.target.x(p.x)
+        e.target.y(p.y)
+        visuals.current.dragId = null
+        setStageCursor(e.target.getStage(), 'move')
+        moveEntity(entity.id, p.x, p.y)
+      }}
+      onMouseEnter={(e) => {
+        visuals.current.hoverId = entity.id
+        setStageCursor(e.target.getStage(), draggable ? 'move' : 'pointer')
+        e.target.getLayer()?.batchDraw()
+      }}
+      onMouseLeave={(e) => {
+        if (visuals.current.hoverId === entity.id) visuals.current.hoverId = null
+        setStageCursor(e.target.getStage(), '')
+        e.target.getLayer()?.batchDraw()
+      }}
+      onClick={(e) => {
+        e.cancelBubble = true
+        setSelectedEntityId(entity.id)
+      }}
+      onTap={(e) => {
+        e.cancelBubble = true
+        setSelectedEntityId(entity.id)
+      }}
+      onDblClick={(e) => {
+        e.cancelBubble = true
+        if (info.hasEvent) onOpenEvent?.(entity.id)
+      }}
+      onDblTap={(e) => {
+        e.cancelBubble = true
+        if (info.hasEvent) onOpenEvent?.(entity.id)
+      }}
+      onMouseDown={(e) => {
+        if (e.evt.button === 0) {
           e.cancelBubble = true
           setSelectedEntityId(entity.id)
-        }}
-        onDragMove={e => {
+        } else if (e.evt.button === 2) {
           e.cancelBubble = true
-          const boundedX = Math.max(0, Math.min(mapWidthPx, e.target.x()))
-          const boundedY = Math.max(0, Math.min(mapHeightPx, e.target.y()))
-          if (snapToGrid) {
-            const snapped = snapEntityPos(boundedX, boundedY)
-            e.target.x(snapped.x)
-            e.target.y(snapped.y)
-          } else {
-            e.target.x(boundedX)
-            e.target.y(boundedY)
-          }
-        }}
-        onDragEnd={e => {
-          e.cancelBubble = true
-          let finalX = Math.max(0, Math.min(mapWidthPx, e.target.x()))
-          let finalY = Math.max(0, Math.min(mapHeightPx, e.target.y()))
-          if (snapToGrid) {
-            const snapped = snapEntityPos(finalX, finalY)
-            finalX = snapped.x
-            finalY = snapped.y
-            e.target.x(finalX)
-            e.target.y(finalY)
-          }
-          moveEntity(entity.id, finalX, finalY)
-        }}
-        onClick={e => {
-          e.cancelBubble = true
-          setSelectedEntityId(entity.id)
-        }}
-        onTap={e => {
-          e.cancelBubble = true
-          setSelectedEntityId(entity.id)
-        }}
-        onMouseDown={e => {
-          if (e.evt.button === 0) {
-            e.cancelBubble = true
-            setSelectedEntityId(entity.id)
-          } else if (e.evt.button === 2) {
-            e.cancelBubble = true
-            e.evt.preventDefault()
-            setSelectedEntityId(entity.id)
-            onRightClickEntity?.(entity, e.evt.clientX, e.evt.clientY)
-          }
-        }}
-        onContextMenu={e => {
           e.evt.preventDefault()
-          e.cancelBubble = true
-        }}
-      >
-        {/* Entity Name Tooltip / Label */}
-        <Group y={-46}>
-          <Rect
-            x={-Math.max(20, entity.name.length * 3.5 + 8)}
-            y={-2}
-            width={Math.max(40, entity.name.length * 7 + 16)}
-            height={15}
-            fill="rgba(0, 0, 0, 0.85)"
-            stroke={isSelected ? '#ffffff' : 'rgba(255, 255, 255, 0.25)'}
-            strokeWidth={1}
-            cornerRadius={2}
-            listening={false}
-          />
-          <Text
-            text={entity.name}
-            x={-Math.max(20, entity.name.length * 3.5 + 8)}
-            y={0}
-            width={Math.max(40, entity.name.length * 7 + 16)}
-            align="center"
-            fontSize={10}
-            fontFamily="monospace"
-            fill={isSelected ? '#ffffff' : 'rgba(255, 255, 255, 0.85)'}
-            listening={false}
-          />
-        </Group>
+          setSelectedEntityId(entity.id)
+          onRightClickEntity?.(entity, e.evt.clientX, e.evt.clientY)
+        }
+      }}
+      onContextMenu={(e) => {
+        e.evt.preventDefault()
+        e.cancelBubble = true
+      }}
+    >
+      {/* grab area: the sprite frame united with the tile */}
+      <Rect x={bounds.x} y={bounds.y} width={bounds.w} height={bounds.h} fill="rgba(0,0,0,0.001)" />
 
-        {/* Entity Box or Sprite: Centered 32x32 tile box */}
-        {spriteView && spriteView.tilesetId && images[spriteView.tilesetId] ? (
-          <Shape
-            x={-16}
-            y={-32}
-            perfectDrawEnabled={false}
-            shadowForStrokeEnabled={false}
-            sceneFunc={(context) => {
-              const ctx = context._context as CanvasRenderingContext2D
-              const img = images[spriteView.tilesetId]
-              if (img && img.complete) {
-                ctx.imageSmoothingEnabled = false
-                ctx.drawImage(
-                  img,
-                  (spriteView.tileX || 0) * 32,
-                  (spriteView.tileY || 0) * 32,
-                  32,
-                  32,
-                  0,
-                  0,
-                  32,
-                  32
-                )
-              }
-            }}
-          />
-        ) : (
-          <Rect
-            x={-16}
-            y={-32}
-            width={32}
-            height={32}
-            fill={isSelected ? 'rgba(255, 255, 255, 0.35)' : 'rgba(255, 255, 255, 0.12)'}
-            stroke={isSelected ? '#ffffff' : 'rgba(255, 255, 255, 0.4)'}
-            strokeWidth={isSelected ? 1.5 : 1}
-            cornerRadius={3}
-            shadowColor={isSelected ? '#ffffff' : 'black'}
-            shadowBlur={isSelected ? 6 : 2}
-            shadowOpacity={isSelected ? 0.4 : 0.2}
-          />
-        )}
-      </Group>
+      <Shape
+        name="entity-sprite"
+        listening={false}
+        perfectDrawEnabled={false}
+        shadowForStrokeEnabled={false}
+        sceneFunc={(context, shape) => {
+          const ctx = context._context as CanvasRenderingContext2D
+          const stage = shape.getStage()
+          const parent = shape.getParent()
+          if (stage && parent) {
+            const s = stage.scaleX() || 1
+            const left = (-stage.x()) / s
+            const top = (-stage.y()) / s
+            const right = left + stage.width() / s
+            const bottom = top + stage.height() / s
+            const px = parent.x()
+            const py = parent.y()
+            if (px + bounds.x + bounds.w < left || px + bounds.x > right || py + bounds.y + bounds.h < top || py + bounds.y > bottom) return
+          }
+          if (resolved) {
+            drawResolvedSprite(ctx, resolved, {
+              anchorX: 0,
+              anchorY: 0,
+              opacity: dim ? Math.min(0.35, sprite?.opacity ?? 1) : sprite?.opacity,
+              tint: sprite?.tint || undefined,
+            })
+          } else {
+            drawPlaceholder(ctx, info.icon, tone, dim ? 0.5 : 1)
+          }
+        }}
+      />
     </Group>
   )
 })
+
+// ── the layer of entities ───────────────────────────────────────────────────────────────────────
 
 export const KonvaEntities = React.memo(function KonvaEntities({
   entities,
@@ -247,53 +275,160 @@ export const KonvaEntities = React.memo(function KonvaEntities({
   setSelectedEntityId,
   moveEntity,
   activeMap,
-  images,
   snapToGrid = true,
   snapEntityPos = (x, y) => ({ x: Math.floor(x / 32) * 32 + 16, y: Math.floor((y - 16) / 32 + 1) * 32 }),
-  resizingColliderEntityId = null,
   onUpdateCollider,
-  onContextMenuEntity,
   onRightClickEntity,
   showEntities = true,
   entityFolders = [],
+  spriteAssets = EMPTY_ASSETS,
+  view,
+  colliderToolActive = false,
+  onOpenEvent,
 }: KonvaEntitiesProps) {
-  if (showEntities === false) return null
+  const imagesVersion = useSpriteImagesVersion()
+  const visuals = useRef<Visuals>({ hoverId: null, dragId: null, dragX: 0, dragY: 0 })
+  const liveRect = useRef<GeoRect | null>(null)
 
   const mapWidthPx = activeMap.width * 32
   const mapHeightPx = activeMap.height * 32
 
-  // Collect hidden folder IDs
-  const hiddenFolderIds = new Set(
-    (entityFolders || []).filter(f => f.visible === false).map(f => f.id)
+  const infos = useMemo(() => {
+    const hiddenFolders = new Set((entityFolders || []).filter((f) => f.visible === false).map((f) => f.id))
+    const visible = entities.filter((entity) => entity.visible !== false && !(entity.folder && hiddenFolders.has(entity.folder)))
+    return sortByDepth(visible).map((e) => buildInfo(e, spriteAssets))
+  }, [entities, entityFolders, spriteAssets])
+
+  const selected = useMemo(() => infos.find((i) => i.id === selectedEntityId) ?? null, [infos, selectedEntityId])
+
+  const handleCommitCollider = useCallback(
+    (id: string, patch: ColliderPatch & { isSolid?: boolean }) => onUpdateCollider?.(id, patch),
+    [onUpdateCollider],
   )
 
-  // Filter out invisible entities
-  const visibleEntities = entities.filter(entity => {
-    if (entity.visible === false) return false
-    if (entity.folder && hiddenFolderIds.has(entity.folder)) return false
-    return true
-  })
+  if (showEntities === false) return null
+
+  const colliderEntity = selected ? { id: selected.id, x: selected.entity.x, y: selected.entity.y, collider: selected.entity.components.Collider } : null
 
   return (
     <Group>
-      {visibleEntities.map(entity => (
-        <KonvaEntityNode
-          key={entity.id}
-          entity={entity}
-          isSelected={selectedEntityId === entity.id}
-          isResizingCollider={resizingColliderEntityId === entity.id}
-          mapWidthPx={mapWidthPx}
-          mapHeightPx={mapHeightPx}
-          setSelectedEntityId={setSelectedEntityId}
-          moveEntity={moveEntity}
-          images={images}
-          snapToGrid={snapToGrid}
-          snapEntityPos={snapEntityPos}
-          onUpdateCollider={onUpdateCollider}
-          onContextMenuEntity={onContextMenuEntity}
-          onRightClickEntity={onRightClickEntity}
-        />
-      ))}
+      {infos.map((info) => {
+        const isSelected = info.id === selectedEntityId
+        return (
+          <KonvaEntityNode
+            key={info.id}
+            info={info}
+            imagesVersion={imagesVersion}
+            showSprites={view.sprites}
+            // In collider-tool mode the selected entity lets presses through so the collider can be drawn over it.
+            listening={!(colliderToolActive && isSelected)}
+            draggable={!colliderToolActive}
+            mapWidthPx={mapWidthPx}
+            mapHeightPx={mapHeightPx}
+            snapToGrid={snapToGrid}
+            snapEntityPos={snapEntityPos}
+            visuals={visuals}
+            setSelectedEntityId={setSelectedEntityId}
+            moveEntity={moveEntity}
+            onRightClickEntity={onRightClickEntity}
+            onOpenEvent={onOpenEvent}
+          />
+        )
+      })}
+
+      {/* Footprints, badges, labels, hover + selection (one shape, zoom-aware, no React state) */}
+      <Shape
+        name="entity-overlays"
+        listening={false}
+        perfectDrawEnabled={false}
+        shadowForStrokeEnabled={false}
+        sceneFunc={(context, shape) => {
+          const ctx = context._context as CanvasRenderingContext2D
+          const stage = shape.getStage()
+          const s = stage?.scaleX() || 1
+          const left = stage ? -stage.x() / s : 0
+          const top = stage ? -stage.y() / s : 0
+          const right = stage ? left + stage.width() / s : mapWidthPx
+          const bottom = stage ? top + stage.height() / s : mapHeightPx
+          const v = visuals.current
+
+          // 1) faint footprints of every entity
+          if (view.colliders) {
+            for (let i = 0; i < infos.length; i++) {
+              const info = infos[i]
+              if (!info.foot || info.id === selectedEntityId) continue
+              const ax = info.id === v.dragId ? v.dragX : info.entity.x
+              const ay = info.id === v.dragId ? v.dragY : info.entity.y
+              const f = info.foot
+              if (ax + f.x + f.w < left || ax + f.x > right || ay + f.y + f.h < top || ay + f.y > bottom) continue
+              drawFootprint(ctx, ax + f.x, ay + f.y, f.w, f.h, info.solid, s, false)
+            }
+          }
+
+          // 2) hover
+          if (v.hoverId && v.hoverId !== selectedEntityId && v.dragId === null) {
+            const info = infos.find((i) => i.id === v.hoverId)
+            if (info) drawHoverFrame(ctx, translateRect(info.bounds, info.entity.x, info.entity.y), s)
+          }
+
+          // 3) selection: frame, prominent footprint, wander ring, anchor
+          if (selected) {
+            const ax = v.dragId === selected.id ? v.dragX : selected.entity.x
+            const ay = v.dragId === selected.id ? v.dragY : selected.entity.y
+            if (selected.controller === 'wander') drawWanderRing(ctx, ax, ay, selected.wanderRadius, s)
+            drawSelectionFrame(ctx, translateRect(selected.bounds, ax, ay), s)
+            if (selected.foot && liveRect.current === null) {
+              drawFootprint(ctx, ax + selected.foot.x, ay + selected.foot.y, selected.foot.w, selected.foot.h, selected.solid, s, true)
+            }
+            drawAnchorCross(ctx, ax, ay, s)
+          }
+
+          // 4) badges (event for everyone, movement for the selected entity)
+          if (view.badges && s >= 0.5) {
+            for (let i = 0; i < infos.length; i++) {
+              const info = infos[i]
+              const isSel = info.id === selectedEntityId
+              const showMove = isSel && info.controller !== null && info.controller !== 'none'
+              if (!info.hasEvent && !showMove) continue
+              const ax = info.id === v.dragId ? v.dragX : info.entity.x
+              const ay = info.id === v.dragId ? v.dragY : info.entity.y
+              const b = info.bounds
+              if (ax + b.x + b.w < left || ax + b.x > right || ay + b.y + b.h < top || ay + b.y > bottom) continue
+              let bx = ax + b.x + b.w - 12 / s
+              const by = ay + b.y - 5 / s
+              if (info.hasEvent) {
+                drawBadge(ctx, 'zap', bx, by, s, EVENT_RGB)
+                bx -= 19 / s
+              }
+              if (showMove) drawBadge(ctx, 'footprints', bx, by, s, MOVE_RGB)
+            }
+          }
+
+          // 5) labels: selected + hovered always, everyone when zoomed in
+          const labelAll = view.labels && s >= 1.25
+          for (let i = 0; i < infos.length; i++) {
+            const info = infos[i]
+            const isSel = info.id === selectedEntityId
+            const isHover = info.id === v.hoverId && v.dragId === null
+            if (!isSel && !isHover && !labelAll) continue
+            const ax = info.id === v.dragId ? v.dragX : info.entity.x
+            const ay = info.id === v.dragId ? v.dragY : info.entity.y
+            const b = info.bounds
+            if (ax + b.x + b.w < left || ax + b.x > right || ay + b.y + b.h < top || ay + b.y > bottom) continue
+            drawLabel(ctx, info.entity.name, ax + b.x + b.w / 2, ay + b.y, s, isSel ? 'selected' : isHover ? 'hover' : 'plain')
+          }
+        }}
+      />
+
+      <KonvaColliderEditor
+        entity={colliderEntity}
+        toolActive={colliderToolActive}
+        showHandles={view.colliders || colliderToolActive}
+        mapWidthPx={mapWidthPx}
+        mapHeightPx={mapHeightPx}
+        onCommit={handleCommitCollider}
+        liveRef={liveRect}
+      />
     </Group>
   )
 })

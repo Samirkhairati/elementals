@@ -1,0 +1,165 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- loose fixtures on purpose */
+import { describe, it, expect } from 'vitest'
+import { createCommand, createDefaultComponent, formatCommandPath, validateEntities, validateEntity } from '../../../shared/engine/index'
+
+const good = (): any => ({
+  id: 'e1',
+  name: 'NPC',
+  x: 48,
+  y: 96,
+  components: {
+    Transform: { x: 48, y: 96, depth: 20 },
+    Sprite: createDefaultComponent('Sprite', { asset: 'characters/player' }),
+    Collider: createDefaultComponent('Collider'),
+    Movement: createDefaultComponent('Movement'),
+    Event: {
+      pages: [
+        {
+          id: 'p1', name: 'Page 1', conditions: [{ kind: 'switch', id: 's1', value: true }], trigger: 'action',
+          commands: [createCommand('showText', { text: 'hi' }), createCommand('warp', { map: 'city' })],
+          faceOnInteract: true, solid: null, appearance: {},
+        },
+      ],
+    },
+    Tag: { tag: 'npc' },
+  },
+})
+
+const codes = (e: unknown, ctx = {}) => validateEntity(e, ctx).map((i) => `${i.severity}:${i.code}`)
+
+describe('validateEntity', () => {
+  it('accepts a healthy entity', () => {
+    expect(validateEntity(good())).toEqual([])
+    expect(validateEntity(good(), { switchIds: ['s1'], mapIds: ['city'], spriteIds: ['characters/player'] })).toEqual([])
+  })
+
+  it('reports structural problems', () => {
+    expect(codes(null)).toEqual(['error:bad-entity'])
+    expect(codes({ ...good(), id: '' })).toEqual(['error:bad-id'])
+    expect(codes({ ...good(), name: 3 })).toEqual(['error:bad-name'])
+    expect(codes({ ...good(), x: NaN })).toEqual(['error:bad-position'])
+    expect(codes({ ...good(), components: 4 })).toEqual(['error:bad-components'])
+  })
+
+  it('requires a Transform and warns when it disagrees with the entity position', () => {
+    const e = good()
+    delete e.components.Transform
+    expect(codes(e)).toEqual(['error:missing-transform'])
+    const m = good()
+    m.components.Transform.x = 64
+    expect(codes(m)).toEqual(['warning:transform-mismatch'])
+  })
+
+  it('flags unknown and legacy components', () => {
+    const e = good()
+    e.components.Bogus = {}
+    e.components.SpriteView = { texture: 'x' }
+    expect(codes(e)).toEqual(['error:unknown-component', 'warning:legacy-component'])
+    expect(validateEntity(e)[0]).toMatchObject({ entityId: 'e1', path: 'components.Bogus' })
+  })
+
+  it('checks prop types, ranges and unknown props', () => {
+    const e = good()
+    e.components.Collider.width = 'wide'
+    e.components.Collider.isSolid = 'yes'
+    e.components.Sprite.facing = 'north'
+    e.components.Sprite.opacity = 2
+    e.components.Sprite.tint = 'red'
+    e.components.Movement.controller = 'fly'
+    e.components.Tag.tag = 5
+    e.components.Collider.junk = 1
+    const issues = validateEntity(e)
+    expect(issues.map((i) => `${i.code}@${i.path}`).sort()).toEqual([
+      'bad-prop@components.Collider.isSolid',
+      'bad-prop@components.Collider.width',
+      'bad-prop@components.Movement.controller',
+      'bad-prop@components.Sprite.facing',
+      'bad-prop@components.Sprite.tint',
+      'bad-prop@components.Tag.tag',
+      'out-of-range@components.Sprite.opacity',
+      'unknown-prop@components.Collider.junk',
+    ])
+    expect(codes({ ...good(), components: { ...good().components, Collider: 5 } })).toEqual(['error:bad-component'])
+  })
+
+  it('partial props are fine (defaults fill the gaps)', () => {
+    expect(validateEntity({ id: 'a', name: 'a', x: 1, y: 2, components: { Transform: { x: 1, y: 2 }, Collider: { width: 32 } } })).toEqual([])
+  })
+
+  it('warns about sprite assets that do not exist, only when the list is given', () => {
+    expect(codes(good())).toEqual([])
+    expect(codes(good(), { spriteIds: ['objects/x'] })).toEqual(['warning:dangling-sprite'])
+    const e = good()
+    e.components.Event.pages[0].appearance = { asset: 'nope' }
+    expect(codes(e, { spriteIds: ['characters/player', 'objects/x'] })).toEqual(['warning:dangling-sprite'])
+  })
+})
+
+describe('validateEntity: Event', () => {
+  it('needs at least one page with unique ids', () => {
+    const e = good()
+    e.components.Event.pages = []
+    expect(codes(e)).toEqual(['error:no-pages'])
+    const d = good()
+    d.components.Event.pages.push({ ...d.components.Event.pages[0] })
+    expect(codes(d)).toEqual(['error:duplicate-page-id'])
+    const m = good()
+    m.components.Event = {}
+    expect(codes(m)).toEqual(['error:no-pages'])
+  })
+
+  it('checks page fields', () => {
+    const e = good()
+    const p = e.components.Event.pages[0]
+    p.trigger = 'sometimes'
+    p.faceOnInteract = 'y'
+    p.solid = 'n'
+    delete p.id
+    expect(codes(e)).toEqual(['error:bad-page', 'error:bad-trigger', 'error:bad-page', 'error:bad-page'])
+    const n = good()
+    n.components.Event.pages[0] = 5
+    expect(codes(n)).toEqual(['error:bad-page'])
+    const c = good()
+    c.components.Event.pages[0].commands = 'x'
+    expect(codes(c)).toEqual(['error:bad-page'])
+  })
+
+  it('reports page condition problems with a path', () => {
+    const e = good()
+    e.components.Event.pages[0].conditions = [{ kind: 'switch', id: 'gone', value: true }, { kind: 'zzz' }]
+    const issues = validateEntity(e, { switchIds: ['other'] })
+    expect(issues.map((i) => [i.code, i.path])).toEqual([
+      ['dangling-switch', 'components.Event.pages[0].conditions[0]'],
+      ['bad-condition', 'components.Event.pages[0].conditions[1]'],
+    ])
+    expect(issues[0].message).toMatch(/^Page 1:/)
+  })
+
+  it('delegates commands to validateCommands and keeps command ids and paths', () => {
+    const e = good()
+    const cond = createCommand('conditional', { conditions: [{ kind: 'selfSwitch', key: 'A', value: true }] })
+    const bad = createCommand('breakLoop')
+    cond.branches!.then.push(bad)
+    e.components.Event.pages[0].commands.push(cond, { id: 'u', type: 'teleport', params: {} })
+    const issues = validateEntity(e)
+    expect(issues.map((i) => [i.code, i.commandId, i.path])).toEqual([
+      ['break-outside-loop', bad.id, 'components.Event.pages[0].commands[2].branches.then[0]'],
+      ['unknown-command', 'u', 'components.Event.pages[0].commands[3]'],
+    ])
+  })
+
+  it('formatCommandPath', () => {
+    expect(formatCommandPath([1, 'then', 0, 'body', 2])).toBe('commands[1].branches.then[0].branches.body[2]')
+    expect(formatCommandPath([], 'x')).toBe('x')
+  })
+})
+
+describe('validateEntities', () => {
+  it('reports duplicate ids and non-arrays, and never throws', () => {
+    const a = good()
+    expect(validateEntities([a, { ...a }]).map((i) => i.code)).toEqual(['duplicate-id'])
+    expect(validateEntities('x')[0].code).toBe('bad-entities')
+    expect(() => validateEntities([null, 4, {}, { components: [] }])).not.toThrow()
+    expect(validateEntities([])).toEqual([])
+  })
+})

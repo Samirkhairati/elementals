@@ -7,7 +7,7 @@ export function ShortcutsDialog({ open, onClose }: { open: boolean, onClose: () 
         <DialogHeader>
           <DialogTitle>Keyboard Shortcuts</DialogTitle>
         </DialogHeader>
-        <div className="py-4 space-y-4">
+        <div className="flex flex-col gap-3 py-3">
           <div className="grid grid-cols-2 gap-y-2 text-sm">
             <div className="font-medium">Undo</div>
             <div className="text-muted-foreground">Ctrl+Z / Cmd+Z</div>
@@ -27,6 +27,9 @@ export function ShortcutsDialog({ open, onClose }: { open: boolean, onClose: () 
             <div className="font-medium">Paint Bucket</div>
             <div className="text-muted-foreground">G</div>
             
+            <div className="font-medium">Collider Tool</div>
+            <div className="text-muted-foreground">C (drag: Shift free, Alt from centre, Esc cancel)</div>
+
             <div className="font-medium">Isolate Layer Visibility</div>
             <div className="text-muted-foreground">Shift + Click (Eye Icon)</div>
             

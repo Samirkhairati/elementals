@@ -109,10 +109,10 @@ export function TilesetPreview({
 
   if (activeLayerType === 'collision') {
     return (
-      <div className="h-full w-full flex flex-col items-center justify-center space-y-4">
-        <div className="text-xs text-red-400 font-mono uppercase tracking-wider">Collision Block</div>
+      <div className="flex h-full w-full flex-col items-center justify-center gap-3">
+        <div className="ed-section-title text-red-400">Collision Block</div>
         <div 
-          className="relative w-16 h-16 border-2 border-red-500 bg-red-500/20 overflow-hidden ring-4 ring-primary shadow-lg shadow-red-500/20 cursor-pointer hover:bg-red-500/30"
+          className="relative w-16 h-16 border-2 border-red-500 bg-red-500/20 overflow-hidden ring-2 ring-primary cursor-pointer hover:bg-red-500/30"
           onClick={() => {
             setTileSelection({ width: 1, height: 1, tiles: [{ tilesetId: '__collision__', x: 0, y: 0 }] })
           }}
@@ -126,17 +126,13 @@ export function TilesetPreview({
 
   if (isDisabled) {
     return (
-      <div className="h-full w-full flex flex-col items-center justify-center text-xs text-muted-foreground font-mono space-y-2">
-        <p>yet to implement</p>
-      </div>
+      <div className="ed-empty">yet to implement</div>
     )
   }
 
   if (!activeTileset) {
     return (
-      <div className="h-full w-full flex items-center justify-center text-xs text-muted-foreground font-mono">
-        Select a tileset to preview
-      </div>
+      <div className="ed-empty">Select a tileset to preview</div>
     )
   }
 

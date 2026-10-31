@@ -2,8 +2,8 @@
   --dv-background-color: transparent;
   --dv-pane-background-color: transparent;
   --dv-tabs-and-actions-container-background-color: hsl(var(--sidebar-background));
-  --dv-tabs-and-actions-container-font-size: 11px;
-  --dv-tabs-and-actions-container-height: 40px;
+  --dv-tabs-and-actions-container-font-size: var(--text-label);
+  --dv-tabs-and-actions-container-height: var(--panel-header-h);
   --dv-activegroup-visiblepanel-tab-background-color: hsl(var(--sidebar-background));
   --dv-activegroup-hiddenpanel-tab-background-color: hsl(var(--sidebar-background));
   --dv-inactivegroup-visiblepanel-tab-background-color: hsl(var(--sidebar-background));
@@ -24,6 +24,21 @@
   text-transform: uppercase;
   font-weight: 500;
   letter-spacing: 0.05em;
+  padding: 0 var(--space-3) !important;
+  height: var(--panel-header-h) !important;
+  align-items: center;
+}
+
+/* Dock tabs, the tab strip and header action buttons all share one 32px header height. */
+.dockview-theme-elementals .dv-tabs-container,
+.dockview-theme-elementals .dv-tabs-and-actions-container,
+.dockview-theme-elementals .dv-right-actions-container {
+  height: var(--panel-header-h);
+  align-items: center;
+}
+
+.dockview-theme-elementals .dv-tab .dv-default-tab {
+  gap: var(--space-2);
 }
 
 .dockview-theme-elementals .dv-tabs-and-actions-container {

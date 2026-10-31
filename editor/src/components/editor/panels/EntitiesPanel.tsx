@@ -1,10 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
 import {
-  User,
-  DoorOpen,
-  MessageSquare,
-  Package,
-  Box,
   Edit2,
   Trash2,
   Copy,
@@ -18,9 +13,24 @@ import {
   ChevronRight,
   ChevronDown,
   FolderInput,
+  Zap,
 } from 'lucide-react'
 import { EntityData, ComponentType, EntityFolder } from '@/types/editor'
 import { PRESET_PREFABS } from '@/lib/componentRegistry'
+import { entityIconName, summarizeEntity } from '@/lib/entityVisuals'
+import { openEventEditor } from '@/lib/openEventEditor'
+import { useEditorSelector, type EditorContextValue } from '../layout/EditorContext'
+import { Badge, IconButton } from '../ui/controls'
+import { NamedIcon } from '../ui/icons'
+import { SpriteThumb } from '../sprites/SpriteThumb'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -68,21 +78,42 @@ interface EntitiesPanelProps {
   moveEntityToFolder?: (entityId: string, folderId: string | null) => void
 }
 
-function getEntityIcon(entity: EntityData) {
-  const comps = entity.components
-  if (comps.Tag?.tag === 'warp' || comps.Interactable?.targetMap) {
-    return <DoorOpen className="w-4 h-4 text-cyan-400" />
-  }
-  if (comps.CharacterAnimation || comps.Tag?.tag === 'npc' || comps.AIWander) {
-    return <User className="w-4 h-4 text-emerald-400" />
-  }
-  if (comps.Tag?.tag === 'sign') {
-    return <MessageSquare className="w-4 h-4 text-blue-400" />
-  }
-  if (comps.Tag?.tag === 'chest') {
-    return <Package className="w-4 h-4 text-amber-400" />
-  }
-  return <Box className="w-4 h-4 text-purple-400" />
+const selectSpriteAssets = (c: EditorContextValue) => c.spriteAssets
+
+/** Sprite thumbnail when the entity has a sprite, otherwise the icon for what it is (npc, sign, warp ...). */
+function EntityGlyph({ entity }: { entity: EntityData }) {
+  const assets = useEditorSelector(selectSpriteAssets)
+  const asset = entity.components.Sprite?.asset ? assets?.[entity.components.Sprite.asset] : undefined
+  if (asset) return <SpriteThumb asset={asset} size={20} />
+  return <NamedIcon name={entityIconName(entity)} className="text-muted-foreground" />
+}
+
+function EntityBadges({ entity }: { entity: EntityData }) {
+  const s = summarizeEntity(entity)
+  return (
+    <>
+      {s.hasEvent && (
+        <Badge tone="event" title="Has an Event">
+          <NamedIcon name="zap" />
+        </Badge>
+      )}
+      {s.controller && s.controller !== 'none' && (
+        <Badge tone="move" title={`Movement: ${s.controller}`}>
+          <NamedIcon name="footprints" />
+        </Badge>
+      )}
+      {s.solid === true && (
+        <Badge tone="solid" title="Solid collider">
+          solid
+        </Badge>
+      )}
+      {s.solid === false && (
+        <Badge tone="trigger" title="Trigger zone (not solid)">
+          zone
+        </Badge>
+      )}
+    </>
+  )
 }
 
 export function EntitiesPanel({
@@ -260,43 +291,34 @@ export function EntitiesPanel({
 
   if (!hasActiveMap) {
     return (
-      <div className="h-full flex items-center justify-center text-muted-foreground p-8 text-center select-none">
-        <p className="text-xs">Select a map to view entities</p>
-      </div>
+      <div className="ed-empty">Select a map to view entities</div>
     )
+  }
+
+  const placeEmpty = (targetFolderId?: string | null) => {
+    if (startPlacement) startPlacement({ name: 'New Entity' })
+    else createEntity('New Entity', 0, 0, undefined, targetFolderId)
+  }
+  const placePrefab = (prefab: (typeof PRESET_PREFABS)[number], targetFolderId?: string | null) => {
+    if (startPlacement) startPlacement({ name: prefab.name, components: prefab.components })
+    else createEntity(prefab.name, 0, 0, prefab.components, targetFolderId)
   }
 
   const renderNewEntityMenuItems = (targetFolderId?: string | null) => (
     <>
-      <ContextMenuItem
-        onClick={() => {
-          if (startPlacement) {
-            startPlacement({ name: 'New Entity' })
-          } else {
-            createEntity('New Entity', 0, 0, undefined, targetFolderId)
-          }
-        }}
-      >
-        <Plus className="w-3.5 h-3.5 mr-2 text-primary" />
-        New Empty Entity
+      <ContextMenuItem onClick={() => placeEmpty(targetFolderId)}>
+        <Plus className="ed-icon mr-2 text-primary" />
+        Empty entity
       </ContextMenuItem>
       <ContextMenuSub>
         <ContextMenuSubTrigger>
-          <Sparkles className="w-3.5 h-3.5 mr-2 text-amber-400" />
-          From Prefab
+          <Sparkles className="ed-icon mr-2 text-amber-400" />
+          From prefab
         </ContextMenuSubTrigger>
-        <ContextMenuSubContent className="w-48 font-mono text-xs">
-          {PRESET_PREFABS.map(prefab => (
-            <ContextMenuItem
-              key={prefab.name}
-              onClick={() => {
-                if (startPlacement) {
-                  startPlacement({ name: prefab.name, components: prefab.components })
-                } else {
-                  createEntity(prefab.name, 0, 0, prefab.components, targetFolderId)
-                }
-              }}
-            >
+        <ContextMenuSubContent className="w-64">
+          {PRESET_PREFABS.map((prefab) => (
+            <ContextMenuItem key={prefab.id} onClick={() => placePrefab(prefab, targetFolderId)}>
+              <NamedIcon name={prefab.icon} className="ed-icon mr-2 text-muted-foreground" />
               {prefab.name}
             </ContextMenuItem>
           ))}
@@ -309,7 +331,6 @@ export function EntitiesPanel({
     const isEditing = editingEntityId === entity.id
     const isSelected = selectedEntityId === entity.id
     const isDropTarget = dragOverTarget?.id === entity.id && draggedEntityId !== entity.id
-    const compCount = Object.keys(entity.components || {}).length
     const isVisible = entity.visible !== false
 
     return (
@@ -323,25 +344,22 @@ export function EntitiesPanel({
             onDrop={e => handleDropOnEntity(e, entity)}
             onClick={() => setSelectedEntityId(entity.id)}
             onDoubleClick={() => startEditingEntity(entity)}
-            className={`group relative flex items-center py-1.5 px-2 rounded-md cursor-pointer text-xs select-none border transition-colors ${
-              isInsideFolder ? 'ml-4' : ''
-            } ${
-              isSelected
-                ? 'bg-primary/25 text-primary-foreground font-medium border-primary/40'
-                : 'border-transparent hover:bg-sidebar-accent text-sidebar-foreground'
-            } ${!isVisible ? 'opacity-50' : ''}`}
+            className={`ed-row group ${isInsideFolder ? 'ed-indent !w-[calc(100%-16px)]' : ''}`}
+            data-selected={isSelected ? 'true' : undefined}
+            data-dim={!isVisible ? 'true' : undefined}
+            data-testid={`entity-row-${entity.id}`}
           >
             {/* Horizontal drag indicator line */}
             {isDropTarget && (
               <div
-                className={`absolute left-0 right-0 h-[2px] bg-primary shadow-[0_0_8px_rgba(59,130,246,1)] z-30 pointer-events-none rounded-full ${
+                className={`pointer-events-none absolute left-0 right-0 z-30 h-[2px] rounded-full bg-primary ${
                   dragOverTarget.position === 'top' ? '-top-[2px]' : '-bottom-[2px]'
                 }`}
               />
             )}
 
-            <div className="mr-2 shrink-0 opacity-80 cursor-grab active:cursor-grabbing">
-              {getEntityIcon(entity)}
+            <div className="flex h-5 w-5 shrink-0 items-center justify-center">
+              <EntityGlyph entity={entity} />
             </div>
 
             {isEditing ? (
@@ -356,41 +374,41 @@ export function EntitiesPanel({
                   if (e.key === 'Escape') setEditingEntityId(null)
                 }}
                 onClick={e => e.stopPropagation()}
-                className="flex-1 bg-black/40 border border-primary/60 rounded px-1.5 py-0.5 text-xs text-foreground outline-none font-mono"
+                className="ed-input h-row-sm min-w-0 flex-1 border-primary/60"
               />
             ) : (
-              <span className="flex-1 truncate">{entity.name}</span>
+              <span className="ed-row-label" title={entity.name}>{entity.name}</span>
             )}
 
-            {/* Right side actions: Visibility & component count */}
-            <div className="flex items-center gap-1.5 ml-2 shrink-0">
-              <button
-                type="button"
-                title={isVisible ? 'Hide Entity' : 'Show Entity'}
+            <div className="ed-row-actions">
+              <EntityBadges entity={entity} />
+              <IconButton
+                title={isVisible ? 'Hide entity' : 'Show entity'}
+                aria-label={isVisible ? 'Hide entity' : 'Show entity'}
                 onClick={e => {
                   e.stopPropagation()
                   toggleEntityVisibility?.(entity.id)
                 }}
-                className={`p-1 rounded transition-colors ${
-                  isVisible
-                    ? 'text-muted-foreground/60 hover:text-foreground hover:bg-muted/40'
-                    : 'text-muted-foreground hover:text-foreground bg-muted/30'
-                }`}
               >
-                {isVisible ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5 text-amber-400/90" />}
-              </button>
-
-              <span
-                title={`${compCount} components`}
-                className="text-[10px] px-1.5 py-0.2 rounded bg-black/20 text-muted-foreground font-mono"
-              >
-                {compCount}
-              </span>
+                {isVisible ? <Eye /> : <EyeOff className="text-amber-400/90" />}
+              </IconButton>
             </div>
           </div>
         </ContextMenuTrigger>
 
         <ContextMenuContent className="w-48 font-mono text-xs">
+          {entity.components.Event && (
+            <ContextMenuItem
+              onClick={() => {
+                setSelectedEntityId(entity.id)
+                // let the inspector render the selected entity's Event card first
+                openEventEditor(entity.id, 60)
+              }}
+            >
+              <Zap className="ed-icon mr-2 text-blue-400" />
+              Edit event…
+            </ContextMenuItem>
+          )}
           <ContextMenuItem onClick={() => startEditingEntity(entity)}>
             <Edit2 className="w-3.5 h-3.5 mr-2" />
             Rename
@@ -447,53 +465,73 @@ export function EntitiesPanel({
   const rootEntities = entities.filter(e => !e.folder)
 
   return (
-    <div className="flex flex-col h-full w-full select-none font-mono text-xs">
-      {/* Top Header Controls */}
-      <div className="flex items-center justify-between px-2 py-1.5 border-b border-sidebar-border bg-sidebar/50 mb-1.5 rounded-t-md">
+    <div className="flex h-full w-full flex-col select-none text-ed-body">
+      {/* Header: show/hide all + add */}
+      <div className="mb-1 flex h-row shrink-0 items-center justify-between gap-2">
         <button
           type="button"
           onClick={toggleShowEntities}
-          className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-colors ${
-            showEntities
-              ? 'bg-primary/20 text-primary font-medium border border-primary/30'
-              : 'text-muted-foreground hover:bg-muted/40 hover:text-foreground border border-transparent'
-          }`}
-          title={showEntities ? 'Hide all entities on canvas' : 'Show entities on canvas'}
+          className="ed-btn"
+          data-size="sm"
+          data-variant={showEntities ? 'primary' : undefined}
+          title={showEntities ? 'Hide all entities on the canvas' : 'Show entities on the canvas'}
         >
-          {showEntities ? <Eye className="w-3.5 h-3.5 text-primary" /> : <EyeOff className="w-3.5 h-3.5 text-muted-foreground" />}
+          {showEntities ? <Eye /> : <EyeOff />}
           <span>Entities</span>
+          <span className="ed-badge ml-1">{entities.length}</span>
         </button>
 
         <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => createEntityFolder?.()}
-            className="p-1.5 rounded hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
-            title="Create Entity Folder"
-          >
-            <FolderPlus className="w-3.5 h-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              if (startPlacement) {
-                startPlacement({ name: 'New Entity' })
-              } else {
-                createEntity('New Entity')
-              }
-            }}
-            className="p-1.5 rounded hover:bg-muted/50 text-primary hover:text-primary transition-colors"
-            title="New Entity"
-          >
-            <Plus className="w-3.5 h-3.5" />
-          </button>
+          <IconButton title="New entity folder" aria-label="New entity folder" onClick={() => createEntityFolder?.()}>
+            <FolderPlus />
+          </IconButton>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button type="button" className="ed-btn" data-size="sm" data-variant="primary" aria-label="Add entity">
+                <Plus />
+                Add
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-72 p-1" data-testid="add-entity-menu">
+              <DropdownMenuLabel className="px-2 py-1 text-ed-label font-normal text-muted-foreground">
+                Pick one, then click the map to place it
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => placeEmpty(null)} className="flex items-start gap-2 px-2 py-2" aria-label="Empty entity">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary">
+                  <Plus className="ed-icon" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-ed-body text-foreground">Empty entity</span>
+                  <span className="block text-ed-label leading-4 text-muted-foreground">Just a position. Add the components you need.</span>
+                </span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              {PRESET_PREFABS.map(prefab => (
+                <DropdownMenuItem
+                  key={prefab.id}
+                  onClick={() => placePrefab(prefab, null)}
+                  className="flex items-start gap-2 px-2 py-2"
+                  aria-label={prefab.name}
+                >
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                    <NamedIcon name={prefab.icon} className="ed-icon" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-ed-body text-foreground">{prefab.name}</span>
+                    <span className="block text-ed-label leading-4 text-muted-foreground">{prefab.description}</span>
+                  </span>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
       {/* Main Entities & Folders Tree View */}
       <ContextMenu>
         <ContextMenuTrigger className="flex-1 overflow-y-auto min-h-0">
-          <div className="space-y-1 pb-4">
+          <div className="flex flex-col gap-0.5 pb-4">
             {/* Entity Folders */}
             {entityFolders.map(folder => {
               const isExpanded = folder.expanded !== false
@@ -503,7 +541,7 @@ export function EntitiesPanel({
               const isDragOver = dragOverFolderId === folder.id
 
               return (
-                <div key={folder.id} className="space-y-1">
+                <div key={folder.id} className="flex flex-col gap-0.5">
                   <ContextMenu>
                     <ContextMenuTrigger>
                       <div
@@ -511,34 +549,17 @@ export function EntitiesPanel({
                         onDragLeave={() => setDragOverFolderId(null)}
                         onDrop={e => handleDropOnFolder(e, folder.id)}
                         onDoubleClick={() => startEditingFolder(folder)}
-                        className={`flex items-center py-1.5 px-2 rounded-md cursor-pointer transition-colors border ${
-                          isDragOver
-                            ? 'bg-amber-500/20 border-amber-400/50'
-                            : 'border-transparent hover:bg-sidebar-accent text-sidebar-foreground'
-                        } ${!isFolderVisible ? 'opacity-50' : ''}`}
+                        onClick={() => toggleEntityFolderExpanded?.(folder.id)}
+                        className="ed-row group"
+                        data-drop={isDragOver ? 'true' : undefined}
+                        data-dim={!isFolderVisible ? 'true' : undefined}
                       >
-                        <button
-                          type="button"
-                          onClick={() => toggleEntityFolderExpanded?.(folder.id)}
-                          className="p-0.5 mr-1 hover:bg-muted/50 rounded text-muted-foreground"
-                        >
-                          {isExpanded ? (
-                            <ChevronDown className="w-3.5 h-3.5" />
-                          ) : (
-                            <ChevronRight className="w-3.5 h-3.5" />
-                          )}
-                        </button>
-
-                        <div
-                          className="mr-1.5 text-amber-400"
-                          onClick={() => toggleEntityFolderExpanded?.(folder.id)}
-                        >
-                          {isExpanded ? (
-                            <FolderOpen className="w-4 h-4" />
-                          ) : (
-                            <Folder className="w-4 h-4" />
-                          )}
-                        </div>
+                        {isExpanded ? (
+                          <ChevronDown className="text-muted-foreground" />
+                        ) : (
+                          <ChevronRight className="text-muted-foreground" />
+                        )}
+                        {isExpanded ? <FolderOpen className="text-amber-400" /> : <Folder className="text-amber-400" />}
 
                         {isEditing ? (
                           <input
@@ -552,41 +573,26 @@ export function EntitiesPanel({
                               if (e.key === 'Escape') setEditingFolderId(null)
                             }}
                             onClick={e => e.stopPropagation()}
-                            className="flex-1 bg-black/40 border border-amber-400/60 rounded px-1.5 py-0.5 text-xs text-foreground outline-none font-mono"
+                            className="ed-input h-row-sm min-w-0 flex-1 border-amber-400/60"
                           />
                         ) : (
-                          <span
-                            onClick={() => toggleEntityFolderExpanded?.(folder.id)}
-                            className="flex-1 truncate font-medium"
-                          >
+                          <span className="ed-row-label font-medium" title={folder.name}>
                             {folder.name}
                           </span>
                         )}
 
-                        <div className="flex items-center gap-1.5 ml-2 shrink-0">
-                          <button
-                            type="button"
-                            title={isFolderVisible ? 'Hide Folder Entities' : 'Show Folder Entities'}
+                        <div className="ed-row-actions">
+                          <span className="ed-badge">{folderEntities.length}</span>
+                          <IconButton
+                            title={isFolderVisible ? 'Hide folder entities' : 'Show folder entities'}
+                            aria-label={isFolderVisible ? 'Hide folder entities' : 'Show folder entities'}
                             onClick={e => {
                               e.stopPropagation()
                               toggleEntityFolderVisibility?.(folder.id)
                             }}
-                            className={`p-1 rounded transition-colors ${
-                              isFolderVisible
-                                ? 'text-muted-foreground/60 hover:text-foreground hover:bg-muted/40'
-                                : 'text-muted-foreground hover:text-foreground bg-muted/30'
-                            }`}
                           >
-                            {isFolderVisible ? (
-                              <Eye className="w-3.5 h-3.5" />
-                            ) : (
-                              <EyeOff className="w-3.5 h-3.5 text-amber-400/90" />
-                            )}
-                          </button>
-
-                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-black/20 text-muted-foreground font-mono">
-                            {folderEntities.length}
-                          </span>
+                            {isFolderVisible ? <Eye /> : <EyeOff className="text-amber-400/90" />}
+                          </IconButton>
                         </div>
                       </div>
                     </ContextMenuTrigger>
@@ -615,9 +621,9 @@ export function EntitiesPanel({
 
                   {/* Folder Children */}
                   {isExpanded && (
-                    <div className="space-y-1">
+                    <div className="flex flex-col gap-0.5">
                       {folderEntities.length === 0 ? (
-                        <div className="pl-8 py-1 text-[11px] text-muted-foreground/60 italic">
+                        <div className="ed-indent ed-hint flex h-row-sm items-center pl-2 italic">
                           Folder is empty
                         </div>
                       ) : (
@@ -633,12 +639,9 @@ export function EntitiesPanel({
             {rootEntities.map(entity => renderEntityRow(entity, false))}
 
             {entities.length === 0 && entityFolders.length === 0 && (
-              <div className="h-40 flex flex-col items-center justify-center text-muted-foreground p-4 text-center select-none">
-                <p className="text-xs">
-                  No entities yet.
-                  <br />
-                  <span className="text-[11px] opacity-70">Right-click here or click + above to add an entity.</span>
-                </p>
+              <div className="ed-empty h-40">
+                <p>No entities yet.</p>
+                <p className="ed-hint">Use “Add” above or right-click here.</p>
               </div>
             )}
           </div>

@@ -11,8 +11,21 @@ if (typeof document !== 'undefined') {
   document.title = `Elementals Editor — [${worktree}] (Port: ${port})`;
 }
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <RouterProvider router={router} />
-  </React.StrictMode>,
-)
+function render() {
+  ReactDOM.createRoot(document.getElementById('root')!).render(
+    <React.StrictMode>
+      <RouterProvider router={router} />
+    </React.StrictMode>,
+  )
+}
+
+// Browser harness (docs/editor-harness.md): without Electron's preload, the dev server's project API stands in
+// for window.electronAPI. `DEV` is a build-time constant, so none of this exists in production bundles.
+if ((import.meta as unknown as { env: { DEV: boolean } }).env.DEV && !window.electronAPI) {
+  import('./lib/browserElectronApi').then(({ installBrowserElectronApi }) => {
+    installBrowserElectronApi()
+    render()
+  })
+} else {
+  render()
+}

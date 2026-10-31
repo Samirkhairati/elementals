@@ -1,102 +1,88 @@
-import React from 'react'
-import { Group, Rect, Text } from 'react-konva'
+import React, { useMemo } from 'react'
+import { Shape } from 'react-konva'
+import type { SpriteAssetInfo } from '../../../../../../shared/engine/types'
+import type { PropBag } from '@/types/editor'
 import { PendingEntityPlacement } from '@/hooks/editor/useEntityPlacement'
+import { colliderLocalRect, entityBounds, entityIconName, normalizeCollider } from '@/lib/entityVisuals'
+import { drawResolvedSprite, resolveSprite, useSpriteImagesVersion } from '@/lib/spriteImages'
+import { drawAnchorCross, drawFootprint, drawLabel, drawPlaceholder } from './entityDraw'
 
 interface KonvaGhostEntityProps {
   pendingPlacement: PendingEntityPlacement | null
   pointerPos: { x: number; y: number } | null
   snapToGrid: boolean
   snapEntityPos: (x: number, y: number) => { x: number; y: number }
+  spriteAssets?: Record<string, SpriteAssetInfo>
 }
 
+const EMPTY: Record<string, SpriteAssetInfo> = {}
+
+/** Placement preview: the prefab's real sprite and footprint, snapped to the grid, semi-transparent. */
 export const KonvaGhostEntity = React.memo(function KonvaGhostEntity({
   pendingPlacement,
   pointerPos,
   snapToGrid,
   snapEntityPos,
+  spriteAssets = EMPTY,
 }: KonvaGhostEntityProps) {
-  if (!pendingPlacement || !pointerPos) return null
+  const imagesVersion = useSpriteImagesVersion()
+  const components = pendingPlacement?.components
+  const sprite = components?.Sprite
+  const asset = sprite?.asset ? spriteAssets[sprite.asset] : undefined
 
-  const targetPos = snapToGrid
-    ? snapEntityPos(pointerPos.x, pointerPos.y)
-    : { x: Math.round(pointerPos.x), y: Math.round(pointerPos.y) }
+  const model = useMemo(() => {
+    void imagesVersion
+    if (!pendingPlacement) return null
+    const entity = { name: pendingPlacement.name, x: 0, y: 0, components: (components ?? {}) as Record<string, PropBag> }
+    const bounds = entityBounds(entity, asset?.meta)
+    const collider = components?.Collider ? normalizeCollider(components.Collider) : null
+    return {
+      bounds,
+      foot: collider ? colliderLocalRect(collider) : null,
+      solid: collider ? collider.isSolid : true,
+      resolved: sprite && asset ? resolveSprite(asset, sprite, 0) : null,
+      icon: entityIconName(entity),
+      hasEvent: !!components?.Event,
+    }
+  }, [pendingPlacement, components, sprite, asset, imagesVersion])
 
-  const collider = pendingPlacement.components?.Collider
-  const colliderW = collider?.width || 16
-  const colliderH = collider?.height || 8
-  const colliderOffX = collider?.offsetX || 0
-  const colliderOffY = collider?.offsetY || 0
+  if (!pendingPlacement || !pointerPos || !model) return null
 
-  const nameText = `${pendingPlacement.name} (Click to place)`
-  const labelWidth = Math.max(50, nameText.length * 6.5 + 14)
+  const target = snapToGrid ? snapEntityPos(pointerPos.x, pointerPos.y) : { x: Math.round(pointerPos.x), y: Math.round(pointerPos.y) }
 
   return (
-    <Group x={targetPos.x} y={targetPos.y} listening={false}>
-      {/* Ghost Collider Box */}
-      <Rect
-        x={colliderOffX - colliderW / 2}
-        y={colliderOffY - colliderH}
-        width={colliderW}
-        height={colliderH}
-        fill="rgba(59, 130, 246, 0.15)"
-        stroke="#60a5fa"
-        strokeWidth={1}
-        dash={[3, 3]}
-        listening={false}
-      />
+    <Shape
+      x={target.x}
+      y={target.y}
+      listening={false}
+      perfectDrawEnabled={false}
+      sceneFunc={(context, shape) => {
+        const ctx = context._context as CanvasRenderingContext2D
+        const s = shape.getStage()?.scaleX() || 1
+        // the tile it will occupy
+        ctx.beginPath()
+        ctx.rect(-16, -32, 32, 32)
+        ctx.fillStyle = 'rgba(96,165,250,0.12)'
+        ctx.fill()
+        ctx.lineWidth = 1 / s
+        ctx.strokeStyle = 'rgba(96,165,250,0.8)'
+        ctx.setLineDash([4 / s, 3 / s])
+        ctx.stroke()
+        ctx.setLineDash([])
 
-      {/* Ghost Entity Name Badge */}
-      <Group y={-46}>
-        <Rect
-          x={-labelWidth / 2}
-          y={-2}
-          width={labelWidth}
-          height={16}
-          fill="rgba(0, 0, 0, 0.85)"
-          stroke="#60a5fa"
-          strokeWidth={1}
-          cornerRadius={2}
-          dash={[3, 3]}
-          listening={false}
-        />
-        <Text
-          text={nameText}
-          x={-labelWidth / 2}
-          y={1}
-          width={labelWidth}
-          align="center"
-          fontSize={10}
-          fontFamily="monospace"
-          fill="#93c5fd"
-          listening={false}
-        />
-      </Group>
+        ctx.save()
+        ctx.globalAlpha = 0.7
+        if (model.resolved) {
+          drawResolvedSprite(ctx, model.resolved, { anchorX: 0, anchorY: 0, opacity: sprite?.opacity, tint: sprite?.tint || undefined })
+        } else {
+          drawPlaceholder(ctx, model.icon, model.hasEvent ? 'event' : 'default')
+        }
+        ctx.restore()
 
-      {/* Ghost Square Badge */}
-      <Group x={-14} y={-28}>
-        <Rect
-          width={28}
-          height={28}
-          fill="rgba(59, 130, 246, 0.35)"
-          stroke="#3b82f6"
-          strokeWidth={1.5}
-          cornerRadius={2}
-          dash={[4, 4]}
-          listening={false}
-        />
-        <Text
-          text={pendingPlacement.name.slice(0, 2).toUpperCase()}
-          x={0}
-          y={7}
-          width={28}
-          align="center"
-          fontSize={11}
-          fontStyle="bold"
-          fontFamily="monospace"
-          fill="#ffffff"
-          listening={false}
-        />
-      </Group>
-    </Group>
+        if (model.foot) drawFootprint(ctx, model.foot.x, model.foot.y, model.foot.w, model.foot.h, model.solid, s, true)
+        drawAnchorCross(ctx, 0, 0, s)
+        drawLabel(ctx, `${pendingPlacement.name} — click to place`, model.bounds.x + model.bounds.w / 2, model.bounds.y, s, 'hover')
+      }}
+    />
   )
 })

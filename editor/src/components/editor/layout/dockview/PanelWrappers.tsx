@@ -10,6 +10,8 @@ import { PropertiesPanel } from '@/components/editor/panels/PropertiesPanel';
 import { TilesetsPanel } from '@/components/editor/panels/TilesetsPanel';
 import { TilesetPreview } from '@/components/editor/panels/TilesetPreview';
 import { ActiveSelectionPanel } from '@/components/editor/panels/ActiveSelectionPanel';
+import { DatabasePanel } from '@/components/editor/panels/DatabasePanel';
+import { SpritesPanel } from '@/components/editor/panels/SpritesPanel';
 import { MapCanvas } from '@/components/editor/canvas/MapCanvas';
 
 // Stable no-op used as a placeholder for callbacks on inactive canvases.
@@ -183,13 +185,14 @@ const selectProperties = (c: EditorContextValue) => ({
   handleAddComponent: c.handleAddComponent,
   handleRemoveComponent: c.handleRemoveComponent,
   handleUpdateComponentProp: c.handleUpdateComponentProp,
+  handleUpdateComponentProps: c.handleUpdateComponentProps,
   handleDeleteEntity: c.handleDeleteEntity,
 });
 
 export function PropertiesWrapper(_props: IDockviewPanelProps) {
   const ctx = useEditorSelector(selectProperties);
   return (
-    <div className="flex-1 overflow-auto p-4 flex flex-col items-center justify-start text-xs text-muted-foreground text-center min-h-0 bg-card/40 h-full">
+    <div className="flex-1 overflow-auto p-2 flex flex-col items-center justify-start text-xs text-muted-foreground text-center min-h-0 bg-card/40 h-full">
       <PropertiesPanel
         layers={ctx.layers}
         activeLayerId={ctx.activeLayerId}
@@ -201,6 +204,7 @@ export function PropertiesWrapper(_props: IDockviewPanelProps) {
         addComponent={ctx.handleAddComponent}
         removeComponent={ctx.handleRemoveComponent}
         updateComponentProp={ctx.handleUpdateComponentProp}
+        updateComponentProps={ctx.handleUpdateComponentProps}
         deleteEntity={ctx.handleDeleteEntity}
       />
     </div>
@@ -442,6 +446,47 @@ export function ActiveSelectionWrapper(_props: IDockviewPanelProps) {
   );
 }
 
+const selectDatabase = (c: EditorContextValue) => ({
+  switches: c.switches,
+  variables: c.variables,
+  maps: c.maps,
+  addSwitch: c.addSwitch,
+  renameSwitch: c.renameSwitch,
+  removeSwitch: c.removeSwitch,
+  addVariable: c.addVariable,
+  renameVariable: c.renameVariable,
+  setVariableInitial: c.setVariableInitial,
+  removeVariable: c.removeVariable,
+});
+
+export function DatabaseWrapper(_props: IDockviewPanelProps) {
+  const ctx = useEditorSelector(selectDatabase);
+  return (
+    <div className="flex-1 overflow-y-auto p-2 font-mono text-xs min-h-0 bg-sidebar-background h-full">
+      <DatabasePanel
+        switches={ctx.switches}
+        variables={ctx.variables}
+        maps={ctx.maps}
+        addSwitch={ctx.addSwitch}
+        renameSwitch={ctx.renameSwitch}
+        removeSwitch={ctx.removeSwitch}
+        addVariable={ctx.addVariable}
+        renameVariable={ctx.renameVariable}
+        setVariableInitial={ctx.setVariableInitial}
+        removeVariable={ctx.removeVariable}
+      />
+    </div>
+  );
+}
+
+export function SpritesWrapper(_props: IDockviewPanelProps) {
+  return (
+    <div className="flex-1 overflow-y-auto font-mono text-xs min-h-0 bg-sidebar-background h-full">
+      <SpritesPanel />
+    </div>
+  );
+}
+
 export const dockviewComponents = {
   maps: MapsWrapper,
   layers: LayersWrapper,
@@ -452,4 +497,6 @@ export const dockviewComponents = {
   tilesets: TilesetsWrapper,
   preview: PreviewWrapper,
   activeSelection: ActiveSelectionWrapper,
+  database: DatabaseWrapper,
+  sprites: SpritesWrapper,
 };

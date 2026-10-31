@@ -120,7 +120,7 @@ export function MapsPanel({
     }
 
     return (
-      <div className="space-y-0.5">
+      <div className="flex flex-col gap-0.5">
         {childrenFolders.map((folder) => {
           const folderName = folder.split('/').pop() || folder
           const isExpanded = expandedMapFolders.has(folder)
@@ -137,11 +137,8 @@ export function MapsPanel({
               <ContextMenu>
                 <ContextMenuTrigger>
                   <div
-                    className={`flex items-center py-1.5 px-2 rounded-md cursor-pointer text-sm select-none text-sidebar-foreground border ${
-                      isFolderDropTarget
-                        ? 'bg-primary/20 ring-2 ring-primary border-transparent'
-                        : 'border-transparent hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                    }`}
+                    className="ed-row"
+                    data-drop={isFolderDropTarget ? 'true' : undefined}
                     onDragOver={(e) => {
                       e.preventDefault()
                       setDragOverFolder(folder)
@@ -159,15 +156,13 @@ export function MapsPanel({
                       toggleMapFolder(folder)
                     }}
                   >
-                    <div className="flex items-center flex-1 min-w-0">
-                      {isExpanded ? (
-                        <ChevronDown className="w-4 h-4 mr-1 shrink-0 opacity-70" />
-                      ) : (
-                        <ChevronRight className="w-4 h-4 mr-1 shrink-0 opacity-70" />
-                      )}
-                      <FolderIcon className="w-4 h-4 mr-2 shrink-0 text-primary" />
-                      <span className="truncate">{folderName}</span>
-                    </div>
+                    {isExpanded ? (
+                      <ChevronDown className="text-muted-foreground" />
+                    ) : (
+                      <ChevronRight className="text-muted-foreground" />
+                    )}
+                    <FolderIcon className="text-primary" />
+                    <span className="ed-row-label" title={folderName}>{folderName}</span>
                   </div>
                 </ContextMenuTrigger>
                 <ContextMenuContent className="w-48">
@@ -206,7 +201,7 @@ export function MapsPanel({
               </ContextMenu>
 
               {isExpanded && hasChildren && (
-                <div className="relative pl-3 ml-2.5 border-l border-white/0 hover:border-white/30 group-hover/folder:border-white/20 transition-colors mt-0.5 space-y-0.5">
+                <div className="ed-tree-children mt-0.5">
                   {renderMapTree(folder, level + 1)}
                 </div>
               )}
@@ -247,24 +242,20 @@ export function MapsPanel({
                     handleMapDrop(e, m.folderPath)
                   }}
                   onClick={() => onSelectMap(m)}
-                  className={`relative flex items-center py-1.5 px-2 rounded-md cursor-pointer text-sm select-none border ${
-                    isSelected
-                      ? 'bg-primary/30 text-primary-foreground font-medium border-primary/40'
-                      : 'border-transparent hover:bg-sidebar-accent text-sidebar-foreground'
-                  }`}
+                  className="ed-row"
+                  data-selected={isSelected ? 'true' : undefined}
                 >
                   {/* Horizontal drag indicator line */}
                   {isMapDropTarget && (
                     <div
-                      className={`absolute left-0 right-0 h-[2px] bg-primary shadow-[0_0_8px_rgba(59,130,246,1)] z-30 pointer-events-none rounded-full ${
+                      className={`absolute left-0 right-0 h-[2px] bg-primary z-30 pointer-events-none rounded-full ${
                         mapDropTarget.position === 'top' ? '-top-[2px]' : '-bottom-[2px]'
                       }`}
                     />
                   )}
 
-                  <div className="w-4 h-4 mr-1 shrink-0 opacity-0" />
-                  <MapIcon className="w-4 h-4 mr-2 shrink-0 opacity-80" />
-                  <span className="flex-1 truncate">{m.name}</span>
+                  <MapIcon className="opacity-80" />
+                  <span className="ed-row-label" title={m.name}>{m.name}</span>
                 </div>
               </ContextMenuTrigger>
               <ContextMenuContent className="w-44">
@@ -314,7 +305,7 @@ export function MapsPanel({
       <ContextMenu>
         <ContextMenuTrigger className="block h-full w-full">
           <div
-            className="h-full flex flex-col items-center justify-center text-muted-foreground p-8 text-center select-none"
+            className="ed-empty"
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => {
               setDragOverFolder(null)
@@ -322,7 +313,7 @@ export function MapsPanel({
               handleMapDrop(e, null)
             }}
           >
-            <p className="text-xs">Right-click here to create a map or folder.</p>
+            <p>Right-click here to create a map or folder.</p>
           </div>
         </ContextMenuTrigger>
         <RootContextMenuContent
@@ -337,7 +328,7 @@ export function MapsPanel({
     <ContextMenu>
       <ContextMenuTrigger className="block min-h-full h-full w-full">
         <div
-          className="min-h-full h-full w-full space-y-1"
+          className="flex min-h-full h-full w-full flex-col gap-0.5"
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
             setDragOverFolder(null)

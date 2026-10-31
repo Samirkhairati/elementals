@@ -2,6 +2,12 @@ import { useState, useCallback } from 'react'
 import { MapData, Layer, EntityData } from '@/types/editor'
 import { mapSaveQueue } from '@/lib/saveQueue'
 import { useSyncedState } from '@/hooks/useSyncedState'
+import { migrateMap } from '../../../../shared/engine/migrate'
+
+/** Legacy maps (SpriteView, Interactable ...) become canonical (schemaVersion 2) the moment the editor loads them. */
+export function migrateLoadedMap(map: MapData): MapData {
+  return migrateMap(map).value
+}
 
 interface UseMapManagerOptions {
   onMapSelected?: (layers: Layer[], entities?: EntityData[]) => void
@@ -48,7 +54,7 @@ export function useMapManager(options: UseMapManagerOptions = {}) {
     if (!window.electronAPI) return []
     const mapRes = await window.electronAPI.getMaps()
     if (mapRes.success) {
-      const loadedMaps = mapRes.maps || []
+      const loadedMaps = (mapRes.maps || []).map(migrateLoadedMap)
       setMapFolders(mapRes.folders || [])
       setMaps(loadedMaps)
       // A rename rewrites `name` on disk; keep the open map in sync so the next
@@ -83,7 +89,8 @@ export function useMapManager(options: UseMapManagerOptions = {}) {
     { mapData: MapData; folderPath: string | null; fileName: string }[]
   >([])
 
-  const onSelectMap = useCallback((m: MapData) => {
+  const onSelectMap = useCallback((raw: MapData) => {
+    const m = migrateLoadedMap(raw)
     setActiveMapAndSync(m)
     const initLayers = m.layers || []
     const initEntities = m.entities || []

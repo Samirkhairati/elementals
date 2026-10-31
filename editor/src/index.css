@@ -70,11 +70,100 @@
   }
 }
 
+
+/* ==========================================================================
+   Editor design tokens - ONE scale for every panel, toolbar, card and dialog.
+   Spacing: 4 / 8 / 12 / 16 (Tailwind 1 / 2 / 3 / 4). Rows 28px, compact 24px, icons 14px.
+   ========================================================================== */
+@layer base {
+  :root {
+    /* spacing scale */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+
+    /* control sizing */
+    --row-h: 28px;
+    --row-h-compact: 24px;
+    --control-h: 28px;
+    --control-h-compact: 24px;
+    --icon-size: 14px;
+    --label-w: 88px;
+    --panel-header-h: 32px;
+    --toolbar-h: 40px;
+
+    /* radii (match Tailwind rounded-sm/md/lg) */
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 8px;
+
+    /* type scale */
+    --text-label: 11px;
+    --text-body: 12px;
+    --text-title: 13px;
+
+    /* semantic colours (hsl triplets) */
+    --solid: 4 84% 62%;
+    --trigger: 174 70% 46%;
+    --success: 152 60% 48%;
+    --warning: 38 92% 55%;
+
+    /* component accents (used by cards, badges and the canvas) */
+    --accent-slate: 215 20% 66%;
+    --accent-violet: 262 83% 72%;
+    --accent-amber: 38 92% 56%;
+    --accent-emerald: 152 62% 48%;
+    --accent-blue: 217 91% 64%;
+    --accent-zinc: 240 6% 66%;
+  }
+}
+
 @layer base {
   * {
     @apply border-border;
-    cursor: default !important;
+    cursor: default;
     font-family: var(--font-mono);
+  }
+  .konvajs-content,
+  .konvajs-content canvas {
+    cursor: inherit;
+  }
+  button, [role="button"], [role="tab"], [role="menuitem"], [role="option"], summary, select, label {
+    cursor: default;
+  }
+  input:not([type="checkbox"]):not([type="range"]):not([type="color"]), textarea {
+    cursor: text;
+  }
+  input[type="range"], input[type="color"] {
+    cursor: pointer;
+  }
+  :disabled {
+    cursor: not-allowed;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 4px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+    background-clip: content-box;
+  }
+  *::-webkit-scrollbar-corner {
+    background: transparent;
   }
   body {
     @apply bg-background text-foreground select-none;
@@ -85,5 +174,338 @@
   }
   h1, h2, h3, h4, h5, h6, .font-serif, .font-mono {
     font-family: var(--font-mono);
+  }
+}
+
+
+/* ==========================================================================
+   Shared editor components. Use these instead of ad-hoc padding/height classes.
+   ========================================================================== */
+@layer components {
+  /* Panel header (dock tab strip height, collapsible headers, panel title bars) */
+  .ed-panel-head {
+    @apply flex shrink-0 items-center gap-2 border-b border-sidebar-border bg-sidebar px-3 select-none;
+    height: var(--panel-header-h);
+    font-size: var(--text-label);
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: hsl(var(--sidebar-foreground) / 0.75);
+  }
+
+  /* Panel body padding: every panel content area uses the same inset */
+  .ed-panel-body {
+    @apply flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto bg-sidebar p-2;
+    font-size: var(--text-body);
+  }
+
+  /* Tree / list row: 28px, 8px padding, 14px icons, selected + hover states */
+  .ed-row {
+    @apply relative flex w-full min-w-0 items-center gap-2 rounded-md border border-transparent px-2 text-sidebar-foreground select-none;
+    height: var(--row-h);
+    font-size: var(--text-body);
+  }
+  .ed-row:hover {
+    @apply bg-sidebar-accent;
+  }
+  .ed-row[data-selected='true'] {
+    background: hsl(var(--primary) / 0.22);
+    border-color: hsl(var(--primary) / 0.45);
+    color: hsl(var(--foreground));
+  }
+  .ed-row[data-dim='true'] {
+    opacity: 0.5;
+  }
+  .ed-row[data-drop='true'] {
+    background: hsl(var(--primary) / 0.15);
+    border-color: hsl(var(--primary) / 0.6);
+  }
+  .ed-row > svg,
+  .ed-icon {
+    width: var(--icon-size);
+    height: var(--icon-size);
+    flex: none;
+  }
+  .ed-row-label {
+    @apply min-w-0 flex-1 truncate;
+  }
+  .ed-row-actions {
+    @apply flex shrink-0 items-center gap-1;
+  }
+  .ed-indent {
+    margin-left: 16px;
+  }
+
+  /* Icon button: 24x24 hit target inside 28px rows */
+  .ed-iconbtn {
+    @apply inline-flex shrink-0 items-center justify-center rounded-sm text-muted-foreground;
+    width: var(--control-h-compact);
+    height: var(--control-h-compact);
+  }
+  .ed-iconbtn > svg {
+    width: var(--icon-size);
+    height: var(--icon-size);
+  }
+  .ed-iconbtn:hover:not(:disabled) {
+    @apply bg-muted text-foreground;
+  }
+  .ed-iconbtn[data-active='true'] {
+    background: hsl(var(--primary) / 0.22);
+    color: hsl(var(--primary));
+  }
+  .ed-iconbtn[data-tone='danger']:hover:not(:disabled) {
+    background: hsl(var(--solid) / 0.18);
+    color: hsl(var(--solid));
+  }
+  .ed-iconbtn:disabled {
+    opacity: 0.4;
+  }
+
+  /* Text button */
+  .ed-btn {
+    @apply inline-flex shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-md border border-input bg-background/40 px-3 text-foreground;
+    height: var(--control-h);
+    font-size: var(--text-body);
+  }
+  .ed-btn > svg {
+    width: var(--icon-size);
+    height: var(--icon-size);
+  }
+  .ed-btn:hover:not(:disabled) {
+    @apply bg-muted;
+  }
+  .ed-btn:disabled {
+    opacity: 0.45;
+  }
+  .ed-btn[data-size='sm'] {
+    height: var(--control-h-compact);
+    @apply px-2;
+    font-size: var(--text-label);
+  }
+  .ed-btn[data-variant='primary'] {
+    @apply border-transparent bg-primary text-primary-foreground;
+  }
+  .ed-btn[data-variant='primary']:hover:not(:disabled) {
+    @apply bg-primary/90;
+  }
+  .ed-btn[data-variant='danger'] {
+    color: hsl(var(--solid));
+    border-color: hsl(var(--solid) / 0.4);
+  }
+  .ed-btn[data-variant='danger']:hover:not(:disabled) {
+    background: hsl(var(--solid) / 0.14);
+  }
+  .ed-btn[data-variant='dashed'] {
+    @apply border-dashed text-muted-foreground;
+  }
+
+  /* Form field: label column + control, always aligned */
+  .ed-field {
+    @apply grid items-center gap-x-2;
+    grid-template-columns: var(--label-w) minmax(0, 1fr);
+    min-height: var(--control-h);
+  }
+  .ed-field[data-stack='true'] {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: var(--space-1);
+  }
+  .ed-label {
+    @apply truncate text-muted-foreground select-none;
+    font-size: var(--text-label);
+  }
+  .ed-input {
+    @apply w-full min-w-0 rounded-md border border-input bg-background/50 px-2 text-foreground outline-none;
+    height: var(--control-h);
+    font-size: var(--text-body);
+  }
+  .ed-input:focus {
+    border-color: hsl(var(--primary) / 0.75);
+    box-shadow: 0 0 0 1px hsl(var(--primary) / 0.35);
+  }
+  .ed-input[data-invalid='true'] {
+    border-color: hsl(var(--solid) / 0.7);
+  }
+  .ed-input[data-align='right'] {
+    text-align: right;
+  }
+  .ed-input-wrap {
+    @apply relative flex min-w-0 items-center;
+  }
+  .ed-input-unit {
+    @apply pointer-events-none absolute right-2 text-muted-foreground;
+    font-size: 10px;
+  }
+  .ed-input-wrap > .ed-input[data-unit='true'] {
+    padding-right: 32px;
+  }
+
+  /* Segmented control */
+  .ed-seg {
+    @apply inline-flex items-center rounded-md border border-border bg-muted/40;
+    padding: 2px;
+    gap: 2px;
+  }
+  .ed-seg > button {
+    @apply inline-flex flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-sm px-2 text-muted-foreground;
+    height: calc(var(--control-h-compact));
+    font-size: var(--text-label);
+  }
+  .ed-seg > button > svg {
+    width: var(--icon-size);
+    height: var(--icon-size);
+  }
+  .ed-seg > button:hover:not([data-active='true']) {
+    @apply bg-muted text-foreground;
+  }
+  .ed-seg > button[data-active='true'] {
+    @apply bg-primary text-primary-foreground;
+  }
+  .ed-seg > button[data-tone='solid'][data-active='true'] {
+    background: hsl(var(--solid));
+    color: hsl(0 0% 100%);
+  }
+  .ed-seg > button[data-tone='trigger'][data-active='true'] {
+    background: hsl(var(--trigger));
+    color: hsl(0 0% 6%);
+  }
+
+  /* Card with coloured accent header (inspector components, dialogs sections) */
+  .ed-card {
+    @apply overflow-hidden rounded-lg border border-border/70 bg-card/60;
+  }
+  .ed-card-head {
+    @apply flex items-center gap-2 bg-sidebar-accent/50 pr-1 select-none;
+    height: var(--panel-header-h);
+    padding-left: 6px;
+    border-left: 2px solid hsl(var(--card-accent, var(--accent-slate)));
+    font-size: var(--text-body);
+    font-weight: 500;
+  }
+  .ed-card-head:hover {
+    @apply bg-sidebar-accent/80;
+  }
+  .ed-card-body {
+    @apply flex flex-col border-t border-border/40 bg-background/30;
+    padding: var(--space-3);
+    gap: var(--space-2);
+  }
+
+  .ed-badge {
+    @apply inline-flex shrink-0 items-center rounded-sm bg-muted/60 text-muted-foreground;
+    height: 16px;
+    padding: 0 4px;
+    gap: 2px;
+    font-size: 10px;
+    line-height: 1;
+  }
+  .ed-badge > svg {
+    width: 10px;
+    height: 10px;
+  }
+  .ed-badge[data-tone='solid'] {
+    background: hsl(var(--solid) / 0.18);
+    color: hsl(var(--solid));
+  }
+  .ed-badge[data-tone='trigger'] {
+    background: hsl(var(--trigger) / 0.18);
+    color: hsl(var(--trigger));
+  }
+  .ed-badge[data-tone='event'] {
+    background: hsl(var(--accent-blue) / 0.18);
+    color: hsl(var(--accent-blue));
+  }
+  .ed-badge[data-tone='move'] {
+    background: hsl(var(--accent-emerald) / 0.18);
+    color: hsl(var(--accent-emerald));
+  }
+  .ed-badge[data-tone='warn'] {
+    background: hsl(var(--warning) / 0.18);
+    color: hsl(var(--warning));
+  }
+
+  .ed-section-title {
+    @apply text-muted-foreground select-none;
+    font-size: var(--text-label);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .ed-hint {
+    @apply text-muted-foreground;
+    font-size: var(--text-label);
+    line-height: 16px;
+  }
+
+  .ed-empty {
+    @apply flex h-full flex-col items-center justify-center gap-1 p-4 text-center text-muted-foreground select-none;
+    font-size: var(--text-body);
+  }
+
+  .ed-checker {
+    background-color: hsl(0 0% 12%);
+    background-image:
+      linear-gradient(45deg, hsl(0 0% 16%) 25%, transparent 25%),
+      linear-gradient(-45deg, hsl(0 0% 16%) 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, hsl(0 0% 16%) 75%),
+      linear-gradient(-45deg, transparent 75%, hsl(0 0% 16%) 75%);
+    background-size: 12px 12px;
+    background-position: 0 0, 0 6px, 6px -6px, -6px 0;
+  }
+
+  .ed-pixelated {
+    image-rendering: pixelated;
+  }
+
+  /* Tree indentation guide */
+  .ed-tree-children {
+    @apply relative flex flex-col gap-0.5 border-l border-border/40;
+    margin-left: 14px;
+    padding-left: 6px;
+  }
+}
+
+@layer components {
+  /* Compact switch (28 x 16) used by inspector toggles */
+  .ed-switch {
+    @apply relative inline-flex shrink-0 items-center rounded-full bg-input transition-colors;
+    width: 28px;
+    height: 16px;
+  }
+  .ed-switch::after {
+    content: '';
+    @apply absolute rounded-full bg-background shadow transition-transform;
+    left: 2px;
+    top: 2px;
+    width: 12px;
+    height: 12px;
+  }
+  .ed-switch[aria-checked='true'] {
+    @apply bg-primary;
+  }
+  .ed-switch[aria-checked='true']::after {
+    transform: translateX(12px);
+  }
+  .ed-switch:disabled {
+    opacity: 0.5;
+  }
+  .ed-switch:focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-1 ring-offset-background;
+  }
+
+  /* Range slider */
+  .ed-range {
+    @apply w-full appearance-none rounded-full bg-input;
+    height: 4px;
+  }
+  .ed-range::-webkit-slider-thumb {
+    @apply appearance-none rounded-full bg-foreground;
+    width: 12px;
+    height: 12px;
+  }
+  .ed-range::-moz-range-thumb {
+    @apply rounded-full border-0 bg-foreground;
+    width: 12px;
+    height: 12px;
   }
 }

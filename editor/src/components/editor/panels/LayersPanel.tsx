@@ -29,17 +29,17 @@ import {
 function getLayerIcon(type: LayerType) {
   switch (type) {
     case 'tile':
-      return <LayersIcon className="w-4 h-4 text-gray-400" />
+      return <LayersIcon className="text-gray-400" />
     case 'collision':
-      return <XSquare className="w-4 h-4 text-red-400" />
+      return <XSquare className="text-red-400" />
     case 'terrain':
-      return <Droplet className="w-4 h-4 text-blue-400" />
+      return <Droplet className="text-blue-400" />
     case 'objects':
-      return <Box className="w-4 h-4 text-amber-400" />
+      return <Box className="text-amber-400" />
     case 'encounters':
-      return <Leaf className="w-4 h-4 text-green-400" />
+      return <Leaf className="text-green-400" />
     default:
-      return <LayersIcon className="w-4 h-4 text-gray-400" />
+      return <LayersIcon className="text-gray-400" />
   }
 }
 
@@ -208,9 +208,7 @@ export function LayersPanel({
 
   if (!hasActiveMap) {
     return (
-      <div className="h-full flex items-center justify-center text-muted-foreground p-8 text-center select-none">
-        <p className="text-xs">Select a map to view layers</p>
-      </div>
+      <div className="ed-empty">Select a map to view layers</div>
     )
   }
 
@@ -218,12 +216,9 @@ export function LayersPanel({
     return (
       <ContextMenu>
         <ContextMenuTrigger className="block h-full w-full">
-          <div className="h-full flex flex-col items-center justify-center text-muted-foreground p-8 text-center select-none">
-            <p className="text-xs">
-              No layers yet.
-              <br />
-              <span className="text-[11px] opacity-70">Right-click here to create a layer.</span>
-            </p>
+          <div className="ed-empty">
+            <p>No layers yet.</p>
+            <p className="ed-hint">Right-click here to create a layer.</p>
           </div>
         </ContextMenuTrigger>
 
@@ -242,7 +237,7 @@ export function LayersPanel({
   return (
     <ContextMenu>
       <ContextMenuTrigger className="block min-h-full h-full w-full">
-        <div className="min-h-full h-full w-full space-y-1">
+        <div className="flex min-h-full h-full w-full flex-col gap-0.5">
           {layers.map((layer) => {
             const isEditing = editingLayerId === layer.id
             const isSelected = activeLayerId === layer.id
@@ -264,24 +259,19 @@ export function LayersPanel({
                     onDoubleClick={() => {
                       if (!layer.locked) startEditing(layer)
                     }}
-                    className={`relative flex items-center py-1.5 px-2.5 rounded-md cursor-pointer text-sm select-none border ${
-                      isSelected
-                        ? 'bg-primary/30 text-primary-foreground font-medium border-primary/40'
-                        : 'border-transparent hover:bg-sidebar-accent text-sidebar-foreground'
-                    }`}
+                    className="ed-row"
+                    data-selected={isSelected ? 'true' : undefined}
                   >
                     {/* Horizontal drag indicator line */}
                     {isDropTarget && (
                       <div
-                        className={`absolute left-0 right-0 h-[2px] bg-primary shadow-[0_0_8px_rgba(59,130,246,1)] z-30 pointer-events-none rounded-full ${
+                        className={`absolute left-0 right-0 h-[2px] bg-primary z-30 pointer-events-none rounded-full ${
                           dragOverTarget.position === 'top' ? '-top-[2px]' : '-bottom-[2px]'
                         }`}
                       />
                     )}
 
-                    <div className="mr-2 shrink-0 opacity-80 cursor-grab active:cursor-grabbing">
-                      {getLayerIcon(layer.type)}
-                    </div>
+                    {getLayerIcon(layer.type)}
 
                     {isEditing ? (
                       <input
@@ -295,20 +285,20 @@ export function LayersPanel({
                           if (e.key === 'Escape') setEditingLayerId(null)
                         }}
                         onClick={(e) => e.stopPropagation()}
-                        className="flex-1 bg-black/40 border border-primary/60 rounded px-1 py-0.5 text-xs text-foreground outline-none font-mono"
+                        className="ed-input h-row-sm min-w-0 flex-1 border-primary/60"
                       />
                     ) : (
-                      <span className="flex-1 truncate">{layer.name}</span>
+                      <span className="ed-row-label" title={layer.name}>{layer.name}</span>
                     )}
 
                     {/* Compact status & inline visibility toggle */}
                     <div
-                      className="flex items-center gap-1 ml-2 shrink-0"
+                      className="ed-row-actions"
                       onDoubleClick={(e) => e.stopPropagation()}
                     >
                       {layer.locked && (
-                        <div title="Layer locked" className="p-0.5 opacity-70">
-                          <Lock className="w-3.5 h-3.5 text-amber-400" />
+                        <div title="Layer locked" className="flex h-6 w-6 items-center justify-center">
+                          <Lock className="text-amber-400" />
                         </div>
                       )}
                       <button
@@ -320,14 +310,10 @@ export function LayersPanel({
                         onDoubleClick={(e) => {
                           e.stopPropagation()
                         }}
-                        className="p-1 rounded hover:bg-black/20 text-sidebar-foreground opacity-60 hover:opacity-100 transition-none"
+                        className="ed-iconbtn"
                         title={layer.visible ? 'Hide Layer' : 'Show Layer'}
                       >
-                        {layer.visible ? (
-                          <Eye className="w-3.5 h-3.5" />
-                        ) : (
-                          <EyeOff className="w-3.5 h-3.5 text-muted-foreground" />
-                        )}
+                        {layer.visible ? <Eye /> : <EyeOff />}
                       </button>
                     </div>
                   </div>

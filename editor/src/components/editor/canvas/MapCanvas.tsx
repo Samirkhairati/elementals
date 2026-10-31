@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react'
+import React, { useCallback } from 'react'
 import { Stage, Layer as KonvaLayer, Rect } from 'react-konva'
 import {
   Layer,
@@ -23,6 +23,15 @@ import { KonvaGhostEntity } from './konva/KonvaGhostEntity'
 import { CanvasContextMenu } from './CanvasContextMenu'
 import { DebugStatusBadge } from './DebugStatusBadge'
 import { PendingEntityPlacement } from '@/hooks/editor/useEntityPlacement'
+import { useCanvasView } from '@/hooks/editor/canvas/canvasView'
+import { useEditorSelector, type EditorContextValue } from '@/components/editor/layout/EditorContext'
+import type { ColliderPatch } from '@/lib/entityVisuals'
+import { openEventEditor } from '@/lib/openEventEditor'
+
+const selectCanvasContext = (c: EditorContextValue) => ({
+  spriteAssets: c.spriteAssets,
+  setActiveTool: c.setActiveTool,
+})
 
 interface MapCanvasProps {
   activeMap: MapData | null
@@ -102,8 +111,9 @@ export function MapCanvas({
 }: MapCanvasProps) {
   // Preload and cache tileset image textures
   const images = useTilesetImages(tilesets)
-
-  const [resizingColliderEntityId, setResizingColliderEntityId] = useState<string | null>(null)
+  const { spriteAssets, setActiveTool } = useEditorSelector(selectCanvasContext)
+  const view = useCanvasView()
+  const colliderToolActive = activeTool === 'collider'
 
   // Viewport, zoom, pan, and stage coordinate translation
   const {
@@ -161,22 +171,17 @@ export function MapCanvas({
     cancelPlacement,
     snapToGrid,
     snapEntityPos,
-    resizingColliderEntityId,
-    setResizingColliderEntityId,
     selectedEntityId,
     setSelectedEntityId,
   })
 
   const handleUpdateCollider = useCallback(
-    (entityId: string, width: number, height: number, offsetX: number, offsetY: number) => {
+    (entityId: string, patch: ColliderPatch & { isSolid?: boolean }) => {
       if (updateComponentProps) {
-        updateComponentProps(entityId, 'Collider', { width, height, offsetX, offsetY })
+        updateComponentProps(entityId, 'Collider', patch)
         return
       }
-      updateComponentProp?.(entityId, 'Collider', 'width', width)
-      updateComponentProp?.(entityId, 'Collider', 'height', height)
-      updateComponentProp?.(entityId, 'Collider', 'offsetX', offsetX)
-      updateComponentProp?.(entityId, 'Collider', 'offsetY', offsetY)
+      for (const [key, value] of Object.entries(patch)) updateComponentProp?.(entityId, 'Collider', key, value)
     },
     [updateComponentProp, updateComponentProps]
   )
@@ -190,7 +195,13 @@ export function MapCanvas({
         ref={containerRef}
         onContextMenu={(e) => e.preventDefault()}
         className={`flex-1 overflow-hidden relative min-w-0 min-h-0 bg-[#1a1a1a] ${
-          isPanning ? 'cursor-grabbing' : isSpaceDown ? 'cursor-grab' : pendingPlacement ? 'cursor-crosshair' : ''
+          isPanning
+            ? 'cursor-grabbing'
+            : isSpaceDown
+              ? 'cursor-grab'
+              : pendingPlacement || colliderToolActive
+                ? 'cursor-crosshair'
+                : ''
         }`}
       >
         {activeMap ? (
@@ -236,22 +247,23 @@ export function MapCanvas({
                 showGrid={showGrid}
               />
 
-              {/* Draggable interactive entities */}
+              {/* Entities: sprites, footprints, badges, labels, selection and collider editing */}
               <KonvaEntities
                 entities={entities}
                 selectedEntityId={selectedEntityId}
                 setSelectedEntityId={setSelectedEntityId || (() => {})}
                 moveEntity={moveEntity || (() => {})}
                 activeMap={activeMap}
-                images={images}
                 snapToGrid={snapToGrid}
                 snapEntityPos={snapEntityPos}
-                resizingColliderEntityId={resizingColliderEntityId}
-                setResizingColliderEntityId={setResizingColliderEntityId}
                 onUpdateCollider={handleUpdateCollider}
                 onRightClickEntity={handleRightClickEntity}
                 showEntities={showEntities}
                 entityFolders={entityFolders}
+                spriteAssets={spriteAssets}
+                view={view}
+                colliderToolActive={colliderToolActive}
+                onOpenEvent={openEventEditor}
               />
 
               {/* Ghost entity preview during placement mode */}
@@ -260,12 +272,21 @@ export function MapCanvas({
                 pointerPos={stagePointerPos}
                 snapToGrid={snapToGrid}
                 snapEntityPos={snapEntityPos}
+                spriteAssets={spriteAssets}
               />
             </KonvaLayer>
           </Stage>
         ) : (
           <div className="h-full w-full flex items-center justify-center text-muted-foreground font-mono text-xs tracking-wider opacity-50">
             Select or create a map to start editing
+          </div>
+        )}
+
+        {colliderToolActive && activeMap && (
+          <div className="pointer-events-none absolute left-1/2 top-3 z-40 max-w-[92%] -translate-x-1/2 truncate whitespace-nowrap rounded-md border border-border bg-black/80 px-3 py-1 text-ed-label text-white shadow-lg" data-testid="collider-tool-hint">
+            {selectedEntityId
+              ? 'Collider tool: drag to draw · drag the box to move it · Shift free · Alt from centre · Esc cancels'
+              : 'Collider tool: click an entity to select it, then drag to draw its collider'}
           </div>
         )}
 
@@ -288,19 +309,9 @@ export function MapCanvas({
         onDeleteEntity={deleteEntity}
         onStartResizeCollider={(id) => {
           const entity = entities.find((e) => e.id === id)
-          if (entity && !entity.components.Collider) {
-            if (addComponent) {
-              addComponent(id, 'Collider')
-            } else {
-              updateComponentProp?.(id, 'Collider', 'width', 32)
-              updateComponentProp?.(id, 'Collider', 'height', 32)
-              updateComponentProp?.(id, 'Collider', 'offsetX', 0)
-              updateComponentProp?.(id, 'Collider', 'offsetY', 0)
-              updateComponentProp?.(id, 'Collider', 'isSolid', true)
-            }
-          }
+          if (entity && !entity.components.Collider) addComponent?.(id, 'Collider')
           setSelectedEntityId?.(id)
-          setResizingColliderEntityId(id)
+          setActiveTool('collider')
         }}
         onSampleTile={sampleSingleTile}
       />

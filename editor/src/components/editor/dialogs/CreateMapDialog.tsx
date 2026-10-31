@@ -21,25 +21,25 @@ export function CreateMapDialog({ open, name, width, height, setName, setWidth, 
           <DialogHeader>
             <DialogTitle>New Map</DialogTitle>
           </DialogHeader>
-          <div className="py-4 space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Map Name</label>
+          <div className="flex flex-col gap-3 py-3">
+            <div className="flex flex-col gap-1">
+              <label className="ed-label">Map Name</label>
               <Input value={name} onChange={e => setName(e.target.value)} autoFocus />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Width (Tiles)</label>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="ed-label">Width (Tiles)</label>
                 <Input type="number" min={1} max={500} value={width} onChange={e => setWidth(parseInt(e.target.value) || 1)} />
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Height (Tiles)</label>
+              <div className="flex flex-col gap-1">
+                <label className="ed-label">Height (Tiles)</label>
                 <Input type="number" min={1} max={500} value={height} onChange={e => setHeight(parseInt(e.target.value) || 1)} />
               </div>
             </div>
           </div>
-          <DialogFooter>
-            <button type="button" onClick={onClose} className="px-4 py-2 rounded-md hover:bg-muted text-sm font-medium">Cancel</button>
-            <button type="submit" className="px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium">Create</button>
+          <DialogFooter className="gap-2 sm:space-x-0">
+            <button type="button" onClick={onClose} className="ed-btn">Cancel</button>
+            <button type="submit" className="ed-btn" data-variant="primary">Create</button>
           </DialogFooter>
         </form>
       </DialogContent>

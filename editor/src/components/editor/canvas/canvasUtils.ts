@@ -1,3 +1,4 @@
+import type Konva from 'konva'
 import { Pos } from '@/types/editor'
 
 export interface BoundingBox {
@@ -26,4 +27,10 @@ export function getBoundingBox(start: Pos | null, current: Pos | null): Bounding
     width: maxX - minX + 1,
     height: maxY - minY + 1,
   }
+}
+
+/** Sets the pointer cursor of the stage's container ('' = back to the CSS cursor of the canvas wrapper). */
+export function setStageCursor(stage: Konva.Stage | null | undefined, cursor: string) {
+  const el = stage?.container()
+  if (el) el.style.cursor = cursor
 }

@@ -54,6 +54,9 @@ export function useKeyboardShortcuts({
           case 'g':
             setActiveTool('bucket')
             break
+          case 'c':
+            setActiveTool('collider')
+            break
         }
       }
     }
