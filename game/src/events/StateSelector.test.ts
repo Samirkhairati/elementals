@@ -24,6 +24,24 @@ describe('conditions', () => {
     inv = new Inventory();
   });
 
+  it('stage compares by the order of the stage values', () => {
+    const at = (op: ComparisonOp, value: string): Condition => ({ kind: 'stage', id: 'cat', op, value });
+    expect(evaluateCondition(at('==', 'none'), ctxOf(flags, inv))).toBe(true);
+    expect(evaluateCondition(at('>=', 'accepted'), ctxOf(flags, inv))).toBe(false);
+    flags.setStage('cat', 'found');
+    expect(evaluateCondition(at('==', 'found'), ctxOf(flags, inv))).toBe(true);
+    expect(evaluateCondition(at('>=', 'accepted'), ctxOf(flags, inv))).toBe(true);
+    expect(evaluateCondition(at('>', 'found'), ctxOf(flags, inv))).toBe(false);
+    expect(evaluateCondition(at('<', 'done'), ctxOf(flags, inv))).toBe(true);
+    expect(evaluateCondition(at('!=', 'found'), ctxOf(flags, inv))).toBe(false);
+  });
+
+  it('a stage condition on an unknown stage or value never holds', () => {
+    expect(evaluateCondition({ kind: 'stage', id: 'ghost', op: '==', value: 'x' }, ctxOf(flags, inv))).toBe(false);
+    expect(evaluateCondition({ kind: 'stage', id: 'cat', op: '!=', value: 'nope' }, ctxOf(flags, inv))).toBe(false);
+    expect(evaluateCondition({ kind: 'stage', id: 'ghost', op: '!=', value: 'x' }, ctxOf(flags, inv))).toBe(false);
+  });
+
   it('switch', () => {
     const c: Condition = { kind: 'switch', id: 's1', value: true };
     expect(evaluateCondition(c, ctxOf(flags, inv))).toBe(false);

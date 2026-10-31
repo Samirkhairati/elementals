@@ -60,7 +60,7 @@ describe('channels end to end (real temp project)', () => {
     expect(await call('get-maps')).toMatchObject({ success: true, maps: [], folders: [] });
     expect(await call('get-tilesets')).toMatchObject({ success: true, tilesets: [] });
     expect(await call('get-sprites')).toMatchObject({ success: true, assets: [] });
-    expect(await call('get-database')).toMatchObject({ success: true, database: { version: 1, switches: [], variables: [] } });
+    expect(await call('get-database')).toMatchObject({ success: true, database: { version: 2, switches: [], variables: [], stages: [] } });
   });
 
   it('creates, saves and lists maps', async () => {
@@ -92,7 +92,7 @@ describe('channels end to end (real temp project)', () => {
   });
 
   it('saves and reads the database', async () => {
-    const db = { version: 1, switches: [{ id: 's', name: 'S' }], variables: [] };
+    const db = { version: 2, switches: [{ id: 's', name: 'S' }], variables: [], stages: [] };
     expect(await call('save-database', db)).toMatchObject({ success: true });
     expect(await call('get-database')).toMatchObject({ success: true, database: db });
   });

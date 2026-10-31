@@ -36,6 +36,18 @@ export function makeEnv(overrides: Partial<EventEnv> = {}): EventEnv {
       { id: 'door', name: 'Door open' },
     ],
     variables: [{ id: 'badges', name: 'Badges earned', initial: 0 }],
+    stages: [
+      {
+        id: 'cat',
+        name: 'Lost cat',
+        values: [
+          { id: 'none', name: 'Not started' },
+          { id: 'found', name: 'Found' },
+          { id: 'done', name: 'Done' },
+        ],
+        initial: 'none',
+      },
+    ],
     maps: [
       { id: 'town', name: 'Town' },
       { id: 'cave', name: 'Cave' },
@@ -50,6 +62,7 @@ export function makeEnv(overrides: Partial<EventEnv> = {}): EventEnv {
     ],
     addSwitch: vi.fn((name: string) => `sw_${name.toLowerCase().replace(/\W+/g, '_')}`),
     addVariable: vi.fn((name: string) => `var_${name.toLowerCase().replace(/\W+/g, '_')}`),
+    addStage: vi.fn((name: string) => `stage_${name.toLowerCase().replace(/\W+/g, '_')}`),
     getSpriteAsset: (id: string) => (id === 'objects/chest' ? chest : undefined),
     ...overrides,
   }

@@ -2,13 +2,14 @@
 // control here (no raw-JSON fallbacks).
 
 import React, { useState } from 'react'
-import { Plus, X } from 'lucide-react'
+import { Plus, Trash2, X } from 'lucide-react'
 import type { ChoiceOption, Command, CommandTarget, Condition, FieldDef, RouteStep } from '../../../../../shared/engine/types'
 import { getCommandDef, isFieldVisible } from '../../../../../shared/engine/commands'
 import { ConditionsEditor } from './ConditionsEditor'
 import { ChoicesEditor, RouteEditor } from './RouteChoicesEditors'
-import { FacingPicker, MapPicker, SpritePicker, SwitchPicker, TargetPicker, VariablePicker } from './pickers'
-import { CheckRow, DraftNumber, DraftText, DraftTextarea, FieldRow, inputClass, selectClass } from './primitives'
+import { FacingPicker, MapPicker, SpritePicker, StagePicker, StageValuePicker, SwitchPicker, TargetPicker, VariablePicker } from './pickers'
+import { CheckRow, DraftNumber, DraftText, DraftTextarea, FieldRow, IconButton, SmallButton, inputClass, selectClass } from './primitives'
+import { useEventEnv } from './eventEnv'
 import { branchCommandCount } from './eventModel'
 
 export type ParamPatch = (patch: Record<string, unknown>, pruneBranches?: string[]) => void
@@ -73,10 +74,46 @@ interface FieldControlProps {
   id: string
 }
 
+/** The values of a stage a `branchStage` command has a path for (`cases`): add one, add all, remove. */
+function StageCasesEditor({ stageId, cases, onChange }: { stageId: string; cases: string[]; onChange: (next: string[]) => void }) {
+  const env = useEventEnv()
+  const stage = env.stages.find((st) => st.id === stageId)
+  const nameOf = (valueId: string) => stage?.values.find((v) => v.id === valueId)?.name ?? `Missing: ${valueId}`
+  const missing = stage ? stage.values.filter((v) => !cases.includes(v.id)) : []
+  return (
+    <div className="space-y-1" data-testid="stage-cases">
+      {cases.length === 0 && <p className="text-[11px] text-muted-foreground">{stage ? 'No values yet: everything takes Default.' : 'Choose a stage first.'}</p>}
+      <ul className="space-y-1">
+        {cases.map((c) => (
+          <li key={c} className="flex items-center justify-between gap-1 rounded border border-border/60 bg-background/40 px-1.5 py-0.5 text-xs">
+            <span className={stage?.values.some((v) => v.id === c) ? '' : 'text-amber-400'}>{nameOf(c)}</span>
+            <IconButton title={`Remove ${nameOf(c)}`} danger onClick={() => onChange(cases.filter((x) => x !== c))}>
+              <Trash2 className="h-3 w-3" />
+            </IconButton>
+          </li>
+        ))}
+      </ul>
+      <div className="flex items-center gap-1">
+        <div className="min-w-0 flex-1">
+          <StageValuePicker stageId={stageId} value="" onChange={(v) => v && !cases.includes(v) && onChange([...cases, v])} />
+        </div>
+        <SmallButton disabled={missing.length === 0} onClick={() => onChange([...cases, ...missing.map((v) => v.id)])}>
+          Add all
+        </SmallButton>
+      </div>
+    </div>
+  )
+}
+
 function FieldControl({ field, command, params, onPatch, id }: FieldControlProps) {
   const def = getCommandDef(command.type)
   const raw = params[field.key] ?? def?.defaultParams[field.key]
   const set = (value: unknown) => onPatch({ [field.key]: value })
+
+  if (field.kind === 'stageValue' && field.multiple) {
+    const list = Array.isArray(raw) ? raw.filter((x): x is string => typeof x === 'string') : []
+    return <StageCasesEditor stageId={asString(params[field.stageKey ?? 'id'])} cases={list} onChange={set} />
+  }
 
   if (field.multiple) {
     const list = Array.isArray(raw) ? raw.filter((x): x is string => typeof x === 'string') : []
@@ -127,6 +164,21 @@ function FieldControl({ field, command, params, onPatch, id }: FieldControlProps
       return <SwitchPicker id={id} value={asString(raw)} onChange={set} />
     case 'variable':
       return <VariablePicker id={id} value={asString(raw)} onChange={set} />
+    case 'stage':
+      return (
+        <StagePicker
+          id={id}
+          value={asString(raw)}
+          onChange={(next) => {
+            // Values that belonged to the previous stage mean nothing for the new one.
+            const patch: Record<string, unknown> = { [field.key]: next }
+            if (next !== asString(raw)) for (const f of def?.params ?? []) if (f.stageKey === field.key) patch[f.key] = f.multiple ? [] : ''
+            onPatch(patch)
+          }}
+        />
+      )
+    case 'stageValue':
+      return <StageValuePicker id={id} stageId={asString(params[field.stageKey ?? 'id'])} value={asString(raw)} onChange={set} />
     case 'target':
       return <TargetPicker id={id} value={raw as CommandTarget | undefined} onChange={set} />
     case 'position': {
@@ -179,7 +231,7 @@ export function ParamForm({ command, onPatch }: { command: Command; onPatch: Par
             </div>
           )
         }
-        const wide = ['textarea', 'route', 'choices', 'conditions', 'position', 'color', 'target', 'sprite', 'switch', 'variable', 'map'].includes(field.kind) || !!field.multiple
+        const wide = ['textarea', 'route', 'choices', 'conditions', 'position', 'color', 'target', 'sprite', 'switch', 'variable', 'stage', 'stageValue', 'map'].includes(field.kind) || !!field.multiple
         return (
           <FieldRow key={field.key} label={field.label} help={field.help} required={field.required} unit={field.unit} inline={!wide && field.kind !== 'text' && field.kind !== 'select' && field.kind !== 'sound' && field.kind !== 'item'}>
             {(id) => <FieldControl field={field} command={command} params={params} onPatch={onPatch} id={id} />}

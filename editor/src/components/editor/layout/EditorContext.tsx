@@ -182,7 +182,7 @@ export interface EditorBaseContextValue
   moveSpriteFolder: Sprites['moveFolder']
   deleteSpriteFolder: Sprites['deleteFolder']
 
-  // Game database (project/database.json): global switches and variables
+  // Game database (project/database.json): global switches, variables and stages
   database: Db['database']
   switches: Db['switches']
   variables: Db['variables']
@@ -195,6 +195,17 @@ export interface EditorBaseContextValue
   renameVariable: Db['renameVariable']
   setVariableInitial: Db['setVariableInitial']
   removeVariable: Db['removeVariable']
+  stages: Db['stages']
+  getStage: Db['getStage']
+  addStage: Db['addStage']
+  renameStage: Db['renameStage']
+  removeStage: Db['removeStage']
+  addStageValue: Db['addStageValue']
+  renameStageValue: Db['renameStageValue']
+  removeStageValue: Db['removeStageValue']
+  moveStageValue: Db['moveStageValue']
+  setStageInitial: Db['setStageInitial']
+  setDatabaseFolder: Db['setFolder']
   reloadDatabase: Db['reload']
 }
 

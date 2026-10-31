@@ -106,6 +106,37 @@ describe('defaults', () => {
   })
 })
 
+describe('normalizeProps: event conditions', () => {
+  const normalizedConditions = (conditions: unknown[]) =>
+    (normalizeProps('Event', { states: [{ id: 's', conditions }] }) as { states: { conditions: unknown[] }[] }).states[0].conditions
+
+  it('keeps the comparison of variable and stage conditions', () => {
+    expect(
+      normalizedConditions([
+        { kind: 'variable', id: 'badges', op: '>=', value: 3 },
+        { kind: 'stage', id: 'cat', op: '<', value: 'found' },
+      ]),
+    ).toEqual([
+      { kind: 'variable', id: 'badges', op: '>=', value: 3 },
+      { kind: 'stage', id: 'cat', op: '<', value: 'found' },
+    ])
+  })
+
+  it('falls back to == for an unknown comparison and fills stage defaults', () => {
+    expect(normalizedConditions([{ kind: 'variable', id: 'v', op: 'bogus', value: 1 }, { kind: 'stage' }])).toEqual([
+      { kind: 'variable', id: 'v', op: '==', value: 1 },
+      { kind: 'stage', id: '', op: '==', value: '' },
+    ])
+  })
+
+  it('local flag conditions keep any name and default an empty one to A', () => {
+    expect(normalizedConditions([{ kind: 'selfSwitch', key: 'opened', value: false }, { kind: 'selfSwitch', key: '  ' }])).toEqual([
+      { kind: 'selfSwitch', key: 'opened', value: false },
+      { kind: 'selfSwitch', key: 'A', value: true },
+    ])
+  })
+})
+
 describe('normalizeProps', () => {
   it('fills missing keys and drops unknown ones', () => {
     expect(normalizeProps('Collider', { width: 48, bogus: 1 })).toEqual({ width: 48, height: 32, offsetX: 0, offsetY: 0, isSolid: true })

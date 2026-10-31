@@ -8,7 +8,7 @@ import { COMPARISON_OPS, SELF_SWITCH_KEYS } from '../../../../../shared/engine/c
 import { validateConditions } from '../../../../../shared/engine/commands'
 import { cn } from '@/lib/utils'
 import { DraftNumber, DraftText, IconButton, Popover, SmallButton, selectClass } from './primitives'
-import { SwitchPicker, VariablePicker } from './pickers'
+import { StagePicker, StageValuePicker, SwitchPicker, VariablePicker } from './pickers'
 import { useEventEnv } from './eventEnv'
 import { buildValidationContext } from './eventModel'
 
@@ -17,6 +17,7 @@ export type ConditionKind = Condition['kind']
 export const CONDITION_KINDS: { kind: ConditionKind; label: string; description: string }[] = [
   { kind: 'switch', label: 'Switch', description: 'A global switch is ON or OFF' },
   { kind: 'variable', label: 'Variable', description: 'A global variable compared with a number' },
+  { kind: 'stage', label: 'Stage', description: 'Progress of a quest or story stage, compared with one of its values' },
   { kind: 'selfSwitch', label: 'Self switch', description: 'One of this event\'s own switches A-D' },
   { kind: 'hasItem', label: 'Has item', description: 'The player carries at least some of an item' },
 ]
@@ -27,6 +28,8 @@ export function defaultCondition(kind: ConditionKind): Condition {
       return { kind: 'switch', id: '', value: true }
     case 'variable':
       return { kind: 'variable', id: '', op: '==', value: 0 }
+    case 'stage':
+      return { kind: 'stage', id: '', op: '>=', value: '' }
     case 'selfSwitch':
       return { kind: 'selfSwitch', key: 'A', value: true }
     case 'hasItem':
@@ -107,6 +110,28 @@ function ConditionRow({ condition, index, onChange, onRemove, problem }: { condi
             <DraftNumber aria-label={`Condition ${n} number`} value={condition.value} onCommit={(value) => onChange({ ...condition, value })} className="w-20 shrink-0" />
           </>
         )}
+        {condition.kind === 'stage' && (
+          <>
+            <div className="w-full">
+              <StagePicker value={condition.id} onChange={(id) => onChange({ ...condition, id, value: id === condition.id ? condition.value : '' })} />
+            </div>
+            <select
+              aria-label={`Condition ${n} comparison`}
+              value={condition.op}
+              onChange={(e) => onChange({ ...condition, op: e.target.value as ComparisonOp })}
+              className={cn(selectClass, 'min-w-[7rem] flex-1')}
+            >
+              {COMPARISON_OPS.map((op) => (
+                <option key={op} value={op}>
+                  {OP_LABELS[op]}
+                </option>
+              ))}
+            </select>
+            <div className="min-w-[8rem] flex-1">
+              <StageValuePicker stageId={condition.id} value={condition.value} onChange={(value) => onChange({ ...condition, value })} />
+            </div>
+          </>
+        )}
         {condition.kind === 'selfSwitch' && (
           <>
             <select
@@ -115,7 +140,7 @@ function ConditionRow({ condition, index, onChange, onRemove, problem }: { condi
               onChange={(e) => onChange({ ...condition, key: e.target.value as SelfSwitchKey })}
               className={cn(selectClass, 'w-20 shrink-0')}
             >
-              {SELF_SWITCH_KEYS.map((k) => (
+              {(SELF_SWITCH_KEYS.includes(condition.key) ? SELF_SWITCH_KEYS : [...SELF_SWITCH_KEYS, condition.key]).map((k) => (
                 <option key={k} value={k}>
                   {k}
                 </option>

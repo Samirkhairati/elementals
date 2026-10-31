@@ -9,9 +9,10 @@ import { idFromName, useDatabase } from './useDatabase'
 const wrapper = ({ children }: { children: ReactNode }) => <StrictMode>{children}</StrictMode>
 
 const initial = (): GameDatabase => ({
-  version: 1,
+  version: 2,
   switches: [{ id: 'intro_done', name: 'Intro done' }],
   variables: [{ id: 'badges', name: 'Badges', initial: 0 }],
+  stages: [],
 })
 
 beforeEach(() => {
@@ -103,7 +104,102 @@ describe('useDatabase', () => {
       result.current.removeSwitch('intro_done')
       result.current.removeVariable('badges')
     })
-    expect(result.current.database).toEqual({ version: 1, switches: [], variables: [] })
+    expect(result.current.database).toEqual({ version: 2, switches: [], variables: [], stages: [] })
+  })
+
+  describe('stages', () => {
+    it('addStage creates a stage with two values and a unique id', async () => {
+      const { result } = await setup()
+      let first = ''
+      let second = ''
+      act(() => {
+        first = result.current.addStage('Lost cat')
+        second = result.current.addStage('Lost cat')
+      })
+      expect(first).toBe('lost_cat')
+      expect(second).toBe('lost_cat_2')
+      expect(result.current.getStage('lost_cat')).toEqual({
+        id: 'lost_cat',
+        name: 'Lost cat',
+        values: [
+          { id: 'not_started', name: 'Not started' },
+          { id: 'done', name: 'Done' },
+        ],
+        initial: 'not_started',
+      })
+    })
+
+    it('adds, renames, orders and removes values; a stage keeps at least one', async () => {
+      const { result } = await setup()
+      act(() => void result.current.addStage('Cat'))
+      let accepted = ''
+      act(() => {
+        accepted = result.current.addStageValue('cat', 'Accepted')
+      })
+      expect(accepted).toBe('accepted')
+      act(() => result.current.moveStageValue('cat', 'accepted', -1))
+      expect(result.current.getStage('cat')?.values.map((v) => v.id)).toEqual(['not_started', 'accepted', 'done'])
+      act(() => {
+        result.current.moveStageValue('cat', 'not_started', -1) // already first: ignored
+        result.current.moveStageValue('cat', 'done', 1) // already last: ignored
+        result.current.renameStageValue('cat', 'accepted', 'Taken on')
+      })
+      expect(result.current.getStage('cat')?.values.map((v) => v.name)).toEqual(['Not started', 'Taken on', 'Done'])
+      act(() => result.current.removeStageValue('cat', 'accepted'))
+      act(() => result.current.removeStageValue('cat', 'done'))
+      act(() => result.current.removeStageValue('cat', 'not_started')) // the last one stays
+      expect(result.current.getStage('cat')?.values.map((v) => v.id)).toEqual(['not_started'])
+    })
+
+    it('removing the starting value moves the start to the first value; setStageInitial validates', async () => {
+      const { result } = await setup()
+      act(() => void result.current.addStage('Cat'))
+      act(() => result.current.setStageInitial('cat', 'done'))
+      expect(result.current.getStage('cat')?.initial).toBe('done')
+      act(() => result.current.setStageInitial('cat', 'nope')) // ignored
+      expect(result.current.getStage('cat')?.initial).toBe('done')
+      act(() => result.current.removeStageValue('cat', 'done'))
+      expect(result.current.getStage('cat')?.initial).toBe('not_started')
+    })
+
+    it('renames and removes a stage', async () => {
+      const { result } = await setup()
+      act(() => void result.current.addStage('Cat'))
+      act(() => result.current.renameStage('cat', 'The cat'))
+      expect(result.current.getStage('cat')?.name).toBe('The cat')
+      act(() => result.current.removeStage('cat'))
+      expect(result.current.stages).toEqual([])
+    })
+
+    it('setFolder tidies the path and an empty folder removes it', async () => {
+      const { result } = await setup()
+      act(() => void result.current.addStage('Cat'))
+      act(() => {
+        result.current.setFolder('stage', 'cat', ' Quests / Cat ')
+        result.current.setFolder('switch', 'intro_done', 'Story')
+        result.current.setFolder('variable', 'badges', 'Gyms')
+      })
+      expect(result.current.getStage('cat')?.folder).toBe('Quests/Cat')
+      expect(result.current.getSwitch('intro_done')?.folder).toBe('Story')
+      expect(result.current.getVariable('badges')?.folder).toBe('Gyms')
+      act(() => result.current.setFolder('stage', 'cat', ''))
+      expect(result.current.getStage('cat')).not.toHaveProperty('folder')
+    })
+
+    it('does not save while a stage or value name is empty', async () => {
+      const { result, saveDatabase } = await setup()
+      act(() => void result.current.addStage('Cat'))
+      act(() => result.current.renameStageValue('cat', 'done', ''))
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(300)
+      })
+      expect(saveDatabase).not.toHaveBeenCalled()
+      act(() => result.current.renameStageValue('cat', 'done', 'Finished'))
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(300)
+      })
+      expect(saveDatabase).toHaveBeenCalledTimes(1)
+    })
   })
 
   it('debounces: many edits produce one save with the final state', async () => {

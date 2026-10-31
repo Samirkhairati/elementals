@@ -90,14 +90,21 @@ An **Event** component holds **states** (RPG Maker calls them pages). The active
 conditions all hold. A state has: conditions, a trigger, optional appearance override, and a **command tree**.
 
 * Triggers: `action`, `playerTouch`, `eventTouch`, `autorun`, `parallel`.
-* Conditions: `switch`, `variable`, `selfSwitch`, `hasItem`.
+* Conditions: `switch`, `variable`, `stage`, `selfSwitch`, `hasItem`. A `stage` condition compares the stage's current value with
+  another value of the same stage by the ORDER of the stage's values (`>=` "Found" holds from Found onwards).
 * Targets (`CommandTarget`): `'self'`, `'player'` or `{ entity: <editor id> }`.
 * Commands form a tree: `Command { id, type, params, branches? }`. Flow commands own nested lists
   (`conditional` → then/else, `choices` → one list per option, `loop` → body). This is exactly an event
   graph: each command is a node, `branches` are its outputs, list order is the "next" edge. A graph view can
   be added later with no data change; today's editor shows it as an indented command list.
-* Global state lives in `project/database.json` (switches + variables with names). **Self switches** A–D
-  are per event.
+* Global state lives in `project/database.json` (version 2): **switches** (on/off), **variables** (numbers) and
+  **stages** (progress through an ordered list of named values, e.g. Not started → Accepted → Found → Done; prefer a
+  stage over several switches that must be set in order). Entries have stable ids, editable names and an optional
+  `folder` path (`"Quests/Lost cat"`) that groups them in the Database panel and the pickers. Version 1 files load
+  as version 2 with no stages. **Local flags** (the old self switches) belong to one event; their name is any
+  non-empty text (`A`–`D` are the quick picks), stored per `mapId/entityId/name`.
+* The Database panel shows where every flag is used and whether it is read or changed there, and flags the two
+  usual mistakes: **never set** (something reads it, nothing changes it) and **never read**.
 
 ### Command catalog (type → params). `●` implemented in the game now, `○` planned (authorable; the game
 logs and skips it until the system exists)
@@ -108,12 +115,14 @@ logs and skips it until the system exists)
 
 **Flow**
 * ● `conditional` {conditions: Condition[]} — branches `then`, `else`.
+* ● `branchStage` {id, cases: valueId[]} — one branch per listed value of the stage, plus `default`.
 * ● `loop` — branch `body`; ● `breakLoop`; ● `exitEvent`.
 * ● `wait` {ms}; ● `comment` {text}.
 * ○ `callCommonEvent` {id}.
 
 **State**
 * ● `setSwitch` {id, value}; ● `setVariable` {id, op: set|add|sub|mul|div|mod, operand: const|variable|random};
+* ● `setStage` {id, mode: set|advance, value} — `advance` moves to the next value (the last value stays last).
 * ● `setSelfSwitch` {key, value}.
 
 **Character**

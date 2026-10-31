@@ -220,7 +220,7 @@ export function PickerField({ id, display, placeholder, invalid, title, width = 
 
 // ── inline creation ─────────────────────────────────────────────────────────────────────────────
 
-function NewEntry({ noun, query, onCreate }: { noun: 'switch' | 'variable'; query: string; onCreate: (name: string) => void }) {
+function NewEntry({ noun, query, onCreate }: { noun: 'switch' | 'variable' | 'stage'; query: string; onCreate: (name: string) => void }) {
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState('')
   if (!editing) {
@@ -255,7 +255,7 @@ function NewEntry({ noun, query, onCreate }: { noun: 'switch' | 'variable'; quer
             submit()
           }
         }}
-        placeholder={`${noun === 'switch' ? 'Switch' : 'Variable'} name`}
+        placeholder={`${noun[0].toUpperCase()}${noun.slice(1)} name`}
         aria-label={`New ${noun} name`}
         className={inputClass}
       />
@@ -282,7 +282,7 @@ interface IdPickerProps {
 
 export function SwitchPicker({ value, onChange, id, disabled }: IdPickerProps) {
   const env = useEventEnv()
-  const items = useMemo<PickerItem[]>(() => env.switches.map((s) => ({ id: s.id, label: s.name, sub: s.id })), [env.switches])
+  const items = useMemo<PickerItem[]>(() => env.switches.map((s) => ({ id: s.id, label: s.name, sub: s.folder ? `${s.folder} · ${s.id}` : s.id })), [env.switches])
   const found = env.switches.find((s) => s.id === value)
   return (
     <PickerField
@@ -316,7 +316,7 @@ export function SwitchPicker({ value, onChange, id, disabled }: IdPickerProps) {
 
 export function VariablePicker({ value, onChange, id, disabled }: IdPickerProps) {
   const env = useEventEnv()
-  const items = useMemo<PickerItem[]>(() => env.variables.map((v) => ({ id: v.id, label: v.name, sub: v.id })), [env.variables])
+  const items = useMemo<PickerItem[]>(() => env.variables.map((v) => ({ id: v.id, label: v.name, sub: v.folder ? `${v.folder} · ${v.id}` : v.id })), [env.variables])
   const found = env.variables.find((v) => v.id === value)
   return (
     <PickerField
@@ -344,6 +344,64 @@ export function VariablePicker({ value, onChange, id, disabled }: IdPickerProps)
           }}
         />
       )}
+    />
+  )
+}
+
+/** Picks a global stage (quest / story progress). */
+export function StagePicker({ value, onChange, id, disabled }: IdPickerProps) {
+  const env = useEventEnv()
+  const items = useMemo<PickerItem[]>(() => env.stages.map((st) => ({ id: st.id, label: st.name, sub: st.folder ? `${st.folder} · ${st.id}` : st.id })), [env.stages])
+  const found = env.stages.find((st) => st.id === value)
+  return (
+    <PickerField
+      id={id}
+      label="Choose a stage"
+      disabled={disabled}
+      items={items}
+      value={value}
+      onSelect={onChange}
+      placeholder="Choose stage…"
+      emptyText="No stages yet. Create one below."
+      display={value ? (found ? found.name : `Missing: ${value}`) : undefined}
+      invalid={!!value && !found}
+      title={value && !found ? `Stage "${value}" does not exist` : found ? found.id : undefined}
+      footer={({ query, close }) => (
+        <NewEntry
+          noun="stage"
+          query={query}
+          onCreate={(name) => {
+            const created = env.addStage(name)
+            if (created) {
+              onChange(created)
+              close()
+            }
+          }}
+        />
+      )}
+    />
+  )
+}
+
+/** Picks one value of a stage. With no stage chosen yet it says so instead of listing anything. */
+export function StageValuePicker({ stageId, value, onChange, id, disabled }: IdPickerProps & { stageId: string }) {
+  const env = useEventEnv()
+  const stage = env.stages.find((st) => st.id === stageId)
+  const items = useMemo<PickerItem[]>(() => (stage ? stage.values.map((v, i) => ({ id: v.id, label: v.name, sub: `#${i + 1}` })) : []), [stage])
+  const found = stage?.values.find((v) => v.id === value)
+  return (
+    <PickerField
+      id={id}
+      label="Choose a stage value"
+      disabled={disabled || !stage}
+      items={items}
+      value={value}
+      onSelect={onChange}
+      placeholder={stage ? 'Choose value…' : 'Choose a stage first'}
+      emptyText="This stage has no values."
+      display={value ? (found ? found.name : `Missing: ${value}`) : undefined}
+      invalid={!!value && !!stage && !found}
+      title={value && stage && !found ? `Stage "${stage.name}" has no value "${value}"` : found ? found.id : undefined}
     />
   )
 }

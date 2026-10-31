@@ -10,6 +10,7 @@ import type {
   IssueSeverity,
   SummaryContext,
   ValidationContext,
+  StageDef,
   VariableDef,
 } from '../../../../../shared/engine/types'
 import {
@@ -96,23 +97,33 @@ function compare(op: string, a: number, b: number): boolean {
   }
 }
 
-/** Would this condition hold in a brand-new game (all switches off, variables at their initial value, empty bag)? */
-export function conditionHoldsAtStart(c: Condition, variables: readonly VariableDef[]): boolean {
+/**
+ * Would this condition hold in a brand-new game (all switches off, variables and stages at their
+ * initial value, empty bag)?
+ */
+export function conditionHoldsAtStart(c: Condition, variables: readonly VariableDef[], stages: readonly StageDef[] = []): boolean {
   switch (c.kind) {
     case 'switch':
     case 'selfSwitch':
       return c.value === false
     case 'variable':
       return compare(c.op, variables.find((v) => v.id === c.id)?.initial ?? 0, c.value)
+    case 'stage': {
+      const stage = stages.find((s) => s.id === c.id)
+      if (!stage) return false
+      const current = stage.values.findIndex((v) => v.id === stage.initial)
+      const wanted = stage.values.findIndex((v) => v.id === c.value)
+      return wanted >= 0 && compare(c.op, current >= 0 ? current : 0, wanted)
+    }
     case 'hasItem':
       return false
   }
 }
 
 /** Index of the state that would run with nothing set (the last state whose conditions all hold), or -1. */
-export function defaultActiveStateIndex(states: readonly EventState[], variables: readonly VariableDef[]): number {
+export function defaultActiveStateIndex(states: readonly EventState[], variables: readonly VariableDef[], stages: readonly StageDef[] = []): number {
   for (let i = states.length - 1; i >= 0; i--) {
-    if (states[i].conditions.every((c) => conditionHoldsAtStart(c, variables))) return i
+    if (states[i].conditions.every((c) => conditionHoldsAtStart(c, variables, stages))) return i
   }
   return -1
 }
@@ -525,20 +536,26 @@ export function applyTemplate(
 
 // ── contexts ────────────────────────────────────────────────────────────────────────────────────
 
-export function buildSummaryContext(env: Pick<EventEnv, 'switches' | 'variables' | 'maps' | 'sprites' | 'entities'>): SummaryContext {
+export function buildSummaryContext(env: Pick<EventEnv, 'switches' | 'variables' | 'maps' | 'sprites' | 'entities'> & { stages?: EventEnv['stages'] }): SummaryContext {
+  const stages = env.stages ?? []
   return {
     switchName: (id) => env.switches.find((s) => s.id === id)?.name,
     variableName: (id) => env.variables.find((v) => v.id === id)?.name,
+    stageName: (id) => stages.find((s) => s.id === id)?.name,
+    stageValueName: (stageId, valueId) => stages.find((s) => s.id === stageId)?.values.find((v) => v.id === valueId)?.name,
     mapName: (id) => env.maps.find((m) => m.id === id)?.name,
     spriteName: (id) => env.sprites.find((s) => s.id === id)?.name,
     entityName: (id) => env.entities.find((e) => e.id === id)?.name,
   }
 }
 
-export function buildValidationContext(env: Pick<EventEnv, 'switches' | 'variables' | 'maps' | 'sprites' | 'entities'>): ValidationContext {
+export function buildValidationContext(env: Pick<EventEnv, 'switches' | 'variables' | 'maps' | 'sprites' | 'entities'> & { stages?: EventEnv['stages'] }): ValidationContext {
+  const stages = env.stages ?? []
   return {
     switchIds: env.switches.map((s) => s.id),
     variableIds: env.variables.map((v) => v.id),
+    stageIds: stages.map((s) => s.id),
+    stageValues: Object.fromEntries(stages.map((s) => [s.id, s.values.map((v) => v.id)])),
     mapIds: env.maps.map((m) => m.id),
     spriteIds: env.sprites.map((s) => s.id),
     entityIds: env.entities.map((e) => e.id),

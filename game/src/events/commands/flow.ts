@@ -16,6 +16,13 @@ registerCommandHandler("conditional", (cmd, rt) => {
   return { port: holds ? "then" : "else" };
 });
 
+/** branchStage: follows the port named after the stage's current value when it is one of `cases`, else `default`. */
+registerCommandHandler("branchStage", (cmd, rt) => {
+  const cases = Array.isArray(cmd.params.cases) ? (cmd.params.cases as unknown[]) : [];
+  const current = rt.ctx.flags.getStage(typeof cmd.params.id === "string" ? cmd.params.id : "");
+  return { port: current !== "" && cases.includes(current) ? current : "default" };
+});
+
 // Loops are cycles in the graph (a wire back to an earlier node) and `exitEvent` is an `end` node, so
 // `loop` / `breakLoop` / `exitEvent` have no handlers: `commandsToGraph` converts them. The interpreter
 // yields a frame when too many nodes ran without waiting, so a fast cycle never freezes the game.

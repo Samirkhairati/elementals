@@ -91,6 +91,19 @@ export const TEST_DB = {
     { id: "v2", name: "V2", initial: 5 },
     { id: "v3", name: "V3", initial: 0 },
   ],
+  stages: [
+    {
+      id: "cat",
+      name: "Lost cat",
+      values: [
+        { id: "none", name: "Not started" },
+        { id: "accepted", name: "Accepted" },
+        { id: "found", name: "Found" },
+        { id: "done", name: "Done" },
+      ],
+      initial: "none",
+    },
+  ],
 };
 
 let idCounter = 0;

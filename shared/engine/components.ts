@@ -1,6 +1,7 @@
 // Component schemas (labels, defaults, form fields), default/normalise helpers and entity cloning.
 
 import type {
+  ComparisonOp,
   ComponentPropsMap,
   ComponentSchema,
   ComponentType,
@@ -227,13 +228,20 @@ function normalizeCondition(c: unknown): Condition | null {
       return {
         kind: 'variable',
         id: typeof c.id === 'string' ? c.id : '',
-        op: (COMPARISON_OPS as readonly unknown[]).includes(c.op) ? (c.op as Condition & { kind: 'variable' })['op'] : '==',
+        op: (COMPARISON_OPS as readonly unknown[]).includes(c.op) ? (c.op as ComparisonOp) : '==',
         value: int(c.value, 0),
+      };
+    case 'stage':
+      return {
+        kind: 'stage',
+        id: typeof c.id === 'string' ? c.id : '',
+        op: (COMPARISON_OPS as readonly unknown[]).includes(c.op) ? (c.op as ComparisonOp) : '==',
+        value: typeof c.value === 'string' ? c.value : '',
       };
     case 'selfSwitch':
       return {
         kind: 'selfSwitch',
-        key: (SELF_SWITCH_KEYS as readonly unknown[]).includes(c.key) ? (c.key as 'A' | 'B' | 'C' | 'D') : 'A',
+        key: typeof c.key === 'string' && c.key.trim() !== '' ? c.key : SELF_SWITCH_KEYS[0],
         value: bool(c.value, true),
       };
     case 'hasItem':

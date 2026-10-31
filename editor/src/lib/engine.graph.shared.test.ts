@@ -59,6 +59,17 @@ describe('getPortDefs', () => {
     expect(getPortDefs({ type: 'showChoices', params: { options, cancel: 'branch' } }).map((p) => p.id)).toEqual(['a', 'b', 'cancel'])
   })
 
+  it('branchStage has one port per chosen value plus default, and no next', () => {
+    expect(getPortDefs({ type: 'branchStage', params: { id: 'cat', cases: ['accepted', 'found'] } }).map((p) => p.id)).toEqual(['accepted', 'found', 'default'])
+    expect(getPortDefs({ type: 'branchStage', params: { id: 'cat', cases: [] } }).map((p) => p.id)).toEqual(['default'])
+    // duplicates, non-strings and a value literally called "default" cannot create clashing ports
+    expect(getPortDefs({ type: 'branchStage', params: { id: 'cat', cases: ['a', 'a', 5, 'default', ''] } }).map((p) => p.id)).toEqual(['a', 'default'])
+  })
+
+  it('setStage is a plain node with a next port', () => {
+    expect(getPortDefs({ type: 'setStage', params: {} }).map((p) => p.id)).toEqual(['next'])
+  })
+
   it('tree-only flow commands and unknown types expose nothing', () => {
     for (const type of ['loop', 'breakLoop', 'exitEvent', 'nope']) expect(getPortDefs({ type, params: {} })).toEqual([])
   })
@@ -224,6 +235,27 @@ describe('validateGraph', () => {
     const g = graphOf(node('s', 'start', { next: 'a' }), node('a', 'setSwitch', {}, { id: 'ghost', value: true }))
     expect(codes(g, { switchIds: ['known'] })).toContain('dangling-switch@a')
     expect(codes(graphOf(node('s', 'start', { next: 'a' }), node('a', 'nope')))).toContain('unknown-command@a')
+  })
+
+  it('validates stage references in nodes and in branchStage values', () => {
+    const ctx = { stageIds: ['cat'], stageValues: { cat: ['none', 'found'] } }
+    const ok = graphOf(
+      node('s', 'start', { next: 'set' }),
+      node('set', 'setStage', { next: 'b' }, { id: 'cat', mode: 'set', value: 'found' }),
+      node('b', 'branchStage', { found: 'e', default: 'e' }, { id: 'cat', cases: ['found'] }),
+      node('e', 'end'),
+    )
+    expect(codes(ok, ctx)).toEqual([])
+    const bad = graphOf(
+      node('s', 'start', { next: 'set' }),
+      node('set', 'setStage', { next: 'b' }, { id: 'ghost', mode: 'set', value: 'x' }),
+      node('b', 'branchStage', { gone: 'e' }, { id: 'cat', cases: ['nope'] }),
+      node('e', 'end'),
+    )
+    const c = codes(bad, ctx)
+    expect(c).toContain('dangling-stage@set')
+    expect(c).toContain('dangling-stage-value@b')
+    expect(c).toContain('unknown-port@b') // the wire on "gone" has no port
   })
 
   it('does not throw on garbage', () => {

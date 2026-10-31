@@ -32,7 +32,7 @@ Legacy Tiled `interactables` object layers become entities with an `Interactable
 
 ## Event runtime (`game/src/events`)
 ```
-GameFlags         switches / variables / self switches (mapId/entityId/A-D); notifies subscribers + EventBus; JSON snapshot
+GameFlags         switches / variables / stages / local flags (mapId/entityId/name); notifies subscribers + EventBus; JSON snapshot
 Inventory         in-memory item counts (hasItem, giveItem, removeItem)
 conditions.ts     evaluateCondition(s)
 StateSelector     active state = last state whose conditions hold; applies appearance + solid overrides when the state CHANGES

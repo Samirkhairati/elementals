@@ -23,7 +23,7 @@ export function EventSummary({ states, onOpen }: { states: EventState[]; onOpen:
   const summaryCtx = useMemo(() => buildSummaryContext(env), [env])
   const problems = useMemo(() => collectProblems(states, buildValidationContext(env)), [states, env])
   const counts = countBySeverity(problems)
-  const startIndex = defaultActiveStateIndex(states, env.variables)
+  const startIndex = defaultActiveStateIndex(states, env.variables, env.stages)
   const shownIndex = startIndex >= 0 ? startIndex : 0
   const shown = states[shownIndex]
   const lines = shown?.commands.slice(0, MAX_LINES) ?? []

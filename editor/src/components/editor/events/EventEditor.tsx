@@ -74,7 +74,7 @@ export function EventEditor({ states: statesProp, onChange, className }: EventEd
   const counts = countBySeverity(problems)
   const stateValidation = useMemo(() => validateState(state, vctx), [state, vctx])
   const issuesByCommand = useMemo(() => groupIssuesByCommand(stateValidation.commandIssues), [stateValidation])
-  const startIndex = defaultActiveStateIndex(states, env.variables)
+  const startIndex = defaultActiveStateIndex(states, env.variables, env.stages)
 
   const commitCommands = useCallback(
     (stateId: string, commands: Command[]) => commit(updateState(pagesRef.current, stateId, { commands })),

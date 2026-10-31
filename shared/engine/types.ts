@@ -105,12 +105,18 @@ export type EventTrigger =
   | 'parallel'; // runs in the background without blocking
 
 export type ComparisonOp = '==' | '!=' | '>' | '>=' | '<' | '<=';
-export type SelfSwitchKey = 'A' | 'B' | 'C' | 'D';
+/**
+ * Name of one of an event's own (local) on/off flags. 'A'-'D' are the classic self switches and the
+ * editor's quick picks, but any non-empty name works (e.g. 'opened').
+ */
+export type SelfSwitchKey = string;
 
 /** Conditions are AND-ed. A state is active when ALL its conditions hold. */
 export type Condition =
   | { kind: 'switch'; id: string; value: boolean }
   | { kind: 'variable'; id: string; op: ComparisonOp; value: number }
+  /** Compares a stage by the order of its values: `op` between the current value and `value` (a value id). */
+  | { kind: 'stage'; id: string; op: ComparisonOp; value: string }
   | { kind: 'selfSwitch'; key: SelfSwitchKey; value: boolean }
   | { kind: 'hasItem'; item: string; qty: number };
 
@@ -222,6 +228,8 @@ export type FieldKind =
   | 'map' // map picker
   | 'switch' // global switch picker
   | 'variable' // global variable picker
+  | 'stage' // global stage picker
+  | 'stageValue' // a value of the stage chosen in the param named by `stageKey`
   | 'target' // CommandTarget picker
   | 'position' // map position picker (x,y tile) — params use {x,y}
   | 'sound'
@@ -252,6 +260,8 @@ export interface FieldDef {
   keys?: string[];
   /** The value is an array of the kind (e.g. `item` with `multiple` = a list of item ids). */
   multiple?: boolean;
+  /** `stageValue` fields: the param holding the stage id whose values are offered. */
+  stageKey?: string;
 }
 
 /** Props of every component type, by name. */
@@ -323,6 +333,9 @@ export interface CommandDef {
 export interface SummaryContext {
   switchName?: (id: string) => string | undefined;
   variableName?: (id: string) => string | undefined;
+  stageName?: (id: string) => string | undefined;
+  /** Name of a value of a stage. */
+  stageValueName?: (stageId: string, valueId: string) => string | undefined;
   mapName?: (id: string) => string | undefined;
   spriteName?: (id: string) => string | undefined;
   entityName?: (id: string) => string | undefined;
@@ -354,6 +367,9 @@ export type IssueSeverity = 'error' | 'warning';
 export interface ValidationContext {
   switchIds?: string[];
   variableIds?: string[];
+  stageIds?: string[];
+  /** Value ids of each stage, for `stageValue` fields. */
+  stageValues?: Record<string, string[]>;
   mapIds?: string[];
   spriteIds?: string[];
   /** Editor ids of entities (for `{ entity: id }` targets). */
@@ -436,18 +452,43 @@ export interface SpriteAssetInfo {
 export interface SwitchDef {
   id: string;
   name: string;
+  /** Slash path used to group entries in the editor ("Quests/Lost cat"). */
+  folder?: string;
 }
 
 export interface VariableDef {
   id: string;
   name: string;
   initial: number;
+  /** Slash path used to group entries in the editor ("Quests/Lost cat"). */
+  folder?: string;
+}
+
+/** One named step of a stage. */
+export interface StageValueDef {
+  id: string;
+  name: string;
+}
+
+/**
+ * Global progress through an ordered list of named values (a quest, a story act, a door that is locked
+ * -> unlocked -> open). Conditions compare by the order of `values`.
+ */
+export interface StageDef {
+  id: string;
+  name: string;
+  folder?: string;
+  values: StageValueDef[];
+  /** Id of the starting value (the first one when empty or unknown). */
+  initial: string;
 }
 
 export interface GameDatabase {
-  version: 1;
+  /** 2 adds `stages` and `folder`; version 1 files are accepted and upgraded on load. */
+  version: 1 | 2;
   switches: SwitchDef[];
   variables: VariableDef[];
+  stages: StageDef[];
 }
 
 // ── Entities and maps (editor format) ───────────────────────────────────────────────────────────

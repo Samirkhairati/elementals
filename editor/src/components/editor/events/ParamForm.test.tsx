@@ -18,7 +18,7 @@ describe('ParamForm: every FieldKind has a real control', () => {
   it('covers every kind used by the catalog', () => {
     const kinds = new Set<FieldKind>()
     for (const def of Object.values(COMMAND_CATALOG)) for (const f of def.params) kinds.add(f.kind)
-    const covered: FieldKind[] = ['number', 'text', 'textarea', 'boolean', 'select', 'color', 'sprite', 'facing', 'map', 'switch', 'variable', 'target', 'position', 'sound', 'item', 'route', 'choices', 'conditions']
+    const covered: FieldKind[] = ['number', 'text', 'textarea', 'boolean', 'select', 'color', 'sprite', 'facing', 'map', 'switch', 'variable', 'stage', 'stageValue', 'target', 'position', 'sound', 'item', 'route', 'choices', 'conditions']
     expect([...kinds].filter((k) => !covered.includes(k))).toEqual([])
     // and no command renders raw JSON or crashes with its defaults
     for (const def of Object.values(COMMAND_CATALOG)) {
@@ -223,6 +223,56 @@ describe('ParamForm: every FieldKind has a real control', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create' }))
     expect(env.addVariable).toHaveBeenCalledWith('Coins')
     expect(onPatch).toHaveBeenLastCalledWith({ id: 'var_coins' })
+  })
+
+  it('stage: picks, creates, and resets the dependent value when the stage changes', () => {
+    const { onPatch, env } = setup(cmd('t', 'setStage', { id: 'cat', mode: 'set', value: 'found' }))
+    fireEvent.click(within(field('Stage')).getByRole('button', { name: /Lost cat/ }))
+    fireEvent.click(screen.getByRole('option', { name: /Lost cat/ }))
+    expect(onPatch).toHaveBeenLastCalledWith({ id: 'cat' }) // same stage: the value stays
+    fireEvent.click(within(field('Stage')).getByRole('button', { name: /Lost cat/ }))
+    fireEvent.click(screen.getByRole('button', { name: /New stage/ }))
+    fireEvent.change(screen.getByRole('textbox', { name: 'New stage name' }), { target: { value: 'Gym' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }))
+    expect(env.addStage).toHaveBeenCalledWith('Gym')
+    // the old value belonged to the old stage, so it is cleared with the stage
+    expect(onPatch).toHaveBeenLastCalledWith({ id: 'stage_gym', value: '' })
+  })
+
+  it('stage value: lists the values of the chosen stage, in order', () => {
+    const { onPatch } = setup(cmd('t', 'setStage', { id: 'cat', mode: 'set', value: '' }))
+    fireEvent.click(within(field('Value')).getByRole('button', { name: /Choose value/ }))
+    expect(within(screen.getByRole('listbox')).getAllByRole('option').map((o) => o.textContent)).toEqual([expect.stringContaining('Not started'), expect.stringContaining('Found'), expect.stringContaining('Done')])
+    fireEvent.click(screen.getByRole('option', { name: /Found/ }))
+    expect(onPatch).toHaveBeenCalledWith({ value: 'found' })
+  })
+
+  it('stage value: marks a value the stage no longer has, and waits for a stage', () => {
+    setup(cmd('t', 'setStage', { id: 'cat', mode: 'set', value: 'ghost' }))
+    expect(within(field('Value')).getByRole('button', { name: /Missing: ghost/ })).toHaveAttribute('title', 'Stage "Lost cat" has no value "ghost"')
+  })
+
+  it('stage value is hidden while advancing', () => {
+    setup(cmd('t', 'setStage', { id: 'cat', mode: 'advance', value: '' }))
+    expect(field('Value')).toBeNull()
+  })
+
+  it('branchStage: adds values one by one or all at once, and removes them', () => {
+    const { onPatch } = setup(cmd('b', 'branchStage', { id: 'cat', cases: ['found'] }))
+    const cases = screen.getByTestId('stage-cases')
+    expect(within(cases).getByText('Found')).toBeInTheDocument()
+    fireEvent.click(within(cases).getByRole('button', { name: 'Remove Found' }))
+    expect(onPatch).toHaveBeenLastCalledWith({ cases: [] })
+    fireEvent.click(within(cases).getByRole('button', { name: 'Add all' }))
+    expect(onPatch).toHaveBeenLastCalledWith({ cases: ['found', 'none', 'done'] })
+    fireEvent.click(within(cases).getByRole('button', { name: /Choose value/ }))
+    fireEvent.click(screen.getByRole('option', { name: /Done/ }))
+    expect(onPatch).toHaveBeenLastCalledWith({ cases: ['found', 'done'] })
+  })
+
+  it('branchStage: asks for a stage first', () => {
+    setup(cmd('b', 'branchStage', { id: '', cases: [] }))
+    expect(screen.getByText('Choose a stage first.')).toBeInTheDocument()
   })
 
   it('creation does nothing when the database is not loaded (addSwitch returns "")', () => {

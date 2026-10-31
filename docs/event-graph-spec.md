@@ -591,6 +591,17 @@ interpreter suite passes unchanged against `commandsToGraph(fixture)` (§13).
 `GameFlags` stages, `stage` condition, `setStage`/`branchStage`, widened local-flag keys, database v2,
 `ConditionsEditor` + Database panel (folders, stages, usage read/write). Can run in parallel with 4.
 
+*Status: done.* Delivered: stages (data, runtime, `stage` condition, `setStage`, `branchStage`, pickers,
+Database panel with value ordering and start value), database version 2 with `folder`, folder grouping in the
+panel, usage tracking with read/write and "never set / never read" hints, and local-flag names widened from `A`–`D`
+to any non-empty text in data, runtime and validation. Deferred: declaring local-flag names per event
+(`EventProps.locals`) and a text input for custom names in the `setSelfSwitch` form (it still offers A–D;
+a custom name already in the data is shown and kept). Folders are shown as headings in the panel and as a
+prefix in the pickers; pickers do not group by folder yet.
+
+While implementing this phase a bug in `normalizeCondition` was found and fixed: variable conditions lost their
+comparison (`op`) when event props were normalised.
+
 **Phase 4: Canvas editor.**
 React Flow canvas, node view, palette, wiring interactions, copy/paste, frames, auto layout, undo, problems
 integration. Retire `CommandList`. Done when an author can build and run the Elder quest (§13.3) without

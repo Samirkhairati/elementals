@@ -36,6 +36,12 @@ export function evaluateCondition(condition: Condition, ctx: ConditionContext): 
       return ctx.flags.getSwitch(condition.id) === condition.value;
     case "variable":
       return compareNumbers(ctx.flags.getVariable(condition.id), condition.op, condition.value);
+    case "stage": {
+      // Compared by the order of the stage's values; an unknown stage or value never holds.
+      const current = ctx.flags.stageIndex(condition.id);
+      const wanted = ctx.flags.stageValueIndex(condition.id, condition.value);
+      return current >= 0 && wanted >= 0 && compareNumbers(current, condition.op, wanted);
+    }
     case "selfSwitch":
       return ctx.flags.getSelfSwitch(ctx.mapId, ctx.entityId, condition.key) === condition.value;
     case "hasItem":

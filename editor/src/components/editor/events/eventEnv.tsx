@@ -3,7 +3,7 @@
 // tests (and any other host) can provide their own through <EventEnvProvider>.
 
 import React, { createContext, useContext, useMemo } from 'react'
-import type { SpriteAssetInfo, SpriteKind, SwitchDef, VariableDef } from '../../../../../shared/engine/types'
+import type { SpriteAssetInfo, SpriteKind, StageDef, SwitchDef, VariableDef } from '../../../../../shared/engine/types'
 import { useEditorSelector, type EditorContextValue } from '../layout/EditorContext'
 
 export interface EventEnv {
@@ -11,6 +11,7 @@ export interface EventEnv {
   entityId: string
   switches: SwitchDef[]
   variables: VariableDef[]
+  stages: StageDef[]
   /** Maps of the project; `id` is the file name without `.json`. */
   maps: { id: string; name: string }[]
   sprites: { id: string; name: string; kind: SpriteKind }[]
@@ -19,6 +20,8 @@ export interface EventEnv {
   /** Creates a global switch / variable and returns its id ('' when the database is not loaded yet). */
   addSwitch: (name: string) => string
   addVariable: (name: string) => string
+  /** Creates a global stage (with two default values) and returns its id. */
+  addStage: (name: string) => string
   getSpriteAsset: (id: string) => SpriteAssetInfo | undefined
   /** Editor-wide undo/redo (the dialog is modal, so it offers its own buttons). */
   undo?: () => void
@@ -49,12 +52,14 @@ export function mapIdOf(fileName: string): string {
 const selectEnvInputs = (c: EditorContextValue) => ({
   switches: c.switches,
   variables: c.variables,
+  stages: c.stages,
   maps: c.maps,
   entities: c.entities,
   spriteList: c.spriteList,
   getSpriteAsset: c.getSpriteAsset,
   addSwitch: c.addSwitch,
   addVariable: c.addVariable,
+  addStage: c.addStage,
   handleUndo: c.handleUndo,
   handleRedo: c.handleRedo,
   historyIndex: c.historyIndex,
@@ -79,11 +84,13 @@ function ContextBackedEnv({ entityId, children }: { entityId: string; children: 
       entityName: c.entities.find((e) => e.id === entityId)?.name,
       switches: c.switches,
       variables: c.variables,
+      stages: c.stages,
       maps: c.maps.map((m) => ({ id: mapIdOf(m.fileName), name: m.name || mapIdOf(m.fileName) })),
       sprites: c.spriteList.map((s) => ({ id: s.id, name: s.meta.name || s.id, kind: s.meta.kind })),
       entities: c.entities.map((e) => ({ id: e.id, name: e.name })),
       addSwitch: (name) => c.addSwitch(name),
       addVariable: (name) => c.addVariable(name),
+      addStage: (name) => c.addStage(name),
       getSpriteAsset: (id) => c.getSpriteAsset(id),
       undo: c.handleUndo,
       redo: c.handleRedo,

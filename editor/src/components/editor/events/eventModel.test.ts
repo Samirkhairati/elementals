@@ -118,6 +118,18 @@ describe('states', () => {
     expect(defaultActiveStateIndex([state('x', [], { conditions: [{ kind: 'hasItem', item: 'potion', qty: 1 }] })], vars)).toBe(-1)
     expect(conditionHoldsAtStart({ kind: 'switch', id: 'met', value: false }, vars)).toBe(true)
     expect(conditionHoldsAtStart({ kind: 'variable', id: 'unknown', op: '==', value: 0 }, vars)).toBe(true)
+    // stages start at their initial value and compare by the order of their values
+    const stages = [{ id: 'cat', name: 'Lost cat', values: [{ id: 'none', name: 'None' }, { id: 'found', name: 'Found' }, { id: 'done', name: 'Done' }], initial: 'none' }]
+    expect(conditionHoldsAtStart({ kind: 'stage', id: 'cat', op: '==', value: 'none' }, vars, stages)).toBe(true)
+    expect(conditionHoldsAtStart({ kind: 'stage', id: 'cat', op: '>=', value: 'found' }, vars, stages)).toBe(false)
+    expect(conditionHoldsAtStart({ kind: 'stage', id: 'cat', op: '<', value: 'done' }, vars, stages)).toBe(true)
+    expect(conditionHoldsAtStart({ kind: 'stage', id: 'ghost', op: '==', value: 'none' }, vars, stages)).toBe(false)
+    expect(conditionHoldsAtStart({ kind: 'stage', id: 'cat', op: '==', value: 'nope' }, vars, stages)).toBe(false)
+    const quest = [
+      state('a', [], {}),
+      state('b', [], { conditions: [{ kind: 'stage', id: 'cat', op: '>=', value: 'found' }] }),
+    ]
+    expect(defaultActiveStateIndex(quest, vars, stages)).toBe(0)
   })
 })
 
@@ -346,6 +358,8 @@ describe('contexts and problems', () => {
     expect(buildValidationContext(env)).toEqual({
       switchIds: ['met', 'door'],
       variableIds: ['badges'],
+      stageIds: ['cat'],
+      stageValues: { cat: ['none', 'found', 'done'] },
       mapIds: ['town', 'cave'],
       spriteIds: ['characters/hero', 'objects/chest'],
       entityIds: ['self-1', 'e2'],

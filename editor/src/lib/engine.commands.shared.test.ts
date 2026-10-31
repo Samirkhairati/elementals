@@ -27,8 +27,8 @@ import type { Command } from '../../../shared/engine/index'
 // The catalog of docs/engine-design.md section 3: type -> status.
 const DOC_CATALOG: Record<string, 'implemented' | 'planned'> = {
   showText: 'implemented', showChoices: 'implemented',
-  conditional: 'implemented', loop: 'implemented', breakLoop: 'implemented', exitEvent: 'implemented', wait: 'implemented', comment: 'implemented', callCommonEvent: 'planned',
-  setSwitch: 'implemented', setVariable: 'implemented', setSelfSwitch: 'implemented',
+  conditional: 'implemented', branchStage: 'implemented', loop: 'implemented', breakLoop: 'implemented', exitEvent: 'implemented', wait: 'implemented', comment: 'implemented', callCommonEvent: 'planned',
+  setSwitch: 'implemented', setVariable: 'implemented', setStage: 'implemented', setSelfSwitch: 'implemented',
   setFacing: 'implemented', moveRoute: 'implemented', setVisible: 'implemented', changeSprite: 'implemented', playAnimation: 'implemented', faceTowards: 'implemented',
   warp: 'implemented', fadeScreen: 'implemented', shakeScreen: 'implemented', tintScreen: 'planned', setWeather: 'planned',
   playSound: 'planned', playMusic: 'planned', stopMusic: 'planned',
@@ -36,8 +36,8 @@ const DOC_CATALOG: Record<string, 'implemented' | 'planned'> = {
   emit: 'implemented', runScript: 'planned',
 }
 const DOC_CATEGORY: Record<string, string> = {
-  showText: 'dialogue', showChoices: 'dialogue', conditional: 'flow', loop: 'flow', breakLoop: 'flow', exitEvent: 'flow', wait: 'flow', comment: 'flow', callCommonEvent: 'flow',
-  setSwitch: 'state', setVariable: 'state', setSelfSwitch: 'state',
+  showText: 'dialogue', showChoices: 'dialogue', conditional: 'flow', branchStage: 'flow', loop: 'flow', breakLoop: 'flow', exitEvent: 'flow', wait: 'flow', comment: 'flow', callCommonEvent: 'flow',
+  setSwitch: 'state', setVariable: 'state', setStage: 'state', setSelfSwitch: 'state',
   setFacing: 'character', moveRoute: 'character', setVisible: 'character', changeSprite: 'character', playAnimation: 'character', faceTowards: 'character',
   warp: 'map', fadeScreen: 'map', shakeScreen: 'map', tintScreen: 'map', setWeather: 'map',
   playSound: 'audio', playMusic: 'audio', stopMusic: 'audio',
@@ -410,8 +410,8 @@ describe('validateCommands', () => {
   })
 
   it('validateConditions covers every kind', () => {
-    expect(validateConditions([{ kind: 'switch', id: 'a', value: true }, { kind: 'variable', id: 'v', op: '<=', value: 2 }, { kind: 'selfSwitch', key: 'B', value: false }, { kind: 'hasItem', item: 'x', qty: 1 }])).toEqual([])
-    const bad = validateConditions([{ kind: 'switch', id: 'a' }, { kind: 'variable', id: 'v', op: '~', value: 'x' }, { kind: 'selfSwitch', key: 'Q' }, { kind: 'hasItem', item: '', qty: 0 }, { kind: 'zzz' }, 4])
+    expect(validateConditions([{ kind: 'switch', id: 'a', value: true }, { kind: 'variable', id: 'v', op: '<=', value: 2 }, { kind: 'selfSwitch', key: 'B', value: false }, { kind: 'selfSwitch', key: 'opened', value: true }, { kind: 'stage', id: 'cat', op: '>=', value: 'found' }, { kind: 'hasItem', item: 'x', qty: 1 }])).toEqual([])
+    const bad = validateConditions([{ kind: 'switch', id: 'a' }, { kind: 'variable', id: 'v', op: '~', value: 'x' }, { kind: 'selfSwitch', key: '' }, { kind: 'hasItem', item: '', qty: 0 }, { kind: 'zzz' }, 4])
     expect(bad.map((i) => `${i.index}:${i.code}`)).toEqual(['0:bad-condition', '1:bad-condition', '1:bad-condition', '2:bad-condition', '2:bad-condition', '3:missing-param', '3:bad-condition', '4:bad-condition', '5:bad-condition'])
     expect(validateConditions('x')[0].code).toBe('bad-conditions')
   })

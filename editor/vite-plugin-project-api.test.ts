@@ -79,7 +79,7 @@ describe('serving the project channels', () => {
   });
 
   it('round-trips the database', async () => {
-    const db = { version: 1, switches: [{ id: 'intro', name: 'Intro' }], variables: [] };
+    const db = { version: 2, switches: [{ id: 'intro', name: 'Intro' }], variables: [], stages: [] };
     expect((await call('save-database', [db])).body.success).toBe(true);
     expect((await call('get-database')).body.database).toEqual(db);
   });

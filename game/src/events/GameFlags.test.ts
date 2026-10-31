@@ -82,6 +82,90 @@ describe('GameFlags', () => {
     expect(l).toHaveBeenCalledWith({ kind: 'reset', id: '' });
   });
 
+  describe('stages', () => {
+    it('start at their initial value; unknown stages have no value', () => {
+      const s = new GameFlags(TEST_DB);
+      expect(s.getStage('cat')).toBe('none');
+      expect(s.stageIndex('cat')).toBe(0);
+      expect(s.hasStage('cat')).toBe(true);
+      expect(s.getStage('ghost')).toBe('');
+      expect(s.stageIndex('ghost')).toBe(-1);
+      expect(s.hasStage('ghost')).toBe(false);
+    });
+
+    it('a missing or invalid initial falls back to the first value', () => {
+      const db = { ...TEST_DB, stages: [{ id: 'q', name: 'Q', values: [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }], initial: 'zzz' }] };
+      expect(new GameFlags(db).getStage('q')).toBe('a');
+    });
+
+    it('setStage moves to a known value and refuses unknown stages or values', () => {
+      const s = new GameFlags(TEST_DB);
+      expect(s.setStage('cat', 'found')).toBe(true);
+      expect(s.getStage('cat')).toBe('found');
+      expect(s.stageIndex('cat')).toBe(2);
+      expect(s.setStage('cat', 'nope')).toBe(false);
+      expect(s.setStage('ghost', 'x')).toBe(false);
+      expect(s.getStage('cat')).toBe('found');
+    });
+
+    it('advanceStage steps forward and stays on the last value', () => {
+      const s = new GameFlags(TEST_DB);
+      for (const expected of ['accepted', 'found', 'done', 'done']) {
+        s.advanceStage('cat');
+        expect(s.getStage('cat')).toBe(expected);
+      }
+      expect(s.advanceStage('ghost')).toBe(false);
+    });
+
+    it('notifies once per real change, with the new value id', () => {
+      const s = new GameFlags(TEST_DB);
+      const local = vi.fn();
+      s.subscribe(local);
+      s.setStage('cat', 'accepted');
+      s.setStage('cat', 'accepted');
+      s.setStage('cat', 'bogus');
+      expect(local.mock.calls).toEqual([[{ kind: 'stage', id: 'cat', value: 'accepted' }]]);
+    });
+
+    it('survive a snapshot; old snapshots without stages and values the database dropped keep the initial', () => {
+      const a = new GameFlags(TEST_DB);
+      a.setStage('cat', 'found');
+      const snapshot = JSON.parse(JSON.stringify(a.toJSON()));
+      expect(snapshot.stages).toEqual({ cat: 'found' });
+
+      const b = new GameFlags(TEST_DB);
+      b.load(snapshot);
+      expect(b.getStage('cat')).toBe('found');
+
+      const c = new GameFlags(TEST_DB);
+      c.setStage('cat', 'done');
+      c.load({ switches: {}, variables: {}, selfSwitches: {} }); // written before stages existed
+      expect(c.getStage('cat')).toBe('none');
+      c.load({ stages: { cat: 'removed_value' } });
+      expect(c.getStage('cat')).toBe('none');
+    });
+
+    it('reset puts every stage back', () => {
+      const s = new GameFlags(TEST_DB);
+      s.setStage('cat', 'done');
+      s.reset();
+      expect(s.getStage('cat')).toBe('none');
+    });
+
+    it('a database without stages works (version 1 data)', () => {
+      const s = new GameFlags({ switches: TEST_DB.switches, variables: TEST_DB.variables });
+      expect(s.getStage('cat')).toBe('');
+      expect(s.toJSON().stages).toEqual({});
+    });
+  });
+
+  it('local flags accept any name, not just A-D', () => {
+    const s = new GameFlags(TEST_DB);
+    s.setSelfSwitch('city', 'chest', 'opened', true);
+    expect(s.getSelfSwitch('city', 'chest', 'opened')).toBe(true);
+    expect(s.getSelfSwitch('city', 'chest', 'A')).toBe(false);
+  });
+
   it('serialises to JSON and loads back', () => {
     const a = new GameFlags(TEST_DB);
     a.setSwitch('s2', true);

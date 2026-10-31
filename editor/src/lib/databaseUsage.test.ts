@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { countEvents, describeRefs, scanDatabaseUsage, type UsageMap } from './databaseUsage'
+import { countAccess, countEvents, describeRefs, scanDatabaseUsage, type UsageMap } from './databaseUsage'
 import { createCommand } from '../../../shared/engine/commands'
 import { createDefaultEventState } from '../../../shared/engine/components'
 
@@ -13,12 +13,13 @@ function mapWith(fileName: string, entities: UsageMap['entities']): UsageMap {
 
 describe('scanDatabaseUsage', () => {
   it('returns empty buckets for no maps or maps without events', () => {
-    expect(scanDatabaseUsage([])).toEqual({ switches: {}, variables: {} })
+    expect(scanDatabaseUsage([])).toEqual({ switches: {}, variables: {}, stages: {} })
     expect(scanDatabaseUsage([mapWith('a.json', [{ id: 'e', name: 'Rock', components: { Transform: {} } }])])).toEqual({
       switches: {},
       variables: {},
+      stages: {},
     })
-    expect(scanDatabaseUsage([{ fileName: 'a.json', name: 'A' }])).toEqual({ switches: {}, variables: {} })
+    expect(scanDatabaseUsage([{ fileName: 'a.json', name: 'A' }])).toEqual({ switches: {}, variables: {}, stages: {} })
   })
 
   it('finds state conditions', () => {
@@ -53,6 +54,27 @@ describe('scanDatabaseUsage', () => {
     expect(usage.variables.badges).toHaveLength(2)
   })
 
+  it('tracks stages and whether a reference reads or writes the flag', () => {
+    const setSw = createCommand('setSwitch', { id: 'met', value: true })
+    const setStage = createCommand('setStage', { id: 'cat', mode: 'set', value: 'found' })
+    const branch = createCommand('branchStage', { id: 'cat', cases: ['found'] })
+    const cond = createCommand('conditional', { conditions: [{ kind: 'switch', id: 'met', value: true }] })
+    const state = createDefaultEventState('Talk')
+    state.conditions = [{ kind: 'stage', id: 'cat', op: '>=', value: 'found' }]
+    state.commands = [setSw, setStage, branch, cond]
+    const usage = scanDatabaseUsage([mapWith('m.json', [entityWith('e1', 'NPC', [state])])])
+
+    expect(usage.stages.cat.map((r) => [r.where, r.access, r.commandType])).toEqual([
+      ['condition', 'read', undefined],
+      ['command', 'write', 'setStage'],
+      ['command', 'read', 'branchStage'],
+    ])
+    expect(countAccess(usage.stages.cat)).toEqual({ reads: 2, writes: 1 })
+    // a switch that is set once and read once
+    expect(countAccess(usage.switches.met)).toEqual({ reads: 1, writes: 1 })
+    expect(countAccess(undefined)).toEqual({ reads: 0, writes: 0 })
+  })
+
   it('ignores hidden fields (sourceId while the operand is a constant) and empty ids', () => {
     const cmd = createCommand('setVariable', { id: 'steps', operand: 'const', sourceId: 'badges' })
     const empty = createCommand('setSwitch', { id: '' })
@@ -72,7 +94,7 @@ describe('scanDatabaseUsage', () => {
       ]),
     ]
     expect(() => scanDatabaseUsage(maps)).not.toThrow()
-    expect(scanDatabaseUsage(maps)).toEqual({ switches: {}, variables: {} })
+    expect(scanDatabaseUsage(maps)).toEqual({ switches: {}, variables: {}, stages: {} })
   })
 
   it('counts events across maps, not references', () => {

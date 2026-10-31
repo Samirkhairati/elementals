@@ -85,6 +85,7 @@ describe('panel wrappers', () => {
     const value = {
       switches: [{ id: 'met', name: 'Met the guard' }],
       variables: [{ id: 'badges', name: 'Badges earned', initial: 0 }],
+      stages: [],
       maps: [],
       addSwitch: vi.fn(),
       renameSwitch: vi.fn(),

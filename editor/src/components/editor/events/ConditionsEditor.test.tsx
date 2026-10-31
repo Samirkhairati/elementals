@@ -22,6 +22,7 @@ describe('ConditionsEditor', () => {
     const kinds: [string, Condition][] = [
       ['Switch', { kind: 'switch', id: '', value: true }],
       ['Variable', { kind: 'variable', id: '', op: '==', value: 0 }],
+      ['Stage', { kind: 'stage', id: '', op: '>=', value: '' }],
       ['Self switch', { kind: 'selfSwitch', key: 'A', value: true }],
       ['Has item', { kind: 'hasItem', item: '', qty: 1 }],
     ]
@@ -30,7 +31,7 @@ describe('ConditionsEditor', () => {
       fireEvent.click(screen.getByRole('menuitem', { name: new RegExp(`^${label}`) }))
       expect(onChange).toHaveBeenLastCalledWith([expected])
     }
-    expect(onChange).toHaveBeenCalledTimes(4)
+    expect(onChange).toHaveBeenCalledTimes(kinds.length)
   })
 
   it('appends to existing conditions', () => {
@@ -84,6 +85,46 @@ describe('ConditionsEditor', () => {
     expect(onChange).toHaveBeenLastCalledWith([{ kind: 'selfSwitch', key: 'C', value: true }])
     fireEvent.change(screen.getByLabelText('Condition 1 value'), { target: { value: 'off' } })
     expect(onChange).toHaveBeenLastCalledWith([{ kind: 'selfSwitch', key: 'A', value: false }])
+  })
+
+  it('self switch row keeps a custom name selectable', () => {
+    const { onChange } = setup([{ kind: 'selfSwitch', key: 'opened', value: false }])
+    const select = screen.getByLabelText('Condition 1 self switch')
+    expect(select).toHaveValue('opened')
+    expect(within(select).getAllByRole('option').map((o) => o.textContent)).toEqual(['A', 'B', 'C', 'D', 'opened'])
+    fireEvent.change(select, { target: { value: 'B' } })
+    expect(onChange).toHaveBeenLastCalledWith([{ kind: 'selfSwitch', key: 'B', value: false }])
+  })
+
+  it('stage row: stage, comparison and a value of that stage', () => {
+    const { onChange } = setup([{ kind: 'stage', id: 'cat', op: '>=', value: 'found' }])
+    const row = document.querySelector('[data-condition-kind="stage"]') as HTMLElement
+    expect(within(row).getByRole('button', { name: /Lost cat/ })).toBeInTheDocument()
+    expect(within(row).getByRole('button', { name: /Found/ })).toBeInTheDocument()
+    fireEvent.change(within(row).getByLabelText('Condition 1 comparison'), { target: { value: '<' } })
+    expect(onChange).toHaveBeenLastCalledWith([{ kind: 'stage', id: 'cat', op: '<', value: 'found' }])
+    fireEvent.click(within(row).getByRole('button', { name: /Found/ }))
+    fireEvent.click(screen.getByRole('option', { name: /Done/ }))
+    expect(onChange).toHaveBeenLastCalledWith([{ kind: 'stage', id: 'cat', op: '>=', value: 'done' }])
+  })
+
+  it('stage row: changing the stage clears the value, which belonged to the old one', () => {
+    const env = makeEnv({
+      stages: [
+        { id: 'cat', name: 'Lost cat', values: [{ id: 'none', name: 'None' }, { id: 'found', name: 'Found' }], initial: 'none' },
+        { id: 'gym', name: 'Gym', values: [{ id: 'closed', name: 'Closed' }], initial: 'closed' },
+      ],
+    })
+    const { onChange } = setup([{ kind: 'stage', id: 'cat', op: '>=', value: 'found' }], env)
+    fireEvent.click(screen.getByRole('button', { name: /Lost cat/ }))
+    fireEvent.click(screen.getByRole('option', { name: /Gym/ }))
+    expect(onChange).toHaveBeenLastCalledWith([{ kind: 'stage', id: 'gym', op: '>=', value: '' }])
+  })
+
+  it('stage row: reports a stage or value that no longer exists', () => {
+    setup([{ kind: 'stage', id: 'cat', op: '==', value: 'removed' }])
+    expect(screen.getByText(/has no value "removed"/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Missing: removed/ })).toBeInTheDocument()
   })
 
   it('has-item row: item and quantity (at least 1)', () => {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { GameDatabase, SwitchDef, VariableDef } from '../../../shared/engine/types'
+import type { GameDatabase, StageDef, SwitchDef, VariableDef } from '../../../shared/engine/types'
 import { createSaveQueue, DEFAULT_SAVE_DELAY_MS, type SaveQueue } from '@/lib/saveQueue'
 import { runIpc } from '@/lib/opResult'
 
@@ -20,8 +20,10 @@ export interface UseDatabase {
   dirty: boolean
   switches: SwitchDef[]
   variables: VariableDef[]
+  stages: StageDef[]
   getSwitch: (id: string | null | undefined) => SwitchDef | undefined
   getVariable: (id: string | null | undefined) => VariableDef | undefined
+  getStage: (id: string | null | undefined) => StageDef | undefined
   /** Each add returns the new id (ids are generated from the name and stay stable when the name changes). */
   addSwitch: (name?: string) => string
   renameSwitch: (id: string, name: string) => void
@@ -30,6 +32,20 @@ export interface UseDatabase {
   renameVariable: (id: string, name: string) => void
   setVariableInitial: (id: string, initial: number) => void
   removeVariable: (id: string) => void
+  /** A new stage starts with two values ("Not started", "Done"); returns its id. */
+  addStage: (name?: string) => string
+  renameStage: (id: string, name: string) => void
+  removeStage: (id: string) => void
+  /** Returns the id of the new value ('' when the stage does not exist). */
+  addStageValue: (stageId: string, name?: string) => string
+  renameStageValue: (stageId: string, valueId: string, name: string) => void
+  /** A stage keeps at least one value; removing the initial one makes the first value the initial. */
+  removeStageValue: (stageId: string, valueId: string) => void
+  /** Moves a value one step earlier (-1) or later (1); conditions compare by this order. */
+  moveStageValue: (stageId: string, valueId: string, delta: -1 | 1) => void
+  setStageInitial: (stageId: string, valueId: string) => void
+  /** Groups an entry in the Database panel ("Quests/Lost cat"); '' removes the folder. */
+  setFolder: (kind: 'switch' | 'variable' | 'stage', id: string, folder: string) => void
   /** Write pending changes now. */
   flush: () => Promise<void>
   /** Discard local state and re-read from disk (pending changes are written first). */
@@ -56,7 +72,21 @@ function uniqueId(base: string, taken: ReadonlySet<string>): string {
 
 /** Invalid values never reach disk: the store would refuse them. Editing a name through "" is allowed locally. */
 function isSavable(db: GameDatabase): boolean {
-  return [...db.switches, ...db.variables].every((e) => e.name.trim() !== '')
+  return (
+    [...db.switches, ...db.variables, ...db.stages].every((e) => e.name.trim() !== '') &&
+    db.stages.every((st) => st.values.every((v) => v.name.trim() !== ''))
+  )
+}
+
+const withFolder = <T extends { folder?: string }>(entry: T, folder: string): T => {
+  const { folder: _old, ...rest } = entry
+  void _old
+  const clean = folder
+    .split('/')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join('/')
+  return (clean ? { ...rest, folder: clean } : rest) as T
 }
 
 /**
@@ -203,6 +233,99 @@ export function useDatabase(options: UseDatabaseOptions = {}): UseDatabase {
     [update]
   )
 
+  const addStage = useCallback(
+    (name = '') => {
+      let id = ''
+      update((db) => {
+        id = uniqueId(idFromName(name, 'stage'), new Set(db.stages.map((s) => s.id)))
+        const stage: StageDef = {
+          id,
+          name: name.trim() || `Stage ${db.stages.length + 1}`,
+          values: [
+            { id: 'not_started', name: 'Not started' },
+            { id: 'done', name: 'Done' },
+          ],
+          initial: 'not_started',
+        }
+        return { ...db, stages: [...db.stages, stage] }
+      })
+      return id
+    },
+    [update]
+  )
+  const patchStage = useCallback(
+    (id: string, change: (stage: StageDef) => StageDef) =>
+      update((db) => {
+        const stage = db.stages.find((s) => s.id === id)
+        if (!stage) return db
+        const next = change(stage)
+        return next === stage ? db : { ...db, stages: db.stages.map((s) => (s.id === id ? next : s)) }
+      }),
+    [update]
+  )
+  const renameStage = useCallback((id: string, name: string) => patchStage(id, (s) => (s.name === name ? s : { ...s, name })), [patchStage])
+  const removeStage = useCallback(
+    (id: string) => update((db) => (db.stages.some((s) => s.id === id) ? { ...db, stages: db.stages.filter((s) => s.id !== id) } : db)),
+    [update]
+  )
+  const addStageValue = useCallback(
+    (stageId: string, name = '') => {
+      let valueId = ''
+      patchStage(stageId, (s) => {
+        valueId = uniqueId(idFromName(name, 'value'), new Set(s.values.map((v) => v.id)))
+        return { ...s, values: [...s.values, { id: valueId, name: name.trim() || `Value ${s.values.length + 1}` }] }
+      })
+      return valueId
+    },
+    [patchStage]
+  )
+  const renameStageValue = useCallback(
+    (stageId: string, valueId: string, name: string) =>
+      patchStage(stageId, (s) =>
+        s.values.some((v) => v.id === valueId && v.name !== name) ? { ...s, values: s.values.map((v) => (v.id === valueId ? { ...v, name } : v)) } : s
+      ),
+    [patchStage]
+  )
+  const removeStageValue = useCallback(
+    (stageId: string, valueId: string) =>
+      patchStage(stageId, (s) => {
+        if (s.values.length <= 1 || !s.values.some((v) => v.id === valueId)) return s
+        const values = s.values.filter((v) => v.id !== valueId)
+        return { ...s, values, initial: s.initial === valueId ? values[0].id : s.initial }
+      }),
+    [patchStage]
+  )
+  const moveStageValue = useCallback(
+    (stageId: string, valueId: string, delta: -1 | 1) =>
+      patchStage(stageId, (s) => {
+        const from = s.values.findIndex((v) => v.id === valueId)
+        const to = from + delta
+        if (from < 0 || to < 0 || to >= s.values.length) return s
+        const values = s.values.slice()
+        const [moved] = values.splice(from, 1)
+        values.splice(to, 0, moved)
+        return { ...s, values }
+      }),
+    [patchStage]
+  )
+  const setStageInitial = useCallback(
+    (stageId: string, valueId: string) =>
+      patchStage(stageId, (s) => (s.initial !== valueId && s.values.some((v) => v.id === valueId) ? { ...s, initial: valueId } : s)),
+    [patchStage]
+  )
+  const setFolder = useCallback(
+    (kind: 'switch' | 'variable' | 'stage', id: string, folder: string) =>
+      update((db) => {
+        const key = kind === 'switch' ? 'switches' : kind === 'variable' ? 'variables' : 'stages'
+        const list = db[key] as { id: string; folder?: string }[]
+        const entry = list.find((e) => e.id === id)
+        if (!entry) return db
+        const next = withFolder(entry, folder)
+        return (next.folder ?? '') === (entry.folder ?? '') ? db : { ...db, [key]: list.map((e) => (e.id === id ? next : e)) }
+      }),
+    [update]
+  )
+
   const flush = useCallback(() => queue.flush(SAVE_KEY), [queue])
   const reload = useCallback(async () => {
     await queue.flushAll()
@@ -211,6 +334,7 @@ export function useDatabase(options: UseDatabaseOptions = {}): UseDatabase {
 
   const getSwitch = useCallback((id: string | null | undefined) => (id ? database?.switches.find((s) => s.id === id) : undefined), [database])
   const getVariable = useCallback((id: string | null | undefined) => (id ? database?.variables.find((v) => v.id === id) : undefined), [database])
+  const getStage = useCallback((id: string | null | undefined) => (id ? database?.stages.find((s) => s.id === id) : undefined), [database])
 
   return {
     database,
@@ -219,8 +343,10 @@ export function useDatabase(options: UseDatabaseOptions = {}): UseDatabase {
     dirty,
     switches: database?.switches ?? EMPTY_SWITCHES,
     variables: database?.variables ?? EMPTY_VARIABLES,
+    stages: database?.stages ?? EMPTY_STAGES,
     getSwitch,
     getVariable,
+    getStage,
     addSwitch,
     renameSwitch,
     removeSwitch,
@@ -228,6 +354,15 @@ export function useDatabase(options: UseDatabaseOptions = {}): UseDatabase {
     renameVariable,
     setVariableInitial,
     removeVariable,
+    addStage,
+    renameStage,
+    removeStage,
+    addStageValue,
+    renameStageValue,
+    removeStageValue,
+    moveStageValue,
+    setStageInitial,
+    setFolder,
     flush,
     reload,
   }
@@ -235,3 +370,4 @@ export function useDatabase(options: UseDatabaseOptions = {}): UseDatabase {
 
 const EMPTY_SWITCHES: SwitchDef[] = []
 const EMPTY_VARIABLES: VariableDef[] = []
+const EMPTY_STAGES: StageDef[] = []

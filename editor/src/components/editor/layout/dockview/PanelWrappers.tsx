@@ -471,6 +471,16 @@ const selectDatabase = (c: EditorContextValue) => ({
   renameVariable: c.renameVariable,
   setVariableInitial: c.setVariableInitial,
   removeVariable: c.removeVariable,
+  stages: c.stages,
+  addStage: c.addStage,
+  renameStage: c.renameStage,
+  removeStage: c.removeStage,
+  addStageValue: c.addStageValue,
+  renameStageValue: c.renameStageValue,
+  removeStageValue: c.removeStageValue,
+  moveStageValue: c.moveStageValue,
+  setStageInitial: c.setStageInitial,
+  setFolder: c.setDatabaseFolder,
 });
 
 export function DatabaseWrapper(_props: IDockviewPanelProps) {
@@ -488,6 +498,16 @@ export function DatabaseWrapper(_props: IDockviewPanelProps) {
         renameVariable={ctx.renameVariable}
         setVariableInitial={ctx.setVariableInitial}
         removeVariable={ctx.removeVariable}
+        stages={ctx.stages}
+        addStage={ctx.addStage}
+        renameStage={ctx.renameStage}
+        removeStage={ctx.removeStage}
+        addStageValue={ctx.addStageValue}
+        renameStageValue={ctx.renameStageValue}
+        removeStageValue={ctx.removeStageValue}
+        moveStageValue={ctx.moveStageValue}
+        setStageInitial={ctx.setStageInitial}
+        setFolder={ctx.setFolder}
       />
     </div>
   );

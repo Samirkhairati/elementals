@@ -37,7 +37,7 @@ export interface EventRuntimeOptions {
   sprites: SpriteRegistry;
   ui: EventUI;
   maps: MapService;
-  database?: Pick<GameDatabase, "switches" | "variables">;
+  database?: Pick<GameDatabase, "switches" | "variables"> & Partial<Pick<GameDatabase, "stages">>;
   /** Locks player input for a reason; returns the release function. Default: `gameState.lockInput`. */
   lockInput?: (reason: string) => () => void;
   /** Fires a custom event on the bus. Default: `EventBus.emit`. */

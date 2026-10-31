@@ -67,10 +67,30 @@ registerCommandHandler("setVariable", (cmd, rt) => {
   }
 });
 
+/** setStage: `mode: "set"` moves the stage to `value` (a value id), `mode: "advance"` to its next value. */
+registerCommandHandler("setStage", (cmd, rt) => {
+  const { ctx } = rt;
+  const id = str(cmd.params, "id");
+  if (!id) {
+    ctx.warn("[Event] setStage without a stage; skipped");
+    return;
+  }
+  if (!ctx.flags.hasStage(id)) {
+    ctx.warnOnce(`stage:${id}`, `[Event] stage "${id}" is not in the database; skipped`);
+    return;
+  }
+  if (str(cmd.params, "mode", "set") === "advance") {
+    ctx.flags.advanceStage(id);
+    return;
+  }
+  const value = str(cmd.params, "value");
+  if (!ctx.flags.setStage(id, value)) ctx.warn(`[Event] setStage: stage "${id}" has no value "${value}"; skipped`);
+});
+
 registerCommandHandler("setSelfSwitch", (cmd, rt) => {
-  const key = str(cmd.params, "key", "A") as SelfSwitchKey;
-  if (!(SELF_SWITCH_KEYS as readonly string[]).includes(key)) {
-    rt.ctx.warn(`[Event] setSelfSwitch: unknown self switch "${key}"; skipped`);
+  const key: SelfSwitchKey = str(cmd.params, "key", SELF_SWITCH_KEYS[0]).trim();
+  if (!key) {
+    rt.ctx.warn("[Event] setSelfSwitch without a name; skipped");
     return;
   }
   rt.ctx.flags.setSelfSwitch(rt.ctx.getMapId(), rt.ctx.entityId, key, bool(cmd.params, "value", true));

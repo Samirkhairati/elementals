@@ -27,6 +27,8 @@ export interface UsageRef {
   stateName: string
   /** 'condition' = a state condition, 'command' = a command parameter or a conditional command. */
   where: 'condition' | 'command'
+  /** 'write' = the reference changes the value (Set Switch / Variable / Stage); everything else reads it. */
+  access: 'read' | 'write'
   /** Set for `where === 'command'`. */
   commandId?: string
   commandType?: string
@@ -35,9 +37,20 @@ export interface UsageRef {
 export interface DatabaseUsage {
   switches: Record<string, UsageRef[]>
   variables: Record<string, UsageRef[]>
+  stages: Record<string, UsageRef[]>
 }
 
-export const EMPTY_USAGE: DatabaseUsage = { switches: {}, variables: {} }
+export const EMPTY_USAGE: DatabaseUsage = { switches: {}, variables: {}, stages: {} }
+
+export function countAccess(refs: readonly UsageRef[] | undefined): { reads: number; writes: number } {
+  let reads = 0
+  let writes = 0
+  for (const r of refs ?? []) {
+    if (r.access === 'write') writes++
+    else reads++
+  }
+  return { reads, writes }
+}
 
 /** Number of distinct events (entities with an Event component) among the references. */
 export function countEvents(refs: readonly UsageRef[] | undefined): number {
@@ -62,28 +75,38 @@ function isObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v)
 }
 
-function conditionRefs(conditions: unknown): { kind: 'switch' | 'variable'; id: string }[] {
-  const out: { kind: 'switch' | 'variable'; id: string }[] = []
+type RefKind = 'switch' | 'variable' | 'stage'
+interface FoundRef {
+  kind: RefKind
+  id: string
+  access: 'read' | 'write'
+}
+
+function conditionRefs(conditions: unknown): FoundRef[] {
+  const out: FoundRef[] = []
   if (!Array.isArray(conditions)) return out
   for (const c of conditions as Condition[]) {
     if (!isObject(c)) continue
-    if ((c.kind === 'switch' || c.kind === 'variable') && typeof c.id === 'string' && c.id !== '') {
-      out.push({ kind: c.kind, id: c.id })
+    if ((c.kind === 'switch' || c.kind === 'variable' || c.kind === 'stage') && typeof c.id === 'string' && c.id !== '') {
+      out.push({ kind: c.kind, id: c.id, access: 'read' })
     }
   }
   return out
 }
 
-/** Switch/variable ids a command references, found through the catalog's field kinds (so new commands count automatically). */
-function commandRefs(cmd: Command): { kind: 'switch' | 'variable'; id: string }[] {
+/** Commands whose own `id` parameter is changed (not just read) by running them. */
+const WRITING_COMMANDS = new Set(['setSwitch', 'setVariable', 'setStage'])
+
+/** Switch/variable/stage ids a command references, found through the catalog's field kinds (so new commands count automatically). */
+function commandRefs(cmd: Command): FoundRef[] {
   const def = getCommandDef(cmd.type)
   if (!def || !isObject(cmd.params)) return []
-  const out: { kind: 'switch' | 'variable'; id: string }[] = []
+  const out: FoundRef[] = []
   for (const field of def.params) {
     if (!isFieldVisible(field, cmd.params, def.defaultParams)) continue
     const v = cmd.params[field.key]
-    if ((field.kind === 'switch' || field.kind === 'variable') && typeof v === 'string' && v !== '') {
-      out.push({ kind: field.kind, id: v })
+    if ((field.kind === 'switch' || field.kind === 'variable' || field.kind === 'stage') && typeof v === 'string' && v !== '') {
+      out.push({ kind: field.kind, id: v, access: field.key === 'id' && WRITING_COMMANDS.has(cmd.type) ? 'write' : 'read' })
     } else if (field.kind === 'conditions') {
       out.push(...conditionRefs(v))
     }
@@ -104,9 +127,9 @@ function visitCommands(list: unknown, visit: (cmd: Command) => void): void {
 
 /** Scans every Event state (conditions and the whole command tree, branches included) of every map. */
 export function scanDatabaseUsage(maps: readonly UsageMap[]): DatabaseUsage {
-  const usage: DatabaseUsage = { switches: {}, variables: {} }
-  const add = (kind: 'switch' | 'variable', id: string, ref: UsageRef) => {
-    const bucket = kind === 'switch' ? usage.switches : usage.variables
+  const usage: DatabaseUsage = { switches: {}, variables: {}, stages: {} }
+  const add = (kind: RefKind, id: string, ref: UsageRef) => {
+    const bucket = kind === 'switch' ? usage.switches : kind === 'variable' ? usage.variables : usage.stages
     ;(bucket[id] ??= []).push(ref)
   }
 
@@ -124,11 +147,11 @@ export function scanDatabaseUsage(maps: readonly UsageMap[]): DatabaseUsage {
           stateIndex,
           stateName: typeof state.name === 'string' ? state.name : '',
         }
-        for (const r of conditionRefs(state.conditions)) add(r.kind, r.id, { ...base, where: 'condition' })
+        for (const r of conditionRefs(state.conditions)) add(r.kind, r.id, { ...base, where: 'condition', access: r.access })
         if (Array.isArray(state.commands)) {
           visitCommands(state.commands, (cmd) => {
             for (const r of commandRefs(cmd)) {
-              add(r.kind, r.id, { ...base, where: 'command', commandId: cmd.id, commandType: cmd.type })
+              add(r.kind, r.id, { ...base, where: 'command', access: r.access, commandId: cmd.id, commandType: cmd.type })
             }
           })
         }

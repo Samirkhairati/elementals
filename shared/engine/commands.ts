@@ -56,6 +56,8 @@ export function describeCondition(c: unknown, ctx?: SummaryContext): string {
       return `Switch ${named(ctx?.switchName, str(c.id))} is ${onOff(c.value)}`;
     case 'variable':
       return `Variable ${named(ctx?.variableName, str(c.id))} ${str(c.op, '==')} ${num(c.value)}`;
+    case 'stage':
+      return `Stage ${named(ctx?.stageName, str(c.id))} ${str(c.op, '==')} ${ctx?.stageValueName?.(str(c.id), str(c.value)) ?? (str(c.value) || '(none)')}`;
     case 'selfSwitch':
       return `Self switch ${str(c.key, 'A')} is ${onOff(c.value)}`;
     case 'hasItem':
@@ -179,6 +181,37 @@ export const COMMAND_CATALOG: Record<string, CommandDef> = {
       return `If ${trunc(list.map((c) => describeCondition(c, ctx)).join(' and '), 60)}`;
     },
   }),
+  branchStage: def({
+    type: 'branchStage',
+    label: 'Branch on Stage',
+    category: 'flow',
+    description: 'Follow a different path for each value of a stage (and a Default path for the others).',
+    icon: 'git-fork',
+    params: [
+      { key: 'id', label: 'Stage', kind: 'stage', required: true },
+      { key: 'cases', label: 'Values', kind: 'stageValue', stageKey: 'id', multiple: true, help: 'Each value you add gets its own path.' },
+    ],
+    defaultParams: { id: '', cases: [] },
+    branchesFor: (p) => {
+      const out: BranchDef[] = [];
+      const seen = new Set<string>();
+      if (Array.isArray(p.cases)) {
+        for (const c of p.cases) {
+          if (typeof c === 'string' && c && c !== 'default' && !seen.has(c)) {
+            seen.add(c);
+            out.push({ id: c, label: c });
+          }
+        }
+      }
+      out.push({ id: 'default', label: 'Default' });
+      return out;
+    },
+    status: 'implemented',
+    summarize: (p, ctx) => {
+      const n = Array.isArray(p.cases) ? p.cases.length : 0;
+      return `Branch on stage ${named(ctx?.stageName, str(p.id))} (${n} value${n === 1 ? '' : 's'})`;
+    },
+  }),
   loop: def({
     type: 'loop',
     label: 'Loop',
@@ -297,6 +330,25 @@ export const COMMAND_CATALOG: Record<string, CommandDef> = {
       else if (p.operand === 'random') rhs = `random ${num(p.min)}..${num(p.max, 10)}`;
       else rhs = String(num(p.value));
       return `Variable ${named(ctx?.variableName, str(p.id))} ${symbol} ${rhs}`;
+    },
+  }),
+  setStage: def({
+    type: 'setStage',
+    label: 'Set Stage',
+    category: 'state',
+    description: 'Move a global stage (quest or story progress) to a value, or on to its next value.',
+    icon: 'milestone',
+    params: [
+      { key: 'id', label: 'Stage', kind: 'stage', required: true },
+      { key: 'mode', label: 'Change', kind: 'select', options: opts(['set', 'Set to a value'], ['advance', 'Advance to the next value']) },
+      { key: 'value', label: 'Value', kind: 'stageValue', stageKey: 'id', required: true, visibleWhen: { key: 'mode', in: ['set'] } },
+    ],
+    defaultParams: { id: '', mode: 'set', value: '' },
+    status: 'implemented',
+    summarize: (p, ctx) => {
+      const stage = named(ctx?.stageName, str(p.id));
+      if (p.mode === 'advance') return `Stage ${stage} advances`;
+      return `Stage ${stage} = ${ctx?.stageValueName?.(str(p.id), str(p.value)) ?? (str(p.value) || '(none)')}`;
     },
   }),
   setSelfSwitch: def({
@@ -926,8 +978,17 @@ export function validateConditions(conditions: unknown, ctx: ValidationContext =
         if (!(COMPARISON_OPS as readonly unknown[]).includes(c.op)) add('error', 'bad-condition', `Unknown comparison "${String(c.op)}"`);
         if (typeof c.value !== 'number' || !Number.isFinite(c.value)) add('error', 'bad-condition', 'Variable condition needs a number');
         break;
+      case 'stage':
+        if (typeof c.id !== 'string' || c.id === '') add('warning', 'missing-param', 'Condition has no stage selected');
+        else if (ctx.stageIds && !ctx.stageIds.includes(c.id)) add('error', 'dangling-stage', `Stage "${c.id}" does not exist`);
+        if (!(COMPARISON_OPS as readonly unknown[]).includes(c.op)) add('error', 'bad-condition', `Unknown comparison "${String(c.op)}"`);
+        if (typeof c.value !== 'string' || c.value === '') add('warning', 'missing-param', 'Condition has no stage value selected');
+        else if (typeof c.id === 'string' && ctx.stageValues?.[c.id] && !ctx.stageValues[c.id].includes(c.value)) {
+          add('error', 'dangling-stage-value', `Stage "${c.id}" has no value "${c.value}"`);
+        }
+        break;
       case 'selfSwitch':
-        if (!(SELF_SWITCH_KEYS as readonly unknown[]).includes(c.key)) add('error', 'bad-condition', `Unknown self switch "${String(c.key)}"`);
+        if (typeof c.key !== 'string' || c.key.trim() === '') add('error', 'bad-condition', 'Self switch needs a name');
         if (typeof c.value !== 'boolean') add('error', 'bad-condition', 'Self switch condition needs an on/off value');
         break;
       case 'hasItem':
@@ -996,12 +1057,20 @@ function validateField(field: FieldDef, params: Record<string, unknown>, ctx: Va
     case 'color':
       if (typeof v !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(v)) bad('must be a #rrggbb colour');
       return;
+    case 'stageValue': {
+      if (typeof v !== 'string') return bad('must be an id');
+      const stageId = params[field.stageKey ?? 'id'];
+      const known = typeof stageId === 'string' ? ctx.stageValues?.[stageId] : undefined;
+      if (known && !known.includes(v)) report('error', 'dangling-stage-value', `${field.label}: stage "${String(stageId)}" has no value "${v}"`);
+      return;
+    }
     case 'switch':
     case 'variable':
+    case 'stage':
     case 'map':
     case 'sprite': {
       if (typeof v !== 'string') return bad('must be an id');
-      const lists = { switch: ctx.switchIds, variable: ctx.variableIds, map: ctx.mapIds, sprite: ctx.spriteIds };
+      const lists = { switch: ctx.switchIds, variable: ctx.variableIds, stage: ctx.stageIds, map: ctx.mapIds, sprite: ctx.spriteIds };
       const list = lists[field.kind];
       if (list && !list.includes(v)) report('error', `dangling-${field.kind}`, `${field.label}: ${field.kind} "${v}" does not exist`);
       return;
@@ -1069,6 +1138,15 @@ export function validateCommandParams(
 
   if (cmd.type === 'conditional' && Array.isArray(params.conditions) && params.conditions.length === 0) {
     report('warning', 'missing-param', 'Conditional Branch has no conditions (it always takes the Then branch)');
+  }
+
+  if (cmd.type === 'branchStage' && typeof params.id === 'string' && Array.isArray(params.cases)) {
+    const known = ctx.stageValues?.[params.id];
+    if (known) {
+      for (const c of params.cases) {
+        if (typeof c === 'string' && !known.includes(c)) report('error', 'dangling-stage-value', `Values: stage "${params.id}" has no value "${c}"`);
+      }
+    }
   }
   return true;
 }

@@ -25,7 +25,11 @@ describe('validateDatabase', () => {
 
   it.each([
     ['non-object', null, /JSON object/],
-    ['wrong version', { ...valid(), version: 2 }, /version/],
+    ['wrong version', { ...valid(), version: 3 }, /version/],
+    ['stage without values', { ...valid(), version: 2, stages: [{ id: 'q', name: 'Q', values: [], initial: '' }] }, /values must be a non-empty/],
+    ['stage with duplicate value ids', { ...valid(), version: 2, stages: [{ id: 'q', name: 'Q', values: [{ id: 'a', name: 'A' }, { id: 'a', name: 'B' }], initial: 'a' }] }, /not unique/],
+    ['stage initial not a value', { ...valid(), version: 2, stages: [{ id: 'q', name: 'Q', values: [{ id: 'a', name: 'A' }], initial: 'zzz' }] }, /initial must be one of its values/],
+    ['version 2 without stages', { ...valid(), version: 2 }, /stages must be an array/],
     ['switches not array', { ...valid(), switches: {} }, /switches must be an array/],
     ['duplicate switch ids', { ...valid(), switches: [{ id: 'a', name: 'A' }, { id: 'a', name: 'B' }] }, /not unique/],
     ['duplicate variable ids', { ...valid(), variables: [{ id: 'a', name: 'A', initial: 0 }, { id: 'a', name: 'B', initial: 1 }] }, /not unique/],
@@ -45,8 +49,28 @@ describe('validateDatabase', () => {
 
 describe('database store', () => {
   it('returns an empty database (and writes nothing) when the file is missing', () => {
-    expect(getDatabase(dir).database).toEqual({ version: 1, switches: [], variables: [] });
+    expect(getDatabase(dir).database).toEqual({ version: 2, switches: [], variables: [], stages: [] });
     expect(fs.existsSync(path.join(dir, 'database.json'))).toBe(false);
+  });
+
+  it('reads a version 1 file as version 2 with no stages', () => {
+    fs.writeFileSync(path.join(dir, 'database.json'), JSON.stringify(valid()));
+    const { database } = getDatabase(dir);
+    expect(database.version).toBe(2);
+    expect(database.stages).toEqual([]);
+  });
+
+  it('round-trips stages and folders, tidying the folder paths', () => {
+    const saved = saveDatabase(dir, {
+      version: 2,
+      switches: [{ id: 'gate', name: 'Gate', folder: ' Town / Gate/ ' }],
+      variables: [{ id: 'v', name: 'V', initial: 1, folder: '' }],
+      stages: [{ id: 'cat', name: ' Lost cat ', folder: 'Quests', values: [{ id: 'none', name: 'Not started' }, { id: 'done', name: ' Done ' }], initial: 'none' }],
+    }).database;
+    expect(saved.switches).toEqual([{ id: 'gate', name: 'Gate', folder: 'Town/Gate' }]);
+    expect(saved.variables).toEqual([{ id: 'v', name: 'V', initial: 1 }]);
+    expect(saved.stages).toEqual([{ id: 'cat', name: 'Lost cat', folder: 'Quests', values: [{ id: 'none', name: 'Not started' }, { id: 'done', name: 'Done' }], initial: 'none' }]);
+    expect(getDatabase(dir).database).toEqual(saved);
   });
 
   it('round-trips, normalising names and dropping unknown keys', () => {

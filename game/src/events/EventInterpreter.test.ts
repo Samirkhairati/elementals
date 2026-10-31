@@ -179,6 +179,68 @@ describe('state commands', () => {
     return rig.runtime.flags.getVariable('v1');
   }
 
+  it('setStage sets a value or advances to the next one', async () => {
+    await rig.runCommands([cmd('setStage', { id: 'cat', mode: 'set', value: 'found' })])!.done;
+    expect(rig.runtime.flags.getStage('cat')).toBe('found');
+    await rig.runCommands([cmd('setStage', { id: 'cat', mode: 'advance' })])!.done;
+    expect(rig.runtime.flags.getStage('cat')).toBe('done');
+    await rig.runCommands([cmd('setStage', { id: 'cat', mode: 'advance' })])!.done;
+    expect(rig.runtime.flags.getStage('cat')).toBe('done');
+  });
+
+  it('setStage with an unknown stage or value is skipped with a warning and the event goes on', async () => {
+    const run = rig.runCommands([
+      cmd('setStage', { id: 'ghost', mode: 'set', value: 'x' }),
+      cmd('setStage', { id: 'cat', mode: 'set', value: 'nope' }),
+      cmd('setStage', { id: '', mode: 'set', value: 'x' }),
+      cmd('setSwitch', { id: 's1', value: true }),
+    ])!;
+    expect(await run.done).toBe('completed');
+    expect(rig.runtime.flags.getStage('cat')).toBe('none');
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(true);
+    expect(rig.warnings.filter((w) => w.includes('setStage') || w.includes('stage "'))).toHaveLength(3);
+  });
+
+  it('branchStage follows the path of the current value, else Default', async () => {
+    const mark = (v: number) => [cmd('setVariable', { id: 'v1', op: 'set', operand: 'const', value: v })];
+    const program = () => [
+      cmd('branchStage', { id: 'cat', cases: ['accepted', 'found'] }, { accepted: mark(1), found: mark(2), default: mark(9) }),
+      cmd('setSwitch', { id: 's1', value: true }),
+    ];
+    await rig.runCommands(program())!.done;
+    expect(rig.runtime.flags.getVariable('v1')).toBe(9); // 'none' is not a case
+    rig.runtime.flags.setStage('cat', 'found');
+    await rig.runCommands(program())!.done;
+    expect(rig.runtime.flags.getVariable('v1')).toBe(2);
+    rig.runtime.flags.setStage('cat', 'accepted');
+    await rig.runCommands(program())!.done;
+    expect(rig.runtime.flags.getVariable('v1')).toBe(1);
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(true); // the branches rejoin
+  });
+
+  it('branchStage on an unknown stage takes Default', async () => {
+    await rig.runCommands([cmd('branchStage', { id: 'ghost', cases: ['x'] }, { x: [cmd('setSwitch', { id: 's1', value: true })], default: [cmd('setSwitch', { id: 's2', value: true })] })])!.done;
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(false);
+    expect(rig.runtime.flags.getSwitch('s2')).toBe(true);
+  });
+
+  it('a state with a stage condition becomes active when the stage moves', async () => {
+    const e = rig.add({ states: [state([]), state([], { conditions: [{ kind: 'stage', id: 'cat', op: '>=', value: 'found' }] })] });
+    const ev = rig.world.getComponent(e, (await import('@/ecs/components/EventComponent')).EventComponent)!;
+    rig.runtime.update(16);
+    expect(ev.activeState).toBe(0);
+    rig.runtime.flags.setStage('cat', 'found');
+    rig.runtime.update(16);
+    expect(ev.activeState).toBe(1);
+  });
+
+  it('setSelfSwitch accepts names other than A-D', async () => {
+    const run = rig.runCommands([cmd('setSelfSwitch', { key: 'opened', value: true }), cmd('setSelfSwitch', { key: '  ', value: true })])!;
+    await run.done;
+    expect(rig.runtime.flags.getSelfSwitch(rig.runtime.mapId, run.entityId, 'opened')).toBe(true);
+    expect(rig.warnings.filter((w) => w.includes('without a name'))).toHaveLength(1);
+  });
+
   it('setSwitch on/off', async () => {
     await rig.runCommands([cmd('setSwitch', { id: 's1', value: true }), cmd('setSwitch', { id: 's2', value: false })])!.done;
     expect(rig.runtime.flags.getSwitch('s1')).toBe(true);

@@ -1,7 +1,7 @@
 import React, { StrictMode, useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import type { SwitchDef, VariableDef } from '../../../../../shared/engine/types'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import type { StageDef, SwitchDef, VariableDef } from '../../../../../shared/engine/types'
 import { createCommand } from '../../../../../shared/engine/commands'
 import { createDefaultEventState } from '../../../../../shared/engine/components'
 import type { UsageMap } from '@/lib/databaseUsage'
@@ -12,6 +12,20 @@ const SWITCHES: SwitchDef[] = [
   { id: 'door', name: 'Door open' },
 ]
 const VARIABLES: VariableDef[] = [{ id: 'badges', name: 'Badges earned', initial: 2 }]
+const noop = () => {}
+/** Stage props for tests that do not care about stages. */
+const STAGE_PROPS = {
+  stages: [] as StageDef[],
+  addStage: () => '',
+  renameStage: noop,
+  removeStage: noop,
+  addStageValue: () => '',
+  renameStageValue: noop,
+  removeStageValue: noop,
+  moveStageValue: noop,
+  setStageInitial: noop,
+  setFolder: noop,
+}
 
 function usageMaps(): UsageMap[] {
   const a = createDefaultEventState('Talk')
@@ -33,6 +47,7 @@ function Harness({ maps = usageMaps(), spies }: { maps?: UsageMap[]; spies?: Rec
   return (
     <StrictMode>
       <DatabasePanel
+        {...STAGE_PROPS}
         switches={switches}
         variables={variables}
         maps={maps}
@@ -196,6 +211,7 @@ describe('DatabasePanel', () => {
     const maps: UsageMap[] = []
     render(
       <DatabasePanel
+        {...STAGE_PROPS}
         switches={[
           { id: 'a', name: 'Same' },
           { id: 'b', name: 'same' },
@@ -265,7 +281,7 @@ describe('DatabasePanel', () => {
 
   it('filters by name or id', () => {
     render(<Harness />)
-    const filter = screen.getByRole('textbox', { name: 'Filter switches and variables' })
+    const filter = screen.getByRole('textbox', { name: 'Filter switches, variables and stages' })
     fireEvent.change(filter, { target: { value: 'door' } })
     expect(switchRow('door')).toBeTruthy()
     expect(switchRow('met')).toBeFalsy()
@@ -279,10 +295,10 @@ describe('DatabasePanel', () => {
 
   it('clears the filter when adding so the new row is visible', async () => {
     render(<Harness />)
-    fireEvent.change(screen.getByRole('textbox', { name: 'Filter switches and variables' }), { target: { value: 'door' } })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Filter switches, variables and stages' }), { target: { value: 'door' } })
     fireEvent.click(screen.getByRole('button', { name: /Add switch/ }))
     await waitFor(() => expect(switchRow('switch_3')).toBeTruthy())
-    expect(screen.getByRole('textbox', { name: 'Filter switches and variables' })).toHaveValue('')
+    expect(screen.getByRole('textbox', { name: 'Filter switches, variables and stages' })).toHaveValue('')
   })
 
   it('copies an id', () => {
@@ -297,6 +313,7 @@ describe('DatabasePanel', () => {
   it('shows helpful empty states', () => {
     render(
       <DatabasePanel
+        {...STAGE_PROPS}
         switches={[]}
         variables={[]}
         maps={[]}
@@ -312,5 +329,214 @@ describe('DatabasePanel', () => {
     expect(screen.getByText(/A switch is a global ON\/OFF flag/)).toBeInTheDocument()
     expect(screen.getByText(/A variable is a global number/)).toBeInTheDocument()
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
+  })
+
+  it('explains stages when there are none', () => {
+    render(<DatabasePanel {...STAGE_PROPS} switches={[]} variables={[]} maps={[]} addSwitch={() => ''} renameSwitch={noop} removeSwitch={noop} addVariable={() => ''} renameVariable={noop} setVariableInitial={noop} removeVariable={noop} />)
+    expect(screen.getByText(/A stage is progress through named steps/)).toBeInTheDocument()
+  })
+})
+
+describe('DatabasePanel: stages and folders', () => {
+  const CAT: StageDef = {
+    id: 'cat',
+    name: 'Lost cat',
+    folder: 'Quests',
+    values: [
+      { id: 'none', name: 'Not started' },
+      { id: 'found', name: 'Found' },
+      { id: 'done', name: 'Done' },
+    ],
+    initial: 'none',
+  }
+
+  function stagesMaps(): UsageMap[] {
+    const talk = createDefaultEventState('Talk')
+    talk.commands = [createCommand('setStage', { id: 'cat', mode: 'set', value: 'found' })]
+    const after = createDefaultEventState('After')
+    after.conditions = [{ kind: 'stage', id: 'cat', op: '>=', value: 'found' }]
+    return [{ fileName: 'town.json', name: 'Town', entities: [{ id: 'e1', name: 'Elder', components: { Event: { states: [talk, after] } } }] }]
+  }
+
+  function mount(overrides: Record<string, unknown> = {}, maps: UsageMap[] = []) {
+    const fns = {
+      addStage: vi.fn(() => 'new_stage'),
+      renameStage: vi.fn(),
+      removeStage: vi.fn(),
+      addStageValue: vi.fn(() => 'new_value'),
+      renameStageValue: vi.fn(),
+      removeStageValue: vi.fn(),
+      moveStageValue: vi.fn(),
+      setStageInitial: vi.fn(),
+      setFolder: vi.fn(),
+    }
+    render(
+      <DatabasePanel
+        switches={[]}
+        variables={[]}
+        stages={[CAT]}
+        maps={maps}
+        addSwitch={() => ''}
+        renameSwitch={noop}
+        removeSwitch={noop}
+        addVariable={() => ''}
+        renameVariable={noop}
+        setVariableInitial={noop}
+        removeVariable={noop}
+        {...fns}
+        {...overrides}
+      />,
+    )
+    return fns
+  }
+
+  const stageCard = () => document.querySelector('[data-testid="stages-section"] li[data-row-id="cat"]') as HTMLElement
+
+  it('lists a stage with its values in order, the folder as a heading and the starting value marked', () => {
+    mount()
+    const section = screen.getByTestId('stages-section')
+    expect(within(section).getByText('Quests')).toBeInTheDocument()
+    expect(within(stageCard()).getByLabelText('Stage name')).toHaveValue('Lost cat')
+    const values = within(screen.getByRole('list', { name: 'Values of Lost cat' })).getAllByRole('listitem')
+    expect(values.map((li) => within(li).getByRole('textbox').getAttribute('aria-label'))).toEqual(['Value 1 of Lost cat', 'Value 2 of Lost cat', 'Value 3 of Lost cat'])
+    expect(screen.getByRole('radio', { name: 'Not started is the starting value' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: 'Done is the starting value' })).not.toBeChecked()
+    expect(within(stageCard()).getByText('unused')).toBeInTheDocument()
+  })
+
+  it('adds a stage and a value', () => {
+    const fns = mount()
+    fireEvent.click(screen.getByRole('button', { name: /Add stage/ }))
+    expect(fns.addStage).toHaveBeenCalledTimes(1)
+    fireEvent.click(within(stageCard()).getByRole('button', { name: /Add value/ }))
+    expect(fns.addStageValue).toHaveBeenCalledWith('cat')
+  })
+
+  it('renames a stage and a value; a duplicate value name is refused', () => {
+    const fns = mount()
+    const name = within(stageCard()).getByLabelText('Stage name')
+    fireEvent.change(name, { target: { value: 'The cat' } })
+    fireEvent.blur(name)
+    expect(fns.renameStage).toHaveBeenCalledWith('cat', 'The cat')
+
+    const value = screen.getByLabelText('Value 2 of Lost cat')
+    fireEvent.change(value, { target: { value: 'Done' } })
+    fireEvent.blur(value)
+    expect(fns.renameStageValue).not.toHaveBeenCalled()
+    expect(screen.getByText('Another value has this name')).toBeInTheDocument()
+    fireEvent.change(value, { target: { value: 'Cat located' } })
+    fireEvent.blur(value)
+    expect(fns.renameStageValue).toHaveBeenCalledWith('cat', 'found', 'Cat located')
+  })
+
+  it('moves values, but not past the ends, and picks the starting value', () => {
+    const fns = mount()
+    expect(screen.getByRole('button', { name: 'Move Not started earlier' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Move Done later' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Move Found earlier' }))
+    expect(fns.moveStageValue).toHaveBeenCalledWith('cat', 'found', -1)
+    fireEvent.click(screen.getByRole('button', { name: 'Move Found later' }))
+    expect(fns.moveStageValue).toHaveBeenCalledWith('cat', 'found', 1)
+    fireEvent.click(screen.getByRole('radio', { name: 'Found is the starting value' }))
+    expect(fns.setStageInitial).toHaveBeenCalledWith('cat', 'found')
+  })
+
+  it('deletes a value, but never the last one', () => {
+    const fns = mount()
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Found' }))
+    expect(fns.removeStageValue).toHaveBeenCalledWith('cat', 'found')
+    cleanup()
+    mount({ stages: [{ ...CAT, values: [CAT.values[0]] }] })
+    expect(screen.getByRole('button', { name: 'Delete Not started' })).toBeDisabled()
+  })
+
+  it('deletes an unused stage at once', () => {
+    const fns = mount()
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Lost cat' }))
+    expect(fns.removeStage).toHaveBeenCalledWith('cat')
+  })
+
+  it('asks before deleting a stage that events use', () => {
+    const fns = mount({}, stagesMaps())
+    expect(within(stageCard()).getByRole('button', { name: /1 event/ })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Lost cat' }))
+    expect(fns.removeStage).not.toHaveBeenCalled()
+    expect(screen.getByRole('alertdialog', { name: 'Delete Lost cat?' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Lost cat' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete anyway' }))
+    expect(fns.removeStage).toHaveBeenCalledWith('cat')
+  })
+
+  it('shows where a stage is used when the count is clicked', () => {
+    mount({}, stagesMaps())
+    fireEvent.click(within(stageCard()).getByRole('button', { name: /1 event/ }))
+    expect(screen.getByRole('list', { name: 'Where Lost cat is used' })).toHaveTextContent('Town > Elder')
+  })
+
+  it('has no read/write warning when a stage is both set and read', () => {
+    mount({}, stagesMaps())
+    expect(screen.queryByText('never set')).not.toBeInTheDocument()
+    expect(screen.queryByText('never read')).not.toBeInTheDocument()
+  })
+
+  it('warns about a stage that is read but never set, and one that is set but never read', () => {
+    const readOnly = createDefaultEventState('R')
+    readOnly.conditions = [{ kind: 'stage', id: 'cat', op: '>=', value: 'found' }]
+    mount({}, [{ fileName: 'a.json', name: 'A', entities: [{ id: 'e', name: 'E', components: { Event: { states: [readOnly] } } }] }])
+    expect(screen.getByText('never set')).toBeInTheDocument()
+    cleanup()
+    const writeOnly = createDefaultEventState('W')
+    writeOnly.commands = [createCommand('setStage', { id: 'cat', mode: 'advance' })]
+    mount({}, [{ fileName: 'a.json', name: 'A', entities: [{ id: 'e', name: 'E', components: { Event: { states: [writeOnly] } } }] }])
+    expect(screen.getByText('never read')).toBeInTheDocument()
+  })
+
+  it('edits the folder of a stage, a switch and a variable', () => {
+    const fns = mount({ switches: [{ id: 'met', name: 'Met' }], variables: [{ id: 'badges', name: 'Badges', initial: 0 }] })
+    const stageFolder = screen.getByLabelText('Folder of Lost cat')
+    expect(stageFolder).toHaveValue('Quests')
+    fireEvent.change(stageFolder, { target: { value: 'Quests/Cat' } })
+    fireEvent.blur(stageFolder)
+    expect(fns.setFolder).toHaveBeenLastCalledWith('stage', 'cat', 'Quests/Cat')
+
+    const switchFolder = screen.getByLabelText('Folder of Met')
+    fireEvent.change(switchFolder, { target: { value: 'Story' } })
+    fireEvent.keyDown(switchFolder, { key: 'Enter' })
+    expect(fns.setFolder).toHaveBeenLastCalledWith('switch', 'met', 'Story')
+
+    const variableFolder = screen.getByLabelText('Folder of Badges')
+    fireEvent.change(variableFolder, { target: { value: 'Gyms' } })
+    fireEvent.keyDown(variableFolder, { key: 'Escape' })
+    expect(variableFolder).toHaveValue('')
+    expect(fns.setFolder).toHaveBeenCalledTimes(2)
+  })
+
+  it('groups switches by folder: unfiled first, then folders alphabetically', () => {
+    mount({
+      stages: [],
+      switches: [
+        { id: 'z', name: 'Zed', folder: 'Zoo' },
+        { id: 'a', name: 'Alpha' },
+        { id: 'm', name: 'Mid', folder: 'Town/Gate' },
+        { id: 'n', name: 'Next', folder: 'Town/Gate' },
+      ],
+    })
+    const table = screen.getByRole('table', { name: 'Switches' })
+    const rows = [...table.querySelectorAll('tbody tr')].map((tr) => tr.getAttribute('data-folder') ?? tr.getAttribute('data-row-id'))
+    expect(rows).toEqual(['a', 'Town/Gate', 'm', 'n', 'Zoo', 'z'])
+  })
+
+  it('the filter also matches folders and the names of stage values', () => {
+    mount({ switches: [{ id: 'g', name: 'Gate', folder: 'Town' }, { id: 'o', name: 'Other' }] })
+    const filter = screen.getByRole('textbox', { name: 'Filter switches, variables and stages' })
+    fireEvent.change(filter, { target: { value: 'town' } })
+    expect(screen.getAllByLabelText('Switch name')).toHaveLength(1)
+    expect(screen.getByLabelText('Switch name')).toHaveValue('Gate')
+    fireEvent.change(filter, { target: { value: 'found' } }) // the name of a stage value
+    expect(within(stageCard()).getByLabelText('Stage name')).toBeInTheDocument()
+    fireEvent.change(filter, { target: { value: 'zzz' } })
+    expect(screen.getByText(/No stage matches/)).toBeInTheDocument()
   })
 })
