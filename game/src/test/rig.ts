@@ -1,4 +1,4 @@
-import { createCommand, createDefaultComponent, tileToAnchor, type Command, type EngineEntity, type EventState, type Facing } from "@shared/engine/index.ts";
+import { commandsToGraph, createCommand, createDefaultComponent, tileToAnchor, type Command, type EngineEntity, type EventState, type Facing } from "@shared/engine/index.ts";
 import { World } from "@/ecs/World";
 import type { Entity } from "@/ecs/Entity";
 import type { ExpandContext } from "@/ecs/expand";
@@ -118,7 +118,7 @@ export const state = (commands: Command[], extra: Partial<EventState> = {}): Eve
   name: "state",
   conditions: [],
   trigger: "action",
-  commands,
+  graph: commandsToGraph(commands, () => "start", { layout: false }),
   faceOnInteract: true,
   solid: null,
   appearance: {},

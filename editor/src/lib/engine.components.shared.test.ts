@@ -16,6 +16,9 @@ import {
   anchorToTile,
   snapToAnchor,
   isFieldVisible,
+  commandNodes,
+  commandsToGraph,
+  validateGraph,
 } from '../../../shared/engine/index'
 import type { ComponentType, EngineEntity } from '../../../shared/engine/index'
 
@@ -84,15 +87,22 @@ describe('defaults', () => {
     expect(createDefaultComponent('Tag')).toEqual({ tag: 'entity', icon: '', color: '' })
   })
 
-  it('Event defaults to one action state without commands and gets fresh ids', () => {
+  it('Event defaults to one action state with an empty graph and gets fresh ids', () => {
     setIdGenerator(createSequentialIdGenerator('p'))
     const a = createDefaultComponent('Event')
     const b = createDefaultEventProps()
     expect(a.states).toHaveLength(1)
     expect(a.states[0]).toEqual({
-      id: 'p-1', name: 'State 1', conditions: [], trigger: 'action', commands: [], faceOnInteract: true, solid: null, appearance: {},
+      id: 'p-1',
+      name: 'State 1',
+      conditions: [],
+      trigger: 'action',
+      graph: { nodes: [{ id: 'p-2', type: 'start', params: {}, out: {}, x: 0, y: 0 }], frames: [] },
+      faceOnInteract: true,
+      solid: null,
+      appearance: {},
     })
-    expect(b.states[0].id).toBe('p-2')
+    expect(b.states[0].id).toBe('p-3')
   })
 
   it('returns independent objects and applies overrides', () => {
@@ -210,9 +220,11 @@ describe('normalizeProps', () => {
     expect(state.name).toBe('State 1')
     expect(state.trigger).toBe('action')
     expect(state.conditions).toEqual([{ kind: 'switch', id: 's', value: true }, { kind: 'hasItem', item: 'potion', qty: 1 }])
-    expect(state.commands.map((c) => c.type)).toEqual(['showText', 'loop'])
-    expect(state.commands[1].id).toBe('keep')
-    expect(state.commands[1].branches).toEqual({ body: [{ id: expect.any(String), type: 'wait', params: {} }], bad: [] })
+    // the legacy command tree becomes a graph: the loop is a reroute head, the old ids are kept
+    expect(commandNodes(state.graph).map((n) => n.type)).toEqual(['showText', 'wait'])
+    expect(state.graph.nodes.find((n) => n.id === 'keep')?.type).toBe('junction')
+    expect(state.graph.nodes.filter((n) => n.type === 'start')).toHaveLength(1)
+    expect(validateGraph(state.graph).filter((i) => i.severity === 'error')).toEqual([])
     expect(state.appearance).toEqual({ frame: 2, visible: false })
     expect(state.solid).toBeNull()
     expect(state.faceOnInteract).toBe(true)
@@ -268,7 +280,7 @@ describe('cloneEntity', () => {
   const entity = (): EngineEntity => ({
     id: 'e1', name: 'E', x: 16, y: 32, components: {
       Transform: createDefaultComponent('Transform', { x: 16, y: 32 }),
-      Event: { states: [{ ...createDefaultEventProps().states[0], id: 'pg', commands: [{ id: 'c1', type: 'wait', params: { ms: 5 } }] }] },
+      Event: { states: [{ ...createDefaultEventProps().states[0], id: 'pg', graph: commandsToGraph([{ id: 'c1', type: 'wait', params: { ms: 5 } }], () => 'start1') }] },
     },
   })
 
@@ -278,8 +290,8 @@ describe('cloneEntity', () => {
     expect(c).toEqual(e)
     expect(c).not.toBe(e)
     expect(c.components.Event).not.toBe(e.components.Event)
-    c.components.Event!.states[0].commands[0].params.ms = 9
-    expect(e.components.Event!.states[0].commands[0].params.ms).toBe(5)
+    c.components.Event!.states[0].graph.nodes[1].params.ms = 9
+    expect(e.components.Event!.states[0].graph.nodes[1].params.ms).toBe(5)
   })
 
   it('freshIds regenerates entity, state and command ids only', () => {
@@ -287,8 +299,11 @@ describe('cloneEntity', () => {
     const c = cloneEntity(e, true)
     expect(c.id).not.toBe('e1')
     expect(c.components.Event!.states[0].id).not.toBe('pg')
-    expect(c.components.Event!.states[0].commands[0].id).not.toBe('c1')
-    expect(c.components.Event!.states[0].commands[0].params).toEqual({ ms: 5 })
+    const [start, wait] = c.components.Event!.states[0].graph.nodes
+    expect(wait.id).not.toBe('c1')
+    expect(start.id).not.toBe('start1')
+    expect(start.out).toEqual({ next: wait.id }) // wires follow the new ids
+    expect(wait.params).toEqual({ ms: 5 })
     expect(c.components.Transform).toEqual(e.components.Transform)
   })
 })

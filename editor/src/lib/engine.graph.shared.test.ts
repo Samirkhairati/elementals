@@ -5,6 +5,11 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   addNode,
+  addNodeFrom,
+  cloneGraph,
+  normalizeGraph,
+  extractFragment,
+  pasteFragment,
   commandsToGraph,
   connect,
   createCommand,
@@ -144,6 +149,86 @@ describe('graph edits', () => {
     expect(r.nodes[0].out).toEqual({ a: 'x' })
     expect(r.nodes[0].params.options).toEqual([options[0]])
     expect(updateNodeParams(g, 'c', { cancel: 'none' })).toBe(g)
+  })
+
+  describe('addNodeFrom', () => {
+    it('adds a node wired from a port', () => {
+      const g = graphOf(node('s', 'start'))
+      const r = addNodeFrom(g, node('a', 'showText'), { nodeId: 's', port: 'next' })
+      expect(r.nodes.map((n) => n.id)).toEqual(['s', 'a'])
+      expect(r.nodes[0].out).toEqual({ next: 'a' })
+    })
+
+    it('inserts into an existing wire: the new node takes over the old target', () => {
+      const g = graphOf(node('s', 'start', { next: 'b' }), node('b', 'wait'))
+      const r = addNodeFrom(g, node('a', 'showText'), { nodeId: 's', port: 'next' })
+      expect(r.nodes.find((n) => n.id === 's')!.out).toEqual({ next: 'a' })
+      expect(r.nodes.find((n) => n.id === 'a')!.out).toEqual({ next: 'b' })
+    })
+
+    it('a branching node does not take over (it has no next); the old target is dropped from the wire only', () => {
+      const g = graphOf(node('s', 'start', { next: 'b' }), node('b', 'wait'))
+      const r = addNodeFrom(g, node('c', 'conditional'), { nodeId: 's', port: 'next' })
+      expect(r.nodes.find((n) => n.id === 'c')!.out).toEqual({})
+      expect(r.nodes.find((n) => n.id === 's')!.out).toEqual({ next: 'c' })
+    })
+
+    it('without a source, with a missing source or with a port the source lacks, it only adds', () => {
+      const g = graphOf(node('s', 'start'))
+      expect(addNodeFrom(g, node('a', 'wait')).nodes.map((n) => n.id)).toEqual(['s', 'a'])
+      expect(addNodeFrom(g, node('a', 'wait'), { nodeId: 'zz', port: 'next' }).nodes[0].out).toEqual({})
+      expect(addNodeFrom(g, node('a', 'wait'), { nodeId: 's', port: 'then' }).nodes[0].out).toEqual({})
+    })
+
+    it('refuses a duplicate id', () => {
+      const g = graphOf(node('s', 'start'), node('a', 'wait'))
+      expect(addNodeFrom(g, node('a', 'wait'), { nodeId: 's', port: 'next' })).toBe(g)
+    })
+  })
+
+  describe('fragments', () => {
+    const g = graphOf(
+      { ...node('s', 'start', { next: 'a' }), x: 0, y: 0 },
+      { ...node('a', 'showText', { next: 'b' }, { text: 'hi' }), x: 300, y: 100 },
+      { ...node('b', 'wait', { next: 'c' }), x: 560, y: 160 },
+      { ...node('c', 'end'), x: 820, y: 100 },
+    )
+
+    it('extracts the selection with relative positions and only the wires inside it', () => {
+      const f = extractFragment(g, ['a', 'b'])
+      expect(f.nodes.map((n) => [n.id, n.x, n.y, n.out])).toEqual([
+        ['a', 0, 0, { next: 'b' }],
+        ['b', 260, 60, {}], // b -> c leaves the selection
+      ])
+    })
+
+    it('never copies start', () => {
+      expect(extractFragment(g, ['s', 'a']).nodes.map((n) => n.id)).toEqual(['a'])
+      expect(extractFragment(g, []).nodes).toEqual([])
+    })
+
+    it('pastes with fresh ids, remapped wires and an offset, leaving the original alone', () => {
+      const f = extractFragment(g, ['a', 'b'])
+      const r = pasteFragment(g, f, { x: 10, y: 500 }, seq())
+      expect(r.ids).toHaveLength(2)
+      expect(r.ids.every((id) => !g.nodes.some((n) => n.id === id))).toBe(true)
+      const [a2, b2] = r.ids.map((id) => r.graph.nodes.find((n) => n.id === id)!)
+      expect(a2.type).toBe('showText')
+      expect(a2.params).toEqual({ text: 'hi' })
+      expect(a2.params).not.toBe(g.nodes[1].params)
+      expect(a2.out).toEqual({ next: b2.id })
+      expect([a2.x, a2.y, b2.x, b2.y]).toEqual([10, 500, 270, 560])
+      expect(r.graph.nodes.slice(0, 4)).toEqual(g.nodes)
+    })
+
+    it('a pasted fragment can be pasted again; start in a fragment is skipped', () => {
+      const f = extractFragment(g, ['a'])
+      const idFn = seq()
+      const once = pasteFragment(g, f, { x: 0, y: 0 }, idFn)
+      const twice = pasteFragment(once.graph, f, { x: 0, y: 0 }, idFn)
+      expect(new Set(twice.graph.nodes.map((n) => n.id)).size).toBe(twice.graph.nodes.length)
+      expect(pasteFragment(g, { nodes: [node('s', 'start')] }, { x: 0, y: 0 }, seq()).ids).toEqual([])
+    })
   })
 
   it('never mutates its input', () => {
@@ -487,12 +572,84 @@ describe('real project maps', () => {
       for (const entity of map.entities ?? []) {
         for (const state of entity.components?.Event?.states ?? []) {
           states++
-          const graph = commandsToGraph(state.commands, seq())
+          const graph = state.graph
           expect(validateGraph(graph).filter((i) => i.severity === 'error'), `${file}/${entity.id}`).toEqual([])
         }
       }
     }
     expect(states).toBeGreaterThan(0)
+  })
+})
+
+describe('normalizeGraph', () => {
+  it('keeps a well-formed graph as it is', () => {
+    const g = graphOf({ ...node('s', 'start', { next: 'a' }), x: 5, y: 6 }, node('a', 'wait', {}, { ms: 5 }))
+    expect(normalizeGraph(g)).toEqual({ ...g, frames: [] })
+  })
+
+  it('adds a start node when there is none and keeps only the first of several', () => {
+    const none = normalizeGraph({ nodes: [node('a', 'wait')] }, seq())
+    expect(none.nodes.map((n) => n.type)).toEqual(['start', 'wait'])
+    const several = normalizeGraph({ nodes: [node('s1', 'start'), node('s2', 'start'), node('a', 'wait')] })
+    expect(several.nodes.map((n) => n.id)).toEqual(['s1', 'a'])
+  })
+
+  it('repairs fields and drops what cannot be a node', () => {
+    const g = normalizeGraph({
+      nodes: [
+        { id: 'a', type: 'wait', params: 5, out: { next: 'b', bad: 7 }, x: 'no', y: NaN },
+        { id: 'a', type: 'wait' }, // duplicate id
+        { id: '', type: 'wait' },
+        { id: 'x' },
+        null,
+        'junk',
+      ],
+    })
+    expect(g.nodes.map((n) => n.id)).toEqual([expect.any(String), 'a'])
+    const a = g.nodes.find((n) => n.id === 'a')!
+    expect(a).toEqual({ id: 'a', type: 'wait', params: {}, out: { next: 'b' }, x: 0, y: 0 })
+  })
+
+  it('keeps dangling wires so validation can report them', () => {
+    const g = normalizeGraph({ nodes: [node('s', 'start', { next: 'gone' })] })
+    expect(g.nodes[0].out).toEqual({ next: 'gone' })
+    expect(validateGraph(g).map((i) => i.code)).toContain('dangling-edge')
+  })
+
+  it('repairs frames', () => {
+    const g = normalizeGraph({
+      nodes: [],
+      frames: [{ id: 'f', title: 5, color: 'red', x: 1, y: 2, w: 10, h: 'x' }, { id: 'f' }, { title: 'no id' }, 3],
+    })
+    expect(g.frames).toEqual([{ id: 'f', title: '', color: '#64748b', x: 1, y: 2, w: 40, h: 160 }])
+  })
+
+  it('accepts anything without throwing', () => {
+    for (const bad of [null, undefined, 5, 'x', [], { nodes: 'no', frames: 4 }]) expect(normalizeGraph(bad).nodes.map((n) => n.type)).toEqual(['start'])
+  })
+})
+
+describe('cloneGraph', () => {
+  const g = {
+    nodes: [node('s', 'start', { next: 'a' }), node('a', 'wait', { next: 'b', odd: 'outside' }, { ms: 5 }), node('b', 'end')],
+    frames: [{ id: 'f', title: 'T', color: '#000000', x: 0, y: 0, w: 100, h: 100 }],
+  }
+
+  it('is a deep copy that keeps ids by default', () => {
+    const c = cloneGraph(g)
+    expect(c).toEqual(g)
+    expect(c.nodes[1].params).not.toBe(g.nodes[1].params)
+    c.nodes[1].params.ms = 9
+    expect(g.nodes[1].params.ms).toBe(5)
+  })
+
+  it('with fresh ids renames nodes and frames and the wires follow; unknown targets stay as they were', () => {
+    const c = cloneGraph(g, true, seq())
+    expect(c.nodes.map((n) => n.id)).toEqual(['n-1', 'n-2', 'n-3'])
+    expect(c.nodes[0].out).toEqual({ next: 'n-2' })
+    expect(c.nodes[1].out).toEqual({ next: 'n-3', odd: 'outside' })
+    expect(c.frames[0].id).toBe('n-4')
+    expect(g.nodes[0].id).toBe('s')
   })
 })
 

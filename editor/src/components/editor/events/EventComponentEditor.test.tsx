@@ -76,9 +76,9 @@ describe('EventComponentEditor card', () => {
     expect(screen.getByText('Before')).toBeInTheDocument()
   })
 
-  it('says so when there are no commands', () => {
+  it('says so when nothing happens yet', () => {
     renderWithEnv(<Card states={[state('p1')]} />)
-    expect(screen.getByText('No commands yet')).toBeInTheDocument()
+    expect(screen.getByText('Nothing happens yet')).toBeInTheDocument()
     expect(screen.getByTestId('event-validation')).toHaveTextContent('OK')
   })
 
@@ -126,10 +126,10 @@ describe('opening the editor dialog', () => {
   it('Escape closes an open popover first and leaves the dialog open', () => {
     renderWithEnv(<Card states={[state('p1')]} />)
     fireEvent.click(screen.getByRole('button', { name: /Open event editor/ }))
-    fireEvent.click(screen.getByRole('button', { name: 'Add command' }))
-    expect(screen.getByRole('dialog', { name: 'Add a command' })).toBeInTheDocument()
-    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Search' }), { key: 'Escape' })
-    expect(screen.queryByRole('dialog', { name: 'Add a command' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Add node' }))
+    expect(screen.getByRole('dialog', { name: 'Add a node' })).toBeInTheDocument()
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Search nodes' }), { key: 'Escape' })
+    expect(screen.queryByRole('dialog', { name: 'Add a node' })).not.toBeInTheDocument()
     expect(screen.getByRole('dialog', { name: /Event editor/ })).toBeInTheDocument()
   })
 
@@ -150,8 +150,8 @@ describe('opening the editor dialog', () => {
     window.addEventListener('keydown', globalKey)
     renderWithEnv(<Card states={[state('p1', [cmd('1', 'wait')])]} />)
     fireEvent.click(screen.getByRole('button', { name: /Open event editor/ }))
-    fireEvent.keyDown(screen.getByRole('tree', { name: 'Commands' }), { key: 'e' })
-    fireEvent.keyDown(screen.getByRole('tree', { name: 'Commands' }), { key: 'Delete' })
+    fireEvent.keyDown(screen.getByTestId('graph-canvas'), { key: 'e' })
+    fireEvent.keyDown(screen.getByTestId('graph-canvas'), { key: 'Delete' })
     window.removeEventListener('keydown', globalKey)
     expect(globalKey).not.toHaveBeenCalled()
   })
@@ -161,7 +161,7 @@ describe('opening the editor dialog', () => {
     window.addEventListener('keydown', globalKey)
     renderWithEnv(<Card states={[state('p1', [cmd('1', 'wait')])]} />)
     fireEvent.click(screen.getByRole('button', { name: /Open event editor/ }))
-    fireEvent.keyDown(screen.getByRole('tree', { name: 'Commands' }), { key: 'z', ctrlKey: true })
+    fireEvent.keyDown(screen.getByTestId('graph-canvas'), { key: 'z', ctrlKey: true })
     window.removeEventListener('keydown', globalKey)
     expect(globalKey).toHaveBeenCalledTimes(1)
   })

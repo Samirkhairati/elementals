@@ -80,12 +80,83 @@ export function createGraph(idFn: IdFn = newId): EventGraph {
   return { nodes: [createGraphNode(GRAPH_START, { x: 0, y: 0 }, idFn)], frames: [] };
 }
 
+/** The command nodes of a graph in authoring order (start / end / junction left out). */
+export function commandNodes(graph: Pick<EventGraph, 'nodes'>): GraphNode[] {
+  return graph.nodes.filter((n) => !isStructural(n.type));
+}
+
 export function findStart(graph: EventGraph): GraphNode | undefined {
   return graph.nodes.find((n) => n.type === GRAPH_START);
 }
 
 export function getNode(graph: EventGraph, id: string): GraphNode | undefined {
   return graph.nodes.find((n) => n.id === id);
+}
+
+const DEFAULT_FRAME_COLOR = '#64748b';
+
+const finiteOr = (v: unknown, fallback: number): number => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
+
+/**
+ * Cleans an untrusted graph (from JSON): keeps well-formed nodes and frames, repairs missing fields and
+ * guarantees exactly one `start` node (the first one wins, a missing one is created). Wires are kept as
+ * they are even when they dangle, so `validateGraph` can still report them. Never throws.
+ */
+export function normalizeGraph(raw: unknown, idFn: IdFn = newId): EventGraph {
+  const nodes: GraphNode[] = [];
+  const seen = new Set<string>();
+  let start = false;
+  const list = isRecord(raw) && Array.isArray(raw.nodes) ? raw.nodes : [];
+  for (const n of list) {
+    if (!isRecord(n) || typeof n.id !== 'string' || n.id === '' || typeof n.type !== 'string' || seen.has(n.id)) continue;
+    if (n.type === GRAPH_START) {
+      if (start) continue;
+      start = true;
+    }
+    seen.add(n.id);
+    nodes.push({
+      id: n.id,
+      type: n.type,
+      params: isRecord(n.params) ? cloneJson(n.params) : {},
+      out: isRecord(n.out) ? Object.fromEntries(Object.entries(n.out).filter(([, to]) => typeof to === 'string')) as Record<string, string> : {},
+      x: finiteOr(n.x, 0),
+      y: finiteOr(n.y, 0),
+    });
+  }
+  if (!start) nodes.unshift(createGraphNode(GRAPH_START, {}, idFn));
+
+  const frames: EventGraph['frames'] = [];
+  const frameIds = new Set<string>();
+  for (const f of isRecord(raw) && Array.isArray(raw.frames) ? raw.frames : []) {
+    if (!isRecord(f) || typeof f.id !== 'string' || f.id === '' || frameIds.has(f.id)) continue;
+    frameIds.add(f.id);
+    frames.push({
+      id: f.id,
+      title: typeof f.title === 'string' ? f.title : '',
+      color: typeof f.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(f.color) ? f.color : DEFAULT_FRAME_COLOR,
+      x: finiteOr(f.x, 0),
+      y: finiteOr(f.y, 0),
+      w: Math.max(40, finiteOr(f.w, 240)),
+      h: Math.max(40, finiteOr(f.h, 160)),
+    });
+  }
+  return { nodes, frames };
+}
+
+/** Deep copy. With `freshIds` every node and frame gets a new id and the wires follow. */
+export function cloneGraph(graph: EventGraph, freshIds = false, idFn: IdFn = newId): EventGraph {
+  const map = new Map(graph.nodes.map((n) => [n.id, freshIds ? idFn() : n.id]));
+  return {
+    nodes: graph.nodes.map((n) => ({
+      id: map.get(n.id) as string,
+      type: n.type,
+      params: cloneJson(n.params),
+      out: Object.fromEntries(Object.entries(n.out).map(([port, to]) => [port, map.get(to) ?? to])),
+      x: n.x,
+      y: n.y,
+    })),
+    frames: graph.frames.map((f) => ({ ...f, id: freshIds ? idFn() : f.id })),
+  };
 }
 
 // ── edits (immutable) ───────────────────────────────────────────────────────────────────────────
@@ -190,6 +261,65 @@ export function updateNodeParams(graph: EventGraph, id: string, patch: Record<st
     const out = Object.fromEntries(Object.entries(n.out).filter(([port]) => valid.has(port)));
     return { ...n, params, out: Object.keys(out).length === Object.keys(n.out).length ? n.out : out };
   });
+}
+
+/**
+ * Adds `node` and, when `from` is given, wires `from.nodeId`'s port to it. If that port already led
+ * somewhere and the new node has a `next` port, the new node takes over the old target (the node is
+ * inserted into the wire instead of cutting it off).
+ */
+export function addNodeFrom(graph: EventGraph, node: GraphNode, from?: { nodeId: string; port: string }): EventGraph {
+  const added = addNode(graph, node);
+  if (added === graph || !from) return added;
+  const source = getNode(added, from.nodeId);
+  if (!source || !getPortDefs(source).some((p) => p.id === from.port)) return added;
+  const displaced = source.out[from.port];
+  let next = connect(added, from.nodeId, from.port, node.id);
+  if (displaced && displaced !== node.id && !node.out[NEXT_PORT] && getPortDefs(node).some((p) => p.id === NEXT_PORT)) {
+    next = connect(next, node.id, NEXT_PORT, displaced);
+  }
+  return next;
+}
+
+/** A copy of some nodes that can be pasted into any graph: wires between them are kept, the rest dropped. */
+export interface GraphFragment {
+  /** Positions are relative to the top-left of the selection. */
+  nodes: GraphNode[];
+}
+
+/** Copies the given nodes (never `start`). Wires to nodes outside the selection are dropped. */
+export function extractFragment(graph: EventGraph, ids: readonly string[]): GraphFragment {
+  const wanted = new Set(ids);
+  const chosen = graph.nodes.filter((n) => wanted.has(n.id) && n.type !== GRAPH_START);
+  const inside = new Set(chosen.map((n) => n.id));
+  const minX = chosen.length ? Math.min(...chosen.map((n) => n.x)) : 0;
+  const minY = chosen.length ? Math.min(...chosen.map((n) => n.y)) : 0;
+  return {
+    nodes: chosen.map((n) => ({
+      id: n.id,
+      type: n.type,
+      params: cloneJson(n.params),
+      out: Object.fromEntries(Object.entries(n.out).filter(([, to]) => inside.has(to))),
+      x: n.x - minX,
+      y: n.y - minY,
+    })),
+  };
+}
+
+/** Adds a fragment with fresh ids at `at` (the top-left of the pasted group). Returns the new node ids. */
+export function pasteFragment(graph: EventGraph, fragment: GraphFragment, at: { x: number; y: number }, idFn: IdFn = newId): { graph: EventGraph; ids: string[] } {
+  const fresh = new Map(fragment.nodes.filter((n) => n.type !== GRAPH_START).map((n) => [n.id, idFn()]));
+  const pasted: GraphNode[] = fragment.nodes
+    .filter((n) => fresh.has(n.id))
+    .map((n) => ({
+      id: fresh.get(n.id) as string,
+      type: n.type,
+      params: cloneJson(n.params),
+      out: Object.fromEntries(Object.entries(n.out).filter(([, to]) => fresh.has(to)).map(([port, to]) => [port, fresh.get(to) as string])),
+      x: n.x + at.x,
+      y: n.y + at.y,
+    }));
+  return { graph: { ...graph, nodes: [...graph.nodes, ...pasted] }, ids: pasted.map((n) => n.id) };
 }
 
 // ── queries ─────────────────────────────────────────────────────────────────────────────────────

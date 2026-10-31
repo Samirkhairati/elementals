@@ -5,7 +5,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { COMPONENT_TYPES, LEGACY_COMPONENT_TYPES, validateEditorMap } from '../../../shared/mapSchema'
 import { convertEditorMapToTiled, serializeTiledMap } from '../../../shared/mapExport'
-import { createCommand, createDefaultComponent } from '../../../shared/engine/index'
+import { commandsToGraph, createCommand, createDefaultComponent } from '../../../shared/engine/index'
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
 
@@ -43,19 +43,20 @@ describe('validateEditorMap + engine validation', () => {
 
   it('reports bad props and broken events as errors', () => {
     const ev = createDefaultComponent('Event')
-    ev.states[0].commands.push(createCommand('breakLoop'))
+    ev.states[0].graph.nodes.push({ id: 'b', type: 'breakLoop', params: {}, out: {}, x: 0, y: 0 })
+    ev.states[0].graph.nodes[0].out = { next: 'b' }
     ev.states[0].trigger = 'whenever' as any
     const res = validateEditorMap(map([entity({ Collider: { isSolid: 'maybe' }, Event: ev })]))
     expect(res.ok).toBe(false)
     expect(res.errors.join('\n')).toMatch(/Solid: must be true or false/)
     expect(res.errors.join('\n')).toMatch(/unknown trigger "whenever"/)
-    expect(res.errors.join('\n')).toMatch(/Break Loop can only be used inside a Loop/)
+    expect(res.errors.join('\n')).toMatch(/"breakLoop" cannot be used in a graph/)
     expect(res.errors[0]).toContain('entities[0] ("E")')
   })
 
   it('missing references only fail when a context is supplied', () => {
     const ev = createDefaultComponent('Event')
-    ev.states[0].commands.push(createCommand('setSwitch', { id: 'ghost' }))
+    ev.states[0].graph = commandsToGraph([createCommand('setSwitch', { id: 'ghost' })])
     const m = map([entity({ Event: ev })])
     expect(validateEditorMap(m).ok).toBe(true)
     const res = validateEditorMap(m, { context: { switchIds: ['s1'] } })
@@ -65,7 +66,7 @@ describe('validateEditorMap + engine validation', () => {
 
   it('unset command parameters are only warnings', () => {
     const ev = createDefaultComponent('Event')
-    ev.states[0].commands.push(createCommand('warp'))
+    ev.states[0].graph = commandsToGraph([createCommand('warp')])
     const res = validateEditorMap(map([entity({ Event: ev })]))
     expect(res.ok).toBe(true)
     expect(res.warnings.join()).toMatch(/"Map" is not set/)
@@ -83,7 +84,7 @@ describe('export always carries canonical entities', () => {
   it('migrates legacy maps and the result validates and re-exports identically', () => {
     const legacy = map([entity({ SpriteView: { texture: 'player-walk' }, Interactable: { type: 'on_step', targetMap: 'city.json', targetX: 3, targetY: 4 } })])
     const first = convertEditorMapToTiled(legacy, [])
-    expect(first.schemaVersion).toBe(3)
+    expect(first.schemaVersion).toBe(4)
     expect(Object.keys(first.entities[0].components)).toEqual(['Transform', 'Sprite', 'Event'])
     expect(validateEditorMap({ ...legacy, entities: first.entities }).warnings).toEqual([])
     expect(serializeTiledMap(convertEditorMapToTiled({ ...legacy, entities: first.entities } as any, []))).toBe(serializeTiledMap(first))
@@ -101,6 +102,6 @@ describe('plain Node (no bundler)', () => {
       console.log(JSON.stringify({ v: t.schemaVersion, c: Object.keys(t.entities[0].components), ok: validateEditorMap(m).ok, p: PREFABS.length, issues: validateEntity(t.entities[0]).length, changed: migrateMap(m).changed }));
     `
     const out = execFileSync(process.execPath, ['--input-type=module', '-e', script], { cwd: REPO, encoding: 'utf8' })
-    expect(JSON.parse(out.trim())).toEqual({ v: 3, c: ['Transform', 'Event'], ok: true, p: 7, issues: 0, changed: true })
+    expect(JSON.parse(out.trim())).toEqual({ v: 4, c: ['Transform', 'Event'], ok: true, p: 7, issues: 0, changed: true })
   })
 })

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { countAccess, countEvents, describeRefs, scanDatabaseUsage, type UsageMap } from './databaseUsage'
 import { createCommand } from '../../../shared/engine/commands'
+import { commandsToGraph } from '../../../shared/engine/graph'
 import { createDefaultEventState } from '../../../shared/engine/components'
 
 function entityWith(id: string, name: string, states: ReturnType<typeof createDefaultEventState>[]) {
@@ -44,7 +45,7 @@ describe('scanDatabaseUsage', () => {
     const loop = createCommand('loop')
     loop.branches = { body: [cond] }
     const state = createDefaultEventState()
-    state.commands = [set, loop]
+    state.graph = commandsToGraph([set, loop])
     const usage = scanDatabaseUsage([mapWith('m.json', [entityWith('e1', 'NPC', [state])])])
     expect(usage.switches.met).toHaveLength(1)
     expect(usage.switches.met[0]).toMatchObject({ where: 'command', commandType: 'setSwitch', commandId: set.id })
@@ -61,7 +62,7 @@ describe('scanDatabaseUsage', () => {
     const cond = createCommand('conditional', { conditions: [{ kind: 'switch', id: 'met', value: true }] })
     const state = createDefaultEventState('Talk')
     state.conditions = [{ kind: 'stage', id: 'cat', op: '>=', value: 'found' }]
-    state.commands = [setSw, setStage, branch, cond]
+    state.graph = commandsToGraph([setSw, setStage, branch, cond])
     const usage = scanDatabaseUsage([mapWith('m.json', [entityWith('e1', 'NPC', [state])])])
 
     expect(usage.stages.cat.map((r) => [r.where, r.access, r.commandType])).toEqual([
@@ -79,7 +80,7 @@ describe('scanDatabaseUsage', () => {
     const cmd = createCommand('setVariable', { id: 'steps', operand: 'const', sourceId: 'badges' })
     const empty = createCommand('setSwitch', { id: '' })
     const state = createDefaultEventState()
-    state.commands = [cmd, empty]
+    state.graph = commandsToGraph([cmd, empty])
     const usage = scanDatabaseUsage([mapWith('m.json', [entityWith('e1', 'NPC', [state])])])
     expect(usage.variables.badges).toBeUndefined()
     expect(usage.switches['']).toBeUndefined()
@@ -99,7 +100,7 @@ describe('scanDatabaseUsage', () => {
 
   it('counts events across maps, not references', () => {
     const state = createDefaultEventState('P')
-    state.commands = [createCommand('setSwitch', { id: 'met' }), createCommand('setSwitch', { id: 'met', value: false })]
+    state.graph = commandsToGraph([createCommand('setSwitch', { id: 'met' }), createCommand('setSwitch', { id: 'met', value: false })])
     state.conditions = [{ kind: 'switch', id: 'met', value: true }]
     const second = createDefaultEventState('Q')
     second.conditions = [{ kind: 'switch', id: 'met', value: true }]
@@ -116,7 +117,7 @@ describe('scanDatabaseUsage', () => {
   it('describes references one line per event state', () => {
     const state = createDefaultEventState('Intro')
     state.conditions = [{ kind: 'switch', id: 'met', value: true }]
-    state.commands = [createCommand('setSwitch', { id: 'met' })]
+    state.graph = commandsToGraph([createCommand('setSwitch', { id: 'met' })])
     const usage = scanDatabaseUsage([mapWith('town.json', [entityWith('e1', 'Guard', [state])])])
     expect(describeRefs(usage.switches.met)).toEqual(['town > Guard (Intro)'])
     expect(describeRefs(undefined)).toEqual([])

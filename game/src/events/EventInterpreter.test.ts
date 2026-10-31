@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { makeRig, cmd, state, type Rig } from '@/test/rig';
 import { EventInterpreter, YIELD_EVERY_COMMANDS } from './EventInterpreter';
 import { registerCommandHandler } from './commands';
-import { graphOf } from './EventRuntime';
 import { SpriteComponent } from '@/ecs/components/SpriteComponent';
 import { AnimationComponent } from '@/ecs/components/AnimationComponent';
 import { GridMovementComponent } from '@/ecs/components/GridMovementComponent';
@@ -505,7 +504,7 @@ describe('cancellation', () => {
 
   it('cancel before the run started cancels at once', async () => {
     const e = rig.add({ states: [state([cmd('setSwitch', { id: 's1', value: true })])] });
-    const interpreter = new EventInterpreter(graphOf(rig.world.getComponent(e, (await import('@/ecs/components/EventComponent')).EventComponent)!.states[0]), {
+    const interpreter = new EventInterpreter(rig.world.getComponent(e, (await import('@/ecs/components/EventComponent')).EventComponent)!.states[0].graph, {
       entity: e, entityId: 'x', getMapId: () => 'test', flags: rig.runtime.flags, inventory: rig.runtime.inventory, ui: rig.ui,
       clock: rig.runtime.clock, ops: rig.runtime.ops, maps: rig.maps, emit: () => {}, warn: () => {}, warnOnce: () => {}, random: () => 0,
     });

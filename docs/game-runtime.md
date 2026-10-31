@@ -37,7 +37,7 @@ Inventory         in-memory item counts (hasItem, giveItem, removeItem)
 conditions.ts     evaluateCondition(s)
 StateSelector     active state = last state whose conditions hold; applies appearance + solid overrides when the state CHANGES
 EventInterpreter  async, cancellable event-graph runner (one cursor along the node wires); handlers in commands/*.ts.
-                  States are still authored as command trees; `graphOf(state)` converts them once (`commandsToGraph`)
+                  runs `state.graph` (stored as a graph since schemaVersion 4)
 EventRuntime      owns state, clock, state selector, running interpreters, the `event` input lock
 TriggerSystem     ECS system (priority 350): decides when events start
 RouteSystem       ECS system (priority 260): runs moveRoute steps through GridMovement.pendingDirection

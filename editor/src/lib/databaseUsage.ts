@@ -148,11 +148,17 @@ export function scanDatabaseUsage(maps: readonly UsageMap[]): DatabaseUsage {
           stateName: typeof state.name === 'string' ? state.name : '',
         }
         for (const r of conditionRefs(state.conditions)) add(r.kind, r.id, { ...base, where: 'condition', access: r.access })
-        if (Array.isArray(state.commands)) {
-          visitCommands(state.commands, (cmd) => {
-            for (const r of commandRefs(cmd)) {
-              add(r.kind, r.id, { ...base, where: 'command', access: r.access, commandId: cmd.id, commandType: cmd.type })
-            }
+        // Graph states (schemaVersion 4); a command tree left over from older data is read too.
+        const nodes: unknown[] = isObject(state.graph) && Array.isArray(state.graph.nodes) ? state.graph.nodes : []
+        for (const raw of nodes) {
+          if (!isObject(raw) || typeof raw.type !== 'string') continue
+          const node = raw as unknown as Command
+          for (const r of commandRefs(node)) add(r.kind, r.id, { ...base, where: 'command', access: r.access, commandId: node.id, commandType: node.type })
+        }
+        const legacy = (state as { commands?: unknown }).commands
+        if (Array.isArray(legacy)) {
+          visitCommands(legacy, (cmd) => {
+            for (const r of commandRefs(cmd)) add(r.kind, r.id, { ...base, where: 'command', access: r.access, commandId: cmd.id, commandType: cmd.type })
           })
         }
       })

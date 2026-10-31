@@ -11,6 +11,7 @@ import {
   normalizeEventProps,
   normalizeProps,
   validateEntity,
+  commandNodes,
 } from '../../../shared/engine/index'
 
 // Legacy-format (schemaVersion 1) copies of project/maps/map2.json and market.json taken from git history
@@ -46,7 +47,7 @@ describe('legacy project maps (fixtures from git history)', () => {
     const { value, changed } = migrateMap(map)
     expect(map).toEqual(before) // input never mutated
     expect(changed).toBe(true)
-    expect(value.schemaVersion).toBe(3)
+    expect(value.schemaVersion).toBe(4)
 
     const [plain, full] = value.entities
     expect(plain).toBe(map.entities[0]) // same object: nothing to migrate
@@ -61,7 +62,8 @@ describe('legacy project maps (fixtures from git history)', () => {
     expect(full.components.Movement).toEqual({ controller: 'player', speed: 100, canRun: true, wanderRadius: 3, wanderInterval: 4000 })
     // empty Interactable -> an Event with one empty action state
     expect(full.components.Event.states).toHaveLength(1)
-    expect(full.components.Event.states[0]).toMatchObject({ name: 'State 1', conditions: [], trigger: 'action', commands: [], faceOnInteract: true, solid: null, appearance: {} })
+    expect(full.components.Event.states[0]).toMatchObject({ name: 'State 1', conditions: [], trigger: 'action', faceOnInteract: true, solid: null, appearance: {} })
+    expect(full.components.Event.states[0].graph.nodes.map((n: any) => n.type)).toEqual(['start'])
     expect(full).toMatchObject({ id: map.entities[1].id, name: 'New Entity1', x: 48, y: 192, visible: true, folder: null })
     for (const e of value.entities) expect(validateEntity(e)).toEqual([])
   })
@@ -75,8 +77,8 @@ describe('legacy project maps (fixtures from git history)', () => {
     expect(sign.components.Tag).toEqual({ tag: 'sign' })
     const state = sign.components.Event.states[0]
     expect(state.trigger).toBe('action')
-    expect(state.commands).toHaveLength(1)
-    expect(state.commands[0]).toMatchObject({ type: 'showText', params: { speaker: '', text: 'The ancient sign is faded...' } })
+    expect(commandNodes(state.graph)).toHaveLength(1)
+    expect(commandNodes(state.graph)[0]).toMatchObject({ type: 'showText', params: { speaker: '', text: 'The ancient sign is faded...' } })
     expect(validateEntity(sign)).toEqual([])
   })
 
@@ -193,7 +195,7 @@ describe('Interactable -> Event', () => {
   it('message -> showText; on_interact -> action trigger', () => {
     const p = state({ type: 'on_interact', message: 'Hello' })
     expect(p.trigger).toBe('action')
-    expect(p.commands.map((c: any) => [c.type, c.params])).toEqual([['showText', { speaker: '', text: 'Hello' }]])
+    expect(commandNodes(p.graph).map((c: any) => [c.type, c.params])).toEqual([['showText', { speaker: '', text: 'Hello' }]])
   })
 
   it('on_step -> playerTouch', () => {
@@ -204,23 +206,25 @@ describe('Interactable -> Event', () => {
 
   it('targetMap -> warp with TILE coordinates (as the old runtime/editor labels treat them)', () => {
     const p = state({ type: 'on_step', targetMap: 'city.json', targetX: 5, targetY: 7 })
-    expect(p.commands).toHaveLength(1)
-    expect(p.commands[0]).toMatchObject({ type: 'warp', params: { map: 'city', x: 5, y: 7, facing: '', fade: true } })
-    expect(state({ targetMap: 'market', targetX: '2' }).commands[0].params).toMatchObject({ map: 'market', x: 0, y: 0 })
+    expect(commandNodes(p.graph)).toHaveLength(1)
+    expect(commandNodes(p.graph)[0]).toMatchObject({ type: 'warp', params: { map: 'city', x: 5, y: 7, facing: '', fade: true } })
+    expect(commandNodes(state({ targetMap: 'market', targetX: '2' }).graph)[0].params).toMatchObject({ map: 'market', x: 0, y: 0 })
   })
 
   it('eventKey -> emit', () => {
-    expect(state({ eventKey: 'OPEN_CHEST_01' }).commands.map((c: any) => [c.type, c.params.event])).toEqual([['emit', 'OPEN_CHEST_01']])
+    expect(commandNodes(state({ eventKey: 'OPEN_CHEST_01' }).graph).map((c: any) => [c.type, c.params.event])).toEqual([['emit', 'OPEN_CHEST_01']])
   })
 
   it('several fields become several commands in the order showText, warp, emit', () => {
     const p = state({ type: 'on_interact', message: 'Bye', targetMap: 'town', targetX: 1, targetY: 2, eventKey: 'LEFT' })
-    expect(p.commands.map((c: any) => c.type)).toEqual(['showText', 'warp', 'emit'])
+    expect(commandNodes(p.graph).map((c: any) => c.type)).toEqual(['showText', 'warp', 'emit'])
   })
 
   it('nothing set -> an empty action state (the Event component is kept)', () => {
     const p = state({ type: 'on_interact', message: '', eventKey: '', targetMap: '' })
-    expect(p).toMatchObject({ trigger: 'action', commands: [] })
+    expect(p).toMatchObject({ trigger: 'action' })
+    expect(commandNodes(p.graph)).toEqual([])
+    expect(p.graph.nodes.map((n: any) => n.type)).toEqual(['start'])
   })
 
   it('ids are deterministic per entity and unique within it; the result validates', () => {
@@ -228,8 +232,8 @@ describe('Interactable -> Event', () => {
     const b = migrateEntity(ent({ Interactable: { message: 'a', targetMap: 'm', eventKey: 'k' } })).value
     expect(JSON.stringify(a)).toBe(JSON.stringify(b))
     const other = migrateEntity(ent({ Interactable: { message: 'a', targetMap: 'm', eventKey: 'k' } }, { id: 'ent-2' })).value
-    const ids = (e: any) => [e.components.Event.states[0].id, ...e.components.Event.states[0].commands.map((c: any) => c.id)]
-    expect(new Set(ids(a)).size).toBe(4)
+    const ids = (e: any) => [e.components.Event.states[0].id, ...e.components.Event.states[0].graph.nodes.map((c: any) => c.id)]
+    expect(new Set(ids(a)).size).toBe(5) // state, start, showText, warp, emit
     expect(ids(a)).not.toEqual(ids(other))
     expect(validateEntity(a, { mapIds: ['m'] }).filter((i) => i.severity === 'error')).toEqual([])
   })
@@ -304,7 +308,7 @@ describe('migrateMap', () => {
     const map = { name: 'm', width: 1, height: 1, layers: [] }
     const r = migrateMap(map)
     expect(r.changed).toBe(true)
-    expect(r.value).toEqual({ ...map, schemaVersion: 3 })
+    expect(r.value).toEqual({ ...map, schemaVersion: 4 })
     expect(map).not.toHaveProperty('schemaVersion')
     const again = migrateMap(r.value)
     expect(again.changed).toBe(false)
@@ -317,13 +321,78 @@ describe('migrateMap', () => {
     expect(Object.keys(r.value.entities[0].components)).toContain('Event')
   })
 
+  describe('Event commands -> graph (schemaVersion 4)', () => {
+    const tree = () => [
+      { id: 'c1', type: 'showText', params: { text: 'Hi' } },
+      {
+        id: 'c2',
+        type: 'conditional',
+        params: { conditions: [{ kind: 'switch', id: 's', value: true }] },
+        branches: { then: [{ id: 'c3', type: 'wait', params: { ms: 5 } }], else: [] },
+      },
+      { id: 'c4', type: 'exitEvent', params: {} },
+    ]
+    const withTree = (extra: Record<string, unknown> = {}) => ({
+      schemaVersion: 3,
+      entities: [ent({ Event: { states: [{ id: 'st1', name: 'One', conditions: [], trigger: 'action', commands: tree(), faceOnInteract: true, solid: null, appearance: {}, ...extra }] } })],
+    })
+
+    it('turns the tree into a graph that keeps the command ids and drops `commands`', () => {
+      const r = migrateMap(withTree())
+      const state = (r.value.entities[0].components as any).Event.states[0]
+      expect(state).not.toHaveProperty('commands')
+      expect(state.graph.frames).toEqual([])
+      expect(state.graph.nodes.map((n: any) => n.id).sort()).toEqual(['c1', 'c2', 'c3', 'c4', expect.any(String)].sort())
+      const byId = Object.fromEntries(state.graph.nodes.map((n: any) => [n.id, n]))
+      expect(byId.c1.out).toEqual({ next: 'c2' })
+      expect(byId.c2.out).toEqual({ then: 'c3', else: 'c4' })
+      expect(byId.c3.out).toEqual({ next: 'c4' })
+      expect(byId.c4.type).toBe('end') // exitEvent
+      expect(state.graph.nodes.find((n: any) => n.type === 'start').out).toEqual({ next: 'c1' })
+    })
+
+    it('is deterministic (same start id) and idempotent', () => {
+      const a = migrateMap(withTree()).value
+      const b = migrateMap(withTree()).value
+      expect(JSON.stringify(a)).toBe(JSON.stringify(b))
+      const again = migrateMap(a)
+      expect(again.changed).toBe(false)
+      expect(again.value).toBe(a)
+    })
+
+    it('every migrated graph validates without errors', () => {
+      const e = migrateMap(withTree()).value.entities[0]
+      expect(validateEntity(e).filter((i) => i.severity === 'error')).toEqual([])
+    })
+
+    it('leaves states that already have a graph, and still removes nothing else', () => {
+      const graph = { nodes: [{ id: 's', type: 'start', params: {}, out: {}, x: 0, y: 0 }], frames: [] }
+      const r = migrateMap({ schemaVersion: 3, entities: [ent({ Event: { states: [{ id: 'g', name: 'G', conditions: [], trigger: 'action', graph, faceOnInteract: true, solid: null, appearance: {} }] } })] })
+      expect((r.value.entities[0].components as any).Event.states[0].graph).toEqual(graph)
+    })
+
+    it('skips junk entries of the tree instead of failing', () => {
+      const messy = withTree()
+      ;(messy.entities[0].components as any).Event.states[0].commands = [null, 5, { type: 'wait' }, { id: 'ok', type: 'wait', params: { ms: 1 } }]
+      const state = (migrateMap(messy).value.entities[0].components as any).Event.states[0]
+      expect(state.graph.nodes.filter((n: any) => n.type === 'wait').map((n: any) => n.id)).toEqual(['ok'])
+    })
+
+    it('does not mutate its input', () => {
+      const input = withTree()
+      const before = structuredClone(input)
+      migrateMap(input)
+      expect(input).toEqual(before)
+    })
+  })
+
   describe('Event pages -> states (schemaVersion 3)', () => {
-    const page = { id: 'p1', name: 'Page 1', conditions: [], trigger: 'action', commands: [], faceOnInteract: true, solid: null, appearance: {} }
+    const page = { id: 'p1', name: 'Page 1', conditions: [], trigger: 'action', graph: { nodes: [{ id: 's', type: 'start', params: {}, out: {}, x: 0, y: 0 }], frames: [] }, faceOnInteract: true, solid: null, appearance: {} }
 
     it('renames the Event component list and leaves everything else alone', () => {
       const r = migrateMap({ schemaVersion: 2, entities: [ent({ Event: { pages: [page] }, Tag: { tag: 'npc' } })] })
       expect(r.changed).toBe(true)
-      expect(r.value.schemaVersion).toBe(3)
+      expect(r.value.schemaVersion).toBe(4)
       const components = r.value.entities[0].components as Record<string, any>
       expect(components.Event).toEqual({ states: [page] })
       expect(components.Tag).toEqual({ tag: 'npc' })

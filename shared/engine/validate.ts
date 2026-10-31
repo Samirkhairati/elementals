@@ -3,6 +3,7 @@
 import type { EntityIssue, FieldDef, IssueSeverity, ValidationContext } from './types.ts';
 import { COMPONENT_SCHEMAS, isComponentType } from './components.ts';
 import { validateCommands, validateConditions } from './commands.ts';
+import { validateGraph } from './graph.ts';
 import { EVENT_TRIGGERS, isFacing } from './constants.ts';
 import { isLegacyComponentType } from './migrate.ts';
 import { isRecord } from './util.ts';
@@ -55,9 +56,9 @@ export function validateEntity(entity: unknown, ctx: ValidationContext = {}): En
     return [{ entityId: '', path: '', severity: 'error', code: 'bad-entity', message: 'Entity is not an object' }];
   }
   const entityId = typeof entity.id === 'string' ? entity.id : '';
-  const add = (severity: IssueSeverity, code: string, message: string, path = '', commandId?: string) => {
+  const add = (severity: IssueSeverity, code: string, message: string, path = '', nodeId?: string) => {
     const issue: EntityIssue = { entityId, path, severity, message, code };
-    if (commandId) issue.commandId = commandId;
+    if (nodeId) issue.nodeId = nodeId;
     issues.push(issue);
   };
 
@@ -120,7 +121,7 @@ function validateEvent(
   props: Record<string, unknown>,
   base: string,
   ctx: ValidationContext,
-  add: (s: IssueSeverity, code: string, msg: string, p?: string, commandId?: string) => void,
+  add: (s: IssueSeverity, code: string, msg: string, p?: string, nodeId?: string) => void,
 ): void {
   if (!Array.isArray(props.states) || props.states.length === 0) {
     add('error', 'no-states', 'Event needs at least one state', `${base}.states`);
@@ -155,12 +156,17 @@ function validateEvent(
       add('warning', 'dangling-sprite', `State ${i + 1}: appearance sprite "${state.appearance.asset}" does not exist`, `${pp}.appearance.asset`);
     }
 
-    if (!Array.isArray(state.commands)) {
-      add('error', 'bad-state', `State ${i + 1}: commands must be a list`, `${pp}.commands`);
-      return;
-    }
-    for (const issue of validateCommands(state.commands as never, ctx)) {
-      add(issue.severity, issue.code, `State ${i + 1}: ${issue.message}`, formatCommandPath(issue.path, `${pp}.commands`), issue.commandId);
+    if (isRecord(state.graph)) {
+      for (const issue of validateGraph(state.graph, ctx)) {
+        add(issue.severity, issue.code, `State ${i + 1}: ${issue.message}`, issue.nodeId ? `${pp}.graph.nodes[${issue.nodeId}]${issue.port ? `.out.${issue.port}` : ''}` : `${pp}.graph`, issue.nodeId || undefined);
+      }
+    } else if (Array.isArray(state.commands)) {
+      // A command tree from before schemaVersion 4 (not migrated yet): still checked.
+      for (const issue of validateCommands(state.commands as never, ctx)) {
+        add(issue.severity, issue.code, `State ${i + 1}: ${issue.message}`, formatCommandPath(issue.path, `${pp}.commands`), issue.commandId);
+      }
+    } else {
+      add('error', 'bad-state', `State ${i + 1}: graph must be an object`, `${pp}.graph`);
     }
   });
 }

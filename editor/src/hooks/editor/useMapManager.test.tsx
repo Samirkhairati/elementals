@@ -1,6 +1,7 @@
 import { StrictMode, type ReactNode } from 'react'
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
+import { commandNodes } from '../../../../shared/engine/graph'
 import { mapSaveQueue } from '@/lib/saveQueue'
 import { installElectronAPI, makeEntity, makeLayer, makeMap, uninstallElectronAPI } from '@/test/helpers'
 import { useMapManager } from './useMapManager'
@@ -54,9 +55,9 @@ describe('useMapManager', () => {
     const { result } = renderHook(() => useMapManager({ onMapSelected }), { wrapper })
     act(() => result.current.onSelectMap(legacy))
     const active = result.current.activeMap!
-    expect(active.schemaVersion).toBe(3)
+    expect(active.schemaVersion).toBe(4)
     expect(Object.keys(active.entities![0].components)).toEqual(['Transform', 'Event'])
-    expect(active.entities![0].components.Event!.states[0].commands[0]).toMatchObject({ type: 'showText', params: { text: 'hello' } })
+    expect(commandNodes(active.entities![0].components.Event!.states[0].graph)[0]).toMatchObject({ type: 'showText', params: { text: 'hello' } })
     expect(legacy.entities![0].components).toHaveProperty('Interactable') // input untouched
     expect(onMapSelected).toHaveBeenCalledWith(active.layers, active.entities)
   })
@@ -73,7 +74,7 @@ describe('useMapManager', () => {
       await result.current.loadMaps()
     })
     const loaded = result.current.maps[0]
-    expect(loaded.schemaVersion).toBe(3)
+    expect(loaded.schemaVersion).toBe(4)
     expect(loaded.entities![0].components.Movement).toMatchObject({ controller: 'player' })
     expect(loaded.entities![0].components.Sprite).toMatchObject({ asset: 'characters/player' })
   })

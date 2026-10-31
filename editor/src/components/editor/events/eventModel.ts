@@ -1,31 +1,21 @@
-// Pure helpers behind the event editor: state operations, command-tree edits (on top of the shared
-// helpers), clipboard format, templates, validation/summary contexts. No React in here, so everything
-// is unit-testable and every function returns new data (inputs are never mutated).
+// Pure helpers behind the event editor: state operations, templates, validation/summary contexts and
+// problems. The graph itself is edited by `graphModel.ts`. No React in here, so everything is
+// unit-testable and every function returns new data (inputs are never mutated).
 
 import type {
   Command,
-  CommandIssue,
   Condition,
   EventState,
+  GraphIssue,
   IssueSeverity,
+  StageDef,
   SummaryContext,
   ValidationContext,
-  StageDef,
   VariableDef,
 } from '../../../../../shared/engine/types'
-import {
-  cloneCommands,
-  createCommand,
-  findCommand,
-  getBranchDefs,
-  getCommandDef,
-  insertCommand,
-  moveCommand,
-  removeCommand,
-  validateCommands,
-  validateConditions,
-} from '../../../../../shared/engine/commands'
+import { createCommand, validateConditions } from '../../../../../shared/engine/commands'
 import { createDefaultEventState } from '../../../../../shared/engine/components'
+import { cloneGraph, commandNodes, commandsToGraph, validateGraph } from '../../../../../shared/engine/graph'
 import { newId } from '../../../../../shared/engine/ids'
 import { cloneJson } from '../../../../../shared/engine/util'
 import type { EventEnv } from './eventEnv'
@@ -48,10 +38,10 @@ export function duplicateState(states: EventState[], id: string): { states: Even
   if (index < 0) return { states, id: null }
   const source = states[index]
   const copy: EventState = {
-    ...cloneJson({ ...source, commands: [] as Command[] }),
+    ...cloneJson({ ...source, graph: undefined }),
     id: newId(),
     name: source.name.trim() ? `${source.name.trim()} copy` : '',
-    commands: cloneCommands(source.commands, true),
+    graph: cloneGraph(source.graph, true),
   }
   return { states: [...states.slice(0, index + 1), copy, ...states.slice(index + 1)], id: copy.id }
 }
@@ -128,308 +118,6 @@ export function defaultActiveStateIndex(states: readonly EventState[], variables
   return -1
 }
 
-// ── command tree ────────────────────────────────────────────────────────────────────────────────
-
-/** The list a command lives in: root (parentId null) or one branch of a parent. */
-export function getList(tree: Command[], parentId: string | null, branch: string | null): Command[] | null {
-  if (parentId === null) return tree
-  const parent = findCommand(tree, parentId)
-  if (!parent || branch === null) return null
-  return parent.command.branches?.[branch] ?? []
-}
-
-function replaceCommand(list: Command[], id: string, fn: (c: Command) => Command): Command[] {
-  let changed = false
-  const next = list.map((c) => {
-    if (c.id === id) {
-      const replaced = fn(c)
-      if (replaced !== c) changed = true
-      return replaced
-    }
-    if (c.branches) {
-      let sub = false
-      const branches: Record<string, Command[]> = {}
-      for (const [k, v] of Object.entries(c.branches)) {
-        const r = replaceCommand(v, id, fn)
-        if (r !== v) sub = true
-        branches[k] = r
-      }
-      if (sub) {
-        changed = true
-        return { ...c, branches }
-      }
-    }
-    return c
-  })
-  return changed ? next : list
-}
-
-/**
- * Patches a command's params. New branch ids get an empty list (shared helper behaviour); ids in
- * `pruneBranches` are deleted together with their commands (used when a choice option is removed).
- */
-export function setCommandParams(tree: Command[], id: string, patch: Record<string, unknown>, pruneBranches: string[] = []): Command[] {
-  const info = findCommand(tree, id)
-  if (!info) return tree
-  const params = { ...info.command.params, ...patch }
-  const defs = getBranchDefs({ type: info.command.type, params })
-  return replaceCommand(tree, id, (c) => {
-    const branches: Record<string, Command[]> = { ...(c.branches ?? {}) }
-    for (const b of defs) if (!branches[b.id]) branches[b.id] = []
-    for (const b of pruneBranches) delete branches[b]
-    const next: Command = { ...c, params }
-    if (Object.keys(branches).length > 0) next.branches = branches
-    else delete next.branches
-    return next
-  })
-}
-
-/** Removes a whole branch (list and commands) of a command - for branches that no longer exist. */
-export function removeBranch(tree: Command[], id: string, branch: string): Command[] {
-  return replaceCommand(tree, id, (c) => {
-    if (!c.branches || !Object.hasOwn(c.branches, branch)) return c
-    const branches = { ...c.branches }
-    delete branches[branch]
-    const next: Command = { ...c }
-    if (Object.keys(branches).length > 0) next.branches = branches
-    else delete next.branches
-    return next
-  })
-}
-
-/** Where new commands go. */
-export type InsertTarget =
-  | { kind: 'before'; id: string }
-  | { kind: 'after'; id: string }
-  | { kind: 'end'; parentId: string | null; branch: string | null }
-
-/** Inserts commands (kept in order) at the target. Unusable target: tree unchanged. */
-export function insertCommands(tree: Command[], target: InsertTarget, cmds: Command[]): Command[] {
-  let parentId: string | null
-  let branch: string | null
-  let index: number
-  if (target.kind === 'end') {
-    parentId = target.parentId
-    branch = target.branch
-    const list = getList(tree, parentId, branch)
-    if (!list) return tree
-    index = list.length
-  } else {
-    const info = findCommand(tree, target.id)
-    if (!info) return tree
-    parentId = info.parentId
-    branch = info.branch
-    index = info.index + (target.kind === 'after' ? 1 : 0)
-  }
-  let next = tree
-  cmds.forEach((c, i) => {
-    next = insertCommand(next, { parentId, branch, index: index + i }, c)
-  })
-  return next
-}
-
-/** Swaps a command with its neighbour inside the same list (Alt+Up/Down). */
-export function moveWithin(tree: Command[], id: string, delta: -1 | 1): Command[] {
-  const info = findCommand(tree, id)
-  if (!info) return tree
-  const list = getList(tree, info.parentId, info.branch)
-  const to = info.index + delta
-  if (!list || to < 0 || to >= list.length) return tree
-  return moveCommand(tree, id, { parentId: info.parentId, branch: info.branch, index: to })
-}
-
-export type DropTarget = InsertTarget
-
-/**
- * Drag & drop: moves `dragId` to the drop target. Returns the same tree when nothing would change
- * (dropped on itself, into its own subtree or onto its current position).
- */
-export function dropCommand(tree: Command[], dragId: string, target: DropTarget): Command[] {
-  const drag = findCommand(tree, dragId)
-  if (!drag) return tree
-  let parentId: string | null
-  let branch: string | null
-  let index: number
-  if (target.kind === 'end') {
-    if (target.parentId === dragId) return tree
-    parentId = target.parentId
-    branch = target.branch
-    const list = getList(tree, parentId, branch)
-    if (!list) return tree
-    index = list.length
-  } else {
-    if (target.id === dragId) return tree
-    const info = findCommand(tree, target.id)
-    if (!info) return tree
-    parentId = info.parentId
-    branch = info.branch
-    index = info.index + (target.kind === 'after' ? 1 : 0)
-  }
-  const sameList = drag.parentId === parentId && drag.branch === branch
-  if (sameList && drag.index < index) index -= 1
-  if (sameList && drag.index === index) return tree
-  return moveCommand(tree, dragId, { parentId, branch, index })
-}
-
-/** Ids of the rows the list shows, top to bottom (children of collapsed commands are hidden). */
-export function visibleOrder(tree: Command[], collapsed: ReadonlySet<string>): string[] {
-  const out: string[] = []
-  const walk = (list: Command[]) => {
-    for (const c of list) {
-      out.push(c.id)
-      if (c.branches && !collapsed.has(c.id)) {
-        for (const b of orderedBranches(c)) walk(c.branches[b.id] ?? [])
-      }
-    }
-  }
-  walk(tree)
-  return out
-}
-
-export interface BranchView {
-  id: string
-  label: string
-  /** False for branches the command no longer exposes (their commands never run). */
-  active: boolean
-}
-
-/** Branches of a command in display order: the defined ones first, then orphans that still hold commands. */
-export function orderedBranches(cmd: Command): BranchView[] {
-  const defs = getBranchDefs(cmd)
-  const out: BranchView[] = defs.map((d) => ({ id: d.id, label: d.label, active: true }))
-  for (const [id, list] of Object.entries(cmd.branches ?? {})) {
-    if (!defs.some((d) => d.id === id) && Array.isArray(list) && list.length > 0) out.push({ id, label: id, active: false })
-  }
-  return out
-}
-
-/** Header text for a branch row: "Then / Else", "Choice: Yes", "Loop body" ... */
-export function branchHeading(cmd: Command, branch: BranchView): string {
-  if (!branch.active) return `Removed branch "${branch.label}" (never runs)`
-  switch (cmd.type) {
-    case 'conditional':
-      return branch.id === 'then' ? 'Then' : 'Else'
-    case 'showChoices':
-      return branch.id === 'cancel' ? 'When cancelled' : `Choice: ${branch.label}`
-    case 'loop':
-      return 'Loop body'
-    default:
-      return branch.label
-  }
-}
-
-/** Which command to select after `id` was removed: the next row, else the previous one, else none. */
-export function selectionAfterRemove(tree: Command[], id: string, collapsed: ReadonlySet<string>): string | null {
-  const order = visibleOrder(tree, collapsed)
-  const at = order.indexOf(id)
-  if (at < 0) return null
-  const subtree = findCommand(tree, id)
-  const skip = new Set<string>()
-  if (subtree) {
-    const collect = (c: Command) => {
-      skip.add(c.id)
-      for (const list of Object.values(c.branches ?? {})) list.forEach(collect)
-    }
-    collect(subtree.command)
-  }
-  const remaining = order.filter((x) => !skip.has(x))
-  const before = order.slice(0, at).filter((x) => !skip.has(x))
-  const after = order.slice(at + 1).find((x) => !skip.has(x))
-  return after ?? before[before.length - 1] ?? (remaining[0] ?? null)
-}
-
-export function removeCommandAndSelect(
-  tree: Command[],
-  id: string,
-  collapsed: ReadonlySet<string>,
-): { tree: Command[]; select: string | null } {
-  const select = selectionAfterRemove(tree, id, collapsed)
-  return { tree: removeCommand(tree, id), select }
-}
-
-/** Number of commands inside a branch (0 when it does not exist). */
-export function branchCommandCount(cmd: Command, branch: string): number {
-  const list = cmd.branches?.[branch]
-  if (!Array.isArray(list)) return 0
-  let n = 0
-  const count = (l: Command[]) => {
-    for (const c of l) {
-      n++
-      for (const sub of Object.values(c.branches ?? {})) count(sub)
-    }
-  }
-  count(list)
-  return n
-}
-
-// ── clipboard ───────────────────────────────────────────────────────────────────────────────────
-
-const CLIPBOARD_FORMAT = 'elementals/commands'
-let memoryClipboard: Command[] | null = null
-
-export function serializeCommands(cmds: Command[]): string {
-  return JSON.stringify({ format: CLIPBOARD_FORMAT, version: 1, commands: cmds })
-}
-
-function isKnownTree(list: unknown): list is Command[] {
-  if (!Array.isArray(list)) return false
-  return list.every((c) => {
-    if (typeof c !== 'object' || c === null) return false
-    const cmd = c as Partial<Command>
-    if (typeof cmd.type !== 'string' || !getCommandDef(cmd.type)) return false
-    if (typeof cmd.params !== 'object' || cmd.params === null || Array.isArray(cmd.params)) return false
-    if (cmd.branches === undefined) return true
-    if (typeof cmd.branches !== 'object' || cmd.branches === null) return false
-    return Object.values(cmd.branches).every(isKnownTree)
-  })
-}
-
-/** Parses clipboard text; null when it is not a list of known commands. */
-export function parseCommands(text: string): Command[] | null {
-  try {
-    const data = JSON.parse(text) as { format?: unknown; commands?: unknown }
-    if (data?.format !== CLIPBOARD_FORMAT || !isKnownTree(data.commands) || data.commands.length === 0) return null
-    return data.commands
-  } catch {
-    return null
-  }
-}
-
-/** Copies with new ids for every command (the tree you paste never shares ids with the original). */
-export function freshCopies(cmds: Command[]): Command[] {
-  return cloneCommands(cmds, true)
-}
-
-export function setMemoryClipboard(cmds: Command[] | null): void {
-  memoryClipboard = cmds ? cloneCommands(cmds) : null
-}
-
-export function getMemoryClipboard(): Command[] | null {
-  return memoryClipboard ? cloneCommands(memoryClipboard) : null
-}
-
-/** Writes commands to the system clipboard (best effort) and always to the in-memory fallback. */
-export async function writeCommandClipboard(cmds: Command[]): Promise<void> {
-  setMemoryClipboard(cmds)
-  try {
-    await navigator.clipboard?.writeText(serializeCommands(cmds))
-  } catch {
-    /* the in-memory copy is enough */
-  }
-}
-
-/** Reads commands from the system clipboard, falling back to the in-memory copy. */
-export async function readCommandClipboard(): Promise<Command[] | null> {
-  try {
-    const text = await navigator.clipboard?.readText()
-    const parsed = text ? parseCommands(text) : null
-    if (parsed) return parsed
-  } catch {
-    /* permission denied or unsupported */
-  }
-  return getMemoryClipboard()
-}
-
 // ── templates ───────────────────────────────────────────────────────────────────────────────────
 
 export interface EventTemplate {
@@ -441,8 +129,11 @@ export interface EventTemplate {
   build: () => { commands: Command[]; extraStates?: EventState[] }
 }
 
-function extraState(name: string, partial: Partial<EventState>): EventState {
-  return { ...createDefaultEventState(name), ...partial }
+/** A second state for a template; `commands` are turned into its graph. */
+function extraState(name: string, partial: Partial<Omit<EventState, 'graph'>> & { commands?: Command[] }): EventState {
+  const { commands, ...rest } = partial
+  const state = { ...createDefaultEventState(name), ...rest }
+  return commands ? { ...state, graph: commandsToGraph(commands) } : state
 }
 
 export const EVENT_TEMPLATES: EventTemplate[] = [
@@ -515,21 +206,22 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
   },
 ]
 
+/** True when a state's graph has nothing but its start node. */
+export function isEmptyGraph(state: Pick<EventState, 'graph'>): boolean {
+  return commandNodes(state.graph).length === 0
+}
+
 /**
- * Applies a template to a state list: the commands go to `target` of the given state, extra states are
- * appended (skipped when the event already has more than this state, so applying twice stays tidy).
+ * Starts a state from a template: the template's commands become the state's graph (laid out) and its extra
+ * states are appended (skipped when the event already has more than this state, so applying twice stays
+ * tidy). Only an empty state takes a template; otherwise nothing changes.
  */
-export function applyTemplate(
-  states: EventState[],
-  stateId: string,
-  template: EventTemplate,
-  target?: InsertTarget,
-): { states: EventState[]; selectId: string | null } {
+export function applyTemplate(states: EventState[], stateId: string, template: EventTemplate): { states: EventState[]; selectId: string | null } {
   const state = states.find((p) => p.id === stateId)
-  if (!state) return { states, selectId: null }
+  if (!state || !isEmptyGraph(state)) return { states, selectId: null }
   const built = template.build()
-  const commands = insertCommands(state.commands, target ?? { kind: 'end', parentId: null, branch: null }, built.commands)
-  let next = updateState(states, stateId, { commands })
+  const graph = commandsToGraph(built.commands)
+  let next = updateState(states, stateId, { graph })
   if (built.extraStates && states.length === 1) next = [...next, ...built.extraStates]
   return { states: next, selectId: built.commands[0]?.id ?? null }
 }
@@ -570,8 +262,8 @@ export interface Problem {
   severity: IssueSeverity
   code: string
   message: string
-  scope: 'command' | 'conditions' | 'appearance'
-  commandId?: string
+  scope: 'node' | 'conditions' | 'appearance'
+  nodeId?: string
 }
 
 export function severityRank(s: IssueSeverity): number {
@@ -584,18 +276,19 @@ export function worstSeverity(issues: readonly { severity: IssueSeverity }[] | u
   return issues.some((i) => i.severity === 'error') ? 'error' : 'warning'
 }
 
-export function groupIssuesByCommand(issues: readonly CommandIssue[]): Map<string, CommandIssue[]> {
-  const map = new Map<string, CommandIssue[]>()
+export function groupIssuesByNode(issues: readonly GraphIssue[]): Map<string, GraphIssue[]> {
+  const map = new Map<string, GraphIssue[]>()
   for (const issue of issues) {
-    const list = map.get(issue.commandId)
+    if (!issue.nodeId) continue
+    const list = map.get(issue.nodeId)
     if (list) list.push(issue)
-    else map.set(issue.commandId, [issue])
+    else map.set(issue.nodeId, [issue])
   }
   return map
 }
 
-/** Validation of one state: conditions, appearance and the command tree. Never throws. */
-export function validateState(state: EventState, ctx: ValidationContext): { commandIssues: CommandIssue[]; stateProblems: Omit<Problem, 'stateId' | 'stateIndex'>[] } {
+/** Validation of one state: conditions, appearance and the graph. Never throws. */
+export function validateState(state: EventState, ctx: ValidationContext): { nodeIssues: GraphIssue[]; stateProblems: Omit<Problem, 'stateId' | 'stateIndex'>[] } {
   const stateProblems: Omit<Problem, 'stateId' | 'stateIndex'>[] = []
   for (const c of validateConditions(state.conditions, ctx)) {
     stateProblems.push({ severity: c.severity, code: c.code, message: `Condition ${c.index + 1}: ${c.message}`, scope: 'conditions' })
@@ -604,23 +297,23 @@ export function validateState(state: EventState, ctx: ValidationContext): { comm
   if (asset && ctx.spriteIds && !ctx.spriteIds.includes(asset)) {
     stateProblems.push({ severity: 'warning', code: 'dangling-sprite', message: `Appearance sprite "${asset}" does not exist`, scope: 'appearance' })
   }
-  return { commandIssues: validateCommands(state.commands, ctx), stateProblems }
+  return { nodeIssues: validateGraph(state.graph, ctx), stateProblems }
 }
 
 export function collectProblems(states: readonly EventState[], ctx: ValidationContext): Problem[] {
   const out: Problem[] = []
   states.forEach((state, stateIndex) => {
-    const { commandIssues, stateProblems } = validateState(state, ctx)
+    const { nodeIssues, stateProblems } = validateState(state, ctx)
     for (const p of stateProblems) out.push({ ...p, stateId: state.id, stateIndex })
-    for (const i of commandIssues) {
+    for (const i of nodeIssues) {
       out.push({
         stateId: state.id,
         stateIndex,
         severity: i.severity,
         code: i.code,
         message: i.message,
-        scope: 'command',
-        commandId: i.commandId || undefined,
+        scope: 'node',
+        nodeId: i.nodeId || undefined,
       })
     }
   })

@@ -1,4 +1,4 @@
-import { commandsToGraph, type Command, type EventGraph, type EventState, type GameDatabase } from "@shared/engine/index.ts";
+import type { EventState, GameDatabase } from "@shared/engine/index.ts";
 import type { World } from "@/ecs/World";
 import type { Entity } from "@/ecs/Entity";
 import { EventComponent } from "@/ecs/components/EventComponent";
@@ -14,23 +14,6 @@ import { StateSelector } from "./StateSelector";
 import { WorldEntityOps } from "./WorldEntityOps";
 import { EventInterpreter, type RunResult } from "./EventInterpreter";
 import type { EventContext, EventUI, MapService } from "./types";
-
-const graphCache = new WeakMap<object, EventGraph>();
-
-/**
- * The graph a state runs. States are still authored as command trees; each one is converted once (cached
- * by its command list) and the interpreter only ever sees graphs. Layout is skipped: the game does not
- * draw graphs.
- */
-export function graphOf(state: Pick<EventState, "commands">): EventGraph {
-  const key = state.commands as object;
-  let graph = graphCache.get(key);
-  if (!graph) {
-    graph = commandsToGraph(state.commands as Command[], () => "start", { layout: false });
-    graphCache.set(key, graph);
-  }
-  return graph;
-}
 
 export interface EventRuntimeOptions {
   world: World;
@@ -194,7 +177,7 @@ export class EventRuntime {
 
     const entityId = this.world.getComponent(entity, EntityInfoComponent)?.editorId ?? `entity#${entity}`;
     const ctx = this.createContext(entity, entityId);
-    const interpreter = new EventInterpreter(graphOf(state), ctx);
+    const interpreter = new EventInterpreter(state.graph, ctx);
 
     const run: RunningEvent = { entity, entityId, state, blocking, interpreter, done: Promise.resolve("completed") };
     this.running.set(entity, run);

@@ -375,8 +375,8 @@ export function entityIconName(entity: EntityLike): string {
   const chosen = typeof c.Tag?.icon === 'string' ? c.Tag.icon : ''
   if (chosen && Object.hasOwn(ICON_PATHS, chosen)) return chosen
   const tag = typeof c.Tag?.tag === 'string' ? c.Tag.tag : ''
-  const states = (c.Event?.states as { commands?: { type?: string }[] }[] | undefined) ?? []
-  const hasWarp = states.some((p) => p?.commands?.some((cmd) => cmd?.type === 'warp'))
+  const states = (c.Event?.states as { graph?: { nodes?: { type?: string }[] } }[] | undefined) ?? []
+  const hasWarp = states.some((p) => p?.graph?.nodes?.some((node) => node?.type === 'warp'))
   if (tag === 'warp' || hasWarp) return 'door-open'
   if (tag === 'trainer') return 'swords'
   if (tag === 'npc' || c.Movement?.controller === 'wander' || c.Movement?.controller === 'player') return 'user'

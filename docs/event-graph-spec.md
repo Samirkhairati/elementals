@@ -429,8 +429,12 @@ Entity-level validation (`validateEntity`) keeps producing `EntityIssue`, with
 ## 9. Migration
 
 Migration runs where `migrateMap`/`migrateEntity` already run (`shared/engine/migrate.ts`), is **pure**,
-idempotent, and stamps `schemaVersion: 3` (`SCHEMA_VERSION` 2 → 3). Database: `version: 1 → 2` (add
-`stages: []`, nothing else changes). Old snapshots load unchanged.
+idempotent, and stamps `schemaVersion: 4` in two steps that shipped separately: 2 → 3 renamed `pages` to `states`,
+3 → 4 replaces the command tree with the graph. Database: `version: 1 → 2` (add `stages: []`, nothing else changes).
+Old snapshots load unchanged.
+
+> **Implemented as schemaVersion 3 → 4.** 3 renamed `pages` to `states` (Phase 0); 4 stores the graph
+> (Phase 4). The steps below describe the final shape; both are done.
 
 ### 9.1 Event component
 
@@ -606,6 +610,17 @@ comparison (`op`) when event props were normalised.
 React Flow canvas, node view, palette, wiring interactions, copy/paste, frames, auto layout, undo, problems
 integration. Retire `CommandList`. Done when an author can build and run the Elder quest (§13.3) without
 touching JSON.
+
+*Status: done* (storage and editor flipped together, schemaVersion 4). Delivered: states store a `graph`
+(`commands` is migrated away on load; the migration is deterministic and idempotent); the game reads
+`state.graph` directly; the event editor's middle column is a React Flow canvas (`@xyflow/react` 12.12.0, pinned)
+with node cards (category colour, summary, labelled ports, problem badges), wiring by dragging, a searchable
+palette (Tab, right-click, the toolbar, or dropping a wire on empty canvas to add and connect), Ctrl+C/X/V/D,
+Ctrl+G frames (draggable, resizable, titled), "Cut out" (remove and reconnect), Auto layout, Delete for nodes and
+wires, snap to a 16px grid, a minimap, and the Problems list jumping to a node. Templates start an empty state.
+Undo/redo are the editor-wide ones (a drag is one step). Not done: Ctrl+Delete as a keyboard shortcut for "cut
+out" (it is a toolbar button), a keyboard way to pan/zoom beyond React Flow's defaults, and node highlighting
+while the game runs.
 
 **Phase 5: Common events.**
 `project/common/`, registry, `callCommonEvent` runtime, Database list, validation, sync scripts.

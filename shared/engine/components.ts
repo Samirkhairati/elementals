@@ -1,6 +1,7 @@
 // Component schemas (labels, defaults, form fields), default/normalise helpers and entity cloning.
 
 import type {
+  Command,
   ComparisonOp,
   ComponentPropsMap,
   ComponentSchema,
@@ -13,8 +14,8 @@ import type {
   StateAppearance,
 } from './types.ts';
 import { EVENT_TRIGGERS, COMPARISON_OPS, SELF_SWITCH_KEYS, isFacing } from './constants.ts';
-import { cloneCommands } from './commands.ts';
-import { newId } from './ids.ts';
+import { cloneGraph, commandsToGraph, createGraph, normalizeGraph } from './graph.ts';
+import { deterministicId, newId } from './ids.ts';
 import { cloneJson, isRecord } from './util.ts';
 
 export const COMPONENT_TYPES = ['Transform', 'Sprite', 'Collider', 'Movement', 'Event', 'Tag'] as const satisfies readonly ComponentType[];
@@ -31,14 +32,14 @@ export function createDefaultEventState(name = 'State 1'): EventState {
     name,
     conditions: [],
     trigger: 'action',
-    commands: [],
+    graph: createGraph(),
     faceOnInteract: true,
     solid: null,
     appearance: {},
   };
 }
 
-/** One `action` state with no commands. */
+/** One `action` state with an empty graph. */
 export function createDefaultEventProps(): EventProps {
   return { states: [createDefaultEventState()] };
 }
@@ -251,12 +252,12 @@ function normalizeCondition(c: unknown): Condition | null {
   }
 }
 
-function normalizeCommandList(list: unknown): EventState['commands'] {
+function normalizeCommandList(list: unknown): Command[] {
   if (!Array.isArray(list)) return [];
-  const out: EventState['commands'] = [];
+  const out: Command[] = [];
   for (const raw of list) {
     if (!isRecord(raw) || typeof raw.type !== 'string') continue;
-    const cmd: EventState['commands'][number] = {
+    const cmd: Command = {
       id: typeof raw.id === 'string' && raw.id ? raw.id : newId(),
       type: raw.type,
       params: isRecord(raw.params) ? cloneJson(raw.params) : {},
@@ -268,6 +269,19 @@ function normalizeCommandList(list: unknown): EventState['commands'] {
     out.push(cmd);
   }
   return out;
+}
+
+/**
+ * The graph of a state read from JSON. States written by schemaVersion 3 and earlier carry a command tree
+ * instead; it is converted (deterministic ids, so loading the same data twice gives the same graph).
+ */
+function normalizeStateGraph(state: Record<string, unknown>): EventState['graph'] {
+  if (isRecord(state.graph)) return normalizeGraph(state.graph);
+  if (Array.isArray(state.commands)) {
+    const stateId = typeof state.id === 'string' && state.id ? state.id : 'state';
+    return commandsToGraph(normalizeCommandList(state.commands), () => deterministicId(`${stateId}/start`));
+  }
+  return createGraph();
 }
 
 function normalizeAppearance(a: unknown): StateAppearance {
@@ -290,7 +304,7 @@ export function normalizeEventState(state: unknown, index = 0): EventState {
       ? p.conditions.map(normalizeCondition).filter((c): c is Condition => c !== null)
       : [],
     trigger: (EVENT_TRIGGERS as readonly unknown[]).includes(p.trigger) ? (p.trigger as EventState['trigger']) : 'action',
-    commands: normalizeCommandList(p.commands),
+    graph: normalizeStateGraph(p),
     faceOnInteract: typeof p.faceOnInteract === 'boolean' ? p.faceOnInteract : true,
     solid: typeof p.solid === 'boolean' ? p.solid : null,
     appearance: normalizeAppearance(p.appearance),
@@ -339,9 +353,9 @@ export function createDefaultComponent<T extends ComponentType>(type: T, overrid
 export function cloneEventProps(event: EventProps, freshIds = false): EventProps {
   return {
     states: event.states.map((state) => ({
-      ...cloneJson({ ...state, commands: [] as EventState['commands'] }),
+      ...cloneJson({ ...state, graph: undefined }),
       id: freshIds ? newId() : state.id,
-      commands: cloneCommands(state.commands, freshIds),
+      graph: cloneGraph(state.graph, freshIds),
     })),
   };
 }

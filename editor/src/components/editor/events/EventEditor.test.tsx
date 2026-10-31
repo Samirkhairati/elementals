@@ -3,7 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import type { EventState } from '../../../../../shared/engine/types'
 import { EventEditor } from './EventEditor'
-import { cmd, flat, makeEnv, state, renderWithEnv, sequentialIds } from './eventTestUtils'
+import { commandNodes, getNode } from '../../../../../shared/engine/graph'
+import { cmd, makeEnv, state, renderWithEnv, sequentialIds } from './eventTestUtils'
 import type { EventEnv } from './eventEnv'
 
 const ids = sequentialIds('n')
@@ -33,28 +34,28 @@ function setup(initial: EventState[], env: EventEnv = makeEnv()) {
 const tab = (name: RegExp | string) => screen.getByRole('tab', { name })
 
 describe('EventEditor: state tabs', () => {
-  it('lists states with trigger and command count and marks the start state', () => {
+  it('lists states with trigger and node count and marks the start state', () => {
     setup([
       state('p1', [cmd('a', 'wait')], { name: 'Intro' }),
       state('p2', [], { name: 'Later', trigger: 'playerTouch', conditions: [{ kind: 'switch', id: 'met', value: true }] }),
     ])
     const first = tab(/Intro/)
     expect(within(first).getByText('Action button')).toBeInTheDocument()
-    expect(within(first).getByText('1 cmd')).toBeInTheDocument()
+    expect(within(first).getByText('1 node')).toBeInTheDocument()
     expect(first.querySelector('[data-start-dot]')).toBeTruthy()
     const second = tab(/Later/)
     expect(within(second).getByText('Player touch')).toBeInTheDocument()
-    expect(within(second).getByText('0 cmds')).toBeInTheDocument()
+    expect(within(second).getByText('0 nodes')).toBeInTheDocument()
     expect(within(second).getByText('1 cond')).toBeInTheDocument()
     expect(second.querySelector('[data-start-dot]')).toBeFalsy()
   })
 
-  it('selects a state and shows its commands', () => {
+  it('selects a state and shows its nodes', () => {
     setup([state('p1', [cmd('a', 'showText', { text: 'first state text' })], { name: 'One' }), state('p2', [cmd('b', 'showText', { text: 'second state text' })], { name: 'Two' })])
-    expect(screen.getByText('"first state text"')).toBeInTheDocument()
+    expect(screen.getByText('first state text')).toBeInTheDocument()
     fireEvent.click(tab(/Two/))
-    expect(screen.getByText('"second state text"')).toBeInTheDocument()
-    expect(screen.queryByText('"first state text"')).not.toBeInTheDocument()
+    expect(screen.getByText('second state text')).toBeInTheDocument()
+    expect(screen.queryByText('first state text')).not.toBeInTheDocument()
     expect(tab(/Two/)).toHaveAttribute('aria-selected', 'true')
   })
 
@@ -73,7 +74,7 @@ describe('EventEditor: state tabs', () => {
     expect(onChange).toHaveBeenCalledTimes(1)
     expect(last().map((p) => p.name)).toEqual(['One', 'One copy'])
     expect(last()[1].id).not.toBe('p1')
-    expect(last()[1].commands[0].id).not.toBe('a')
+    expect(commandNodes(last()[1].graph)[0].id).not.toBe('a')
     expect(tab(/One copy/)).toHaveAttribute('aria-selected', 'true')
   })
 
@@ -86,12 +87,12 @@ describe('EventEditor: state tabs', () => {
     expect(tab(/One/)).toHaveAttribute('aria-selected', 'true')
   })
 
-  it('asks before deleting a state that has commands', () => {
+  it('asks before deleting a state that has nodes', () => {
     const { onChange, last } = setup([state('p1', [cmd('a', 'wait'), cmd('b', 'wait')], { name: 'One' }), state('p2', [], { name: 'Two' })])
     fireEvent.click(screen.getByRole('button', { name: 'Delete state' }))
     expect(onChange).not.toHaveBeenCalled()
     const alert = screen.getByRole('alert')
-    expect(alert).toHaveTextContent('2 commands')
+    expect(alert).toHaveTextContent('2 nodes')
     fireEvent.click(within(alert).getByRole('button', { name: 'Cancel' }))
     expect(onChange).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'Delete state' }))
@@ -240,7 +241,7 @@ describe('EventEditor: state header', () => {
     expect(last()[0].appearance.animation).toBe('wave')
   })
 
-  it('collapses the state settings to give room to the commands', () => {
+  it('collapses the state settings to give room to the canvas', () => {
     setup([state('p1')])
     expect(screen.getByTestId('state-settings')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /State 1/ }))
@@ -248,113 +249,136 @@ describe('EventEditor: state header', () => {
   })
 })
 
-describe('EventEditor: commands and inspector', () => {
-  it('shows the parameter form of the selected command; one change per edit', () => {
+const pickNode = (id: string) => fireEvent.click(screen.getByTestId(`node-${id}`))
+
+describe('EventEditor: canvas and inspector', () => {
+  it('draws the nodes of the selected state and shows the form of the selected node; one change per edit', () => {
     const { onChange, last } = setup([state('p1', [cmd('a', 'showText', { text: 'Hello' }), cmd('b', 'wait', { ms: 100 })])])
+    expect(screen.getByTestId('graph-canvas')).toBeInTheDocument()
     expect(screen.getByTestId('no-selection')).toBeInTheDocument()
-    fireEvent.click(screen.getByText('"Hello"'))
-    const inspector = screen.getByTestId('command-inspector')
+    pickNode('a')
+    const inspector = screen.getByTestId('node-inspector')
     expect(within(inspector).getByRole('heading', { name: 'Show Text' })).toBeInTheDocument()
     const text = within(inspector).getByRole('textbox', { name: /Text/ })
     fireEvent.change(text, { target: { value: 'Goodbye' } })
     fireEvent.blur(text)
     expect(onChange).toHaveBeenCalledTimes(1)
-    expect(last()[0].commands[0].params.text).toBe('Goodbye')
-    expect(screen.getByText('"Goodbye"')).toBeInTheDocument()
+    expect(getNode(last()[0].graph, 'a')!.params.text).toBe('Goodbye')
+    expect(within(screen.getByTestId('node-a')).getByText('Goodbye')).toBeInTheDocument()
+  })
+
+  it('switching states shows that state’s graph', () => {
+    setup([state('p1', [cmd('a', 'wait')], { name: 'One' }), state('p2', [cmd('z', 'comment', { text: 'two' })], { name: 'Two' })])
+    expect(screen.getByTestId('node-a')).toBeInTheDocument()
+    expect(screen.queryByTestId('node-z')).not.toBeInTheDocument()
+    fireEvent.click(tab(/Two/))
+    expect(screen.getByTestId('node-z')).toBeInTheDocument()
+    expect(screen.queryByTestId('node-a')).not.toBeInTheDocument()
+  })
+
+  it('explains the start and end nodes in the inspector', () => {
+    setup([state('p1', [cmd('x', 'exitEvent')])])
+    fireEvent.click(document.querySelector('[data-node-type="start"]') as HTMLElement)
+    expect(within(screen.getByTestId('node-inspector')).getByRole('heading', { name: 'Start' })).toBeInTheDocument()
+    expect(within(screen.getByTestId('node-inspector')).queryByTestId('param-form')).toBeNull()
+    fireEvent.click(document.querySelector('[data-node-type="end"]') as HTMLElement)
+    expect(within(screen.getByTestId('node-inspector')).getByRole('heading', { name: 'End' })).toBeInTheDocument()
   })
 
   it('shows a planned note for planned commands', () => {
     setup([state('p1', [cmd('a', 'givePokemon', { species: 'pidgey' })])])
-    fireEvent.click(screen.getByText('Give pidgey Lv.5'))
+    pickNode('a')
     expect(screen.getByText(/the game skips it until that system exists/)).toBeInTheDocument()
   })
 
-  it('shows validation issues of the selected command above its form', () => {
+  it('shows validation issues of the selected node above its form', () => {
     setup([state('p1', [cmd('a', 'setSwitch', { id: 'ghost' })])])
-    fireEvent.click(screen.getByText('Switch "ghost" = ON'))
-    expect(within(screen.getByTestId('command-issues')).getByText('Switch: switch "ghost" does not exist')).toBeInTheDocument()
+    pickNode('a')
+    expect(within(screen.getByTestId('node-issues')).getByText('Switch: switch "ghost" does not exist')).toBeInTheDocument()
   })
 
   it('reflects names created through the pickers (switch created from the form)', () => {
     const env = makeEnv()
     const { last } = setup([state('p1', [cmd('a', 'setSwitch', { id: '' })])], env)
-    fireEvent.click(screen.getByText('Switch (none) = ON'))
+    pickNode('a')
     fireEvent.click(screen.getByRole('button', { name: /Choose switch/ }))
     fireEvent.click(screen.getByRole('button', { name: /New switch/ }))
     fireEvent.change(screen.getByRole('textbox', { name: 'New switch name' }), { target: { value: 'Gate open' } })
     fireEvent.click(screen.getByRole('button', { name: 'Create' }))
-    expect(last()[0].commands[0].params.id).toBe('sw_gate_open')
+    expect(getNode(last()[0].graph, 'a')!.params.id).toBe('sw_gate_open')
   })
 
-  it('editing choices keeps branches in sync (one change)', () => {
+  it('adding a choice option adds its port (one change)', () => {
     const { onChange, last } = setup([state('p1', [cmd('q', 'showChoices', {}, { opt1: [cmd('x', 'wait')], opt2: [] })])])
-    fireEvent.click(screen.getByText('Choices: Yes / No'))
+    pickNode('q')
     fireEvent.click(screen.getByRole('button', { name: 'Add option' }))
     expect(onChange).toHaveBeenCalledTimes(1)
-    expect(Object.keys(last()[0].commands[0].branches ?? {})).toEqual(['opt1', 'opt2', 'opt3'])
-    expect(screen.getByRole('group', { name: 'Choice: Option 3' })).toBeInTheDocument()
+    const q = getNode(last()[0].graph, 'q')!
+    expect((q.params.options as { id: string }[]).map((o) => o.id)).toEqual(['opt1', 'opt2', 'opt3'])
+    expect(screen.getByTestId('node-q').querySelectorAll('[data-port]')).toHaveLength(3)
   })
 
-  it('removing a choice with commands deletes its branch after confirmation', () => {
+  it('removing a choice option unwires its path but keeps the nodes', () => {
     const { last } = setup([state('p1', [cmd('q', 'showChoices', {}, { opt1: [cmd('x', 'wait')], opt2: [] })])])
-    fireEvent.click(screen.getByText('Choices: Yes / No'))
+    pickNode('q')
     fireEvent.click(screen.getByRole('button', { name: 'Remove option 1' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Remove option and commands' }))
-    expect(flat(last()[0].commands)).toEqual(['showChoices'])
-    expect(Object.keys(last()[0].commands[0].branches ?? {})).toEqual(['opt2'])
+    const graph = last()[0].graph
+    const q = getNode(graph, 'q')!
+    expect((q.params.options as { id: string }[]).map((o) => o.id)).toEqual(['opt2'])
+    expect(q.out.opt1).toBeUndefined() // the wire went with the option
+    expect(getNode(graph, 'x')).toBeDefined() // the node did not
   })
 
-  it('Enter in the list moves focus into the form', async () => {
+  it('a node cut out of the canvas clears the inspector', () => {
     setup([state('p1', [cmd('a', 'showText', { text: 'Hello' })])])
-    fireEvent.click(screen.getByText('"Hello"'))
-    fireEvent.keyDown(screen.getByRole('tree', { name: 'Commands' }), { key: 'Enter' })
-    await waitFor(() => expect(document.activeElement).toBe(within(screen.getByTestId('command-inspector')).getByRole('textbox', { name: /Speaker/ })))
-  })
-
-  it('double-clicking a row focuses its form', async () => {
-    setup([state('p1', [cmd('a', 'showText', { text: 'Hello' })])])
-    fireEvent.doubleClick(screen.getByText('"Hello"'))
-    await waitFor(() => expect(document.activeElement).toBe(within(screen.getByTestId('command-inspector')).getByRole('textbox', { name: /Speaker/ })))
-  })
-
-  it('a deleted selection clears the inspector', () => {
-    setup([state('p1', [cmd('a', 'showText', { text: 'Hello' })])])
-    fireEvent.click(screen.getByText('"Hello"'))
-    fireEvent.keyDown(screen.getByRole('tree', { name: 'Commands' }), { key: 'Delete' })
+    pickNode('a')
+    expect(screen.getByTestId('node-inspector')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Remove and reconnect' }))
     expect(screen.getByTestId('no-selection')).toBeInTheDocument()
   })
 })
 
 describe('EventEditor: templates', () => {
-  it('yes/no from the empty state is one change with both branches filled', () => {
+  it('shows the template picker while the graph is empty', () => {
+    setup([state('p1')])
+    expect(screen.getByTestId('template-start')).toBeInTheDocument()
+  })
+
+  it('hides the template picker once the graph has nodes', () => {
+    setup([state('p1', [cmd('a', 'wait')])])
+    expect(screen.queryByTestId('template-start')).not.toBeInTheDocument()
+  })
+
+  it('yes/no from the empty state is one change with both paths wired', () => {
     const { onChange, last } = setup([state('p1')])
     fireEvent.click(screen.getByRole('button', { name: 'Yes / No question' }))
     expect(onChange).toHaveBeenCalledTimes(1)
-    expect(flat(last()[0].commands)).toEqual(['showText', 'showChoices', 'showText', 'showText'])
-    expect(screen.getByRole('group', { name: 'Choice: Yes' })).toBeInTheDocument()
+    expect(commandNodes(last()[0].graph).map((n) => n.type)).toEqual(['showText', 'showChoices', 'showText', 'showText'])
+    const choices = commandNodes(last()[0].graph).find((n) => n.type === 'showChoices')!
+    expect(Object.keys(choices.out)).toEqual(['opt1', 'opt2'])
+    expect(screen.queryByTestId('template-start')).not.toBeInTheDocument()
   })
 
-  it('"Open chest" adds the opened state and selects the first new command', () => {
+  it('"Open chest" adds the opened state and selects the first new node', () => {
     const { onChange, last } = setup([state('p1')])
-    fireEvent.click(screen.getByRole('button', { name: 'Templates' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: /Open chest/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Open chest' }))
     expect(onChange).toHaveBeenCalledTimes(1)
     expect(last()).toHaveLength(2)
     expect(last()[1].conditions[0]).toEqual({ kind: 'selfSwitch', key: 'A', value: true })
-    expect(screen.getByTestId('command-inspector')).toBeInTheDocument()
+    expect(screen.getByTestId('node-inspector')).toBeInTheDocument()
   })
 
-  it('"Warp" and "Dialogue" templates insert one command', () => {
+  it('"Warp" inserts one command', () => {
     const { last } = setup([state('p1')])
     fireEvent.click(screen.getByRole('button', { name: 'Warp' }))
-    expect(flat(last()[0].commands)).toEqual(['warp'])
+    expect(commandNodes(last()[0].graph).map((n) => n.type)).toEqual(['warp'])
   })
 })
 
 describe('EventEditor: problems', () => {
   const broken = () => [state('p1', [cmd('a', 'setSwitch', { id: 'ghost' }), cmd('b', 'warp', { map: '' })], { name: 'Broken' }), state('p2', [], { name: 'Fine' })]
 
-  it('lists problems with counts and jumps to the command', () => {
+  it('lists problems with counts and jumps to the node', () => {
     setup(broken())
     const problemsTab = screen.getByRole('tab', { name: /Problems/ })
     expect(problemsTab).toHaveTextContent('1')
@@ -362,8 +386,8 @@ describe('EventEditor: problems', () => {
     const list = screen.getByTestId('problems-list')
     expect(within(list).getAllByRole('button')).toHaveLength(2)
     fireEvent.click(within(list).getByText(/switch "ghost" does not exist/))
-    expect(screen.getByRole('tab', { name: 'Command' })).toHaveAttribute('aria-selected', 'true')
-    expect(within(screen.getByTestId('command-inspector')).getByRole('heading', { name: 'Set Switch' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Node' })).toHaveAttribute('aria-selected', 'true')
+    expect(within(screen.getByTestId('node-inspector')).getByRole('heading', { name: 'Set Switch' })).toBeInTheDocument()
   })
 
   it('shows a calm message when everything is fine', () => {
@@ -377,6 +401,15 @@ describe('EventEditor: problems', () => {
     fireEvent.click(screen.getByRole('tab', { name: /Problems/ }))
     fireEvent.click(screen.getByText(/switch "ghost" does not exist/))
     expect(tab(/Broken/)).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByTestId('node-a')).toBeInTheDocument()
+  })
+
+  it('reports a node nothing leads to', () => {
+    const s = state('p1', [cmd('a', 'wait')])
+    s.graph = { ...s.graph, nodes: [...s.graph.nodes, { id: 'lost', type: 'wait', params: { ms: 1 }, out: {}, x: 0, y: 300 }] }
+    setup([s])
+    fireEvent.click(screen.getByRole('tab', { name: /Problems/ }))
+    expect(screen.getByText(/Nothing leads to this node/)).toBeInTheDocument()
   })
 })
 
@@ -400,7 +433,7 @@ describe('EventEditor: robustness', () => {
   it('shows a fresh empty state when the event has no states', () => {
     setup([])
     expect(screen.getAllByRole('tab', { name: /State 1/ }).length).toBeGreaterThan(0)
-    expect(screen.getByTestId('empty-commands')).toBeInTheDocument()
+    expect(screen.getByTestId('template-start')).toBeInTheDocument()
   })
 
   it('consecutive edits in one tick compose instead of overwriting each other', () => {

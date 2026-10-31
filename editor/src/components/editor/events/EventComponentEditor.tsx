@@ -5,7 +5,8 @@ import { AlertCircle, AlertTriangle, CheckCircle2, ExternalLink } from 'lucide-r
 import type { EventState } from '../../../../../shared/engine/types'
 import { TRIGGER_LABELS } from '../../../../../shared/engine/constants'
 import { createDefaultEventState } from '../../../../../shared/engine/components'
-import { countCommands, getCommandDef, summarizeCommand } from '../../../../../shared/engine/commands'
+import { getCommandDef, summarizeCommand } from '../../../../../shared/engine/commands'
+import { commandNodes } from '../../../../../shared/engine/graph'
 import type { CustomEditorProps } from '../inspector/customEditors'
 import { EditorEventEnvProvider, useEventEnv } from './eventEnv'
 import { EventEditorDialog } from './EventEditorDialog'
@@ -26,8 +27,9 @@ export function EventSummary({ states, onOpen }: { states: EventState[]; onOpen:
   const startIndex = defaultActiveStateIndex(states, env.variables, env.stages)
   const shownIndex = startIndex >= 0 ? startIndex : 0
   const shown = states[shownIndex]
-  const lines = shown?.commands.slice(0, MAX_LINES) ?? []
-  const extra = Math.max(0, (shown?.commands.length ?? 0) - lines.length)
+  const shownNodes = shown ? commandNodes(shown.graph) : []
+  const lines = shownNodes.slice(0, MAX_LINES)
+  const extra = Math.max(0, shownNodes.length - lines.length)
 
   return (
     <div className="space-y-2" data-testid="event-summary">
@@ -64,7 +66,7 @@ export function EventSummary({ states, onOpen }: { states: EventState[]; onOpen:
             {shown.conditions.length > 0 && ` · ${shown.conditions.length} condition${shown.conditions.length > 1 ? 's' : ''}`}
           </div>
           {lines.length === 0 ? (
-            <p className="text-[11px] italic text-muted-foreground">No commands yet</p>
+            <p className="text-[11px] italic text-muted-foreground">Nothing happens yet</p>
           ) : (
             <ul className="space-y-0.5" data-testid="event-summary-lines">
               {lines.map((c) => {
@@ -79,7 +81,7 @@ export function EventSummary({ states, onOpen }: { states: EventState[]; onOpen:
                   </li>
                 )
               })}
-              {extra > 0 && <li className="pl-6 text-[10px] text-muted-foreground">+{extra} more ({countCommands(shown.commands)} in total)</li>}
+              {extra > 0 && <li className="pl-6 text-[10px] text-muted-foreground">+{extra} more ({shownNodes.length} in total)</li>}
             </ul>
           )}
         </div>

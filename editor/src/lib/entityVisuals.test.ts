@@ -180,7 +180,7 @@ describe('entity summaries', () => {
   it('picks an icon that says what the entity is', () => {
     expect(entityIconName(entity({ Tag: { tag: 'npc' } }))).toBe('user')
     expect(entityIconName(entity({ Tag: { tag: 'sign' } }))).toBe('signpost')
-    expect(entityIconName(entity({ Event: { states: [{ commands: [{ type: 'warp' }] }] } }))).toBe('door-open')
+    expect(entityIconName(entity({ Event: { states: [{ graph: { nodes: [{ type: 'warp' }] } }] } }))).toBe('door-open')
     expect(entityIconName(entity({ Collider: { isSolid: false } }))).toBe('square-dashed')
     expect(entityIconName(entity({ Event: { states: [] } }))).toBe('zap')
     expect(entityIconName(entity({}))).toBe('box')

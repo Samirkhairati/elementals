@@ -24,6 +24,7 @@
 import type { Command, EngineEntity, EventState, LegacyComponentType } from './types.ts';
 import { SCHEMA_VERSION } from './types.ts';
 import { createCommand } from './commands.ts';
+import { commandsToGraph } from './graph.ts';
 import { normalizeProps } from './components.ts';
 import { isFacing } from './constants.ts';
 import { deterministicId } from './ids.ts';
@@ -162,7 +163,7 @@ function migrateInteractable(entityId: string, inter: Record<string, unknown>) {
     name: 'State 1',
     conditions: [],
     trigger: inter.type === 'on_step' ? 'playerTouch' : 'action',
-    commands,
+    graph: commandsToGraph(commands, seed('start')),
     faceOnInteract: true,
     solid: null,
     appearance: {},
@@ -176,9 +177,33 @@ function migrateInteractable(entityId: string, inter: Record<string, unknown>) {
  * migrated props are returned as they are.
  */
 function migrateEventProps(event: unknown): unknown {
-  if (!isRecord(event) || !Object.hasOwn(event, 'pages')) return event;
-  const { pages, ...rest } = event;
-  return Object.hasOwn(rest, 'states') ? rest : { ...rest, states: pages };
+  if (!isRecord(event)) return event;
+  let out: Record<string, unknown> = event;
+  if (Object.hasOwn(out, 'pages')) {
+    const { pages, ...rest } = out;
+    out = Object.hasOwn(rest, 'states') ? rest : { ...rest, states: pages };
+  }
+  if (Array.isArray(out.states) && out.states.some(needsGraph)) {
+    out = { ...out, states: out.states.map((s: unknown) => (needsGraph(s) ? withGraph(s) : s)) };
+  }
+  return out;
+}
+
+/** A state still stored as a command tree (schemaVersion 3 and earlier). */
+function needsGraph(state: unknown): state is Record<string, unknown> {
+  return isRecord(state) && !isRecord(state.graph) && Array.isArray(state.commands);
+}
+
+/**
+ * schemaVersion 3 -> 4: a state's `commands` tree becomes a `graph`. Node ids are the old command ids
+ * (so usage references stay valid); the start node's id is derived from the state id, so migrating the
+ * same data twice gives the same graph.
+ */
+function withGraph(state: Record<string, unknown>): Record<string, unknown> {
+  const { commands, ...rest } = state;
+  const stateId = typeof state.id === 'string' && state.id ? state.id : 'state';
+  const tree = (commands as unknown[]).filter((c): c is Command => isRecord(c) && typeof c.type === 'string' && typeof c.id === 'string');
+  return { ...rest, graph: commandsToGraph(tree, () => deterministicId(`${stateId}/start`)) };
 }
 
 /** Converts one entity to the canonical components. Returns the same object when nothing changed. */

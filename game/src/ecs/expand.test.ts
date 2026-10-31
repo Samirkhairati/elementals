@@ -3,7 +3,7 @@ import { createDefaultComponent, objectAnimKey, spriteTextureKey, characterFrame
 import { expandEntity, type ExpandContext } from './expand';
 import { createComponentFromData, ComponentDataError } from './componentFactory';
 import { spriteRegistry } from '@/data/spriteRegistry';
-import { testSprites, characterMeta } from '@/test/helpers';
+import { testSprites, characterMeta, commandTypes, firstCommand } from '@/test/helpers';
 import { World } from './World';
 import { hydrateMapEntities, spawnPlayer } from './spawner';
 import { TransformComponent } from './components/TransformComponent';
@@ -163,13 +163,13 @@ describe('legacy maps through the spawner', () => {
     expect(w.getComponent(e, AnimationComponent)).toMatchObject({ assetId: 'characters/npc', direction: 'left' });
     expect(w.getComponent(e, AIWanderComponent)).toMatchObject({ radius: 2, interval: 2500, speed: 55 });
     const state = w.getComponent(e, EventComponent)!.states[0];
-    expect(state.commands.map((c) => c.type)).toEqual(['showText', 'emit']);
+    expect(commandTypes(state)).toEqual(['showText', 'emit']);
   });
 
   it('a legacy Interactable without content shows the entity name', () => {
     const w = new World();
     const { entities } = hydrateMapEntities(w, [{ id: 's', name: 'Old Sign', components: { Transform: { x: 1, y: 2 }, Interactable: {} } }], ctx);
-    expect(w.getComponent(entities[0], EventComponent)!.states[0].commands[0].params.text).toBe('Old Sign');
+    expect(firstCommand(w.getComponent(entities[0], EventComponent)!.states[0]).params.text).toBe('Old Sign');
   });
 });
 

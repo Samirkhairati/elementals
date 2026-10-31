@@ -6,12 +6,12 @@ import {
   getPrefab,
   instantiatePrefab,
   validateEntity,
-  walkCommands,
+  commandNodes,
 } from '../../../shared/engine/index'
 
 const commandTypes = (entity: any): string[] => {
   const out: string[] = []
-  for (const state of entity.components.Event?.states ?? []) walkCommands(state.commands, (c) => void out.push(c.type))
+  for (const state of entity.components.Event?.states ?? []) for (const n of commandNodes(state.graph)) out.push(n.type)
   return out
 }
 
@@ -59,8 +59,8 @@ describe('PREFABS', () => {
   it('Chest: closed state sets self switch A, open state reacts to it and shows frame 1', () => {
     const e = instantiatePrefab(getPrefab('chest')!, { x: 16, y: 32 })
     const [closed, open] = e.components.Event!.states
-    expect(closed.commands.map((c) => c.type)).toEqual(['showText', 'setSelfSwitch'])
-    expect(closed.commands[1].params).toMatchObject({ key: 'A', value: true })
+    expect(commandNodes(closed.graph).map((c) => c.type)).toEqual(['showText', 'setSelfSwitch'])
+    expect(commandNodes(closed.graph)[1].params).toMatchObject({ key: 'A', value: true })
     expect(closed.conditions).toEqual([])
     expect(open.conditions).toEqual([{ kind: 'selfSwitch', key: 'A', value: true }])
     expect(open.appearance).toEqual({ frame: 1 })
@@ -80,13 +80,14 @@ describe('PREFABS', () => {
     const e = instantiatePrefab(getPrefab('trigger')!, { x: 16, y: 32 })
     expect(e.components.Sprite).toBeUndefined()
     expect(e.components.Collider!.isSolid).toBe(false)
-    expect(e.components.Event!.states[0]).toMatchObject({ trigger: 'playerTouch', commands: [] })
+    expect(e.components.Event!.states[0]).toMatchObject({ trigger: 'playerTouch' })
+    expect(commandNodes(e.components.Event!.states[0].graph)).toEqual([])
   })
 
   it('Item Ball: giveItem then hide through self switch A', () => {
     const e = instantiatePrefab(getPrefab('item-ball')!, { x: 16, y: 32 })
     const [pick, taken] = e.components.Event!.states
-    expect(pick.commands.map((c) => c.type)).toEqual(['giveItem', 'showText', 'setSelfSwitch'])
+    expect(commandNodes(pick.graph).map((c) => c.type)).toEqual(['giveItem', 'showText', 'setSelfSwitch'])
     expect(taken.appearance).toEqual({ visible: false })
     expect(taken.solid).toBe(false)
     expect(taken.conditions).toEqual([{ kind: 'selfSwitch', key: 'A', value: true }])
@@ -105,7 +106,7 @@ describe('instantiatePrefab', () => {
     const a = instantiatePrefab(prefab, { x: 16, y: 32 })
     const b = instantiatePrefab(prefab, { x: 16, y: 32 })
     expect(a.id).not.toBe(b.id)
-    const ids = (e: any) => e.components.Event.states.flatMap((p: any) => [p.id, ...p.commands.map((c: any) => c.id)])
+    const ids = (e: any) => e.components.Event.states.flatMap((p: any) => [p.id, ...p.graph.nodes.map((c: any) => c.id)])
     const all = [...ids(a), ...ids(b)]
     expect(new Set(all).size).toBe(all.length)
     expect(ids(a).some((id: string) => ids(prefab as any).includes(id))).toBe(false)
@@ -116,7 +117,7 @@ describe('instantiatePrefab', () => {
     const before = JSON.stringify(prefab)
     const e = instantiatePrefab(prefab, { x: 48, y: 64, name: 'Guard', id: 'fixed', folder: 'f' })
     e.components.Collider!.width = 99
-    e.components.Event!.states[0].commands[0].params.text = 'changed'
+    commandNodes(e.components.Event!.states[0].graph)[0].params.text = 'changed'
     expect(JSON.stringify(prefab)).toBe(before)
     expect(e).toMatchObject({ id: 'fixed', name: 'Guard', folder: 'f', x: 48, y: 64 })
     expect(prefab.components.Transform).toMatchObject({ x: 0, y: 0 })

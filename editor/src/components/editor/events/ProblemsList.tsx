@@ -18,7 +18,7 @@ export function ProblemsList({ problems, states, onJump }: { problems: Problem[]
         const Icon = p.severity === 'error' ? AlertCircle : AlertTriangle
         const state = states[p.stateIndex]
         return (
-          <li key={`${p.stateId}-${p.code}-${p.commandId ?? 'state'}-${i}`}>
+          <li key={`${p.stateId}-${p.code}-${p.nodeId ?? 'state'}-${i}`}>
             <button
               type="button"
               onClick={() => onJump(p)}
@@ -29,7 +29,7 @@ export function ProblemsList({ problems, states, onJump }: { problems: Problem[]
               <span className="min-w-0 flex-1">
                 <span className="block text-xs">{p.message}</span>
                 <span className="block text-[10px] text-muted-foreground">
-                  {state ? stateLabel(state, p.stateIndex) : `State ${p.stateIndex + 1}`} · {p.scope === 'command' ? 'command' : p.scope}
+                  {state ? stateLabel(state, p.stateIndex) : `State ${p.stateIndex + 1}`} · {p.scope === 'node' ? 'node' : p.scope}
                 </span>
               </span>
             </button>

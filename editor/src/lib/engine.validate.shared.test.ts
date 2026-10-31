@@ -135,14 +135,41 @@ describe('validateEntity: Event', () => {
     expect(issues[0].message).toMatch(/^State 1:/)
   })
 
-  it('delegates commands to validateCommands and keeps command ids and paths', () => {
+  it('validates the graph of a state and reports node ids with their paths', () => {
+    const e = good()
+    e.components.Event.states[0].graph = {
+      nodes: [
+        { id: 'st', type: 'start', params: {}, out: { next: 'b', bogus: 'u' }, x: 0, y: 0 },
+        { id: 'b', type: 'breakLoop', params: {}, out: {}, x: 0, y: 0 },
+        { id: 'u', type: 'teleport', params: {}, out: {}, x: 0, y: 0 },
+        { id: 'lost', type: 'wait', params: { ms: 5 }, out: { next: 'gone' }, x: 0, y: 0 },
+      ],
+      frames: [],
+    }
+    delete e.components.Event.states[0].commands
+    const issues = validateEntity(e)
+    const find = (code: string) => issues.find((i) => i.code === code)
+    expect(find('legacy-flow-node')).toMatchObject({ nodeId: 'b', path: 'components.Event.states[0].graph.nodes[b]', severity: 'error' })
+    expect(find('unknown-command')).toMatchObject({ nodeId: 'u', path: 'components.Event.states[0].graph.nodes[u]' })
+    expect(find('unknown-port')).toMatchObject({ nodeId: 'st', path: 'components.Event.states[0].graph.nodes[st].out.bogus' })
+    expect(find('dangling-edge')).toMatchObject({ nodeId: 'lost' })
+    expect(find('unreachable')).toMatchObject({ nodeId: 'lost', severity: 'warning' })
+  })
+
+  it('a state with neither a graph nor commands is an error', () => {
+    const e = good()
+    delete e.components.Event.states[0].commands
+    expect(validateEntity(e).map((i) => i.code)).toContain('bad-state')
+  })
+
+  it('still checks a command tree that was not migrated yet', () => {
     const e = good()
     const cond = createCommand('conditional', { conditions: [{ kind: 'selfSwitch', key: 'A', value: true }] })
     const bad = createCommand('breakLoop')
     cond.branches!.then.push(bad)
     e.components.Event.states[0].commands.push(cond, { id: 'u', type: 'teleport', params: {} })
     const issues = validateEntity(e)
-    expect(issues.map((i) => [i.code, i.commandId, i.path])).toEqual([
+    expect(issues.map((i) => [i.code, i.nodeId, i.path])).toEqual([
       ['break-outside-loop', bad.id, 'components.Event.states[0].commands[2].branches.then[0]'],
       ['unknown-command', 'u', 'components.Event.states[0].commands[3]'],
     ])

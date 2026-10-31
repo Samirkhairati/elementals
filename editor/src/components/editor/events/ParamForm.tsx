@@ -10,7 +10,6 @@ import { ChoicesEditor, RouteEditor } from './RouteChoicesEditors'
 import { FacingPicker, MapPicker, SpritePicker, StagePicker, StageValuePicker, SwitchPicker, TargetPicker, VariablePicker } from './pickers'
 import { CheckRow, DraftNumber, DraftText, DraftTextarea, FieldRow, IconButton, SmallButton, inputClass, selectClass } from './primitives'
 import { useEventEnv } from './eventEnv'
-import { branchCommandCount } from './eventModel'
 
 export type ParamPatch = (patch: Record<string, unknown>, pruneBranches?: string[]) => void
 
@@ -199,9 +198,8 @@ function FieldControl({ field, command, params, onPatch, id }: FieldControlProps
     case 'route':
       return <RouteEditor steps={Array.isArray(raw) ? (raw as RouteStep[]) : []} onChange={set} />
     case 'choices': {
-      const counts: Record<string, number> = {}
-      for (const key of Object.keys(command.branches ?? {})) counts[key] = branchCommandCount(command, key)
-      return <ChoicesEditor options={Array.isArray(raw) ? (raw as ChoiceOption[]) : []} branchCounts={counts} onChange={(options, prune) => onPatch({ [field.key]: options }, prune)} />
+      // Removing an option only unwires its path in a graph; nothing is deleted with it.
+      return <ChoicesEditor options={Array.isArray(raw) ? (raw as ChoiceOption[]) : []} branchCounts={{}} onChange={(options, prune) => onPatch({ [field.key]: options }, prune)} />
     }
     case 'conditions':
       return <ConditionsEditor conditions={Array.isArray(raw) ? (raw as Condition[]) : []} onChange={set} emptyHint="No conditions: the Then branch always runs." />

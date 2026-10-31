@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { StageDef, SwitchDef, VariableDef } from '../../../../../shared/engine/types'
 import { createCommand } from '../../../../../shared/engine/commands'
+import { commandsToGraph } from '../../../../../shared/engine/graph'
 import { createDefaultEventState } from '../../../../../shared/engine/components'
 import type { UsageMap } from '@/lib/databaseUsage'
 import { DatabasePanel } from './DatabasePanel'
@@ -29,11 +30,11 @@ const STAGE_PROPS = {
 
 function usageMaps(): UsageMap[] {
   const a = createDefaultEventState('Talk')
-  a.commands = [createCommand('setSwitch', { id: 'met', value: true })]
+  a.graph = commandsToGraph([createCommand('setSwitch', { id: 'met', value: true })])
   const b = createDefaultEventState('After')
   b.conditions = [{ kind: 'switch', id: 'met', value: true }]
   const c = createDefaultEventState('Gate')
-  c.commands = [createCommand('setVariable', { id: 'badges', op: 'add', operand: 'const', value: 1 })]
+  c.graph = commandsToGraph([createCommand('setVariable', { id: 'badges', op: 'add', operand: 'const', value: 1 })])
   return [
     { fileName: 'town.json', name: 'Town', entities: [{ id: 'e1', name: 'Guard', components: { Event: { states: [a, b] } } }] },
     { fileName: 'cave.json', name: 'Cave', entities: [{ id: 'e2', name: 'Lever', components: { Event: { states: [c] } } }] },
@@ -352,7 +353,7 @@ describe('DatabasePanel: stages and folders', () => {
 
   function stagesMaps(): UsageMap[] {
     const talk = createDefaultEventState('Talk')
-    talk.commands = [createCommand('setStage', { id: 'cat', mode: 'set', value: 'found' })]
+    talk.graph = commandsToGraph([createCommand('setStage', { id: 'cat', mode: 'set', value: 'found' })])
     const after = createDefaultEventState('After')
     after.conditions = [{ kind: 'stage', id: 'cat', op: '>=', value: 'found' }]
     return [{ fileName: 'town.json', name: 'Town', entities: [{ id: 'e1', name: 'Elder', components: { Event: { states: [talk, after] } } }] }]
@@ -488,7 +489,7 @@ describe('DatabasePanel: stages and folders', () => {
     expect(screen.getByText('never set')).toBeInTheDocument()
     cleanup()
     const writeOnly = createDefaultEventState('W')
-    writeOnly.commands = [createCommand('setStage', { id: 'cat', mode: 'advance' })]
+    writeOnly.graph = commandsToGraph([createCommand('setStage', { id: 'cat', mode: 'advance' })])
     mount({}, [{ fileName: 'a.json', name: 'A', entities: [{ id: 'e', name: 'E', components: { Event: { states: [writeOnly] } } }] }])
     expect(screen.getByText('never read')).toBeInTheDocument()
   })

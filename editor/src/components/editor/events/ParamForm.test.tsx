@@ -363,13 +363,12 @@ describe('ParamForm: every FieldKind has a real control', () => {
     expect(onPatch).toHaveBeenCalledWith({ steps: [{ type: 'up' }, { type: 'left' }] })
   })
 
-  it('choices: embeds the choices editor and forwards pruned branches', () => {
+  it('choices: embeds the choices editor; removing an option just patches the list (its wire goes with it)', () => {
     const c = cmd('q', 'showChoices', {}, { opt1: [cmd('x', 'wait')], opt2: [] })
     const { onPatch } = setup(c)
     fireEvent.click(screen.getByRole('button', { name: 'Remove option 1' }))
-    expect(onPatch).not.toHaveBeenCalled() // has commands: asks first
-    fireEvent.click(screen.getByRole('button', { name: 'Remove option and commands' }))
-    expect(onPatch).toHaveBeenCalledWith({ options: [{ id: 'opt2', label: 'No' }] }, ['opt1'])
+    expect(onPatch).toHaveBeenCalledTimes(1) // no confirmation: removing an option deletes no nodes
+    expect(onPatch.mock.calls[0][0]).toEqual({ options: [{ id: 'opt2', label: 'No' }] })
   })
 
   it('conditions: embeds the conditions builder', () => {

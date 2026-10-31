@@ -24,7 +24,7 @@ export type LegacyComponentType =
   | 'Interactable';
 
 /** Version written to `map.schemaVersion`. Maps without it are legacy (1). */
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 // ── Component props ─────────────────────────────────────────────────────────────────────────────
 // Positions are pixels in map space. A tile is 32px. The Transform position is the entity's
@@ -123,6 +123,10 @@ export type Condition =
 /** Where a command acts: this event's entity, the player, or another entity by its editor id. */
 export type CommandTarget = 'self' | 'player' | { entity: string };
 
+/**
+ * The command TREE of schemaVersion 3 and earlier (kept for migration, command templates and tests; states
+ * now store a graph). Flow commands nest lists in `branches`.
+ */
 export interface Command {
   /** Stable id (uuid-ish) so editors can address/reorder/undo and graph views can key nodes. */
   id: string;
@@ -201,7 +205,8 @@ export interface EventState {
   name: string;
   conditions: Condition[];
   trigger: EventTrigger;
-  commands: Command[];
+  /** What runs when the state is triggered: a graph of nodes wired from its `start` node. */
+  graph: EventGraph;
   /** Turn to face the player when triggered by `action`. Default true. */
   faceOnInteract: boolean;
   /** null = keep the Collider's isSolid. */
@@ -393,8 +398,8 @@ export interface EntityIssue {
   severity: IssueSeverity;
   message: string;
   code: string;
-  /** Set when the issue is about one command of an Event state. */
-  commandId?: string;
+  /** Set when the issue is about one node of an Event state's graph. */
+  nodeId?: string;
 }
 
 // ── Sprite assets ───────────────────────────────────────────────────────────────────────────────

@@ -7,6 +7,7 @@ import type { Command, EventState, SpriteAssetInfo } from '../../../../../shared
 import { createSequentialIdGenerator, setIdGenerator } from '../../../../../shared/engine/ids'
 import { createCommand } from '../../../../../shared/engine/commands'
 import { createDefaultEventState } from '../../../../../shared/engine/components'
+import { commandsToGraph } from '../../../../../shared/engine/graph'
 import { EventEnvProvider, type EventEnv } from './eventEnv'
 import { PortalContainerProvider } from './primitives'
 
@@ -87,8 +88,9 @@ export function cmd(id: string, type: string, params?: Record<string, unknown>, 
   return c
 }
 
+/** A state whose graph is built from a command list (flow commands nest their branches). */
 export function state(id: string, commands: Command[] = [], extra: Partial<EventState> = {}): EventState {
-  return { ...createDefaultEventState(), id, name: '', commands, ...extra }
+  return { ...createDefaultEventState(), id, name: '', graph: commandsToGraph(commands, () => `start-${id}`), ...extra }
 }
 
 /** Flat list of `type` (or `type:id`) in depth-first order, for tree assertions. */

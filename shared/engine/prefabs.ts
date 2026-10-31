@@ -8,6 +8,7 @@
 import type { Command, Condition, EngineEntity, EntityComponents, EventState, StateAppearance, Prefab } from './types.ts';
 import { cloneEntity, createDefaultComponent } from './components.ts';
 import { createCommand } from './commands.ts';
+import { commandsToGraph } from './graph.ts';
 import { newId, deterministicId } from './ids.ts';
 import { cloneJson } from './util.ts';
 
@@ -24,7 +25,7 @@ function builder(prefabId: string) {
     name,
     conditions: extra.conditions ?? [],
     trigger: extra.trigger ?? 'action',
-    commands,
+    graph: commandsToGraph(commands, idFn),
     faceOnInteract: true,
     solid: extra.solid ?? null,
     appearance: extra.appearance ?? {},

@@ -1,4 +1,4 @@
-import type { SpriteAssetMeta, SpriteManifestEntry } from "@shared/engine/index.ts";
+import { STRUCTURAL_TYPES, type EventState, type GraphNode, type SpriteAssetMeta, type SpriteManifestEntry } from "@shared/engine/index.ts";
 import { SpriteRegistry } from "@/data/spriteRegistry";
 
 export function characterMeta(overrides: Partial<SpriteAssetMeta> = {}): SpriteAssetMeta {
@@ -55,3 +55,11 @@ export function testSprites(): SpriteRegistry {
   });
   return registry;
 }
+
+/** The command nodes of a state in authoring order (start / end / junction nodes left out). */
+export function commandNodes(state: Pick<EventState, "graph">): GraphNode[] {
+  return state.graph.nodes.filter((n) => !STRUCTURAL_TYPES.includes(n.type));
+}
+
+export const commandTypes = (state: Pick<EventState, "graph">): string[] => commandNodes(state).map((n) => n.type);
+export const firstCommand = (state: Pick<EventState, "graph">): GraphNode => commandNodes(state)[0];

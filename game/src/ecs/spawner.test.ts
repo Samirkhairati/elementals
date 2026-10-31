@@ -8,7 +8,7 @@ import { EventComponent } from './components/EventComponent';
 import { EntityInfoComponent } from './components/EntityInfoComponent';
 import { SpriteComponent } from './components/SpriteComponent';
 import { AnimationComponent } from './components/AnimationComponent';
-import { testSprites } from '@/test/helpers';
+import { testSprites, firstCommand } from '@/test/helpers';
 import type { ExpandContext } from './expand';
 import { TagComponent } from './components/TagComponent';
 import { AIWanderComponent } from './components/AIWanderComponent';
@@ -72,7 +72,7 @@ describe('hydrateMapEntities', () => {
     const event = w.getComponent(e, EventComponent)!;
     expect(event.states).toHaveLength(1);
     expect(event.states[0]).toMatchObject({ trigger: 'action' });
-    expect(event.states[0].commands[0]).toMatchObject({ type: 'showText', params: { text: 'The ancient sign is faded...' } });
+    expect(firstCommand(event.states[0])).toMatchObject({ type: 'showText', params: { text: 'The ancient sign is faded...' } });
     expect(w.getComponent(e, EntityInfoComponent)).toMatchObject({ editorId: 'e41e2972', name: 'Sign / Inspectable' });
     expect(w.getComponent(e, TagComponent)?.tag).toBe('sign');
   });
@@ -161,7 +161,7 @@ describe('hydrateMapEntities', () => {
     expect(w.getComponent(entities[0], AIWanderComponent)).toMatchObject({ radius: 2, interval: 4000, speed: 60 });
     expect(w.getComponent(entities[0], SpriteComponent)).toMatchObject({ assetId: 'characters/npc' });
     expect(w.getComponent(entities[0], AnimationComponent)).toMatchObject({ assetId: 'characters/npc', hasRun: false });
-    expect(w.getComponent(entities[0], EventComponent)!.states[0].commands[0].params.text).toBe('Hello traveler!');
+    expect(firstCommand(w.getComponent(entities[0], EventComponent)!.states[0]).params.text).toBe('Hello traveler!');
   });
 });
 

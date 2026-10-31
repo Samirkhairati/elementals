@@ -87,16 +87,21 @@ animation to create. `buildSpriteManifest(assets)` produces `data/sprites.json`
 ## 3. Events
 
 An **Event** component holds **states** (RPG Maker calls them pages). The active state is the *last* state whose
-conditions all hold. A state has: conditions, a trigger, optional appearance override, and a **command tree**.
+conditions all hold. A state has: conditions, a trigger, optional appearance override, and a **node graph**
+(`graph`) that runs when it is triggered.
 
 * Triggers: `action`, `playerTouch`, `eventTouch`, `autorun`, `parallel`.
 * Conditions: `switch`, `variable`, `stage`, `selfSwitch`, `hasItem`. A `stage` condition compares the stage's current value with
   another value of the same stage by the ORDER of the stage's values (`>=` "Found" holds from Found onwards).
 * Targets (`CommandTarget`): `'self'`, `'player'` or `{ entity: <editor id> }`.
-* Commands form a tree: `Command { id, type, params, branches? }`. Flow commands own nested lists
-  (`conditional` → then/else, `choices` → one list per option, `loop` → body). This is exactly an event
-  graph: each command is a node, `branches` are its outputs, list order is the "next" edge. A graph view can
-  be added later with no data change; today's editor shows it as an indented command list.
+* The graph (schemaVersion 4): `EventGraph { nodes, frames }`. A node is `{ id, type, params, out, x, y }`: a
+  command from the catalog (or the structural `start` / `end` / `junction`), its canvas position, and `out`, a map
+  from output port to the id of the next node. Every graph has exactly one `start`; a port with no wire ends the
+  run. `conditional` has ports `then` / `else`, `showChoices` one port per option (+ `cancel`), `branchStage` one per
+  chosen stage value (+ `default`); every other command has a single `next` port. A loop is a wire back to an
+  earlier node (validation rejects a loop that never waits). `frames` are comment boxes, ignored by the game.
+  Before schemaVersion 4 a state stored a command TREE (`commands`, with nested `branches`); it is converted on
+  load (`commandsToGraph`, node ids = old command ids). See `docs/event-graph-spec.md`.
 * Global state lives in `project/database.json` (version 2): **switches** (on/off), **variables** (numbers) and
   **stages** (progress through an ordered list of named values, e.g. Not started → Accepted → Found → Done; prefer a
   stage over several switches that must be set in order). Entries have stable ids, editable names and an optional

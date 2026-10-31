@@ -35,7 +35,7 @@ export function EventEditorDialog({ open, onOpenChange, states, onChange }: Even
         >
           <header className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-2.5 pr-12">
             <DialogTitle className="text-sm font-semibold">Event editor{env.entityName ? ` · ${env.entityName}` : ''}</DialogTitle>
-            <DialogDescription className="text-xs">States decide when something runs; commands decide what happens. The last state whose conditions hold is the active one.</DialogDescription>
+            <DialogDescription className="text-xs">States decide when something runs; the node graph decides what happens. The last state whose conditions hold is the active one.</DialogDescription>
           </header>
           <PortalContainerProvider value={content}>
             <EventEditor states={states} onChange={onChange} />
