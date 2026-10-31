@@ -18,7 +18,8 @@ Editing a map in the editor does **not** update the game by itself.
 `shared/` is the single implementation, used by both runtimes:
 
 - `shared/mapExport.ts` - `convertEditorMapToTiled(map, tilesets)` and `serializeTiledMap` (2-space JSON, no trailing newline).
-- `shared/mapSchema.ts` - `validateEditorMap` and `validateTiledMap` (hand-written, no dependencies).
+  Legacy entities are migrated (`shared/engine/migrate.ts`) and the output always has `schemaVersion: 2`.
+- `shared/mapSchema.ts` - `validateEditorMap` (also validates entities/events via `shared/engine`) and `validateTiledMap` (hand-written, no dependencies).
 - `shared/png.ts` - `readPngSize`. `shared/mapTypes.ts` - types only.
 
 The editor imports it from `src/hooks/useExportMap.ts` (relative path, no extension); Node imports it with explicit `.ts`
@@ -59,10 +60,12 @@ Usage errors exit 2.
 STATUS   MAP     SOURCE       GAME FILE
 -------  ------  -----------  -----------
 DRIFTED  map2    map2.json    map2.json
-IN SYNC  market  market.json  market.json
+DRIFTED  market  market.json  market.json
 ```
 
-- `market`: in sync.
+- `market`: only drifted because the exporter now writes canonical engine entities (`Event` instead of `Interactable`) and
+  `schemaVersion: 2` (see `docs/engine-design.md`, Migration); the committed game copy still has the legacy entity. Re-export it with
+  `node scripts/export-maps.mjs --write --only market --force`.
 - `map2`: `project/maps/map2.json` has the internal name `city` and corresponds to the game's **`city.json`** (the game's `map2.json` is a different map),
   so the file-name mapping compares it with the wrong game map. Compared with `city.json` it is still DRIFTED: the editor map uses extra `interior`/`outside`
   tilesets, orders its layers differently, and (in the uncommitted working-tree edit) has one entity. Decide whether the editor or the game copy is the truth before exporting.

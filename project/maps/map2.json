@@ -3819,13 +3819,92 @@
           "depth": 10
         },
         "Collider": {
-          "width": 56,
+          "width": 32,
           "height": 32,
-          "offsetX": 16,
+          "offsetX": 0,
+          "offsetY": 0,
+          "isSolid": true
+        }
+      }
+    },
+    {
+      "id": "f1a63193-85a2-427a-ac61-a76a978083a2",
+      "name": "New Entity1",
+      "x": 48,
+      "y": 192,
+      "visible": true,
+      "folder": null,
+      "components": {
+        "Transform": {
+          "x": 48,
+          "y": 192,
+          "depth": 10
+        },
+        "Sprite": {
+          "asset": "characters/player",
+          "facing": "down",
+          "animation": "",
+          "frame": 0,
+          "offsetX": 0,
+          "offsetY": 0,
+          "scale": 1,
+          "flipX": false,
+          "tint": "",
+          "opacity": 1,
+          "visible": true
+        },
+        "Collider": {
+          "width": 16,
+          "height": 8,
+          "offsetX": 0,
+          "offsetY": 0,
+          "isSolid": true
+        },
+        "Movement": {
+          "controller": "player",
+          "speed": 100,
+          "canRun": true,
+          "wanderRadius": 3,
+          "wanderInterval": 4000
+        },
+        "Event": {
+          "pages": [
+            {
+              "id": "5f9f0519-e8cc-4005-9ab5-24db3ae26f4d",
+              "name": "Page 1",
+              "conditions": [],
+              "trigger": "action",
+              "commands": [],
+              "faceOnInteract": true,
+              "solid": null,
+              "appearance": {}
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "d4794f97-aad4-4ff5-a74b-6d0daf3095a9",
+      "name": "New Entity",
+      "x": 80,
+      "y": 128,
+      "visible": true,
+      "folder": null,
+      "components": {
+        "Transform": {
+          "x": 80,
+          "y": 128,
+          "depth": 10
+        },
+        "Collider": {
+          "width": 32,
+          "height": 32,
+          "offsetX": 0,
           "offsetY": 0,
           "isSolid": true
         }
       }
     }
-  ]
+  ],
+  "schemaVersion": 2
 }

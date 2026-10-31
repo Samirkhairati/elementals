@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "name": "Wooden Sign",
+  "kind": "object",
+  "frameWidth": 32,
+  "frameHeight": 32,
+  "margin": 0,
+  "spacing": 0,
+  "pivotX": 0.5,
+  "pivotY": 1,
+  "sheet": "sheet.png"
+}

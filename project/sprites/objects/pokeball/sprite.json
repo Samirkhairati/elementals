@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "name": "Pokeball",
+  "kind": "object",
+  "frameWidth": 24,
+  "frameHeight": 24,
+  "margin": 0,
+  "spacing": 0,
+  "pivotX": 0.5,
+  "pivotY": 1,
+  "sheet": "pokeball.png"
+}

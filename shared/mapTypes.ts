@@ -1,6 +1,8 @@
 // Type-only definitions shared by the map pipeline (editor export hook, CLI, tests).
 // No runtime code lives here so it can be imported with `import type` everywhere.
 
+import type { EngineEntity } from './engine/types.ts'
+
 export type EditorLayerType = 'tile' | 'collision' | 'terrain' | 'objects' | 'encounters'
 
 export interface EditorTile {
@@ -37,6 +39,8 @@ export interface EditorMap {
   layers: EditorLayer[]
   entities?: EditorEntity[]
   entityFolders?: unknown[]
+  /** 2 = canonical engine components (see shared/engine). Missing = legacy (1); migrateMap upgrades it. */
+  schemaVersion?: number
   fileName?: string
   folderPath?: string | null
 }
@@ -101,7 +105,9 @@ export interface TiledMap {
   type: string
   version: string
   width: number
-  entities: EditorEntity[]
+  /** Always written by the exporter; entities are canonical (migrated) engine entities. */
+  schemaVersion: number
+  entities: EngineEntity[]
 }
 
 export interface ValidationResult {

@@ -2,23 +2,21 @@
 // Pure TypeScript, no dependencies. Both validators accept `unknown` and never throw.
 
 import type { ValidationResult } from './mapTypes.ts'
+import type { ValidationContext } from './engine/types.ts'
+import { COMPONENT_TYPES } from './engine/components.ts'
+import { LEGACY_COMPONENT_TYPES, listLegacyComponents, migrateEntity } from './engine/migrate.ts'
+import type { EntityLike } from './engine/migrate.ts'
+import { validateEntity } from './engine/validate.ts'
 
 /** Mirrors `LayerType` in editor/src/types/editor.ts (checked at compile time by the editor tests). */
 export const LAYER_TYPES = ['tile', 'collision', 'terrain', 'objects', 'encounters'] as const
 
-/** Mirrors `ComponentType` in editor/src/types/editor.ts (checked at compile time by the editor tests). */
-export const COMPONENT_TYPES = [
-  'Transform',
-  'SpriteView',
-  'Collider',
-  'GridMovement',
-  'FreeMovement',
-  'PlayerControl',
-  'CharacterAnimation',
-  'Interactable',
-  'AIWander',
-  'Tag',
-] as const
+/**
+ * Canonical component names (mirrors `ComponentType` in editor/src/types/editor.ts, checked at compile
+ * time by the editor tests). Maps saved before schemaVersion 2 may still use LEGACY_COMPONENT_TYPES;
+ * they are accepted and converted by `migrateMap`.
+ */
+export { COMPONENT_TYPES, LEGACY_COMPONENT_TYPES }
 
 const COLLISION_TILESET_ID = '__collision__'
 const TILED_LAYER_TYPES = ['tilelayer', 'objectgroup']
@@ -62,7 +60,15 @@ export interface ValidateEditorMapOptions {
    * (or `__collision__`), and tile coordinates are bounds-checked against the image size when known.
    */
   tilesets?: { fileName: string; name?: string; width?: number; height?: number }[]
+  /**
+   * Things entities may reference (switch/variable/map/sprite ids). A missing list disables that check.
+   * Dangling references in event commands are reported as errors.
+   */
+  context?: ValidationContext
 }
+
+/** Entity-level problems already reported by the raw structural checks in validateEditorMap. */
+const RAW_COVERED_CODES = new Set(['bad-entity', 'bad-id', 'bad-name', 'bad-position', 'bad-components', 'missing-transform', 'unknown-component', 'duplicate-id'])
 
 export function validateEditorMap(data: unknown, options: ValidateEditorMapOptions = {}): ValidationResult {
   const errors: string[] = []
@@ -219,7 +225,7 @@ export function validateEditorMap(data: unknown, options: ValidateEditorMapOptio
           return
         }
         for (const [type, props] of Object.entries(entity.components)) {
-          if (!(COMPONENT_TYPES as readonly string[]).includes(type)) {
+          if (!(COMPONENT_TYPES as readonly string[]).includes(type) && !(LEGACY_COMPONENT_TYPES as readonly string[]).includes(type)) {
             errors.push(`${label}: unknown component type "${type}"`)
             continue
           }
@@ -234,6 +240,26 @@ export function validateEditorMap(data: unknown, options: ValidateEditorMapOptio
           if (!isRecord(transform)) {
             errors.push(`${label}: has x/y but no Transform component`)
           }
+        }
+
+        // Canonical-component checks run on the migrated entity, so legacy maps are judged by what
+        // the exporter will actually write.
+        const legacy = listLegacyComponents(entity)
+        if (legacy.length > 0) {
+          warnings.push(`${label}: uses legacy components (${legacy.join(', ')}); they are converted to Sprite/Movement/Event on load and export`)
+        }
+        try {
+          const migrated = migrateEntity(entity as EntityLike).value
+          const nonFinite = errors.some((e) => e.startsWith(`${label}: `) && e.endsWith('is not a finite number'))
+          for (const issue of validateEntity(migrated, options.context)) {
+            if (RAW_COVERED_CODES.has(issue.code)) continue
+            if (nonFinite && issue.code === 'bad-prop' && issue.message.endsWith('must be a number')) continue
+            const text = `${label}: ${issue.message} (${issue.path})`
+            if (issue.severity === 'error') errors.push(text)
+            else warnings.push(text)
+          }
+        } catch (e) {
+          errors.push(`${label}: could not be checked (${e instanceof Error ? e.message : String(e)})`)
         }
       })
     }

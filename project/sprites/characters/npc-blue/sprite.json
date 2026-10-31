@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "name": "NPC Blue",
+  "kind": "character",
+  "frameWidth": 32,
+  "frameHeight": 48,
+  "margin": 0,
+  "spacing": 0,
+  "pivotX": 0.5,
+  "pivotY": 1,
+  "character": {
+    "sheets": {
+      "walk": "walk.png",
+      "run": "run.png"
+    },
+    "framesPerDirection": 4,
+    "idleFrame": 0,
+    "walkFps": 10,
+    "runFps": 15
+  }
+}

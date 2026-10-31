@@ -3,6 +3,9 @@
 // Pure TypeScript: no DOM, electron or node imports. Keep syntax type-strippable (no enums etc).
 
 import type { EditorLayer, EditorMap, TilesetInfo, TiledLayer, TiledMap, TiledProperty, TiledTileset } from './mapTypes.ts'
+import type { EngineEntity } from './engine/types.ts'
+import { SCHEMA_VERSION } from './engine/types.ts'
+import { migrateMap } from './engine/migrate.ts'
 
 export const TILE_SIZE = 32
 export const COLLISION_TILESET_ID = '__collision__'
@@ -31,6 +34,9 @@ function tiledLayerType(layer: EditorLayer): TiledLayer['type'] {
  * Run validateEditorMap first to turn those cases into explicit errors.
  */
 export function convertEditorMapToTiled(map: EditorMap, tilesets: TilesetInfo[]): TiledMap {
+  // Legacy entities (SpriteView, Interactable, ...) are converted so the game only ever sees the
+  // canonical components; the exported map is always stamped with the schema version.
+  const migrated = migrateMap(map).value
   const layers = map.layers || []
   const hasCollisionLayer = layers.some((l) => l.type === 'collision')
 
@@ -135,7 +141,8 @@ export function convertEditorMapToTiled(map: EditorMap, tilesets: TilesetInfo[])
     type: 'map',
     version: '1.10',
     width: map.width,
-    entities: map.entities || [],
+    schemaVersion: typeof migrated.schemaVersion === 'number' ? migrated.schemaVersion : SCHEMA_VERSION,
+    entities: (migrated.entities || []) as unknown as EngineEntity[],
   }
 }
 
