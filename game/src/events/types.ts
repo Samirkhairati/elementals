@@ -1,10 +1,16 @@
-import type { Command, CommandTarget, Facing, RouteStep } from "@shared/engine/index.ts";
+import type { CommandTarget, Facing, GraphNode, RouteStep } from "@shared/engine/index.ts";
 import type { Entity } from "@/ecs/Entity";
 import type { GameFlags } from "./GameFlags";
 import type { Inventory } from "./Inventory";
 
-/** What a command (or list of commands) tells its parent to do next. */
-export type Flow = "next" | "break" | "exit";
+/**
+ * What a command handler tells the interpreter to do next:
+ *  - nothing: follow the node's `next` wire;
+ *  - `{ port }`: follow that output port (`conditional` -> then/else, `showChoices` -> an option id);
+ *  - `"end"`: stop the run successfully.
+ * A port with no wire ends the run, like the end of a command list.
+ */
+export type NodeResult = void | { port: string } | "end";
 
 export interface ChoicesRequest {
   options: string[];
@@ -94,13 +100,9 @@ export interface CommandRuntime {
   signal: AbortSignal;
   /** Awaits `promise` but rejects with CancelledError as soon as the event is cancelled. */
   guard<T>(promise: Promise<T>): Promise<T>;
-  /** Runs the command list of a branch (missing branches are empty). */
-  runBranch(command: Command, branchId: string): Promise<Flow>;
-  /** Inside a loop (breakLoop outside of one is ignored with a warning by the loop owner). */
-  loopDepth: number;
 }
 
-export type CommandHandler = (command: Command, rt: CommandRuntime) => Flow | void | Promise<Flow | void>;
+export type CommandHandler = (node: GraphNode, rt: CommandRuntime) => NodeResult | Promise<NodeResult>;
 
 export class CancelledError extends Error {
   constructor() {

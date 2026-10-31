@@ -293,6 +293,12 @@ describe('commandsToGraph', () => {
     expect(reachableFromStart(g).has('DEAD')).toBe(false)
   })
 
+  it('a breakLoop outside of any loop is ignored: the flow continues past it', () => {
+    const g = commandsToGraph([{ ...c('breakLoop'), id: 'B' }, { ...c('showText'), id: 'A' }], seq())
+    expect(g.nodes.find((n) => n.id === 'B')).toBeUndefined()
+    expect(findStart(g)!.out).toEqual({ next: 'A' })
+  })
+
   it('keeps the content of branches the command no longer exposes, unwired', () => {
     const cond: Command = { ...c('conditional'), id: 'K', branches: { then: [], else: [], old: [{ ...c('wait'), id: 'ORPHAN' }] } }
     const g = commandsToGraph([cond], seq())

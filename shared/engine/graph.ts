@@ -337,12 +337,13 @@ export function validateGraph(graph: unknown, ctx: ValidationContext = {}): Grap
  *     cycle, `exitEvent` an `end` node;
  *   - commands that could never run (after a `breakLoop` / `exitEvent`, orphan branches) are kept as
  *     unwired nodes instead of being dropped.
- * Positions are laid out with `layoutGraph`.
+ * Positions are laid out with `layoutGraph` (pass `{ layout: false }` when only the flow matters).
  */
-export function commandsToGraph(commands: readonly Command[], idFn: IdFn = newId): EventGraph {
+export function commandsToGraph(commands: readonly Command[], idFn: IdFn = newId, options: { layout?: boolean } = {}): EventGraph {
   const made: GraphNode[] = [];
 
-  const lower = (list: readonly Command[], after: string | null, breakTarget: string | null): string | null => {
+  // `breakTarget`: where a breakLoop leads (null = the end of the flow); undefined = not inside a loop.
+  const lower = (list: readonly Command[], after: string | null, breakTarget: string | null | undefined): string | null => {
     let next = after;
     for (let i = list.length - 1; i >= 0; i--) {
       const c = list[i];
@@ -353,8 +354,9 @@ export function commandsToGraph(commands: readonly Command[], idFn: IdFn = newId
 
       switch (c.type) {
         case 'breakLoop':
-          // Leaves the cycle; commands after it in this list are already lowered and are now unwired.
-          next = breakTarget;
+          // Outside a loop it does nothing (as in the old interpreter). Inside, it leaves the cycle;
+          // commands after it in this list are already lowered and are now unwired.
+          if (breakTarget !== undefined) next = breakTarget;
           continue;
         case 'exitEvent': {
           const end: GraphNode = { id: c.id, type: GRAPH_END, params: {}, out: {}, x: 0, y: 0 };
@@ -391,9 +393,10 @@ export function commandsToGraph(commands: readonly Command[], idFn: IdFn = newId
   };
 
   const start = createGraphNode(GRAPH_START, {}, idFn);
-  const first = lower(commands, null, null);
+  const first = lower(commands, null, undefined);
   if (first !== null) start.out[NEXT_PORT] = first;
-  return layoutGraph({ nodes: [start, ...made.reverse()], frames: [] });
+  const graph: EventGraph = { nodes: [start, ...made.reverse()], frames: [] };
+  return options.layout === false ? graph : layoutGraph(graph);
 }
 
 // ── layout ──────────────────────────────────────────────────────────────────────────────────────

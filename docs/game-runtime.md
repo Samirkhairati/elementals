@@ -36,7 +36,8 @@ GameFlags         switches / variables / self switches (mapId/entityId/A-D); not
 Inventory         in-memory item counts (hasItem, giveItem, removeItem)
 conditions.ts     evaluateCondition(s)
 StateSelector     active state = last state whose conditions hold; applies appearance + solid overrides when the state CHANGES
-EventInterpreter  async, cancellable command-tree runner; handlers in commands/*.ts
+EventInterpreter  async, cancellable event-graph runner (one cursor along the node wires); handlers in commands/*.ts.
+                  States are still authored as command trees; `graphOf(state)` converts them once (`commandsToGraph`)
 EventRuntime      owns state, clock, state selector, running interpreters, the `event` input lock
 TriggerSystem     ECS system (priority 350): decides when events start
 RouteSystem       ECS system (priority 260): runs moveRoute steps through GridMovement.pendingDirection
@@ -65,11 +66,11 @@ BusEventUI        EventUI over the EventBus -> DialogueHUD / ChoiceMenuHUD (UISc
    ```ts
    registerCommandHandler('myCommand', async (cmd, rt) => {
      const amount = num(cmd.params, 'amount', 1);                   // params.ts helpers never throw
-     rt.ctx.state.setVariable('x', rt.ctx.state.getVariable('x') + amount);
+     rt.ctx.flags.setVariable('x', rt.ctx.flags.getVariable('x') + amount);
      await rt.guard(rt.ctx.clock.wait(200, rt.signal));              // anything that waits goes through rt.guard + rt.signal
-     return rt.runBranch(cmd, 'then');                               // flow commands return a Flow ('next' | 'break' | 'exit')
-   });
+     return { port: 'then' };                                        // branching commands name the output port to follow;
+   });                                                               // plain commands return nothing (= follow `next`); 'end' stops the run
    ```
-3. Reach the game only through `rt.ctx` (`ui`, `clock`, `ops`, `maps`, `state`, `inventory`, `emit`, `warn`/`warnOnce`); add a method to the matching
+3. Reach the game only through `rt.ctx` (`ui`, `clock`, `ops`, `maps`, `flags`, `inventory`, `emit`, `warn`/`warnOnce`); add a method to the matching
    interface in `events/types.ts` (and its implementation: `BusEventUI`, `WorldEntityOps`, ...) when a new service is needed. Fakes for tests live in `test/rig.ts`.
 4. Test it with `makeRig()` (`events/EventInterpreter.test.ts` has an example per command); a handler that throws is logged and skipped.

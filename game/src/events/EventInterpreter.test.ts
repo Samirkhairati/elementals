@@ -2,11 +2,12 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { makeRig, cmd, state, type Rig } from '@/test/rig';
 import { EventInterpreter, YIELD_EVERY_COMMANDS } from './EventInterpreter';
 import { registerCommandHandler } from './commands';
+import { graphOf } from './EventRuntime';
 import { SpriteComponent } from '@/ecs/components/SpriteComponent';
 import { AnimationComponent } from '@/ecs/components/AnimationComponent';
 import { GridMovementComponent } from '@/ecs/components/GridMovementComponent';
 import { TransformComponent } from '@/ecs/components/TransformComponent';
-import { objectAnimKey, spriteTextureKey } from '@shared/engine/index.ts';
+import { objectAnimKey, spriteTextureKey, type EventGraph, type GraphNode } from '@shared/engine/index.ts';
 import { gameState } from '@/core/GameState';
 
 let rig: Rig;
@@ -143,10 +144,9 @@ describe('flow commands', () => {
     expect(rig.runtime.flags.getSwitch('s1')).toBe(false);
   });
 
-  it('breakLoop outside of a loop warns and continues', async () => {
+  it('breakLoop outside of a loop is ignored and the event continues', async () => {
     const run = rig.runCommands([cmd('breakLoop'), cmd('setSwitch', { id: 's1', value: true })])!;
-    await run.done;
-    expect(rig.warnings.some((w) => w.includes('breakLoop outside'))).toBe(true);
+    expect(await run.done).toBe('completed');
     expect(rig.runtime.flags.getSwitch('s1')).toBe(true);
   });
 
@@ -443,7 +443,7 @@ describe('cancellation', () => {
 
   it('cancel before the run started cancels at once', async () => {
     const e = rig.add({ states: [state([cmd('setSwitch', { id: 's1', value: true })])] });
-    const interpreter = new EventInterpreter(rig.world.getComponent(e, (await import('@/ecs/components/EventComponent')).EventComponent)!.states[0].commands, {
+    const interpreter = new EventInterpreter(graphOf(rig.world.getComponent(e, (await import('@/ecs/components/EventComponent')).EventComponent)!.states[0]), {
       entity: e, entityId: 'x', getMapId: () => 'test', flags: rig.runtime.flags, inventory: rig.runtime.inventory, ui: rig.ui,
       clock: rig.runtime.clock, ops: rig.runtime.ops, maps: rig.maps, emit: () => {}, warn: () => {}, warnOnce: () => {}, random: () => 0,
     });
@@ -461,5 +461,92 @@ describe('cancellation', () => {
     expect(gameState.isLockedBy('event')).toBe(false);
     expect(rig.runtime.isBlocking).toBe(false);
     expect(await run.done).toBe('cancelled');
+  });
+});
+
+describe('graph interpreter', () => {
+  const n = (id: string, type: string, out: Record<string, string> = {}, params: Record<string, unknown> = {}): GraphNode => ({ id, type, params, out, x: 0, y: 0 });
+  const g = (...nodes: GraphNode[]): EventGraph => ({ nodes, frames: [] });
+
+  function interpret(graph: EventGraph): EventInterpreter {
+    const e = rig.add({ states: [state([])] });
+    return new EventInterpreter(graph, {
+      entity: e, entityId: 'x', getMapId: () => 'test', flags: rig.runtime.flags, inventory: rig.runtime.inventory, ui: rig.ui,
+      clock: rig.runtime.clock, ops: rig.runtime.ops, maps: rig.maps, emit: () => {}, warn: (m) => rig.warnings.push(m), warnOnce: (_k, m) => rig.warnings.push(m), random: () => 0,
+    });
+  }
+
+  it('follows the wires through junctions and ignores unreachable nodes', async () => {
+    const run = interpret(g(
+      n('s', 'start', { next: 'a' }),
+      n('a', 'setSwitch', { next: 'j' }, { id: 's1', value: true }),
+      n('j', 'junction', { next: 'b' }),
+      n('b', 'setSwitch', {}, { id: 's2', value: true }),
+      n('lost', 'setSwitch', {}, { id: 's3', value: true }),
+    ));
+    expect(await run.run()).toBe('completed');
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(true);
+    expect(rig.runtime.flags.getSwitch('s2')).toBe(true);
+    expect(rig.runtime.flags.getSwitch('s3')).toBe(false);
+  });
+
+  it('an end node stops the run', async () => {
+    const run = interpret(g(n('s', 'start', { next: 'e' }), n('e', 'end', { next: 'a' }), n('a', 'setSwitch', {}, { id: 's1', value: true })));
+    expect(await run.run()).toBe('completed');
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(false);
+  });
+
+  it('a conditional follows then or else', async () => {
+    rig.runtime.flags.setSwitch('s1', true);
+    const run = interpret(g(
+      n('s', 'start', { next: 'c' }),
+      n('c', 'conditional', { then: 'yes', else: 'no' }, { conditions: [{ kind: 'switch', id: 's1', value: true }] }),
+      n('yes', 'setVariable', {}, { id: 'v1', op: 'set', operand: 'const', value: 1 }),
+      n('no', 'setVariable', {}, { id: 'v1', op: 'set', operand: 'const', value: 2 }),
+    ));
+    await run.run();
+    expect(rig.runtime.flags.getVariable('v1')).toBe(1);
+  });
+
+  it('currentNodeId follows the run and is null before and after', async () => {
+    const run = interpret(g(n('s', 'start', { next: 'w' }), n('w', 'wait', { next: 'a' }, { ms: 500 }), n('a', 'setSwitch', {}, { id: 's1', value: true })));
+    expect(run.currentNodeId).toBeNull();
+    const done = run.run();
+    await rig.advance(100);
+    expect(run.currentNodeId).toBe('w');
+    await rig.advance(1000);
+    expect(await done).toBe('completed');
+    expect(run.currentNodeId).toBeNull();
+  });
+
+  it('a cycle through a wait keeps running until it is cancelled', async () => {
+    const run = interpret(g(
+      n('s', 'start', { next: 'j' }),
+      n('j', 'junction', { next: 'w' }),
+      n('w', 'wait', { next: 'inc' }, { ms: 100 }),
+      n('inc', 'setVariable', { next: 'j' }, { id: 'v1', op: 'add', operand: 'const', value: 1 }),
+    ));
+    const done = run.run();
+    await rig.advance(1000);
+    expect(rig.runtime.flags.getVariable('v1')).toBeGreaterThanOrEqual(5);
+    run.cancel();
+    expect(await done).toBe('cancelled');
+  });
+
+  it('a wire to a missing node ends the run with a warning; a graph without start does nothing', async () => {
+    expect(await interpret(g(n('s', 'start', { next: 'gone' }))).run()).toBe('completed');
+    expect(rig.warnings.some((w) => w.includes('missing node'))).toBe(true);
+    expect(await interpret(g(n('a', 'setSwitch', {}, { id: 's1', value: true }))).run()).toBe('completed');
+    expect(rig.warnings.some((w) => w.includes('no start'))).toBe(true);
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(false);
+  });
+
+  it('a cycle that never waits still yields frames, so the game is not frozen', async () => {
+    const run = interpret(g(n('s', 'start', { next: 'j' }), n('j', 'junction', { next: 'j' })));
+    const done = run.run();
+    await rig.advance(100);
+    expect(run.finished).toBe(false);
+    run.cancel();
+    expect(await done).toBe('cancelled');
   });
 });

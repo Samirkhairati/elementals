@@ -23,11 +23,11 @@ registerCommandHandler("showText", async (cmd, rt) => {
 });
 
 /**
- * showChoices: one branch per option id.
+ * showChoices: one output port per option id (plus `cancel`).
  *  - cancel 'none': the menu cannot be cancelled;
  *  - cancel 'last': cancelling picks the last option;
  *  - cancel 'branch': cancelling runs the `cancel` branch.
- * No options: warning, nothing happens.
+ * No options: warning, nothing happens (the node has no ports, so the run ends there).
  */
 registerCommandHandler("showChoices", async (cmd, rt) => {
   const options = choiceOptions(cmd.params);
@@ -39,9 +39,9 @@ registerCommandHandler("showChoices", async (cmd, rt) => {
   const allowCancel = cancel === "last" || cancel === "branch";
   const index = await rt.guard(rt.ctx.ui.showChoices({ options: options.map((o) => o.label), allowCancel }, rt.signal));
 
-  if (index >= 0 && index < options.length) return rt.runBranch(cmd, options[index].id);
-  if (cancel === "last") return rt.runBranch(cmd, options[options.length - 1].id);
-  if (cancel === "branch") return rt.runBranch(cmd, "cancel");
+  if (index >= 0 && index < options.length) return { port: options[index].id };
+  if (cancel === "last") return { port: options[options.length - 1].id };
+  if (cancel === "branch") return { port: "cancel" };
   // 'none' but the UI still reported a cancel: fall back to the first option rather than hanging.
-  return rt.runBranch(cmd, options[0].id);
+  return { port: options[0].id };
 });
