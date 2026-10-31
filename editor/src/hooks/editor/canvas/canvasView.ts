@@ -3,6 +3,25 @@
 
 import { useSyncExternalStore } from 'react'
 
+/** Tints for an entity's area overlay (border + faint fill), chosen per entity on its Tag. White is the default. */
+export const OVERLAY_COLORS = [
+  { id: '', label: 'White', rgb: '255,255,255' },
+  { id: 'pink', label: 'Pink', rgb: '255,179,204' },
+  { id: 'peach', label: 'Peach', rgb: '255,205,160' },
+  { id: 'yellow', label: 'Yellow', rgb: '255,240,150' },
+  { id: 'mint', label: 'Mint', rgb: '160,235,196' },
+  { id: 'sky', label: 'Sky', rgb: '160,210,255' },
+  { id: 'lavender', label: 'Lavender', rgb: '208,190,255' },
+] as const
+
+/** `r,g,b` for a Tag colour id (unknown or empty = white). */
+export function overlayRgb(id: unknown): string {
+  return (OVERLAY_COLORS.find((c) => c.id === id) ?? OVERLAY_COLORS[0]).rgb
+}
+
+/** The on/off switches of the View group (everything in the settings except the overlay colour). */
+export type CanvasViewToggle = 'sprites' | 'colliders' | 'labels' | 'badges'
+
 export interface CanvasViewSettings {
   /** Draw real sprites (off = placeholder tiles only). */
   sprites: boolean
@@ -53,7 +72,7 @@ export function setCanvasView(patch: Partial<CanvasViewSettings>) {
   listeners.forEach((l) => l())
 }
 
-export function toggleCanvasView(key: keyof CanvasViewSettings) {
+export function toggleCanvasView(key: CanvasViewToggle) {
   setCanvasView({ [key]: !state[key] })
 }
 

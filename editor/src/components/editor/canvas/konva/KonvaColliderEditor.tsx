@@ -1,5 +1,5 @@
-// Collider editing on the canvas for the selected entity:
-//  * always: 8 resize handles on its collider (corners + edges),
+// Area editing on the canvas for the selected entity (its collider, or the tile it stands on when it has none):
+//  * always: 8 resize handles on the area (corners + edges); resizing an entity without a Collider creates one,
 //  * Collider tool (C): drag the body to move it, drag on empty ground to draw a new one,
 //  * everything snaps to 4px (Shift = free, Alt = from the centre), Escape cancels, Enter commits,
 //  * ONE change is reported per gesture (so one undo step).
@@ -49,8 +49,8 @@ interface KonvaColliderEditorProps {
   entity: ColliderEditEntity | null
   /** Collider tool active: body drag + drawing on empty ground. */
   toolActive: boolean
-  /** Show handles for an existing collider even without the tool. */
-  showHandles: boolean
+  /** `r,g,b` of the overlay tint the area is drawn in. */
+  rgb: string
   mapWidthPx: number
   mapHeightPx: number
   /** Called once per finished gesture. `isSolid` is only set when a new collider is created. */
@@ -65,12 +65,14 @@ function clientToWorld(stage: Konva.Stage, clientX: number, clientY: number): Po
   return { x: (clientX - box.left - stage.x()) / s, y: (clientY - box.top - stage.y()) / s }
 }
 
-export function KonvaColliderEditor({ entity, toolActive, showHandles, mapWidthPx, mapHeightPx, onCommit, liveRef }: KonvaColliderEditorProps) {
+export function KonvaColliderEditor({ entity, toolActive, rgb, mapWidthPx, mapHeightPx, onCommit, liveRef }: KonvaColliderEditorProps) {
   const [gesture, setGesture] = useState<Gesture | null>(null)
   const gestureRef = useRef<Gesture | null>(null)
   const cleanupRef = useRef<(() => void) | null>(null)
 
-  const collider = entity?.collider ? normalizeCollider(entity.collider) : null
+  // An entity without a Collider is edited as its tile (the defaults of a new collider).
+  const hasCollider = !!entity?.collider
+  const collider = entity ? normalizeCollider(entity.collider) : null
   const rect = entity && collider ? colliderWorldRect(entity.x, entity.y, collider) : null
 
   const finish = useCallback(
@@ -85,9 +87,9 @@ export function KonvaColliderEditor({ entity, toolActive, showHandles, mapWidthP
       const patch = rectToColliderProps(g.rect, { x: entity.x, y: entity.y })
       const prev = collider ? { width: collider.width, height: collider.height, offsetX: collider.offsetX, offsetY: collider.offsetY } : null
       if (prev && sameCollider(prev, patch)) return
-      onCommit(entity.id, collider ? patch : { ...patch, isSolid: true })
+      onCommit(entity.id, hasCollider ? patch : { ...patch, isSolid: true })
     },
-    [entity, collider, onCommit, liveRef],
+    [entity, collider, hasCollider, onCommit, liveRef],
   )
 
   useEffect(() => () => cleanupRef.current?.(), [])
@@ -207,8 +209,7 @@ export function KonvaColliderEditor({ entity, toolActive, showHandles, mapWidthP
   }
 
   const live = gesture?.rect ?? null
-  const solid = collider ? collider.isSolid : true
-  const handlesVisible = !!rect && (showHandles || toolActive) && !gesture
+  const handlesVisible = !!rect && !gesture
 
   return (
     <>
@@ -228,7 +229,7 @@ export function KonvaColliderEditor({ entity, toolActive, showHandles, mapWidthP
       )}
 
       {/* Handles (and the body in tool mode) */}
-      {rect && (handlesVisible || (toolActive && !gesture)) && (
+      {rect && handlesVisible && (
         <Shape
           name="collider-handles"
           fill="#000"
@@ -238,7 +239,7 @@ export function KonvaColliderEditor({ entity, toolActive, showHandles, mapWidthP
             const s = shape.getStage()?.scaleX() || 1
             for (const h of HANDLES) {
               const p = handlePoint(rect, h)
-              drawHandle(ctx, p.x, p.y, s, solid)
+              drawHandle(ctx, p.x, p.y, s)
             }
           }}
           hitFunc={(context, shape) => {
@@ -266,10 +267,10 @@ export function KonvaColliderEditor({ entity, toolActive, showHandles, mapWidthP
           sceneFunc={(context, shape) => {
             const ctx = context._context as CanvasRenderingContext2D
             const s = shape.getStage()?.scaleX() || 1
-            drawFootprint(ctx, live.x, live.y, live.w, live.h, solid, s, true)
+            drawFootprint(ctx, live.x, live.y, live.w, live.h, rgb, s, true)
             for (const h of HANDLES) {
               const p = handlePoint(live, h)
-              drawHandle(ctx, p.x, p.y, s, solid)
+              drawHandle(ctx, p.x, p.y, s)
             }
             drawReadout(ctx, formatColliderRect(rectToColliderProps(live, { x: entity.x, y: entity.y })), live.x, live.y + live.h + 6 / s, s)
           }}

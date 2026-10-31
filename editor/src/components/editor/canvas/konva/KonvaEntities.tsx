@@ -24,6 +24,7 @@ import {
 } from '@/lib/entityVisuals'
 import { drawResolvedSprite, resolveSprite, useSpriteImagesVersion } from '@/lib/spriteImages'
 import type { CanvasViewSettings } from '@/hooks/editor/canvas/canvasView'
+import { overlayRgb } from '@/hooks/editor/canvas/canvasView'
 import { KonvaColliderEditor } from './KonvaColliderEditor'
 import {
   EVENT_RGB,
@@ -66,13 +67,16 @@ interface EntityInfo {
   id: string
   asset: SpriteAssetInfo | undefined
   bounds: GeoRect
-  foot: GeoRect | null
+  /** The entity's area: its collider box, or the tile it stands on when it has no collider. */
+  foot: GeoRect
   solid: boolean
   hasEvent: boolean
   controller: 'none' | 'player' | 'wander' | null
   wanderRadius: number
   spriteHidden: boolean
   icon: string
+  /** `r,g,b` of the area outline (the entity's Tag colour). */
+  rgb: string
 }
 
 function buildInfo(entity: EntityData, assets: Record<string, SpriteAssetInfo>): EntityInfo {
@@ -86,13 +90,14 @@ function buildInfo(entity: EntityData, assets: Record<string, SpriteAssetInfo>):
     id: entity.id,
     asset,
     bounds: translateRect(abs, -entity.x, -entity.y),
-    foot: collider ? colliderLocalRect(collider) : null,
+    foot: colliderLocalRect(collider ?? normalizeCollider(null)),
     solid: collider ? collider.isSolid : true,
     hasEvent: sum.hasEvent,
     controller: sum.controller,
     wanderRadius: sum.wanderRadius,
     spriteHidden: sum.spriteHidden,
     icon: entityIconName(entity),
+    rgb: overlayRgb(entity.components.Tag?.color),
   }
 }
 
@@ -147,7 +152,7 @@ const KonvaEntityNode = React.memo(function KonvaEntityNode({
     return showSprites && sprite && info.asset ? resolveSprite(info.asset, sprite, 0) : null
   }, [showSprites, sprite, info.asset, imagesVersion])
 
-  const tone = info.hasEvent ? 'event' : info.foot && !info.solid ? 'trigger' : 'default'
+  const tone = info.hasEvent ? 'event' : info.entity.components.Collider && !info.solid ? 'trigger' : 'default'
   const dim = info.spriteHidden
 
   const clampSnap = (x: number, y: number) => {
@@ -356,12 +361,12 @@ export const KonvaEntities = React.memo(function KonvaEntities({
           if (view.colliders) {
             for (let i = 0; i < infos.length; i++) {
               const info = infos[i]
-              if (!info.foot || info.id === selectedEntityId) continue
+              if (info.id === selectedEntityId) continue
               const ax = info.id === v.dragId ? v.dragX : info.entity.x
               const ay = info.id === v.dragId ? v.dragY : info.entity.y
               const f = info.foot
               if (ax + f.x + f.w < left || ax + f.x > right || ay + f.y + f.h < top || ay + f.y > bottom) continue
-              drawFootprint(ctx, ax + f.x, ay + f.y, f.w, f.h, info.solid, s, false)
+              drawFootprint(ctx, ax + f.x, ay + f.y, f.w, f.h, info.rgb, s, false)
             }
           }
 
@@ -377,8 +382,8 @@ export const KonvaEntities = React.memo(function KonvaEntities({
             const ay = v.dragId === selected.id ? v.dragY : selected.entity.y
             if (selected.controller === 'wander') drawWanderRing(ctx, ax, ay, selected.wanderRadius, s)
             drawSelectionFrame(ctx, translateRect(selected.bounds, ax, ay), s)
-            if (selected.foot && liveRect.current === null) {
-              drawFootprint(ctx, ax + selected.foot.x, ay + selected.foot.y, selected.foot.w, selected.foot.h, selected.solid, s, true)
+            if (liveRect.current === null) {
+              drawFootprint(ctx, ax + selected.foot.x, ay + selected.foot.y, selected.foot.w, selected.foot.h, selected.rgb, s, true)
             }
             drawAnchorCross(ctx, ax, ay, s)
           }
@@ -423,7 +428,7 @@ export const KonvaEntities = React.memo(function KonvaEntities({
       <KonvaColliderEditor
         entity={colliderEntity}
         toolActive={colliderToolActive}
-        showHandles={view.colliders || colliderToolActive}
+        rgb={selected?.rgb ?? '255,255,255'}
         mapWidthPx={mapWidthPx}
         mapHeightPx={mapHeightPx}
         onCommit={handleCommitCollider}

@@ -47,7 +47,7 @@ describe('PREFABS', () => {
     expect(e.components.Event!.pages).toHaveLength(1)
     expect(e.components.Event!.pages[0].trigger).toBe('action')
     expect(commandTypes(e)).toEqual(['showText'])
-    expect(e.components.Tag).toEqual({ tag: 'npc' })
+    expect(e.components.Tag).toEqual({ tag: 'npc', icon: '', color: '' })
   })
 
   it('Sign: solid, readable', () => {

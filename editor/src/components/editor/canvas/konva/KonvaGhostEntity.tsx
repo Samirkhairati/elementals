@@ -79,7 +79,7 @@ export const KonvaGhostEntity = React.memo(function KonvaGhostEntity({
         }
         ctx.restore()
 
-        if (model.foot) drawFootprint(ctx, model.foot.x, model.foot.y, model.foot.w, model.foot.h, model.solid, s, true)
+        if (model.foot) drawFootprint(ctx, model.foot.x, model.foot.y, model.foot.w, model.foot.h, '255,255,255', s, true)
         drawAnchorCross(ctx, 0, 0, s)
         drawLabel(ctx, `${pendingPlacement.name} — click to place`, model.bounds.x + model.bounds.w / 2, model.bounds.y, s, 'hover')
       }}

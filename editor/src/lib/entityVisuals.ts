@@ -7,6 +7,7 @@
 //  * A sprite frame is drawn with its pivot on the anchor, shifted by the Sprite offsetX/offsetY.
 
 import type { PropBag } from '@/types/editor'
+import { ICON_PATHS } from '@/lib/iconPaths'
 import type { ColliderProps, SpriteAssetMeta, SpriteProps } from '../../../shared/engine/types'
 import { TILE_SIZE, anchorToTile, tileToAnchor } from '../../../shared/engine/constants'
 import { previewFrame, type PreviewFrame } from '../../../shared/engine/sprites'
@@ -368,9 +369,11 @@ export function summarizeEntity(entity: EntityLike): EntitySummary {
   }
 }
 
-/** Icon name (see lib/iconPaths + lucide) that best describes an entity when it has no sprite. */
+/** Icon name (see lib/iconPaths + lucide) that best describes an entity: the one chosen on its Tag, else a guess. */
 export function entityIconName(entity: EntityLike): string {
   const c = entity.components
+  const chosen = typeof c.Tag?.icon === 'string' ? c.Tag.icon : ''
+  if (chosen && Object.hasOwn(ICON_PATHS, chosen)) return chosen
   const tag = typeof c.Tag?.tag === 'string' ? c.Tag.tag : ''
   const pages = (c.Event?.pages as { commands?: { type?: string }[] }[] | undefined) ?? []
   const hasWarp = pages.some((p) => p?.commands?.some((cmd) => cmd?.type === 'warp'))

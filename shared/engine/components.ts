@@ -160,8 +160,18 @@ export const COMPONENT_SCHEMAS: Record<ComponentType, ComponentSchema> = {
     accent: 'zinc',
     category: 'core',
     singleton: true,
-    defaultProps: { tag: 'entity' },
-    fields: [{ key: 'tag', label: 'Tag', kind: 'text', placeholder: 'e.g. npc, chest, warp' }],
+    defaultProps: { tag: 'entity', icon: '', color: '' },
+    fields: [
+      { key: 'tag', label: 'Tag', kind: 'text', placeholder: 'e.g. npc, chest, warp' },
+      { key: 'icon', label: 'Icon', kind: 'text', help: 'Editor-only icon for the map marker and the entity lists.' },
+      {
+        key: 'color',
+        label: 'Area colour',
+        kind: 'select',
+        help: 'Editor-only tint of the entity area on the map.',
+        options: [{ label: 'White', value: '' }, ...['pink', 'peach', 'yellow', 'mint', 'sky', 'lavender'].map((v) => ({ label: v, value: v }))],
+      },
+    ],
   },
 };
 

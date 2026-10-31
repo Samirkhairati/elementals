@@ -6,7 +6,6 @@
 import { ICON_PATHS } from '@/lib/iconPaths'
 import type { Rect } from '@/lib/entityVisuals'
 
-export const SOLID_RGB = '239,68,68'
 export const TRIGGER_RGB = '45,212,191'
 export const EVENT_RGB = '96,165,250'
 export const MOVE_RGB = '52,211,153'
@@ -57,35 +56,30 @@ export function roundRectPath(ctx: CanvasRenderingContext2D, x: number, y: numbe
 }
 
 /**
- * The stand-in for an entity without a (loadable) sprite: an icon in a rounded tile on the entity's tile.
+ * The stand-in for an entity without a (loadable) sprite: just its icon, low opacity, centred on its tile.
  * Origin = the entity anchor (bottom-centre of the tile).
  */
 export function drawPlaceholder(ctx: CanvasRenderingContext2D, iconName: string, tone: 'default' | 'event' | 'trigger', alpha = 1) {
   ctx.save()
-  ctx.globalAlpha *= alpha
-  const rgb = tone === 'event' ? EVENT_RGB : tone === 'trigger' ? TRIGGER_RGB : '148,163,184'
-  roundRectPath(ctx, -13, -29, 26, 26, 6)
-  ctx.fillStyle = 'rgba(15,23,42,0.88)'
-  ctx.fill()
-  ctx.lineWidth = 1.5
-  ctx.strokeStyle = `rgba(${rgb},0.85)`
-  ctx.stroke()
-  drawIcon(ctx, iconName, -8, -24, 16, `rgba(${rgb},1)`, 2)
+  ctx.globalAlpha *= alpha * 0.6
+  const rgb = tone === 'event' ? EVENT_RGB : tone === 'trigger' ? TRIGGER_RGB : '255,255,255'
+  drawIcon(ctx, iconName, -11, -27, 22, 'rgba(0,0,0,0.55)', 3.2)
+  drawIcon(ctx, iconName, -11, -27, 22, `rgba(${rgb},1)`, 2)
   ctx.restore()
 }
 
-/** Collider outline: solid = red fill + solid stroke, trigger = teal fill + dashed stroke. */
-export function drawFootprint(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, solid: boolean, scale: number, strong: boolean) {
-  const rgb = solid ? SOLID_RGB : TRIGGER_RGB
+/**
+ * Entity area (collider box, or the tile for entities without one): a solid 1px border in the overlay tint
+ * over an almost transparent fill of the same tint. `strong` is the selected entity's.
+ */
+export function drawFootprint(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, rgb: string, scale: number, strong: boolean) {
   ctx.beginPath()
   ctx.rect(x, y, w, h)
-  ctx.fillStyle = `rgba(${rgb},${strong ? 0.26 : 0.1})`
+  ctx.fillStyle = `rgba(${rgb},${strong ? 0.16 : 0.08})`
   ctx.fill()
   ctx.lineWidth = (strong ? 1.5 : 1) / scale
-  ctx.strokeStyle = `rgba(${rgb},${strong ? 1 : 0.55})`
-  if (!solid) ctx.setLineDash([5 / scale, 3 / scale])
+  ctx.strokeStyle = `rgba(${rgb},${strong ? 1 : 0.85})`
   ctx.stroke()
-  if (!solid) ctx.setLineDash([])
 }
 
 export function drawAnchorCross(ctx: CanvasRenderingContext2D, x: number, y: number, scale: number) {
@@ -187,14 +181,14 @@ export function drawWanderRing(ctx: CanvasRenderingContext2D, anchorX: number, a
 }
 
 /** Resize handle square (8 screen px) centred on (x, y). */
-export function drawHandle(ctx: CanvasRenderingContext2D, x: number, y: number, scale: number, solid: boolean) {
+export function drawHandle(ctx: CanvasRenderingContext2D, x: number, y: number, scale: number) {
   const s = 8 / scale
   ctx.beginPath()
   ctx.rect(x - s / 2, y - s / 2, s, s)
   ctx.fillStyle = '#ffffff'
   ctx.fill()
   ctx.lineWidth = 1.5 / scale
-  ctx.strokeStyle = `rgb(${solid ? SOLID_RGB : TRIGGER_RGB})`
+  ctx.strokeStyle = 'rgba(15,23,42,0.9)'
   ctx.stroke()
 }
 

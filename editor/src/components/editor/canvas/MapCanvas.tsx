@@ -186,6 +186,14 @@ export function MapCanvas({
     [updateComponentProp, updateComponentProps]
   )
 
+  const handleUpdateTag = useCallback(
+    (entityId: string, patch: Record<string, any>) => {
+      if (updateComponentProps) updateComponentProps(entityId, 'Tag', patch)
+      else for (const [key, value] of Object.entries(patch)) updateComponentProp?.(entityId, 'Tag', key, value)
+    },
+    [updateComponentProp, updateComponentProps]
+  )
+
   const mapWidthPx = activeMap ? activeMap.width * 32 : 0
   const mapHeightPx = activeMap ? activeMap.height * 32 : 0
 
@@ -312,6 +320,10 @@ export function MapCanvas({
           if (entity && !entity.components.Collider) addComponent?.(id, 'Collider')
           setSelectedEntityId?.(id)
           setActiveTool('collider')
+        }}
+        onSetAreaColor={(id, color) => {
+          const hasTag = !!entities.find((e) => e.id === id)?.components.Tag
+          handleUpdateTag(id, hasTag ? { color } : { tag: 'entity', color })
         }}
         onSampleTile={sampleSingleTile}
       />

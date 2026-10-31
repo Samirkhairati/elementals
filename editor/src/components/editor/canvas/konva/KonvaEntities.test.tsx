@@ -32,7 +32,7 @@ vi.mock('./entityDraw', async (orig) => ({
   drawHoverFrame: drawn.hover,
   drawPlaceholder: drawn.placeholder,
 }))
-vi.mock('./KonvaColliderEditor', () => ({ KonvaColliderEditor: (p: any) => <div data-testid="collider-editor" data-tool={String(p.toolActive)} data-handles={String(p.showHandles)} data-entity={p.entity?.id ?? ''} /> }))
+vi.mock('./KonvaColliderEditor', () => ({ KonvaColliderEditor: (p: any) => <div data-testid="collider-editor" data-tool={String(p.toolActive)} data-rgb={p.rgb} data-entity={p.entity?.id ?? ''} /> }))
 
 import { KonvaEntities } from './KonvaEntities'
 import { makeEntity, makeMap } from '@/test/helpers'
@@ -86,14 +86,18 @@ describe('KonvaEntities', () => {
     expect(nodes()).toHaveLength(0)
   })
 
-  it('draws a faint footprint for every collider when "Colliders" is on, and none when off', () => {
+  it('draws a faint area for every entity (its collider, else its tile) when "Colliders" is on, and none when off', () => {
     const entities = [entity('a', 16, 32, { Collider: { width: 32, height: 32, offsetX: 0, offsetY: 0, isSolid: true } }), entity('b', 48, 32, { Collider: { width: 16, height: 8, isSolid: false } }), entity('c', 80, 32)]
     renderEntities(entities, { view: { colliders: true } })
     runOverlay()
-    expect(drawn.footprint).toHaveBeenCalledTimes(2)
-    // (ctx, x, y, w, h, solid, scale, strong)
-    expect(drawn.footprint.mock.calls.map((c) => c[5])).toEqual([true, false])
-    expect(drawn.footprint.mock.calls.every((c) => c[7] === false)).toBe(true)
+    expect(drawn.footprint).toHaveBeenCalledTimes(3)
+    // (ctx, x, y, w, h, rgb, scale, strong): the collider's box, the 16x8 trigger, and the tile of the entity without a collider
+    expect(drawn.footprint.mock.calls.map((c) => c.slice(1, 5))).toEqual([
+      [0, 0, 32, 32],
+      [40, 24, 16, 8],
+      [64, 0, 32, 32],
+    ])
+    expect(drawn.footprint.mock.calls.every((c) => c[5] === '255,255,255' && c[7] === false)).toBe(true)
 
     drawn.footprint.mockClear()
     renderEntities(entities, { view: { colliders: false } })
@@ -215,6 +219,16 @@ describe('KonvaEntities', () => {
     const ed = getByTestId('collider-editor')
     expect(ed.dataset.entity).toBe('a')
     expect(ed.dataset.tool).toBe('true')
-    expect(ed.dataset.handles).toBe('true')
+    // the area is always editable, whatever the "Colliders" view toggle says
+    expect(ed.dataset.rgb).toBe('255,255,255')
+  })
+
+  it("tints each entity's area with its Tag colour (unknown or empty = white)", () => {
+    renderEntities([entity('a', 16, 32, { Tag: { tag: 'x', color: 'mint' } }), entity('b', 48, 32, { Tag: { tag: 'x', color: 'nope' } }), entity('c', 80, 32)], { selectedEntityId: 'a' })
+    runOverlay()
+    const byX = Object.fromEntries(drawn.footprint.mock.calls.map((c) => [c[1], c[5]]))
+    expect(byX[0]).toBe('160,235,196')
+    expect(byX[32]).toBe('255,255,255')
+    expect(byX[64]).toBe('255,255,255')
   })
 })

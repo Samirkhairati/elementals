@@ -21,7 +21,7 @@ import {
 } from 'lucide-react'
 import { useEditorSelector, type EditorContextValue } from './EditorContext'
 import { ShortcutsDialog } from '../dialogs/ShortcutsDialog'
-import { toggleCanvasView, useCanvasView, type CanvasViewSettings } from '@/hooks/editor/canvas/canvasView'
+import { toggleCanvasView, useCanvasView, type CanvasViewToggle } from '@/hooks/editor/canvas/canvasView'
 import { IconButton } from '../ui/controls'
 
 export type EditorViewMode = 'map' | 'behaviour-graph' | 'lighting' | 'dialogue'
@@ -86,9 +86,9 @@ function ToolButton({ title, active, disabled, onClick, children, label, tone }:
   )
 }
 
-const VIEW_TOGGLES: { key: keyof CanvasViewSettings; title: string; icon: React.ReactNode }[] = [
+const VIEW_TOGGLES: { key: CanvasViewToggle; title: string; icon: React.ReactNode }[] = [
   { key: 'sprites', title: 'Sprites: draw real graphics (off: placeholder tiles)', icon: <ImageIcon /> },
-  { key: 'colliders', title: 'Colliders: footprint of every entity', icon: <ScanLine /> },
+  { key: 'colliders', title: 'Entity areas: outline of every entity', icon: <ScanLine /> },
   { key: 'labels', title: 'Labels: names of all entities when zoomed in', icon: <Type /> },
   { key: 'badges', title: 'Event badges: lightning on entities with an Event', icon: <Zap /> },
 ]

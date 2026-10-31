@@ -81,7 +81,7 @@ describe('defaults', () => {
       asset: '', facing: 'down', animation: '', frame: 0, offsetX: 0, offsetY: 0, scale: 1, flipX: false, tint: '', opacity: 1, visible: true,
     })
     expect(createDefaultComponent('Movement')).toMatchObject({ controller: 'none', speed: 100 })
-    expect(createDefaultComponent('Tag')).toEqual({ tag: 'entity' })
+    expect(createDefaultComponent('Tag')).toEqual({ tag: 'entity', icon: '', color: '' })
   })
 
   it('Event defaults to one action page without commands and gets fresh ids', () => {
@@ -109,7 +109,7 @@ describe('defaults', () => {
 describe('normalizeProps', () => {
   it('fills missing keys and drops unknown ones', () => {
     expect(normalizeProps('Collider', { width: 48, bogus: 1 })).toEqual({ width: 48, height: 32, offsetX: 0, offsetY: 0, isSolid: true })
-    expect(normalizeProps('Tag', undefined)).toEqual({ tag: 'entity' })
+    expect(normalizeProps('Tag', undefined)).toEqual({ tag: 'entity', icon: '', color: '' })
     expect(normalizeProps('Transform', null)).toEqual({ x: 0, y: 0, depth: 10 })
     expect(normalizeProps('Transform', [1, 2])).toEqual({ x: 0, y: 0, depth: 10 })
   })

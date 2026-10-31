@@ -89,6 +89,10 @@ export interface MovementProps {
 
 export interface TagProps {
   tag: string;
+  /** Editor icon name for the entity's marker on the map and its rows in the lists ('' = guessed from the tag). */
+  icon?: string;
+  /** Editor-only tint of the entity's area outline on the map: a pastel id ('' = white). */
+  color?: string;
 }
 
 // ── Events (RPG-Maker style pages + a command tree that maps 1:1 onto an event graph) ───────────

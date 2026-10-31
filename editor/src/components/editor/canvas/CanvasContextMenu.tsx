@@ -10,7 +10,8 @@ import {
   DropdownMenuTrigger,
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu'
-import { Plus, Sparkles, Copy, Trash2, Maximize2, Pipette } from 'lucide-react'
+import { Plus, Sparkles, Copy, Trash2, Maximize2, Pipette, Palette } from 'lucide-react'
+import { OVERLAY_COLORS } from '@/hooks/editor/canvas/canvasView'
 import { PRESET_PREFABS } from '@/lib/componentRegistry'
 import { EntityData, ComponentType } from '@/types/editor'
 
@@ -40,6 +41,8 @@ interface CanvasContextMenuProps {
   onDuplicateEntity?: (id: string) => void
   onDeleteEntity?: (id: string) => void
   onStartResizeCollider?: (id: string) => void
+  /** Sets the tint of an entity's area outline ('' = white). */
+  onSetAreaColor?: (id: string, color: string) => void
   onSampleTile?: (tileX: number, tileY: number) => void
 }
 
@@ -50,6 +53,7 @@ export function CanvasContextMenu({
   onDuplicateEntity,
   onDeleteEntity,
   onStartResizeCollider,
+  onSetAreaColor,
   onSampleTile,
 }: CanvasContextMenuProps) {
   const { isOpen, x, y, target } = menuState
@@ -80,7 +84,7 @@ export function CanvasContextMenu({
       <DropdownMenuContent
         align="start"
         side="bottom"
-        className="w-52 font-mono text-xs z-50 bg-popover/95 backdrop-blur-sm border-border/80 shadow-2xl"
+        className="w-52 text-xs z-50 bg-popover/95 backdrop-blur-sm border-border/80 shadow-2xl"
         onCloseAutoFocus={(e) => {
           e.preventDefault()
           document.body.style.pointerEvents = ''
@@ -101,6 +105,32 @@ export function CanvasContextMenu({
               <Maximize2 className="w-3.5 h-3.5 mr-2 text-primary" />
               Resize Collider
             </DropdownMenuItem>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <Palette className="w-3.5 h-3.5 mr-2" />
+                Area colour
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="w-auto p-2">
+                <div className="flex items-center gap-1.5" role="radiogroup" aria-label="Area colour">
+                  {OVERLAY_COLORS.map((c) => (
+                    <button
+                      key={c.id || 'white'}
+                      type="button"
+                      role="radio"
+                      aria-checked={(target.entity!.components.Tag?.color ?? '') === c.id}
+                      aria-label={c.label}
+                      title={c.label}
+                      onClick={() => {
+                        onSetAreaColor?.(target.entity!.id, c.id)
+                        onClose()
+                      }}
+                      className="h-5 w-5 rounded-full border border-black/40 aria-checked:ring-2 aria-checked:ring-primary aria-checked:ring-offset-1 aria-checked:ring-offset-background"
+                      style={{ background: `rgb(${c.rgb})` }}
+                    />
+                  ))}
+                </div>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
             <DropdownMenuItem
               onClick={() => {
                 onDuplicateEntity?.(target.entity!.id)
@@ -144,7 +174,7 @@ export function CanvasContextMenu({
                 <Sparkles className="w-3.5 h-3.5 mr-2 text-amber-400" />
                 From Prefab
               </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="w-48 font-mono text-xs z-50 bg-popover/95 backdrop-blur-sm">
+              <DropdownMenuSubContent className="w-48 text-xs z-50 bg-popover/95 backdrop-blur-sm">
                 {PRESET_PREFABS.map((prefab) => (
                   <DropdownMenuItem
                     key={prefab.name}

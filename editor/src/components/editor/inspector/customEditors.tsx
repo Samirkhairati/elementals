@@ -2,6 +2,7 @@ import type { ComponentType as ReactComponentType } from 'react'
 import { SpriteComponentEditor } from './SpriteComponentEditor'
 import { ColliderComponentEditor } from './ColliderComponentEditor'
 import { MovementComponentEditor } from './MovementComponentEditor'
+import { TagComponentEditor } from './TagComponentEditor'
 import { EventComponentEditor } from '../events/EventComponentEditor'
 
 /** Props every custom component editor receives from the inspector's ComponentCard. */
@@ -26,5 +27,6 @@ export const CUSTOM_EDITORS: Partial<Record<string, ReactComponentType<CustomEdi
   Sprite: SpriteComponentEditor,
   Collider: ColliderComponentEditor,
   Movement: MovementComponentEditor,
+  Tag: TagComponentEditor,
   Event: EventComponentEditor,
 }
