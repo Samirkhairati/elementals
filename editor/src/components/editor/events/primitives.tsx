@@ -312,7 +312,7 @@ export function FieldRow({ label, help, required, unit, children, inline, classN
   return (
     <div className={cn('py-1', className)} data-field={label}>
       <div className={cn(inline ? 'flex items-center justify-between gap-2' : 'space-y-1')}>
-        <label id={`${id}-label`} htmlFor={id} className="block shrink-0 select-none text-[11px] font-mono text-muted-foreground">
+        <label id={`${id}-label`} htmlFor={id} className="block shrink-0 select-none text-ed-label font-medium text-muted-foreground">
           {label}
           {required && (
             <span className="ml-0.5 text-amber-400" aria-hidden title="Required">
@@ -367,7 +367,7 @@ export const SmallButton = React.forwardRef<
       type={type}
       {...rest}
       className={cn(
-        'inline-flex h-7 items-center gap-1 whitespace-nowrap rounded border px-2 text-[11px] font-mono transition-colors disabled:pointer-events-none disabled:opacity-50',
+        'inline-flex h-7 items-center justify-center gap-1 whitespace-nowrap rounded border px-2.5 text-[11px] font-medium transition-colors disabled:pointer-events-none disabled:opacity-50',
         variant === 'default' && 'border-border bg-background/60 hover:bg-accent',
         variant === 'primary' && 'border-transparent bg-primary text-primary-foreground hover:opacity-90',
         variant === 'danger' && 'border-red-500/40 bg-red-500/10 text-red-400 hover:bg-red-500/20',
@@ -381,7 +381,7 @@ export const SmallButton = React.forwardRef<
 export function SectionTitle({ children, right }: { children: React.ReactNode; right?: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-2 pb-1">
-      <h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{children}</h3>
+      <h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/90">{children}</h3>
       {right}
     </div>
   )
@@ -392,11 +392,25 @@ export function CheckRow({ checked, onChange, label, help, disabled }: { checked
   const id = useId()
   return (
     <div className="py-0.5">
-      <label htmlFor={id} className="flex cursor-pointer items-center gap-2 text-xs font-mono">
+      <label htmlFor={id} className="flex cursor-pointer items-center gap-2 text-ed-body">
         <input id={id} type="checkbox" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} className="h-3.5 w-3.5 accent-primary" />
         <span>{label}</span>
       </label>
       {help && <p className="ml-5 text-[10px] leading-snug text-muted-foreground/80">{help}</p>}
     </div>
+  )
+}
+
+/** A titled block of related fields: the unit a settings panel is built from. */
+export function Group({ title, hint, right, children, className }: { title: string; hint?: string; right?: React.ReactNode; children: React.ReactNode; className?: string }) {
+  return (
+    <section className={cn('rounded-md border border-border/70 bg-card/40', className)} aria-label={title}>
+      <header className="flex items-center justify-between gap-2 border-b border-border/60 px-3 py-1.5">
+        <h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{title}</h3>
+        {right}
+      </header>
+      <div className="space-y-1 px-3 py-2">{children}</div>
+      {hint && <p className="border-t border-border/50 px-3 py-1.5 text-[10px] leading-snug text-muted-foreground/80">{hint}</p>}
+    </section>
   )
 }

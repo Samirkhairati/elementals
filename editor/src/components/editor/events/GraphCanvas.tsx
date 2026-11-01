@@ -453,9 +453,10 @@ function Canvas({ graph, onChange, selectedId, onSelect, issues, summaryContext,
         />
       </ReactFlow>
 
-      <div className="absolute left-2 top-2 z-10 flex items-center gap-1 rounded-md border border-border bg-background/90 p-1 shadow-sm" role="toolbar" aria-label="Graph tools">
+      <div className="absolute left-3 top-3 z-10 flex items-center gap-0.5 rounded-lg border border-border bg-background/90 p-1 shadow-md backdrop-blur" role="toolbar" aria-label="Graph tools">
         <ToolButton
           label="Add node"
+          hint="Tab"
           onClick={() => {
             const box = wrapRef.current?.getBoundingClientRect()
             openPaletteAtPointer((box?.left ?? 0) + 8, (box?.top ?? 0) + 44, { title: 'Add a node' })
@@ -463,16 +464,18 @@ function Canvas({ graph, onChange, selectedId, onSelect, issues, summaryContext,
         >
           <Plus className="h-3.5 w-3.5" /> Add node
         </ToolButton>
-        <ToolButton label="Auto layout" onClick={autoLayout}>
+        <ToolSeparator />
+        <ToolButton label="Auto layout" hint="arranges every node" onClick={autoLayout}>
           <LayoutGrid className="h-3.5 w-3.5" /> Layout
         </ToolButton>
-        <ToolButton label="Group in a frame" disabled={!hasNodeSelection} onClick={group}>
+        <ToolSeparator />
+        <ToolButton label="Group in a frame" hint="Ctrl+G" disabled={!hasNodeSelection} onClick={group}>
           <Frame className="h-3.5 w-3.5" /> Group
         </ToolButton>
-        <ToolButton label="Disconnect wires" disabled={!hasNodeSelection && selectedEdges.size === 0} onClick={disconnectSelection}>
+        <ToolButton label="Disconnect wires" hint="removes every wire of the selection" disabled={!hasNodeSelection && selectedEdges.size === 0} onClick={disconnectSelection}>
           <Unplug className="h-3.5 w-3.5" /> Disconnect
         </ToolButton>
-        <ToolButton label="Remove and reconnect" disabled={!hasNodeSelection} onClick={() => removeSelection(true)}>
+        <ToolButton label="Remove and reconnect" hint="deletes the node and joins its neighbours" disabled={!hasNodeSelection} onClick={() => removeSelection(true)}>
           <Scissors className="h-3.5 w-3.5" /> Cut out
         </ToolButton>
       </div>
@@ -482,15 +485,19 @@ function Canvas({ graph, onChange, selectedId, onSelect, issues, summaryContext,
   )
 }
 
-function ToolButton({ label, onClick, disabled, children }: { label: string; onClick: () => void; disabled?: boolean; children: React.ReactNode }) {
+function ToolSeparator() {
+  return <span className="mx-0.5 h-4 w-px shrink-0 bg-border" aria-hidden />
+}
+
+function ToolButton({ label, hint, onClick, disabled, children }: { label: string; hint?: string; onClick: () => void; disabled?: boolean; children: React.ReactNode }) {
   return (
     <button
       type="button"
-      title={label}
+      title={hint ? `${label} (${hint})` : label}
       aria-label={label}
       disabled={disabled}
       onClick={onClick}
-      className="inline-flex h-6 items-center gap-1 rounded px-1.5 text-[11px] text-foreground hover:bg-accent disabled:opacity-40"
+      className="inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-[11px] font-medium text-foreground transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-40"
     >
       {children}
     </button>

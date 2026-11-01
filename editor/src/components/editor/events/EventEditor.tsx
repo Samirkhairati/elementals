@@ -2,7 +2,7 @@
 // It is a pure function of `states`; every edit calls `onChange(newStates)` exactly once.
 
 import React, { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { AlertCircle, AlertTriangle, ChevronDown, ChevronRight, Redo2, Undo2 } from 'lucide-react'
+import { AlertCircle, AlertTriangle, ChevronDown, ChevronRight, MousePointerClick, Redo2, Undo2 } from 'lucide-react'
 import type { EventGraph, EventState } from '../../../../../shared/engine/types'
 import { getCommandDef } from '../../../../../shared/engine/commands'
 import { createDefaultEventState } from '../../../../../shared/engine/components'
@@ -162,19 +162,26 @@ export function EventEditor({ states: statesProp, onChange, className, common = 
       {/* state content */}
       <section className="flex min-h-0 min-w-0 flex-1 flex-col" aria-label={`State ${stateIndex + 1}`}>
         {!common && (
-        <div className="shrink-0 border-b border-border">
+        <div className="shrink-0 border-b border-border bg-muted/10">
           <button
             type="button"
             onClick={() => setSettingsOpen((o) => !o)}
             aria-expanded={settingsOpen}
-            className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left hover:bg-accent/40"
+            className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-accent/40"
           >
-            {settingsOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-            <span className="text-xs font-semibold">State {stateIndex + 1}</span>
-            <span className="truncate text-xs text-muted-foreground">
-              {state.name.trim() ? `“${state.name.trim()}” · ` : ''}
-              {TRIGGER_LABELS[state.trigger]}
-              {state.conditions.length > 0 ? ` · ${state.conditions.length} condition${state.conditions.length > 1 ? 's' : ''}` : ' · always eligible'}
+            {settingsOpen ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+            <span className="shrink-0 text-xs font-semibold">State {stateIndex + 1}</span>
+            {state.name.trim() && <span className="min-w-0 truncate text-xs text-foreground/80">“{state.name.trim()}”</span>}
+            <span className="ml-auto flex shrink-0 items-center gap-1.5">
+              <span className="rounded border border-border bg-background/60 px-1.5 py-0.5 text-[10px] text-muted-foreground">{TRIGGER_LABELS[state.trigger]}</span>
+              <span
+                className={cn(
+                  'rounded border px-1.5 py-0.5 text-[10px]',
+                  state.conditions.length > 0 ? 'border-primary/40 bg-primary/10 text-primary' : 'border-border bg-background/60 text-muted-foreground',
+                )}
+              >
+                {state.conditions.length > 0 ? `${state.conditions.length} condition${state.conditions.length > 1 ? 's' : ''}` : 'Always eligible'}
+              </span>
             </span>
           </button>
           {settingsOpen && (
@@ -232,7 +239,7 @@ export function EventEditor({ states: statesProp, onChange, className, common = 
             role="tab"
             aria-selected={rightTab === 'node'}
             onClick={() => setRightTab('node')}
-            className={cn('px-3 py-1.5 text-xs font-medium', rightTab === 'node' ? 'border-b-2 border-primary' : 'text-muted-foreground hover:text-foreground')}
+            className={cn('-mb-px px-3.5 py-2 text-xs font-medium', rightTab === 'node' ? 'border-b-2 border-primary text-foreground' : 'border-b-2 border-transparent text-muted-foreground hover:text-foreground')}
           >
             Node
           </button>
@@ -241,7 +248,7 @@ export function EventEditor({ states: statesProp, onChange, className, common = 
             role="tab"
             aria-selected={rightTab === 'problems'}
             onClick={() => setRightTab('problems')}
-            className={cn('flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium', rightTab === 'problems' ? 'border-b-2 border-primary' : 'text-muted-foreground hover:text-foreground')}
+            className={cn('-mb-px flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium', rightTab === 'problems' ? 'border-b-2 border-primary text-foreground' : 'border-b-2 border-transparent text-muted-foreground hover:text-foreground')}
           >
             Problems
             {counts.errors > 0 && (
@@ -271,7 +278,7 @@ export function EventEditor({ states: statesProp, onChange, className, common = 
             <ProblemsList problems={problems} states={states} onJump={jumpToProblem} />
           ) : selected ? (
             <div className="p-3" data-testid="node-inspector">
-              <div className="mb-2 flex items-start gap-2">
+              <div className="mb-3 flex items-start gap-2.5 rounded-md border border-border/70 bg-card/40 p-2.5">
                 <CommandIcon icon={def?.icon} category={def?.category} className="mt-0.5" />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
@@ -304,10 +311,19 @@ export function EventEditor({ states: statesProp, onChange, className, common = 
               )}
             </div>
           ) : (
-            <div className="p-4 text-center text-xs text-muted-foreground" data-testid="no-selection">
-              Select a node to edit its parameters.
-              <br />
-              <span className="text-[10px]">Drag from a node’s right handle to connect it, or drop the wire on empty canvas to add a node.</span>
+            <div className="flex h-full flex-col items-center px-5 pt-10 text-center text-muted-foreground" data-testid="no-selection">
+              <MousePointerClick className="mb-3 h-6 w-6 opacity-60" aria-hidden />
+              <p className="text-xs text-foreground/90">Select a node to edit its parameters.</p>
+              <ul className="mt-4 w-full space-y-1.5 text-left text-[11px]">
+                <li className="rounded border border-border/60 bg-card/30 px-2.5 py-1.5">Drag from a node’s right handle to connect it, or drop the wire on empty canvas to add a node.</li>
+                <li className="rounded border border-border/60 bg-card/30 px-2.5 py-1.5">
+                  <kbd className="mr-1 rounded border border-border bg-background px-1 text-[10px]">Tab</kbd> or right-click adds a node.
+                </li>
+                <li className="rounded border border-border/60 bg-card/30 px-2.5 py-1.5">
+                  <kbd className="mr-1 rounded border border-border bg-background px-1 text-[10px]">Ctrl</kbd>
+                  <kbd className="mr-1 rounded border border-border bg-background px-1 text-[10px]">C</kbd>/<kbd className="mx-1 rounded border border-border bg-background px-1 text-[10px]">V</kbd> copy and paste nodes and groups.
+                </li>
+              </ul>
             </div>
           )}
         </div>

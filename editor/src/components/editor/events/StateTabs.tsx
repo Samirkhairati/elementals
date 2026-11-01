@@ -41,10 +41,10 @@ export function StateTabs({ states, selectedId, startIndex, problems, onSelect, 
 
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid="state-tabs">
-      <div className="px-2 pt-2">
-        <SectionTitle>States</SectionTitle>
+      <div className="px-3 pt-3">
+        <SectionTitle right={<span className="rounded bg-muted px-1.5 text-[10px] text-muted-foreground">{states.length}</span>}>States</SectionTitle>
       </div>
-      <div role="tablist" aria-label="Event states" aria-orientation="vertical" className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-1.5 pb-1">
+      <div role="tablist" aria-label="Event states" aria-orientation="vertical" className="min-h-0 flex-1 space-y-1 overflow-y-auto px-2 pb-2">
         {states.map((state, i) => {
           const active = state.id === selectedId
           const own = problems.filter((p) => p.stateId === state.id)
@@ -70,7 +70,7 @@ export function StateTabs({ states, selectedId, startIndex, problems, onSelect, 
                   onSelect(states[i - 1].id)
                 }
               }}
-              className={cn('cursor-pointer rounded border px-2 py-1.5', active ? 'border-primary/50 bg-primary/10' : 'border-transparent hover:bg-accent/60')}
+              className={cn('cursor-pointer rounded-md border px-2.5 py-2 transition-colors', active ? 'border-primary/50 bg-primary/10 shadow-sm' : 'border-border/50 bg-card/30 hover:border-border hover:bg-accent/50')}
             >
               <div className="flex items-center gap-1.5">
                 <span
@@ -79,7 +79,7 @@ export function StateTabs({ states, selectedId, startIndex, problems, onSelect, 
                   data-start-dot={i === startIndex ? 'true' : undefined}
                   aria-label={i === startIndex ? 'Active at start' : undefined}
                 />
-                <span className="w-3 shrink-0 text-[10px] text-muted-foreground">{i + 1}</span>
+                <span className={cn('flex h-4 w-4 shrink-0 items-center justify-center rounded text-[10px] font-semibold', active ? 'bg-primary/25 text-primary' : 'bg-muted text-muted-foreground')}>{i + 1}</span>
                 {renaming === state.id ? (
                   <DraftText
                     autoFocus
@@ -111,7 +111,7 @@ export function StateTabs({ states, selectedId, startIndex, problems, onSelect, 
                   </span>
                 )}
               </div>
-              <div className="mt-0.5 flex flex-wrap items-center gap-x-1 pl-[26px] text-[10px] text-muted-foreground">
+              <div className="mt-1 flex flex-wrap items-center gap-x-1 pl-[22px] text-[10px] text-muted-foreground">
                 <span>{TRIGGER_LABELS[state.trigger]}</span>
                 <span>·</span>
                 <span>
@@ -130,25 +130,25 @@ export function StateTabs({ states, selectedId, startIndex, problems, onSelect, 
           )
         })}
       </div>
-      <p className="px-2 pb-1 text-[10px] leading-snug text-muted-foreground">
+      <p className="px-3 pb-2 text-[10px] leading-snug text-muted-foreground">
         <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-emerald-400 align-middle" />
         runs with nothing set. The last state whose conditions hold wins.
       </p>
-      <div className="border-t border-border p-1.5">
-        <div className="flex flex-wrap items-center gap-1">
-          <SmallButton variant="primary" onClick={onAdd}>
-            <Plus className="h-3 w-3" /> Add state
-          </SmallButton>
-          <IconButton title="Duplicate state" disabled={!selected} onClick={() => selected && onDuplicate(selected.id)}>
+      <div className="space-y-1.5 border-t border-border bg-muted/20 p-2">
+        <SmallButton variant="primary" onClick={onAdd} className="w-full">
+          <Plus className="h-3 w-3" /> Add state
+        </SmallButton>
+        <div className="grid grid-cols-4 gap-1 rounded-md border border-border/70 bg-background/50 p-0.5">
+          <IconButton title="Duplicate state" className="h-6 w-full" disabled={!selected} onClick={() => selected && onDuplicate(selected.id)}>
             <CopyPlus className="h-3.5 w-3.5" />
           </IconButton>
-          <IconButton title="Move state up (earlier)" disabled={selectedIndex <= 0} onClick={() => selected && onMove(selected.id, -1)}>
+          <IconButton title="Move state up (earlier)" className="h-6 w-full" disabled={selectedIndex <= 0} onClick={() => selected && onMove(selected.id, -1)}>
             <ArrowUp className="h-3.5 w-3.5" />
           </IconButton>
-          <IconButton title="Move state down (later)" disabled={selectedIndex < 0 || selectedIndex >= states.length - 1} onClick={() => selected && onMove(selected.id, 1)}>
+          <IconButton title="Move state down (later)" className="h-6 w-full" disabled={selectedIndex < 0 || selectedIndex >= states.length - 1} onClick={() => selected && onMove(selected.id, 1)}>
             <ArrowDown className="h-3.5 w-3.5" />
           </IconButton>
-          <IconButton title="Delete state" danger disabled={states.length <= 1} onClick={requestDelete}>
+          <IconButton title="Delete state" danger className="h-6 w-full" disabled={states.length <= 1} onClick={requestDelete}>
             <Trash2 className="h-3.5 w-3.5" />
           </IconButton>
         </div>

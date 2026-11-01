@@ -6,7 +6,7 @@ import type { EventState, EventTrigger, StateAppearance } from '../../../../../s
 import { EVENT_TRIGGERS, TRIGGER_LABELS } from '../../../../../shared/engine/constants'
 import { ConditionsEditor } from './ConditionsEditor'
 import { FacingPicker, SpritePicker } from './pickers'
-import { CheckRow, DraftNumber, DraftText, FieldRow, SectionTitle, selectClass } from './primitives'
+import { CheckRow, DraftNumber, DraftText, FieldRow, Group, selectClass } from './primitives'
 import { useEventEnv } from './eventEnv'
 
 export const TRIGGER_HELP: Record<EventTrigger, string> = {
@@ -79,8 +79,8 @@ export function StateSettings({ state, onChange }: { state: EventState; onChange
   const [appearanceOpen, setAppearanceOpen] = useState(false)
   const overrides = Object.keys(state.appearance ?? {}).length
   return (
-    <div className="grid gap-x-5 gap-y-2 p-3 lg:grid-cols-2 xl:grid-cols-3" data-testid="state-settings">
-      <div className="space-y-1">
+    <div className="grid gap-3 p-3 md:grid-cols-2 2xl:grid-cols-3" data-testid="state-settings">
+      <Group title="When it runs">
         <FieldRow label="State name">{(id) => <DraftText id={id} value={state.name} placeholder="e.g. After the quest" onCommit={(name) => onChange({ name })} />}</FieldRow>
         <FieldRow label="Trigger" help={TRIGGER_HELP[state.trigger]}>
           {(id) => (
@@ -93,9 +93,9 @@ export function StateSettings({ state, onChange }: { state: EventState; onChange
             </select>
           )}
         </FieldRow>
-      </div>
+      </Group>
 
-      <div className="space-y-1">
+      <Group title="Behaviour">
         <CheckRow
           checked={state.faceOnInteract}
           onChange={(faceOnInteract) => onChange({ faceOnInteract })}
@@ -116,7 +116,7 @@ export function StateSettings({ state, onChange }: { state: EventState; onChange
             </select>
           )}
         </FieldRow>
-        <div>
+        <div className="border-t border-border/50 pt-1.5">
           <button
             type="button"
             aria-expanded={appearanceOpen}
@@ -132,17 +132,19 @@ export function StateSettings({ state, onChange }: { state: EventState; onChange
             </div>
           )}
         </div>
-      </div>
+      </Group>
 
-      <div className="lg:col-span-2 xl:col-span-1">
-        <SectionTitle>Conditions</SectionTitle>
+      <Group
+        title="Conditions"
+        className="md:col-span-2 2xl:col-span-1"
+        hint={state.conditions.length > 0 ? 'The state is used while these hold. If a later state also qualifies, the later state wins.' : undefined}
+      >
         <ConditionsEditor
           conditions={state.conditions}
           onChange={(conditions) => onChange({ conditions })}
           emptyHint="No conditions: this state is always eligible. When several states qualify, the last one runs."
         />
-        {state.conditions.length > 0 && <p className="mt-1 text-[10px] text-muted-foreground">The state is used while these hold. If a later state also qualifies, the later state wins.</p>}
-      </div>
+      </Group>
     </div>
   )
 }

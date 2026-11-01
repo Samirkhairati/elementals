@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { Workflow } from 'lucide-react'
 import type { EventState } from '../../../../../shared/engine/types'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { useEventEnv } from './eventEnv'
@@ -33,9 +34,12 @@ export function EventEditorDialog({ open, onOpenChange, states, onChange }: Even
             if (!e.ctrlKey && !e.metaKey) e.stopPropagation()
           }}
         >
-          <header className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-2.5 pr-12">
-            <DialogTitle className="text-sm font-semibold">Event editor{env.entityName ? ` · ${env.entityName}` : ''}</DialogTitle>
-            <DialogDescription className="text-xs">States decide when something runs; the node graph decides what happens. The last state whose conditions hold is the active one.</DialogDescription>
+          <header className="flex shrink-0 items-center gap-3 border-b border-border bg-muted/20 px-4 py-2.5 pr-12">
+            <Workflow className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+            <DialogTitle className="shrink-0 text-sm font-semibold">Event editor{env.entityName ? ` · ${env.entityName}` : ''}</DialogTitle>
+            <DialogDescription className="min-w-0 truncate text-[11px] text-muted-foreground" title="States decide when something runs; the node graph decides what happens. The last state whose conditions hold is the active one.">
+              States decide <em className="not-italic text-foreground/80">when</em> it runs, the graph decides <em className="not-italic text-foreground/80">what</em> happens. The last state whose conditions hold wins.
+            </DialogDescription>
           </header>
           <PortalContainerProvider value={content}>
             <EventEditor states={states} onChange={onChange} />
