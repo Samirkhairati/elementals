@@ -40,8 +40,9 @@ describe('SpriteComponentEditor', () => {
     fireEvent.click(screen.getByRole('button', { name: /Change/ }))
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).getByRole('button', { name: 'No sprite' })).toBeInTheDocument()
-    expect(within(dialog).getByText('characters')).toBeInTheDocument()
-    expect(within(dialog).getByText('objects')).toBeInTheDocument()
+    // one section per kind: characters (four facings), objects (a still picture), animated props (they have animations)
+    expect(within(dialog).getByText('Characters')).toBeInTheDocument()
+    expect(within(dialog).getByText('Objects')).toBeInTheDocument()
 
     fireEvent.change(within(dialog).getByLabelText('Search sprites'), { target: { value: 'chest' } })
     expect(within(dialog).queryByRole('button', { name: 'Sprite characters/hero' })).toBeNull()

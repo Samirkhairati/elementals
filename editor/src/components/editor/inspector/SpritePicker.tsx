@@ -19,18 +19,17 @@ export function splitAssetId(id: string): { folder: string; leaf: string } {
   return i < 0 ? { folder: '', leaf: id } : { folder: id.slice(0, i), leaf: id.slice(i + 1) }
 }
 
-/** Assets matching `query` (id or name), grouped by folder, folders and entries sorted. */
+const KIND_SECTIONS: { kind: string; label: string }[] = [
+  { kind: 'character', label: 'Characters' },
+  { kind: 'object', label: 'Objects' },
+  { kind: 'animated', label: 'Animated props' },
+]
+
+/** Assets matching `query` (id or name), one section per kind (characters, objects, animated props), each sorted by id. */
 export function groupAssets(assets: SpriteAssetInfo[], query: string): { folder: string; items: SpriteAssetInfo[] }[] {
   const q = query.trim().toLowerCase()
-  const groups = new Map<string, SpriteAssetInfo[]>()
-  for (const a of assets) {
-    if (q && !a.id.toLowerCase().includes(q) && !a.meta.name.toLowerCase().includes(q)) continue
-    const { folder } = splitAssetId(a.id)
-    const list = groups.get(folder) ?? []
-    list.push(a)
-    groups.set(folder, list)
-  }
-  return [...groups.entries()].sort(([a], [b]) => (a < b ? -1 : 1)).map(([folder, items]) => ({ folder, items: items.sort((x, y) => (x.id < y.id ? -1 : 1)) }))
+  const shown = assets.filter((a) => !q || a.id.toLowerCase().includes(q) || a.meta.name.toLowerCase().includes(q))
+  return KIND_SECTIONS.map(({ kind, label }) => ({ folder: label, items: shown.filter((a) => a.meta.kind === kind).sort((x, y) => (x.id < y.id ? -1 : 1)) })).filter((g) => g.items.length > 0)
 }
 
 const KIND_LABEL: Record<string, string> = { character: 'Character', object: 'Object', animated: 'Animated' }
@@ -85,7 +84,7 @@ export function SpritePicker({ open, onOpenChange, assets, value, onSelect }: Sp
 
             {groups.map((g) => (
               <section key={g.folder || '(root)'} className="mb-4">
-                <div className="ed-section-title mb-2">{g.folder || 'Sprites'}</div>
+                <div className="ed-section-title mb-2">{g.folder}</div>
                 <div className="grid grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-2">
                   {g.items.map((a) => (
                     <button

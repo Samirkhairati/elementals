@@ -9,6 +9,20 @@ import { cloneJson } from '../../../shared/engine/util'
 
 export type Preset = 'actor' | 'prop' | 'animated'
 
+/** What a character is for lists and pickers: a person-like actor (four facings), a still object, or a prop that animates. */
+export type CharacterKind = 'actor' | 'object' | 'animated'
+
+export const KIND_ORDER: readonly CharacterKind[] = ['actor', 'object', 'animated']
+export const KIND_LABELS: Record<CharacterKind, string> = { actor: 'Characters', object: 'Objects', animated: 'Animated props' }
+
+export function characterKind(def: Pick<CharacterDef, 'facing' | 'clips'>): CharacterKind {
+  if (def.facing === 'four') return 'actor'
+  return Object.keys(def.clips).length > 0 ? 'animated' : 'object'
+}
+
+/** Folder a new character of this preset goes into by default (ids stay editable). */
+export const PRESET_FOLDERS: Record<Preset, string> = { actor: 'characters', prop: 'objects', animated: 'animated' }
+
 export const PRESET_LABELS: Record<Preset, string> = { actor: 'Actor (4 directions)', prop: 'Object (one picture)', animated: 'Animated prop' }
 
 export interface GridSuggestion {

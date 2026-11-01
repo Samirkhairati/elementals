@@ -538,7 +538,7 @@ export function SpritePicker({
         id: s.id,
         label: s.name,
         sub: s.id,
-        trailing: <span className="shrink-0 text-[9px] uppercase text-muted-foreground">{s.kind}</span>,
+        group: s.kind,
         leading: <SpriteThumb asset={s.id} size={28} />,
       })),
     [env.sprites],
@@ -553,6 +553,11 @@ export function SpritePicker({
       onSelect={onChange}
       placeholder={clearLabel ?? 'Choose sprite…'}
       emptyText="No sprite assets in the project."
+      groups={[
+        { id: 'character', label: 'Characters' },
+        { id: 'object', label: 'Objects' },
+        { id: 'animated', label: 'Animated props' },
+      ]}
       clearLabel={clearLabel}
       onClear={clearLabel ? () => onChange('') : undefined}
       display={

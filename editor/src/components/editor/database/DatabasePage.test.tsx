@@ -103,7 +103,7 @@ describe('List and tile views', () => {
     expect(screen.getAllByTestId('character-thumb').length).toBe(1) // the broken one has no readable image
     fireEvent.click(screen.getByRole('button', { name: 'Tile view' }))
     expect(screen.getByRole('button', { name: 'Chest' })).toHaveAttribute('title', expect.stringContaining('objects/chest'))
-    expect(screen.getByText('objects')).toBeInTheDocument() // folder heading
+    expect(screen.getByText('Objects')).toBeInTheDocument() // section heading: still, animation-less characters are objects
     expect(store.get('database.view.characters')).toBe('tiles')
     fireEvent.click(screen.getByRole('button', { name: 'Chest' }))
     expect(await screen.findByTestId('character-detail')).toBeInTheDocument()

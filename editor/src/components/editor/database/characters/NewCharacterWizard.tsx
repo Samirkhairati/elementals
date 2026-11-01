@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { PRESET_LABELS, newCharacter, slugify, suggestGrid, type Preset } from '@/lib/characterEdit'
+import { PRESET_FOLDERS, PRESET_LABELS, newCharacter, slugify, suggestGrid, type Preset } from '@/lib/characterEdit'
 import { isValidCharacterId } from '../../../../../../shared/engine/graphics'
 import { Select } from '../../ui/fields'
 import { EdButton, Field, FieldRow, InfoTip, Segmented, TextField } from '../../ui/controls'
@@ -23,7 +23,7 @@ export function NewCharacterWizard({ data, open, onOpenChange, onCreated }: Prop
   const [error, setError] = useState('')
   const graphic = graphics.find((g) => g.id === image)
   const grid = graphic ? suggestGrid(preset, graphic.width, graphic.height) : null
-  const folder = preset === 'actor' ? 'characters' : 'objects'
+  const folder = PRESET_FOLDERS[preset]
   const id = idEdit ?? `${folder}/${slugify(name, 'new')}`
   const idError = useMemo(() => (!isValidCharacterId(id) ? 'Use letters, digits, “-”, “_” and “/”.' : characters[id] ? 'A character with this id already exists.' : ''), [id, characters])
 

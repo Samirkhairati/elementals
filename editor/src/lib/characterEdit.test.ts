@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { validateCharacter, type CharacterDef } from '../../../shared/engine/characters'
 import {
-  addClip, addSheet, autoAssignRows, cutFromGrid, deleteClip, facingChangeImpact, framesFor, marqueeFrames, newCharacter, pickFrame, removeSheet,
+  KIND_LABELS, KIND_ORDER, PRESET_FOLDERS, addClip, addSheet, autoAssignRows, characterKind, cutFromGrid, deleteClip, facingChangeImpact, framesFor, marqueeFrames, newCharacter, pickFrame, removeSheet,
   renameClip, rowFrames, setBinding, setDirectional, setFacingMode, setFrames, setMirror, setPivot, setTags, sheetSummary, sheetUsers, slugify, suggestGrid, uniqueKey, updateClip, updateSheet,
 } from './characterEdit'
 
@@ -151,5 +151,21 @@ describe('setup', () => {
     expect(setFacingMode(actor(), 'four').facing).toBe('four')
     expect(setPivot(actor(), { x: 2, y: -1 }).pivot).toEqual({ x: 1, y: 0 })
     expect(setTags(actor(), [' npc ', 'npc', '', 'boss']).tags).toEqual(['npc', 'boss'])
+  })
+})
+
+describe('characterKind', () => {
+  it('splits actors, still objects and animated props', () => {
+    const actor = newCharacter('actor', 'Hero', 'a.png', { width: 128, height: 192 })
+    const still = newCharacter('prop', 'Sign', 'b.png', { width: 32, height: 32 })
+    const animated = newCharacter('animated', 'Flower', 'c.png', { width: 96, height: 32 })
+    expect(characterKind(actor)).toBe('actor')
+    expect(characterKind(still)).toBe('object')
+    expect(characterKind(animated)).toBe('animated')
+    expect(KIND_ORDER.map((k) => KIND_LABELS[k])).toEqual(['Characters', 'Objects', 'Animated props'])
+  })
+
+  it('new characters of each preset go into their own folder', () => {
+    expect(PRESET_FOLDERS).toEqual({ actor: 'characters', prop: 'objects', animated: 'animated' })
   })
 })
