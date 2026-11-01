@@ -1,18 +1,47 @@
-import { Plus, Trash2 } from 'lucide-react'
+import { useState } from 'react'
+import { Plus, Trash2, Wand2 } from 'lucide-react'
 import type { CharacterDef } from '../../../../../../shared/engine/characters'
 import type { GraphicInfo } from '../../../../../../shared/engine/graphics'
 import { addSheet, cutFromGrid, gridOf, removeSheet, sheetSummary, sheetUsers, updateSheet } from '@/lib/characterEdit'
+import { readImagePixels } from '@/lib/imagePixels'
+import { describeDetection, detectSheetGrid } from '@/lib/sheetDetect'
 import { EdButton, Field, FieldRow, IconButton, InfoTip, NumberField, Section } from '../../ui/controls'
 import { PivotPicker } from './PivotPicker'
+import { SheetGridPreview } from './SheetGridPreview'
 
 interface Props {
   def: CharacterDef
   onChange: (def: CharacterDef) => void
   graphics: GraphicInfo[]
+  /** data: URL of each graphic, for the cut preview and for detecting the cut. */
+  images?: Record<string, string>
 }
 
-export function SheetsTab({ def, onChange, graphics }: Props) {
+const CUT_INFO = 'A sheet is cut into an even grid of equal frames, numbered 0, 1, 2… left to right, top to bottom. The grid comes from the frame width and height (with the margin around the image and the spacing between frames). Set columns × rows and the size is worked out, or let “Detect from picture” find the gaps between sprites.'
+
+export function SheetsTab({ def, onChange, graphics, images = {} }: Props) {
   const sizeOf = (image: string) => graphics.find((g) => g.id === image)
+  const [notes, setNotes] = useState<Record<string, string>>({})
+  const note = (key: string, text: string) => setNotes((n) => ({ ...n, [key]: text }))
+
+  const detect = async (key: string) => {
+    const sheet = def.sheets[key]
+    const size = sizeOf(sheet.image)
+    const url = images[sheet.image]
+    if (!size || !url) return note(key, 'The image is missing, so there is nothing to look at.')
+    try {
+      const found = detectSheetGrid(await readImagePixels(url))
+      const current = gridOf(sheet, size)
+      const columns = found.columns ?? Math.max(1, current.columns)
+      const rows = found.rows ?? Math.max(1, current.rows)
+      if (found.columns === null && found.rows === null) return note(key, describeDetection(found, { columns, rows, ...cutFromGrid(size, columns, rows, sheet.margin, sheet.spacing) }))
+      const cut = cutFromGrid(size, columns, rows, 0, 0)
+      onChange(updateSheet(def, key, { ...cut, margin: 0, spacing: 0 }))
+      note(key, describeDetection(found, { columns, rows, ...cut }))
+    } catch (e) {
+      note(key, e instanceof Error ? e.message : String(e))
+    }
+  }
   return (
     <div className="flex flex-col gap-2" data-testid="sheets-tab">
       {Object.entries(def.sheets).map(([key, sheet]) => {
@@ -27,6 +56,19 @@ export function SheetsTab({ def, onChange, graphics }: Props) {
                 {graphics.map((g) => <option key={g.id} value={g.id}>{g.id}</option>)}
               </select>
             </Field>
+            {size && images[sheet.image] && (
+              <div className="flex flex-wrap items-start gap-3">
+                <SheetGridPreview url={images[sheet.image]} sheet={sheet} size={size} />
+                <div className="flex min-w-[200px] flex-1 flex-col gap-2">
+                  <FieldRow>
+                    <EdButton size="sm" onClick={() => void detect(key)}><Wand2 /> Detect from picture</EdButton>
+                    <InfoTip>{CUT_INFO}</InfoTip>
+                  </FieldRow>
+                  {notes[key] && <p role="status" className="ed-hint" data-testid={`detect-note-${key}`}>{notes[key]}</p>}
+                  <p className="ed-hint">Each box is one frame; the number is what animations use to refer to it.</p>
+                </div>
+              </div>
+            )}
             <FieldRow>
               <span className="text-ed-label">Columns × Rows</span>
               <NumberField aria-label={`Columns of ${key}`} size="xs" min={1} value={grid?.columns ?? 1} onCommit={(c) => size && onChange(updateSheet(def, key, cutFromGrid(size, c, grid?.rows || 1, sheet.margin, sheet.spacing)))} />

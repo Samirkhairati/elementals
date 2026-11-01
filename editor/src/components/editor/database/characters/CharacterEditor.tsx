@@ -79,8 +79,8 @@ export function CharacterEditor({ data, id, tab: tabParam, onSelect }: { data: D
             {check.issues.map((i, n) => <li key={n} data-severity={i.severity} className={i.severity === 'error' ? 'text-destructive' : 'text-muted-foreground'}>{i.severity === 'error' ? '✕' : i.severity === 'warning' ? '!' : 'i'} {i.message}</li>)}
           </ul>
         )}
-        {tab === 'animations' && <AnimationsTab def={draft} onChange={setDraft} images={images} sizes={sizes} clipCounts={data.refs.clipCounts(id)} onRenameClip={(from, to) => setRenames((r) => [...r, { from, to }])} />}
-        {tab === 'sheets' && <SheetsTab def={draft} onChange={setDraft} graphics={graphics} />}
+        {tab === 'animations' && <AnimationsTab def={draft} onChange={setDraft} images={images} sizes={sizes} clipCounts={data.refs.clipCounts(id)} onRenameClip={(from, to) => setRenames((r) => [...r, { from, to }])} onOpenSheets={() => setTab('sheets')} />}
+        {tab === 'sheets' && <SheetsTab def={draft} onChange={setDraft} graphics={graphics} images={images} />}
         {tab === 'setup' && <SetupTab id={id} def={draft} onChange={setDraft} />}
         {tab === 'used-by' && <UsedByTab data={data} id={id} />}
         <CharacterActions data={data} id={id} mode={action} onClose={() => setAction(null)} onDone={(next) => { setAction(null); onSelect?.(next ?? '') }} />
