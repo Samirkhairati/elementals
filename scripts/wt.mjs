@@ -86,7 +86,8 @@ async function describeAll() {
 function statusBadges(w) {
   if (!w.present) return [c.red('missing on disk (run: git worktree prune)')];
   const badges = [w.running ? c.green('● running') : c.dim('○ stopped')];
-  if (w.missingInstalls.length) badges.push(c.yellow('deps missing'));
+  if (w.missingInstalls.some((p) => p.pkg === 'node')) badges.push(c.yellow('wrong Node'));
+  else if (w.missingInstalls.length) badges.push(c.yellow('deps missing'));
   if (!w.hasRunner) badges.push(c.red('no dev runner (merge main into it)'));
   if (w.dirty) badges.push(c.yellow('uncommitted changes'));
   return badges;
@@ -159,6 +160,8 @@ async function runWorktree(query, flags, passthrough) {
 
   if (wt.missingInstalls.length) {
     console.log(c.yellow(formatInstallProblems(wt.missingInstalls)));
+    // Installing on the wrong Node cannot work (engine-strict) and would only hide the real cause.
+    if (wt.missingInstalls.some((p) => p.pkg === 'node')) fail('Switch Node first, then run this again.');
     if (await confirm('Install them now?', { yes: flags.yes, defaultYes: true })) {
       installDeps(wt);
     } else {

@@ -3,6 +3,9 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "engines": {
+    "node": "^24"
+  },
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "dev:main": "node scripts/dev.mjs",

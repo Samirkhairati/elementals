@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "main": "dist-electron/main.js",
   "type": "module",
+  "engines": {
+    "node": "^24"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build && tsc -p tsconfig.electron.json",
@@ -61,5 +64,10 @@
     "react-resizable-panels": "^4.12.2",
     "tailwind-merge": "^3.6.0",
     "zustand": "^5.0.14"
+  },
+  "allowScripts": {
+    "electron": true,
+    "esbuild": true,
+    "fsevents": true
   }
 }

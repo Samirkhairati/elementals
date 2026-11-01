@@ -81,6 +81,24 @@ test('buildPlan: reports busy ports and win32 npm.cmd', async () => {
   assert.equal(plan.commands[0].shell, true);
 });
 
+test('checkInstalls: flags a Node major that differs from .nvmrc, accepts the right one', () => {
+  const exists = (p) => p.endsWith('/node_modules/vite') || p.endsWith('/dist/Electron');
+  const readFile = (p) => (p.endsWith('.nvmrc') ? '24\n' : 'Electron');
+  const wrong = checkInstalls('/r', { exists, readFile, nodeVersion: '26.6.0' });
+  assert.equal(wrong.length, 1);
+  assert.equal(wrong[0].pkg, 'node');
+  assert.match(wrong[0].missing, /Node 26\.6\.0.*needs Node 24/);
+  assert.match(wrong[0].fix, /^nvm use 24/);
+  assert.deepEqual(checkInstalls('/r', { exists, readFile, nodeVersion: '24.11.0' }), []);
+  // v-prefixed .nvmrc and a missing .nvmrc both behave.
+  assert.deepEqual(checkInstalls('/r', { exists, readFile: (p) => (p.endsWith('.nvmrc') ? 'v24' : 'Electron'), nodeVersion: '24.0.0' }), []);
+  const noNvmrc = (p) => {
+    if (p.endsWith('.nvmrc')) throw new Error('ENOENT');
+    return 'Electron';
+  };
+  assert.deepEqual(checkInstalls('/r', { exists, readFile: noNvmrc, nodeVersion: '26.6.0' }), []);
+});
+
 test('checkInstalls: actionable messages for each missing piece', () => {
   const files = new Set();
   const exists = (p) => files.has(p);

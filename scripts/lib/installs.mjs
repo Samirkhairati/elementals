@@ -6,8 +6,30 @@ import path from 'node:path';
 /**
  * Returns a list of { pkg, missing, fix } problems (empty when all is well).
  */
-export function checkInstalls(rootDir, { exists = fs.existsSync, readFile = fs.readFileSync } = {}) {
+export function checkInstalls(
+  rootDir,
+  { exists = fs.existsSync, readFile = fs.readFileSync, nodeVersion = process.versions.node } = {},
+) {
   const problems = [];
+
+  // The supported Node major lives in .nvmrc. On other versions Electron's installer (extract-zip)
+  // can exit 0 after a partial extract, which leaves the binary missing with no error message.
+  let wantMajor = null;
+  try {
+    const m = /^v?(\d+)/.exec(String(readFile(path.join(rootDir, '.nvmrc'), 'utf8')).trim());
+    if (m) wantMajor = Number(m[1]);
+  } catch {
+    wantMajor = null;
+  }
+  const nodeWrong = wantMajor !== null && Number(String(nodeVersion).split('.')[0]) !== wantMajor;
+  if (nodeWrong) {
+    problems.push({
+      pkg: 'node',
+      missing: `Node ${nodeVersion} (this project needs Node ${wantMajor}, see .nvmrc)`,
+      fix: `nvm use ${wantMajor}  (then reinstall: rm -rf editor/node_modules/electron/dist && npm install --prefix editor)`,
+    });
+  }
+
   const gameDir = path.join(rootDir, 'game');
   const editorDir = path.join(rootDir, 'editor');
 

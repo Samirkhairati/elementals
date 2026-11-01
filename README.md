@@ -16,6 +16,9 @@ A 2D tile-based game and desktop map editor engine.
 ## 🚀 Quick Start
 
 ### Install Dependencies
+Use **Node 24** (`nvm use`, reads `.nvmrc`). Other versions are refused by `npm install` (`engine-strict`) and by `npm run dev`:
+on Node 26, Electron's installer exits 0 after a partial extract and the binary is silently missing.
+
 Each checkout (and every `git worktree`) needs its own install; `node_modules` is not shared:
 ```bash
 npm install --prefix game
