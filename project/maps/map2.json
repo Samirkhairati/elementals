@@ -3808,26 +3808,6 @@
   ],
   "entities": [
     {
-      "id": "2005a387-2346-4cf3-bdea-8838aa7ab4cc",
-      "name": "New Entity",
-      "x": 80,
-      "y": 64,
-      "components": {
-        "Transform": {
-          "x": 80,
-          "y": 64,
-          "depth": 10
-        },
-        "Collider": {
-          "width": 32,
-          "height": 32,
-          "offsetX": 0,
-          "offsetY": 0,
-          "isSolid": true
-        }
-      }
-    },
-    {
       "id": "f1a63193-85a2-427a-ac61-a76a978083a2",
       "name": "New Entity1",
       "x": 48,
@@ -3854,57 +3834,63 @@
           "visible": true
         },
         "Collider": {
-          "width": 16,
-          "height": 8,
+          "width": 32,
+          "height": 32,
           "offsetX": 0,
           "offsetY": 0,
           "isSolid": true
         },
         "Movement": {
-          "controller": "player",
+          "controller": "wander",
           "speed": 100,
           "canRun": true,
           "wanderRadius": 3,
           "wanderInterval": 4000
         },
         "Event": {
-          "pages": [
+          "states": [
             {
               "id": "5f9f0519-e8cc-4005-9ab5-24db3ae26f4d",
               "name": "Page 1",
               "conditions": [],
               "trigger": "action",
-              "commands": [],
               "faceOnInteract": true,
               "solid": null,
-              "appearance": {}
+              "appearance": {},
+              "graph": {
+                "nodes": [
+                  {
+                    "id": "0a71849e-789f-4a88-b538-3ecc0d43d6db",
+                    "type": "start",
+                    "params": {},
+                    "out": {
+                      "next": "407d0461-0d67-4232-96a5-8883405e20fa"
+                    },
+                    "x": 0,
+                    "y": 0
+                  },
+                  {
+                    "id": "407d0461-0d67-4232-96a5-8883405e20fa",
+                    "type": "warp",
+                    "params": {
+                      "map": "market",
+                      "x": 8,
+                      "y": 11,
+                      "facing": "",
+                      "fade": true
+                    },
+                    "out": {},
+                    "x": 241,
+                    "y": -34
+                  }
+                ],
+                "frames": []
+              }
             }
           ]
         }
       }
-    },
-    {
-      "id": "d4794f97-aad4-4ff5-a74b-6d0daf3095a9",
-      "name": "New Entity",
-      "x": 80,
-      "y": 128,
-      "visible": true,
-      "folder": null,
-      "components": {
-        "Transform": {
-          "x": 80,
-          "y": 128,
-          "depth": 10
-        },
-        "Collider": {
-          "width": 32,
-          "height": 32,
-          "offsetX": 0,
-          "offsetY": 0,
-          "isSolid": true
-        }
-      }
     }
   ],
-  "schemaVersion": 2
+  "schemaVersion": 4
 }

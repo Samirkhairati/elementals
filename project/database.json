@@ -1,11 +1,26 @@
 {
-  "version": 1,
+  "version": 2,
   "switches": [
-    { "id": "intro_done", "name": "Intro finished" },
-    { "id": "has_pokedex", "name": "Received the Pokedex" }
+    {
+      "id": "intro_done",
+      "name": "Intro finished"
+    },
+    {
+      "id": "has_pokedex",
+      "name": "Received the Pokedex"
+    }
   ],
   "variables": [
-    { "id": "badges", "name": "Badges earned", "initial": 0 },
-    { "id": "steps_taken", "name": "Steps taken", "initial": 0 }
-  ]
+    {
+      "id": "badges",
+      "name": "Badges earned",
+      "initial": 0
+    },
+    {
+      "id": "steps_taken",
+      "name": "Steps taken",
+      "initial": 0
+    }
+  ],
+  "stages": []
 }

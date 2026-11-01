@@ -2680,15 +2680,78 @@
           "offsetY": 0,
           "isSolid": true
         },
-        "Interactable": {
-          "type": "on_interact",
-          "message": "The ancient sign is faded...",
-          "eventKey": ""
+        "Event": {
+          "states": [
+            {
+              "id": "5d1d60ed-c7fa-45b4-beed-1f77300d5540",
+              "name": "State 1",
+              "conditions": [],
+              "trigger": "action",
+              "graph": {
+                "nodes": [
+                  {
+                    "id": "0daf4c1b-1b27-43fb-82f6-1e9814490fdd",
+                    "type": "start",
+                    "params": {},
+                    "out": {
+                      "next": "270c6bff-d4a6-42e9-8fdc-455263a3d20a"
+                    },
+                    "x": 0,
+                    "y": 0
+                  },
+                  {
+                    "id": "270c6bff-d4a6-42e9-8fdc-455263a3d20a",
+                    "type": "showText",
+                    "params": {
+                      "speaker": "",
+                      "text": "The ancient sign is faded..."
+                    },
+                    "out": {
+                      "next": "d7bb1443-9e66-4f61-bcfe-c4900a13068f"
+                    },
+                    "x": 260,
+                    "y": 0
+                  },
+                  {
+                    "id": "d7bb1443-9e66-4f61-bcfe-c4900a13068f",
+                    "type": "showText",
+                    "params": {
+                      "speaker": "",
+                      "text": "The ancient sign is faded..."
+                    },
+                    "out": {},
+                    "x": 520,
+                    "y": 0
+                  }
+                ],
+                "frames": []
+              },
+              "faceOnInteract": true,
+              "solid": null,
+              "appearance": {}
+            }
+          ]
         },
         "Tag": {
-          "tag": "sign"
+          "tag": "sign",
+          "color": "yellow"
+        },
+        "Sprite": {
+          "asset": "objects/door",
+          "facing": "down",
+          "animation": "",
+          "animSpeed": 1,
+          "frame": 0,
+          "offsetX": 0,
+          "offsetY": 0,
+          "scale": 1,
+          "flipX": false,
+          "tint": "",
+          "opacity": 1,
+          "visible": true
         }
       }
     }
-  ]
+  ],
+  "schemaVersion": 4
 }
