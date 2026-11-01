@@ -2,11 +2,12 @@ import { Scene } from "phaser";
 import { MAPS } from "@/constants/assets";
 import { MANIFEST_KEYS, setGameCommonEvents, setGameDatabase, setGameTilesets } from "@/data/gameData";
 import { spriteRegistry } from "@/data/spriteRegistry";
-import { createPlannedAnimations, planSpriteLoads, type SpriteLoadPlan } from "@/sprites/spritePlan";
+import { CharacterLoader } from "@/sprites/characterLoader";
+import { phaserLoaderPort } from "@/sprites/phaserLoaderPort";
+import { charactersForMap } from "@/sprites/preloadSets";
+import { bootParams } from "@/core/bootParams";
 
 export class Preloader extends Scene {
-  private plan: SpriteLoadPlan = { sheets: [], animations: [], problems: [] };
-
   constructor() {
     super("Preloader");
   }
@@ -28,18 +29,9 @@ export class Preloader extends Scene {
       console.error(`[Preloader] failed to load "${file.key}" (${file.url})`);
     });
 
-    // Sprite sheets: sprite:<id>:<role>
+    // Character sheets are not queued here: only the characters of the first map load before the game starts
+    // (create below); the others load per map or when an event first swaps to them (CharacterLoader).
     this.load.setPath("");
-    this.plan = planSpriteLoads(spriteRegistry.all());
-    for (const problem of this.plan.problems) console.warn(`[Preloader] ${problem}`);
-    for (const sheet of this.plan.sheets) {
-      this.load.spritesheet(sheet.textureKey, sheet.url, {
-        frameWidth: sheet.frameWidth,
-        frameHeight: sheet.frameHeight,
-        margin: sheet.margin,
-        spacing: sheet.spacing,
-      });
-    }
 
     // Tilesets (Tiled tileset name = texture key)
     for (const tileset of tilesets) this.load.image(tileset.name, tileset.file);
@@ -54,8 +46,11 @@ export class Preloader extends Scene {
     });
   }
 
-  create() {
-    createPlannedAnimations(this.anims, this.plan.animations);
+  async create() {
+    const requested = bootParams.map && MAPS.some((m) => m.key === bootParams.map) ? bootParams.map : undefined;
+    const first = requested ?? MAPS[0].key;
+    const raw = this.cache.tilemap.get(first)?.data;
+    await new CharacterLoader(spriteRegistry, phaserLoaderPort(this)).ensure(charactersForMap(raw));
     this.scene.start("Game");
   }
 }

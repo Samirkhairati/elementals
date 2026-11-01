@@ -497,6 +497,20 @@ export const COMMAND_CATALOG: Record<string, CommandDef> = {
     status: 'implemented',
     summarize: (p, ctx) => `Move speed of ${describeTarget(p.target, ctx)} = ${num(p.speed, 100)} px/s`,
   }),
+  setMovementMode: def({
+    type: 'setMovementMode',
+    label: 'Set Movement Mode',
+    category: 'character',
+    description: 'Switch how a character moves for animation purposes (e.g. swim). Its animation bindings for that mode take over.',
+    icon: 'waves',
+    params: [
+      TARGET_FIELD,
+      { key: 'mode', label: 'Mode', kind: 'text', placeholder: 'normal', help: 'normal, or a mode the character has bindings for, like swim. Letters, digits, dashes and underscores.' },
+    ],
+    defaultParams: { target: 'self', mode: 'normal' },
+    status: 'implemented',
+    summarize: (p, ctx) => `Movement mode of ${describeTarget(p.target, ctx)} = ${str(p.mode, 'normal') || 'normal'}`,
+  }),
   faceTowards: def({
     type: 'faceTowards',
     label: 'Face Towards',

@@ -12,6 +12,9 @@ import { EventBus, Events } from "@/utils/EventBus";
 import { Direction } from "@/utils/Direction";
 import { gameData } from "@/data/gameData";
 import { spriteRegistry } from "@/data/spriteRegistry";
+import { CharacterLoader } from "@/sprites/characterLoader";
+import { phaserLoaderPort } from "@/sprites/phaserLoaderPort";
+import { charactersForMap } from "@/sprites/preloadSets";
 import {
   World,
   SpatialSystem,
@@ -65,6 +68,7 @@ export class Game extends Scene {
   private cameraEffects!: CameraEffects;
   private playerEntity?: Entity;
   private currentMapKey = "";
+  private characters!: CharacterLoader;
   private debugGraphics?: Phaser.GameObjects.Graphics;
 
   constructor() {
@@ -85,6 +89,7 @@ export class Game extends Scene {
     this.routeSystem = new RouteSystem();
     this.animationSystem = new AnimationSystem();
     this.renderBridgeSystem = new RenderBridgeSystem(this);
+    this.characters = new CharacterLoader(spriteRegistry, phaserLoaderPort(this));
 
     // Event runtime: state/states/interpreters + the system that decides when they start
     const maps: MapService = {
@@ -98,6 +103,7 @@ export class Game extends Scene {
       maps,
       database: gameData.database,
       commonEvent: (id) => gameData.common.get(id),
+      ensureCharacter: (id) => void this.characters.ensure([id]),
     });
     this.triggerSystem = new TriggerSystem(this.runtime);
     this.triggerSystem.attach();
@@ -195,6 +201,8 @@ export class Game extends Scene {
       return;
     }
     this.runtime.cancelAll();
+    // Characters of this map that are not loaded yet (a warp waits for them before getting here).
+    void this.characters.ensure(this.charactersOf(mapKey));
 
     const map = this.mapSystem.loadMap(mapKey);
     const rawMapData = this.cache.tilemap.get(mapKey)?.data;
@@ -251,6 +259,11 @@ export class Game extends Scene {
     return resolveMapKey(MAPS.map((m) => m.key), id);
   }
 
+  /** Everything a map needs on screen: the player, its entities' characters and the saved appearance overrides. */
+  private charactersOf(mapKey: string): string[] {
+    return charactersForMap(this.cache.tilemap.get(mapKey)?.data, this.runtime.appearance.assets());
+  }
+
   /** `warp` command: same map = move the player, other map = load it (this cancels the running events). */
   private async warpPlayer(request: WarpRequest): Promise<void> {
     const never = new AbortController().signal;
@@ -266,6 +279,7 @@ export class Game extends Scene {
     if (mapKey === this.currentMapKey && this.playerEntity !== undefined) {
       this.teleportPlayer(spawn);
     } else {
+      await this.characters.ensure(this.charactersOf(mapKey));
       this.switchMap(mapKey, spawn);
     }
 

@@ -257,6 +257,50 @@ describe('changeSprite persistence (AppearanceOverrides, not GameFlags)', () => 
   });
 });
 
+describe('movement modes, profiles and lazy characters', () => {
+  it('setMovementMode switches the bindings the animator uses (swim) and back, and rejects bad names', async () => {
+    const e = rig.add({ id: 'hero', sprite: { asset: HERO }, movement: { controller: 'none' } });
+    const a = rig.world.getComponent(e, AnimatorComponent)!;
+    const grid = rig.world.getComponent(e, GridMovementComponent)!;
+    rig.world.update(16);
+    expect(a.currentAnimKey).toBe(clipAnimKey(HERO, 'idle', 'down'));
+    await interpret(graph(n('start', 'start', { next: 'a' }), n('a', 'setMovementMode', { next: 'b' }, { target: 'self', mode: 'swim' }), n('b', 'setMovementMode', {}, { target: 'self', mode: 'no good!' })), e).run();
+    expect(a.mode).toBe('swim');
+    rig.world.update(16);
+    expect(a.currentAnimKey).toBe(clipAnimKey(HERO, 'swim_idle', 'down'));
+    grid.isMoving = true;
+    rig.world.update(16);
+    expect(a.currentAnimKey).toBe(clipAnimKey(HERO, 'swim', 'down'));
+    expect(rig.warnings.some((w) => w.includes('not a valid mode'))).toBe(true);
+    await interpret(graph(n('start', 'start', { next: 'a' }), n('a', 'setMovementMode', {}, { target: 'self', mode: 'normal' })), e).run();
+    rig.world.update(16);
+    expect(a.currentAnimKey).toBe(clipAnimKey(HERO, 'walk', 'down'));
+  });
+
+  it('changeSprite warns (does not fail) when swapping between characters with different profiles', async () => {
+    const actor = { ...heroDef('Actor'), profile: 'actor4' };
+    const prop = { ...heroDef('Prop'), profile: 'prop', facing: 'none' as const, clips: {}, bindings: {} };
+    const r = makeRig({ sprites: characterRegistry({ 'characters/a': actor, 'objects/p': prop, 'characters/b': { ...actor, name: 'B' } }) });
+    const e = r.add({ id: 'x', sprite: { asset: 'characters/a' }, movement: { controller: 'none' } });
+    expect(r.runtime.ops.changeSprite(e, 'characters/b', '')).toBe(true);
+    expect(r.warnings).toEqual([]); // same profile
+    expect(r.runtime.ops.changeSprite(e, 'objects/p', '')).toBe(true);
+    expect(r.warnings.filter((w) => w.includes('"prop" character but this one is "actor4"'))).toHaveLength(1);
+    expect(r.world.getComponent(e, AnimatorComponent)!.characterId).toBe('objects/p');
+  });
+
+  it('changeSprite asks for the character to be loaded (lazy loading), unknown ones included', () => {
+    const asked: string[] = [];
+    const defs = { 'characters/a': heroDef('A'), 'characters/b': heroDef('B') };
+    const registry = characterRegistry(defs);
+    const r = makeRig({ sprites: registry, ensureCharacter: (id) => asked.push(id) });
+    const e = r.add({ id: 'x', sprite: { asset: 'characters/a' }, movement: { controller: 'none' } });
+    r.runtime.ops.changeSprite(e, 'characters/b', '');
+    r.runtime.ops.changeSprite(e, 'characters/ghost', '');
+    expect(asked).toEqual(['characters/b', 'characters/ghost']);
+  });
+});
+
 describe('texture and animation names of existing characters are unchanged', () => {
   it('migrated test characters keep sprite:<id>:<sheet> textures and sprite:<id>:<phase>-<facing> animations', () => {
     const r = makeRig();

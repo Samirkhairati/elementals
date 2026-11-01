@@ -53,6 +53,11 @@ export class AppearanceOverrides {
     this.map.clear();
   }
 
+  /** Character ids of every stored override (they are needed on the map they apply to). */
+  public assets(): string[] {
+    return [...new Set([...this.map.values()].map((o) => o.asset))].sort();
+  }
+
   public get size(): number {
     return this.map.size;
   }

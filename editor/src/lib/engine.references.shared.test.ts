@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { PREFABS, buildReferenceIndex, rewriteCharacterId, rewriteClipName, rewriteGraphicId } from '../../../shared/engine/index'
+import { PREFABS, buildReferenceIndex, characterIdsOfMap, rewriteCharacterId, rewriteClipName, rewriteGraphicId } from '../../../shared/engine/index'
 import type { CharacterDef, RefMap } from '../../../shared/engine/index'
 
 const node = (id: string, type: string, params: Record<string, unknown>) => ({ id, type, params, out: {}, x: 0, y: 0 })
@@ -127,5 +127,13 @@ describe('rewrites', () => {
     expect(rewriteGraphicId(d, 'a.png', 'b.png').def.sheets.sheet.image).toBe('b.png')
     expect(rewriteGraphicId(d, 'zzz.png', 'b.png')).toEqual({ def: d, changed: false })
     expect(d.sheets.sheet.image).toBe('a.png')
+  })
+})
+
+describe('characterIdsOfMap (preload sets)', () => {
+  it('lists every character a map shows or can swap to, sorted and without duplicates or empties', () => {
+    expect(characterIdsOfMap(town)).toEqual(['characters/cloak', 'characters/oldman', 'characters/oldman-sad', 'objects/chest'])
+    expect(characterIdsOfMap({ fileName: 'x', name: 'X' })).toEqual([])
+    expect(characterIdsOfMap({ fileName: 'x', name: 'X', entities: [entity('e', 'E', { asset: '' })] })).toEqual([])
   })
 })

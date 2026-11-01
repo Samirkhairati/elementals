@@ -88,3 +88,11 @@ Every sprite has a character (`SpriteRegistry` holds v2 `CharacterDef`s; the v1 
 * Animations are registered once at the authored fps (`buildClipRegistrations`); speed changes never re-register.
 * Nodes: `playAnimation` {animation, speed, wait, then: auto|hold|loop} (a node saved without `then` holds the last frame, as before),
   `stopAnimation`, `setAnimationSpeed` {value, mode: scale|fps, clip?}, `setMoveSpeed` {speed}, `changeSprite` {…, persist: state|map|forever}.
+
+## Loading and modes
+* **Preload sets**: the Preloader loads only the characters of the first map (`charactersForMap`: the player, entity sprites, state
+  appearances and Change Sprite targets). `warp` waits for the destination's set before switching maps, `switchMap` asks for it too,
+  and a `changeSprite` to a character nobody loaded yet loads it on the spot (its graphic appears when the texture arrives).
+  `CharacterLoader` (`sprites/characterLoader.ts`) loads each character once and creates its animations after the files arrive.
+* **Modes**: `setMovementMode` {target, mode} sets `AnimatorComponent.mode`; the animator then prefers `<mode>.<activity>` bindings
+  (`swim.walk`, ...) and falls back to the plain ones. A `changeSprite` between characters with different profiles logs a warning.

@@ -34,6 +34,7 @@ export class WorldEntityOps implements EntityOps {
   private readonly warn: (message: string) => void;
   private readonly appearance?: AppearanceOverrides;
   private readonly getMapId: () => string;
+  private readonly ensureCharacter?: (id: string) => void;
 
   constructor(
     world: World,
@@ -41,12 +42,14 @@ export class WorldEntityOps implements EntityOps {
     warn: (message: string) => void = (m) => console.warn(m),
     appearance?: AppearanceOverrides,
     getMapId: () => string = () => "",
+    ensureCharacter?: (id: string) => void,
   ) {
     this.world = world;
     this.sprites = sprites;
     this.warn = warn;
     this.appearance = appearance;
     this.getMapId = getMapId;
+    this.ensureCharacter = ensureCharacter;
   }
 
   public findPlayer(): Entity | undefined {
@@ -178,6 +181,11 @@ export class WorldEntityOps implements EntityOps {
   private swapCharacter(entity: Entity, asset: string, animation: string): boolean {
     const current = this.readSpriteProps(entity);
     const facing = current.facing;
+    // A character nobody asked for yet is loaded now; its graphic shows as soon as the texture arrives.
+    if (asset) this.ensureCharacter?.(asset);
+    const before = this.world.getComponent(entity, AnimatorComponent)?.def?.profile;
+    const after = this.sprites.character(asset)?.profile;
+    if (before && after && before !== after) this.warn(`[Event] changeSprite: "${asset}" is a "${after}" character but this one is "${before}"; animations may not match`);
     const ok = applySpriteProps(this.world, entity, { ...current, asset, animation, frame: 0 }, this.sprites, this.warn);
     if (ok && isFacing(facing)) setEntityFacing(this.world, entity, facing);
     return ok;
@@ -199,6 +207,13 @@ export class WorldEntityOps implements EntityOps {
     const animator = this.world.getComponent(entity, AnimatorComponent);
     if (!animator) return false;
     setClipSpeed(animator, change);
+    return true;
+  }
+
+  public setMovementMode(entity: Entity, mode: string): boolean {
+    const animator = this.world.getComponent(entity, AnimatorComponent);
+    if (!animator || !/^[A-Za-z0-9_-]+$/.test(mode)) return false;
+    animator.mode = mode;
     return true;
   }
 

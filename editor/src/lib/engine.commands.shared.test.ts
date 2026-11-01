@@ -21,7 +21,7 @@ const DOC_CATALOG: Record<string, 'implemented' | 'planned'> = {
   showText: 'implemented', showChoices: 'implemented',
   conditional: 'implemented', branchStage: 'implemented', loop: 'implemented', breakLoop: 'implemented', exitEvent: 'implemented', wait: 'implemented', comment: 'implemented', callCommonEvent: 'implemented',
   setSwitch: 'implemented', setVariable: 'implemented', setStage: 'implemented', setSelfSwitch: 'implemented',
-  setFacing: 'implemented', moveRoute: 'implemented', setVisible: 'implemented', changeSprite: 'implemented', playAnimation: 'implemented', stopAnimation: 'implemented', setAnimationSpeed: 'implemented', setMoveSpeed: 'implemented', faceTowards: 'implemented',
+  setFacing: 'implemented', moveRoute: 'implemented', setVisible: 'implemented', changeSprite: 'implemented', playAnimation: 'implemented', stopAnimation: 'implemented', setAnimationSpeed: 'implemented', setMoveSpeed: 'implemented', setMovementMode: 'implemented', faceTowards: 'implemented',
   warp: 'implemented', fadeScreen: 'implemented', shakeScreen: 'implemented', tintScreen: 'planned', setWeather: 'planned',
   playSound: 'planned', playMusic: 'planned', stopMusic: 'planned',
   giveItem: 'implemented', removeItem: 'implemented', givePokemon: 'planned', healParty: 'planned', startBattle: 'planned', openShop: 'planned', startQuest: 'planned', completeQuest: 'planned',
@@ -30,7 +30,7 @@ const DOC_CATALOG: Record<string, 'implemented' | 'planned'> = {
 const DOC_CATEGORY: Record<string, string> = {
   showText: 'dialogue', showChoices: 'dialogue', conditional: 'flow', branchStage: 'flow', loop: 'flow', breakLoop: 'flow', exitEvent: 'flow', wait: 'flow', comment: 'flow', callCommonEvent: 'flow',
   setSwitch: 'state', setVariable: 'state', setStage: 'state', setSelfSwitch: 'state',
-  setFacing: 'character', moveRoute: 'character', setVisible: 'character', changeSprite: 'character', playAnimation: 'character', stopAnimation: 'character', setAnimationSpeed: 'character', setMoveSpeed: 'character', faceTowards: 'character',
+  setFacing: 'character', moveRoute: 'character', setVisible: 'character', changeSprite: 'character', playAnimation: 'character', stopAnimation: 'character', setAnimationSpeed: 'character', setMoveSpeed: 'character', setMovementMode: 'character', faceTowards: 'character',
   warp: 'map', fadeScreen: 'map', shakeScreen: 'map', tintScreen: 'map', setWeather: 'map',
   playSound: 'audio', playMusic: 'audio', stopMusic: 'audio',
   giveItem: 'rpg', removeItem: 'rpg', givePokemon: 'rpg', healParty: 'rpg', startBattle: 'rpg', openShop: 'rpg', startQuest: 'rpg', completeQuest: 'rpg',

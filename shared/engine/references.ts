@@ -255,3 +255,18 @@ export function rewriteGraphicId(def: CharacterDef, from: string, to: string): {
   }));
   return changed ? { def: { ...def, sheets }, changed } : { def, changed };
 }
+
+// ── preload sets ────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Characters a map needs on screen or can swap to: entity sprites, event-state appearances and Change Sprite nodes
+ * (the same scan as where-used), sorted and without duplicates. The game loads these before the map is shown and
+ * loads any other character lazily the first time something swaps to it.
+ */
+export function characterIdsOfMap(map: RefMap): string[] {
+  const ids = new Set<string>();
+  for (const r of buildReferenceIndex({ maps: [map], characters: [] }).all) {
+    if (r.target.table === 'character' && r.target.clip === undefined) ids.add(r.target.id);
+  }
+  return [...ids].sort();
+}

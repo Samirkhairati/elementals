@@ -142,3 +142,10 @@ registerCommandHandler("setMoveSpeed", (node, rt) => {
   if (!(speed > 0)) return rt.ctx.warn("[Event] setMoveSpeed needs a speed above 0; skipped");
   if (!rt.ctx.ops.setMoveSpeed(entity, speed)) rt.ctx.warnOnce("move-speed:none", "[Event] setMoveSpeed: the target cannot move; skipped");
 });
+
+registerCommandHandler("setMovementMode", (node, rt) => {
+  const entity = resolveTarget(node.params, "target", rt, "setMovementMode");
+  if (entity === undefined) return;
+  const mode = str(node.params, "mode", "normal").trim() || "normal";
+  if (!rt.ctx.ops.setMovementMode(entity, mode)) rt.ctx.warn(`[Event] setMovementMode: "${mode}" is not a valid mode (letters, digits, - and _); skipped`);
+});

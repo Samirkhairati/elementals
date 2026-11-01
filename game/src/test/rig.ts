@@ -152,7 +152,7 @@ export function makeEntityDef(o: EntityOptions = {}): EngineEntity {
 }
 
 /** A World + EventRuntime with fake UI / maps and the test sprite registry. */
-export function makeRig(options: { random?: () => number; sprites?: SpriteRegistry } = {}) {
+export function makeRig(options: { random?: () => number; sprites?: SpriteRegistry; ensureCharacter?: (id: string) => void } = {}) {
   const world = new World();
   const sprites = options.sprites ?? testSprites();
   const ui = new FakeUI();
@@ -171,6 +171,7 @@ export function makeRig(options: { random?: () => number; sprites?: SpriteRegist
     warn: (m) => warnings.push(m),
     emit: (event, payload) => emitted.push({ event, payload }),
     random: options.random ?? (() => 0),
+    ensureCharacter: options.ensureCharacter,
   });
   runtime.mapId = "test";
 

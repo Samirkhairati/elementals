@@ -70,6 +70,8 @@ export interface EntityOps {
   stopAnimation(entity: Entity): boolean;
   /** `setAnimationSpeed`: false when the entity has no animator. */
   setAnimationSpeed(entity: Entity, change: SpeedChange): boolean;
+  /** `setMovementMode`: selects the `<mode>.<activity>` animation bindings. false when the entity has no animator. */
+  setMovementMode(entity: Entity, mode: string): boolean;
   /** `setMoveSpeed` (px/s): false when the entity cannot move. */
   setMoveSpeed(entity: Entity, speed: number): boolean;
 }

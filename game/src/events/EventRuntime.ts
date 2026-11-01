@@ -30,6 +30,8 @@ export interface EventRuntimeOptions {
   emit?: (event: string, payload: unknown) => void;
   warn?: (message: string) => void;
   random?: () => number;
+  /** Called when a command swaps to a character (the game loads it if it has not been loaded yet). */
+  ensureCharacter?: (id: string) => void;
 }
 
 export interface StartOptions {
@@ -96,7 +98,7 @@ export class EventRuntime {
     this.random = options.random ?? Math.random;
     this.commonEvent = options.commonEvent ?? (() => undefined);
     this.flags = new GameFlags(options.database);
-    this.ops = new WorldEntityOps(this.world, options.sprites, (m) => this.warn(m), this.appearance, () => this.mapId);
+    this.ops = new WorldEntityOps(this.world, options.sprites, (m) => this.warn(m), this.appearance, () => this.mapId, options.ensureCharacter);
     this.states = new StateSelector({
       world: this.world,
       flags: this.flags,
