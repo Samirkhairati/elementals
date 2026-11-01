@@ -88,14 +88,26 @@ export function deleteNodes(graph: EventGraph, ids: readonly string[], dissolve 
   return ids.reduce((g, id) => dissolveNode(g, id), graph)
 }
 
-/** Copies the nodes (and the wires between them) 40px down-right; returns the ids of the copies. */
-export function duplicateNodes(graph: EventGraph, ids: readonly string[], idFn: IdFn = newId): { graph: EventGraph; ids: string[] } {
-  const fragment = extractFragment(graph, ids)
-  if (fragment.nodes.length === 0) return { graph, ids: [] }
-  const source = graph.nodes.filter((n) => fragment.nodes.some((f) => f.id === n.id))
-  const left = Math.min(...source.map((n) => n.x))
-  const top = Math.min(...source.map((n) => n.y))
-  return pasteFragment(graph, fragment, { x: snapToGrid(left + 48), y: snapToGrid(top + 48) }, idFn)
+/** Removes every wire into or out of the given nodes; the nodes stay where they are. */
+export function disconnectNodes(graph: EventGraph, ids: readonly string[]): EventGraph {
+  const set = new Set(ids)
+  let changed = false
+  const nodes = graph.nodes.map((n) => {
+    const out = Object.fromEntries(Object.entries(n.out).filter(([, to]) => !set.has(n.id) && !set.has(to)))
+    if (Object.keys(out).length === Object.keys(n.out).length) return n
+    changed = true
+    return { ...n, out }
+  })
+  return changed ? { ...graph, nodes } : graph
+}
+
+/** Copies the nodes and frames (and the wires between the nodes) 48px down-right; returns the ids of the copies. */
+export function duplicateNodes(graph: EventGraph, ids: readonly string[], idFn: IdFn = newId, frameIds: readonly string[] = []): { graph: EventGraph; ids: string[]; frameIds: string[] } {
+  const fragment = extractFragment(graph, ids, frameIds)
+  if (fragment.nodes.length === 0 && !fragment.frames?.length) return { graph, ids: [], frameIds: [] }
+  const xs = [...graph.nodes.filter((n) => fragment.nodes.some((f) => f.id === n.id)).map((n) => n.x), ...graph.frames.filter((f) => frameIds.includes(f.id)).map((f) => f.x)]
+  const ys = [...graph.nodes.filter((n) => fragment.nodes.some((f) => f.id === n.id)).map((n) => n.y), ...graph.frames.filter((f) => frameIds.includes(f.id)).map((f) => f.y)]
+  return pasteFragment(graph, fragment, { x: snapToGrid(Math.min(...xs) + 48), y: snapToGrid(Math.min(...ys) + 48) }, idFn)
 }
 
 // ── clipboard ────────────────────────────────────────────────────────────────────────────────────
@@ -104,7 +116,7 @@ const CLIPBOARD_FORMAT = 'elementals/graph-fragment'
 let memoryClipboard: GraphFragment | null = null
 
 export function serializeFragment(fragment: GraphFragment): string {
-  return JSON.stringify({ format: CLIPBOARD_FORMAT, version: 1, nodes: fragment.nodes })
+  return JSON.stringify({ format: CLIPBOARD_FORMAT, version: 1, nodes: fragment.nodes, ...(fragment.frames?.length ? { frames: fragment.frames } : {}) })
 }
 
 function isKnownNode(n: unknown): n is GraphNode {
@@ -114,23 +126,30 @@ function isKnownNode(n: unknown): n is GraphNode {
   return isRecord(n.params) && isRecord(n.out) && typeof n.x === 'number' && typeof n.y === 'number'
 }
 
-/** Parses clipboard text; null when it is not a list of known nodes. */
+function isKnownFrame(f: unknown): f is GraphFrame {
+  return isRecord(f) && typeof f.title === 'string' && typeof f.color === 'string' && ['x', 'y', 'w', 'h'].every((k) => typeof f[k] === 'number')
+}
+
+/** Parses clipboard text; null when it is not a list of known nodes (frames may come with them). */
 export function parseFragment(text: string): GraphFragment | null {
   try {
-    const data = JSON.parse(text) as { format?: unknown; nodes?: unknown }
-    if (data?.format !== CLIPBOARD_FORMAT || !Array.isArray(data.nodes) || data.nodes.length === 0) return null
-    return data.nodes.every(isKnownNode) ? { nodes: data.nodes } : null
+    const data = JSON.parse(text) as { format?: unknown; nodes?: unknown; frames?: unknown }
+    if (data?.format !== CLIPBOARD_FORMAT || !Array.isArray(data.nodes)) return null
+    const frames = Array.isArray(data.frames) ? data.frames : []
+    if (data.nodes.length === 0 && frames.length === 0) return null
+    if (!data.nodes.every(isKnownNode) || !frames.every(isKnownFrame)) return null
+    return frames.length > 0 ? { nodes: data.nodes, frames: frames.map((f) => ({ ...f, id: typeof f.id === 'string' ? f.id : '' })) } : { nodes: data.nodes }
   } catch {
     return null
   }
 }
 
 export function setMemoryClipboard(fragment: GraphFragment | null): void {
-  memoryClipboard = fragment ? { nodes: structuredClone(fragment.nodes) } : null
+  memoryClipboard = fragment ? structuredClone(fragment) : null
 }
 
 export function getMemoryClipboard(): GraphFragment | null {
-  return memoryClipboard ? { nodes: structuredClone(memoryClipboard.nodes) } : null
+  return memoryClipboard ? structuredClone(memoryClipboard) : null
 }
 
 /** Writes to the system clipboard (best effort) and always to the in-memory fallback. */

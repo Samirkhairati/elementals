@@ -1,7 +1,7 @@
 // The look of a graph node on the canvas: a card with the command's icon and label, its summary line,
 // one input handle on the left and one output handle per port on the right. Also the comment frame.
 
-import React from 'react'
+import React, { useState } from 'react'
 import { Handle, NodeResizer, Position, type Node, type NodeProps } from '@xyflow/react'
 import { AlertCircle, AlertTriangle, Flag, OctagonX } from 'lucide-react'
 import type { GraphFrame, GraphIssue, GraphNode, SummaryContext } from '../../../../../shared/engine/types'
@@ -15,6 +15,8 @@ export interface CommandNodeData extends Record<string, unknown> {
   node: GraphNode
   issues: GraphIssue[]
   summaryContext: SummaryContext
+  /** Nothing leads here from Start: allowed (scratch space), shown dimmed because it never runs. */
+  floating?: boolean
 }
 
 export type CommandFlowNode = Node<CommandNodeData, 'command'>
@@ -40,10 +42,10 @@ export function nodeSummary(node: GraphNode, ctx: SummaryContext): string {
   return summarizeCommand(node, ctx)
 }
 
-function StructuralNode({ node, selected }: { node: GraphNode; selected: boolean }) {
+function StructuralNode({ node, selected, floating }: { node: GraphNode; selected: boolean; floating?: boolean }) {
   if (node.type === GRAPH_JUNCTION) {
     return (
-      <div className={cn('flex h-4 w-4 items-center justify-center rounded-full border-2 border-muted-foreground bg-background', selected && 'ring-2 ring-primary')} title="Reroute" data-node-type="junction">
+      <div className={cn('flex h-4 w-4 items-center justify-center rounded-full border-2 border-muted-foreground bg-background', selected && 'ring-2 ring-primary', floating && 'opacity-60')} title="Reroute" data-node-type="junction">
         <Handle type="target" position={Position.Left} id="in" className={handleClass} />
         <Handle type="source" position={Position.Right} id="next" className={handleClass} />
       </div>
@@ -56,6 +58,7 @@ function StructuralNode({ node, selected }: { node: GraphNode; selected: boolean
         'flex items-center gap-1.5 rounded-full border bg-card px-3 py-1 text-xs font-semibold shadow-sm',
         isStart ? 'border-emerald-500/60 text-emerald-400' : 'border-red-500/50 text-red-400',
         selected && 'ring-2 ring-primary',
+        floating && 'opacity-60',
       )}
       data-node-type={node.type}
     >
@@ -68,8 +71,8 @@ function StructuralNode({ node, selected }: { node: GraphNode; selected: boolean
 }
 
 export function CommandNodeView({ data, selected }: NodeProps<CommandFlowNode>) {
-  const { node, issues, summaryContext } = data
-  if (node.type === GRAPH_START || node.type === GRAPH_END || node.type === GRAPH_JUNCTION) return <StructuralNode node={node} selected={!!selected} />
+  const { node, issues, summaryContext, floating } = data
+  if (node.type === GRAPH_START || node.type === GRAPH_END || node.type === GRAPH_JUNCTION) return <StructuralNode node={node} selected={!!selected} floating={floating} />
 
   const def = getCommandDef(node.type)
   const style = def ? CATEGORY_STYLES[def.category] : undefined
@@ -83,9 +86,11 @@ export function CommandNodeView({ data, selected }: NodeProps<CommandFlowNode>) 
         'w-[220px] rounded-md border bg-card text-card-foreground shadow-sm',
         worst === 'error' ? 'border-red-500/70' : worst === 'warning' ? 'border-amber-500/60' : 'border-border',
         selected && 'ring-2 ring-primary',
+        floating && 'opacity-60',
       )}
       data-node-type={node.type}
       data-testid={`node-${node.id}`}
+      title={floating ? 'Not connected to Start, so this never runs' : undefined}
     >
       <Handle type="target" position={Position.Left} id="in" className={handleClass} />
       <div className="flex items-center gap-1.5 border-b border-border/60 px-2 py-1">
@@ -132,15 +137,41 @@ export function FrameNodeView({ data, selected }: NodeProps<FrameFlowNode>) {
         style={{ borderColor: frame.color, backgroundColor: `${frame.color}14` }}
         data-testid={`frame-${frame.id}`}
       >
-        <input
-          aria-label="Frame title"
-          defaultValue={frame.title}
-          onBlur={(e) => e.target.value !== frame.title && onTitle(frame.id, e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-          className="nodrag m-1 w-[calc(100%-0.5rem)] bg-transparent px-1 text-xs font-semibold outline-none"
-          style={{ color: frame.color }}
-        />
+        <FrameTitle title={frame.title} color={frame.color} onCommit={(title) => onTitle(frame.id, title)} />
       </div>
     </>
+  )
+}
+
+/**
+ * The title is plain text until it is double-clicked. An always-present input took the focus on every
+ * click on the frame, so Ctrl+C / Ctrl+V landed in the text field (pasting raw clipboard text into the
+ * title) instead of copying and pasting the frame.
+ */
+function FrameTitle({ title, color, onCommit }: { title: string; color: string; onCommit: (title: string) => void }) {
+  const [editing, setEditing] = useState(false)
+  if (!editing) {
+    return (
+      <div className="m-1 cursor-grab select-none truncate px-1 text-xs font-semibold" style={{ color }} onDoubleClick={() => setEditing(true)} title="Double-click to rename" data-testid="frame-title">
+        {title || 'Group'}
+      </div>
+    )
+  }
+  return (
+    <input
+      aria-label="Frame title"
+      autoFocus
+      defaultValue={title}
+      onBlur={(e) => {
+        if (e.target.value !== title) onCommit(e.target.value)
+        setEditing(false)
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+        else if (e.key === 'Escape') setEditing(false)
+      }}
+      className="nodrag m-1 w-[calc(100%-0.5rem)] bg-transparent px-1 text-xs font-semibold outline-none"
+      style={{ color }}
+    />
   )
 }

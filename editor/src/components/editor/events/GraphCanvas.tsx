@@ -14,15 +14,16 @@ import {
   useReactFlow,
   type Connection,
   type Edge,
+  type EdgeChange,
   type Node,
   type NodeChange,
   type NodeTypes,
   type OnConnectEnd,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { Frame, LayoutGrid, Plus, Scissors } from 'lucide-react'
+import { Frame, LayoutGrid, Plus, Scissors, Unplug } from 'lucide-react'
 import type { EventGraph, GraphIssue, SummaryContext } from '../../../../../shared/engine/types'
-import { GRAPH_START, connect, disconnect, edgesOf, extractFragment, getNode, layoutGraph, moveNode, pasteFragment } from '../../../../../shared/engine/graph'
+import { GRAPH_START, connect, disconnect, edgesOf, extractFragment, getNode, layoutGraph, moveNode, pasteFragment, reachableFromStart } from '../../../../../shared/engine/graph'
 import { cn } from '@/lib/utils'
 import { useThemeStore } from '@/store/themeStore'
 import {
@@ -38,8 +39,10 @@ import {
   addCommandNode,
   addFrameAround,
   deleteNodes,
+  disconnectNodes,
   duplicateNodes,
   moveFrame,
+  nodesInFrame,
   readFragmentClipboard,
   removeFrame,
   updateFrame,
@@ -89,6 +92,9 @@ function Canvas({ graph, onChange, selectedId, onSelect, issues, summaryContext,
   const [measured, setMeasured] = useState<Record<string, { width: number; height: number }>>({})
   const themeMode = useThemeStore((s) => s.mode)
   const [palette, setPalette] = useState<PaletteState | null>(null)
+  const [selectedEdges, setSelectedEdges] = useState<Set<string>>(() => new Set())
+  // Set while a wire end is being dragged: dropping it on a handle reconnects it, dropping it on nothing removes the wire.
+  const reconnected = useRef(false)
 
   const graphRef = useRef(graph)
   graphRef.current = graph
@@ -115,6 +121,9 @@ function Canvas({ graph, onChange, selectedId, onSelect, issues, summaryContext,
     [commit],
   )
 
+  // Nodes Start does not lead to are fine (scratch space) but drawn dimmed so it is clear they never run.
+  const live = useMemo(() => reachableFromStart(graph), [graph])
+
   const flowNodes = useMemo(() => {
     const frames: FrameFlowNode[] = graph.frames.map((f) => {
       const id = `${FRAME_PREFIX}${f.id}`
@@ -122,15 +131,15 @@ function Canvas({ graph, onChange, selectedId, onSelect, issues, summaryContext,
       return { id, type: 'frame', position: dragging[id] ?? { x: f.x, y: f.y }, style: { width: f.w, height: f.h }, zIndex: -1, selected: selected.has(id), measured: measured[id], data }
     })
     const nodes: CommandFlowNode[] = graph.nodes.map((n) => {
-      const data: CommandNodeData = { node: n, issues: issues.get(n.id) ?? [], summaryContext }
+      const data: CommandNodeData = { node: n, issues: issues.get(n.id) ?? [], summaryContext, floating: !live.has(n.id) && n.type !== GRAPH_START }
       return { id: n.id, type: 'command', position: dragging[n.id] ?? { x: n.x, y: n.y }, selected: selected.has(n.id), deletable: n.type !== GRAPH_START, measured: measured[n.id], data }
     })
     return [...frames, ...nodes] as Node[]
-  }, [graph.frames, graph.nodes, issues, summaryContext, selected, dragging, measured, frameCallbacks])
+  }, [graph, live, issues, summaryContext, selected, dragging, measured, frameCallbacks])
 
   const flowEdges = useMemo<Edge[]>(
-    () => edgesOf(graph).map((e) => ({ id: e.id, source: e.from, sourceHandle: e.port, target: e.to, targetHandle: 'in', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } })),
-    [graph],
+    () => edgesOf(graph).map((e) => ({ id: e.id, source: e.from, sourceHandle: e.port, target: e.to, targetHandle: 'in', type: 'smoothstep', selected: selectedEdges.has(e.id), markerEnd: { type: MarkerType.ArrowClosed } })),
+    [graph, selectedEdges],
   )
 
   // ── events from React Flow ───────────────────────────────────────────────────────────────────────
@@ -149,7 +158,17 @@ function Canvas({ graph, onChange, selectedId, onSelect, issues, summaryContext,
           else nextSelected.delete(c.id)
         } else if (c.type === 'position' && c.dragging && c.position) {
           const { id, position } = c as { id: string; position: { x: number; y: number } }
-          setDragging((d) => ({ ...d, [id]: position }))
+          setDragging((d) => {
+            const next = { ...d, [id]: position }
+            // The nodes inside a frame travel with it while it is dragged, not after the drop.
+            const frame = id.startsWith(FRAME_PREFIX) ? graphRef.current.frames.find((f) => f.id === id.slice(FRAME_PREFIX.length)) : undefined
+            if (frame) {
+              const dx = position.x - frame.x
+              const dy = position.y - frame.y
+              for (const n of nodesInFrame(graphRef.current, frame.id)) next[n.id] = { x: n.x + dx, y: n.y + dy }
+            }
+            return next
+          })
         }
       }
       if (sizes) {
@@ -167,6 +186,19 @@ function Canvas({ graph, onChange, selectedId, onSelect, issues, summaryContext,
     },
     [selected, onSelect],
   )
+
+  const onEdgesChange = useCallback((changes: EdgeChange[]) => {
+    const picks = changes.filter((c): c is Extract<EdgeChange, { type: 'select' }> => c.type === 'select')
+    if (picks.length === 0) return
+    setSelectedEdges((prev) => {
+      const next = new Set(prev)
+      for (const c of picks) {
+        if (c.selected) next.add(c.id)
+        else next.delete(c.id)
+      }
+      return next
+    })
+  }, [])
 
   const onNodeDragStop = useCallback(
     (_event: unknown, _node: Node, moved: Node[]) => {
@@ -204,10 +236,30 @@ function Canvas({ graph, onChange, selectedId, onSelect, issues, summaryContext,
       next = deleteNodes(next, nodes.filter((n) => !n.id.startsWith(FRAME_PREFIX)).map((n) => n.id))
       for (const n of nodes) if (n.id.startsWith(FRAME_PREFIX)) next = removeFrame(next, n.id.slice(FRAME_PREFIX.length))
       setSelected(new Set())
+      setSelectedEdges(new Set())
       onSelect(null)
       commit(next)
     },
     [commit, onSelect],
+  )
+
+  const onReconnect = useCallback(
+    (old: Edge, c: Connection) => {
+      reconnected.current = true
+      if (!c.source || !c.target || !c.sourceHandle) return
+      commit(connect(disconnect(graphRef.current, old.source, old.sourceHandle ?? 'next'), c.source, c.sourceHandle, c.target))
+      setSelectedEdges(new Set())
+    },
+    [commit],
+  )
+
+  const onReconnectEnd = useCallback(
+    (_event: unknown, edge: Edge) => {
+      if (reconnected.current) return
+      commit(disconnect(graphRef.current, edge.source, edge.sourceHandle ?? 'next'))
+      setSelectedEdges(new Set())
+    },
+    [commit],
   )
 
   const openPaletteAtPointer = useCallback(
@@ -247,41 +299,60 @@ function Canvas({ graph, onChange, selectedId, onSelect, issues, summaryContext,
     }
   }
 
+  // Copying or cutting a frame takes the nodes inside it along.
+  const withFrameContents = useCallback(() => {
+    const ids = new Set(selectedNodeIds)
+    for (const frameId of selectedFrameIds) for (const n of nodesInFrame(graphRef.current, frameId)) ids.add(n.id)
+    return [...ids]
+  }, [selectedNodeIds, selectedFrameIds])
+
   const copySelection = useCallback(async () => {
-    const fragment = extractFragment(graphRef.current, selectedNodeIds)
-    if (fragment.nodes.length > 0) await writeFragmentClipboard(fragment)
-    return fragment.nodes.length > 0
-  }, [selectedNodeIds])
+    const fragment = extractFragment(graphRef.current, withFrameContents(), selectedFrameIds)
+    const copied = fragment.nodes.length > 0 || (fragment.frames?.length ?? 0) > 0
+    if (copied) await writeFragmentClipboard(fragment)
+    return copied
+  }, [withFrameContents, selectedFrameIds])
 
   const removeSelection = useCallback(
-    (dissolve: boolean) => {
-      let next = deleteNodes(graphRef.current, selectedNodeIds, dissolve)
+    (dissolve: boolean, withContents = false) => {
+      let next = deleteNodes(graphRef.current, withContents ? withFrameContents() : selectedNodeIds, dissolve)
       for (const id of selectedFrameIds) next = removeFrame(next, id)
       if (next === graphRef.current) return
       setSelected(new Set())
       onSelect(null)
       commit(next)
     },
-    [commit, onSelect, selectedNodeIds, selectedFrameIds],
+    [commit, onSelect, selectedNodeIds, selectedFrameIds, withFrameContents],
   )
 
   const paste = useCallback(async () => {
     const fragment = await readFragmentClipboard()
     if (!fragment) return
     const r = pasteFragment(graphRef.current, fragment, { x: Math.round(pointer.current.x), y: Math.round(pointer.current.y) })
-    if (r.ids.length === 0) return
+    if (r.ids.length === 0 && r.frameIds.length === 0) return
     commit(r.graph, r.ids[0])
-    setSelected(new Set(r.ids))
-    onSelect(r.ids.length === 1 ? r.ids[0] : null)
+    setSelected(new Set([...r.ids, ...r.frameIds.map((id) => FRAME_PREFIX + id)]))
+    onSelect(r.ids.length === 1 && r.frameIds.length === 0 ? r.ids[0] : null)
   }, [commit, onSelect])
 
   const duplicate = useCallback(() => {
-    const r = duplicateNodes(graphRef.current, selectedNodeIds)
-    if (r.ids.length === 0) return
+    const r = duplicateNodes(graphRef.current, withFrameContents(), undefined, selectedFrameIds)
+    if (r.ids.length === 0 && r.frameIds.length === 0) return
     commit(r.graph, r.ids[0])
-    setSelected(new Set(r.ids))
-    onSelect(r.ids.length === 1 ? r.ids[0] : null)
-  }, [commit, onSelect, selectedNodeIds])
+    setSelected(new Set([...r.ids, ...r.frameIds.map((id) => FRAME_PREFIX + id)]))
+    onSelect(r.ids.length === 1 && r.frameIds.length === 0 ? r.ids[0] : null)
+  }, [commit, onSelect, withFrameContents, selectedFrameIds])
+
+  const disconnectSelection = useCallback(() => {
+    let next = graphRef.current
+    for (const id of selectedEdges) {
+      const edge = edgesOf(next).find((e) => e.id === id)
+      if (edge) next = disconnect(next, edge.from, edge.port)
+    }
+    next = disconnectNodes(next, selectedNodeIds)
+    setSelectedEdges(new Set())
+    if (next !== graphRef.current) commit(next)
+  }, [commit, selectedEdges, selectedNodeIds])
 
   const group = useCallback(() => {
     const r = addFrameAround(graphRef.current, selectedNodeIds)
@@ -303,7 +374,7 @@ function Canvas({ graph, onChange, selectedId, onSelect, issues, summaryContext,
       void copySelection()
     } else if (mod && key === 'x') {
       e.preventDefault()
-      void copySelection().then((copied) => copied && removeSelection(false))
+      void copySelection().then((copied) => copied && removeSelection(false, true))
     } else if (mod && key === 'v') {
       e.preventDefault()
       void paste()
@@ -325,19 +396,29 @@ function Canvas({ graph, onChange, selectedId, onSelect, issues, summaryContext,
   const hasNodeSelection = selectedNodeIds.some((id) => getNode(graph, id)?.type !== GRAPH_START)
 
   return (
-    <div ref={wrapRef} className={cn('relative min-h-0 flex-1', className)} data-testid="graph-canvas" onKeyDown={onKeyDown}>
+    <div ref={wrapRef} tabIndex={-1} className={cn('relative min-h-0 flex-1 outline-none', className)} data-testid="graph-canvas" onKeyDown={onKeyDown}>
       <ReactFlow
         nodes={flowNodes}
         edges={flowEdges}
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        edgesReconnectable
+        onReconnect={onReconnect}
+        onReconnectStart={() => {
+          reconnected.current = false
+        }}
+        onReconnectEnd={onReconnectEnd}
         onNodeDragStop={onNodeDragStop}
         onConnect={onConnect}
         onConnectEnd={onConnectEnd}
         isValidConnection={isValidConnection}
         onDelete={onDelete}
         onPaneClick={() => {
+          // Focus the canvas so Ctrl+C / Ctrl+V / Delete reach it even when nothing inside it has focus.
+          wrapRef.current?.focus({ preventScroll: true })
           setPalette(null)
+          setSelectedEdges(new Set())
           setSelected(new Set())
           onSelect(null)
         }}
@@ -387,6 +468,9 @@ function Canvas({ graph, onChange, selectedId, onSelect, issues, summaryContext,
         </ToolButton>
         <ToolButton label="Group in a frame" disabled={!hasNodeSelection} onClick={group}>
           <Frame className="h-3.5 w-3.5" /> Group
+        </ToolButton>
+        <ToolButton label="Disconnect wires" disabled={!hasNodeSelection && selectedEdges.size === 0} onClick={disconnectSelection}>
+          <Unplug className="h-3.5 w-3.5" /> Disconnect
         </ToolButton>
         <ToolButton label="Remove and reconnect" disabled={!hasNodeSelection} onClick={() => removeSelection(true)}>
           <Scissors className="h-3.5 w-3.5" /> Cut out

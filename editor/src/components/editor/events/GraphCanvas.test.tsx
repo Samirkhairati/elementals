@@ -213,8 +213,43 @@ describe('GraphCanvas', () => {
       const withFrame = { ...sample(), frames: [{ id: 'f1', title: 'Intro', color: '#64748b', x: 0, y: 0, w: 300, h: 200 }] }
       render(<Harness initial={withFrame} onChange={onChange} />)
       fireEvent.click(screen.getByTestId('node-a'))
+      fireEvent.doubleClick(screen.getByTestId('frame-title'))
       fireEvent.keyDown(screen.getByLabelText('Frame title'), { key: 'd', ctrlKey: true })
       expect(onChange).not.toHaveBeenCalled()
+    })
+
+    it('a frame title is plain text until double-clicked, so clicks and pastes never land in a text field', () => {
+      const withFrame = { ...sample(), frames: [{ id: 'f1', title: 'Intro', color: '#64748b', x: 0, y: 0, w: 300, h: 200 }] }
+      render(<Harness initial={withFrame} />)
+      expect(screen.queryByLabelText('Frame title')).toBeNull()
+      fireEvent.doubleClick(screen.getByTestId('frame-title'))
+      expect(screen.getByLabelText('Frame title')).toHaveValue('Intro')
+    })
+
+    it('copying a frame takes the nodes inside it, and pasting brings the frame back', async () => {
+      const onChange = vi.fn()
+      const g = commandsToGraph([cmd('a', 'showText', { speaker: '', text: 'hi' }), cmd('b', 'wait', { ms: 5 })], () => 'start')
+      const a = g.nodes.find((n) => n.id === 'a')!
+      const framed: EventGraph = { ...g, frames: [{ id: 'f1', title: 'Intro', color: '#64748b', x: a.x - 20, y: a.y - 20, w: 260, h: 140 }] }
+      render(<Harness initial={framed} onChange={onChange} />)
+      fireEvent.click(screen.getByTestId('frame-f1'))
+      fireEvent.keyDown(screen.getByTestId('graph-canvas'), { key: 'd', ctrlKey: true })
+      const [dup] = onChange.mock.calls[0] as [EventGraph]
+      expect(dup.frames).toHaveLength(2)
+      expect(dup.frames[1].title).toBe('Intro')
+      expect(commandNodes(dup).filter((n) => n.type === 'showText')).toHaveLength(2)
+    })
+
+    it('Disconnect removes the wires of the selected node', () => {
+      const onChange = vi.fn()
+      render(<Harness initial={sample()} onChange={onChange} />)
+      expect(screen.getByRole('button', { name: 'Disconnect wires' })).toBeDisabled()
+      fireEvent.click(screen.getByTestId('node-a'))
+      fireEvent.click(screen.getByRole('button', { name: 'Disconnect wires' }))
+      const g = onChange.mock.calls[0][0] as EventGraph
+      expect(findStart(g)!.out).toEqual({})
+      expect(g.nodes.find((n) => n.id === 'a')!.out).toEqual({})
+      expect(commandNodes(g)).toHaveLength(2) // nodes stay, floating
     })
   })
 })

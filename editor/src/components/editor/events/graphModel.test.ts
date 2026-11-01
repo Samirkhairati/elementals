@@ -115,7 +115,7 @@ describe('deleting and duplicating', () => {
     expect([a2.x, a2.y]).toEqual([304, 112])
     expect([b2.x, b2.y]).toEqual([560, 112])
     expect(a2.out).toEqual({ next: b2.id })
-    expect(duplicateNodes(laid, ['s'], seq())).toEqual({ graph: laid, ids: [] })
+    expect(duplicateNodes(laid, ['s'], seq())).toEqual({ graph: laid, ids: [], frameIds: [] })
   })
 })
 
