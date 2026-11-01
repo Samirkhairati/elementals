@@ -32,8 +32,8 @@ export function Field({ label, hint, info, stack, htmlFor, className, children }
         </label>
         {info ? <InfoTip>{info}</InfoTip> : null}
       </div>
-      {/* Controls sit on the right edge so switches, segmented controls and inputs line up. */}
-      <div className="flex min-w-0 items-center justify-end gap-2">{children}</div>
+      {/* Controls sit on the right edge so switches, segmented controls and inputs line up; stacked fields start at the left. */}
+      <div className={cn('flex min-w-0 items-center gap-2', stack ? 'justify-start' : 'justify-end')}>{children}</div>
     </div>
   )
 }

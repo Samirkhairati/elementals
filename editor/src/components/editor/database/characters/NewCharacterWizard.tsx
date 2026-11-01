@@ -3,8 +3,14 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { PRESET_FOLDERS, PRESET_LABELS, newCharacter, slugify, suggestGrid, type Preset } from '@/lib/characterEdit'
 import { isValidCharacterId } from '../../../../../../shared/engine/graphics'
 import { Select } from '../../ui/fields'
-import { EdButton, Field, FieldRow, InfoTip, Segmented, TextField } from '../../ui/controls'
+import { EdButton, Field, Segmented, TextField } from '../../ui/controls'
 import type { DatabaseData } from '../useDatabaseData'
+
+const PRESET_HELP: Record<Preset, string> = {
+  actor: 'Four directions, with idle and walk animations ready to use. Pick this for people and anything that walks around.',
+  prop: 'One still picture, like a sign or a rock. It can still be given animations later.',
+  animated: 'A strip of frames that loops, like a flower or a flame. Events can play its other animations.',
+}
 
 interface Props {
   data: DatabaseData
@@ -38,33 +44,50 @@ export function NewCharacterWizard({ data, open, onOpenChange, onCreated }: Prop
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg" aria-describedby="new-character-desc">
+      <DialogContent className="max-w-lg gap-4" aria-describedby="new-character-desc">
         <DialogHeader className="text-left">
           <DialogTitle>New character</DialogTitle>
-          <DialogDescription id="new-character-desc">Pick a picture, say what it is, and give it a name. You can change everything afterwards.</DialogDescription>
+          <DialogDescription id="new-character-desc" className="ed-hint">Pick a picture, say what it is and give it a name. You can change everything afterwards.</DialogDescription>
         </DialogHeader>
+
         <Field label="Picture" stack info="The picture file this character is cut from. Images live in Graphics (import new ones there).">
           <Select aria-label="Picture" value={image} placeholder="Choose a graphic…" options={graphics.map((g) => ({ value: g.id, label: `${g.id} (${g.width}×${g.height})` }))} onChange={setImage} />
         </Field>
-        {graphic && images[graphic.id] && <img src={images[graphic.id]} alt="Chosen picture" className="max-h-32 self-start rounded border border-border" style={{ imageRendering: 'pixelated' }} />}
-        <Field label="It is a" stack info="Actors have four directions (walk, idle). An object is one picture; an animated prop plays its frames in a loop.">
-          <Segmented<Preset> aria-label="Preset" value={preset} options={(Object.keys(PRESET_LABELS) as Preset[]).map((p) => ({ value: p, label: PRESET_LABELS[p] }))} onChange={setPreset} />
+        {graphic && (
+          <div className="flex items-center gap-3 rounded border border-border bg-card/30 p-2">
+            {images[graphic.id] && <img src={images[graphic.id]} alt="Chosen picture" className="ed-checker max-h-24 max-w-[40%] shrink-0 rounded border border-border object-contain" style={{ imageRendering: 'pixelated' }} />}
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <span className="truncate text-ed-label text-foreground">{graphic.id}</span>
+              <span className="ed-hint">{graphic.width}×{graphic.height} px</span>
+              {grid && <span className="ed-hint" data-testid="grid-suggestion">Cut as {grid.columns}×{grid.rows} frames of {grid.frameWidth}×{grid.frameHeight} px.</span>}
+            </div>
+          </div>
+        )}
+
+        <Field label="It is a" stack>
+          <div className="flex w-full flex-col gap-1.5">
+            <Segmented<Preset> className="w-full [&>button]:flex-1" aria-label="Preset" value={preset} options={(Object.keys(PRESET_LABELS) as Preset[]).map((p) => ({ value: p, label: PRESET_LABELS[p] }))} onChange={setPreset} />
+            <p className="ed-hint">{PRESET_HELP[preset]}</p>
+          </div>
         </Field>
-        {grid && <p className="ed-hint" data-testid="grid-suggestion">Cut as {grid.columns}×{grid.rows} frames of {grid.frameWidth}×{grid.frameHeight} px.</p>}
-        <Field label="Name" stack>
-          <TextField aria-label="Name" value={name} onCommit={setName} placeholder="Old man" />
-        </Field>
-        <Field label="Id" stack info="The permanent name maps and events use to refer to this character.">
-          <FieldRow>
+
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Name" stack>
+            <TextField aria-label="Name" value={name} onCommit={setName} placeholder="Old man" />
+          </Field>
+          <Field label="Id" stack info="The permanent name maps and events use to refer to this character.">
             <TextField aria-label="Id" value={id} onCommit={setIdEdit} />
-            {idError && <span role="alert" className="text-destructive">{idError}</span>}
-          </FieldRow>
-        </Field>
-        <InfoTip>Nothing is saved until you press Create.</InfoTip>
+          </Field>
+        </div>
+        {idError && <p role="alert" className="-mt-2 text-destructive">{idError}</p>}
         {error && <p role="alert" className="text-destructive">{error}</p>}
-        <div className="flex justify-end gap-2">
-          <EdButton onClick={() => onOpenChange(false)}>Cancel</EdButton>
-          <EdButton variant="primary" disabled={!graphic || !!idError} onClick={() => void create()}>Create</EdButton>
+
+        <div className="flex items-center gap-2 border-t border-border pt-3">
+          <span className="ed-hint">Nothing is saved until you press Create.</span>
+          <div className="ml-auto flex gap-2">
+            <EdButton onClick={() => onOpenChange(false)}>Cancel</EdButton>
+            <EdButton variant="primary" disabled={!graphic || !!idError} onClick={() => void create()}>Create</EdButton>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
