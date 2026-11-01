@@ -7,6 +7,7 @@ import { bootParams } from "@/core/bootParams";
 import { MapSystem } from "@/world/MapSystem";
 import { InputManager } from "@/components/InputManager";
 import { MAPS } from "@/constants/assets";
+import { resolveMapKey } from "@/data/mapIds";
 import { EventBus, Events } from "@/utils/EventBus";
 import { Direction } from "@/utils/Direction";
 import { gameData } from "@/data/gameData";
@@ -87,7 +88,7 @@ export class Game extends Scene {
 
     // Event runtime: state/states/interpreters + the system that decides when they start
     const maps: MapService = {
-      hasMap: (id) => MAPS.some((m) => m.key === id),
+      hasMap: (id) => this.mapKeyFor(id) !== undefined,
       warp: (request) => this.warpPlayer(request),
     };
     this.runtime = new EventRuntime({
@@ -245,17 +246,27 @@ export class Game extends Scene {
     );
   }
 
+  /** Game map key for an id as the editor stores it (file name) or as exported (see data/mapIds.ts). */
+  private mapKeyFor(id: string): string | undefined {
+    return resolveMapKey(MAPS.map((m) => m.key), id);
+  }
+
   /** `warp` command: same map = move the player, other map = load it (this cancels the running events). */
   private async warpPlayer(request: WarpRequest): Promise<void> {
     const never = new AbortController().signal;
     const spawn = { col: request.x, row: request.y, facing: request.facing };
+    const mapKey = this.mapKeyFor(request.map);
+    if (!mapKey) {
+      console.warn(`[Game] warp: unknown map "${request.map}"`);
+      return;
+    }
 
     if (request.fade) await this.cameraEffects.fade("out", FADE_MS, never);
 
-    if (request.map === this.currentMapKey && this.playerEntity !== undefined) {
+    if (mapKey === this.currentMapKey && this.playerEntity !== undefined) {
       this.teleportPlayer(spawn);
     } else {
-      this.switchMap(request.map, spawn);
+      this.switchMap(mapKey, spawn);
     }
 
     // After a fade (ours or an earlier fadeScreen command) the new map fades in.
