@@ -1,3 +1,4 @@
+import { chooseOption } from '@/test/helpers'
 import React, { StrictMode, useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
@@ -107,7 +108,7 @@ describe('opening the editor dialog', () => {
     const dialog = screen.getByRole('dialog', { name: /Event editor · Old man/ })
     expect(dialog.className).toContain('w-[90vw]')
     expect(dialog.className).toContain('h-[85vh]')
-    fireEvent.change(within(dialog).getByRole('combobox', { name: 'Trigger' }), { target: { value: 'playerTouch' } })
+    chooseOption(within(dialog).getByRole('combobox', { name: 'Trigger' }), 'playerTouch')
     expect(onChange).toHaveBeenCalledTimes(1)
     expect(onChange.mock.calls[0][0]).toBe('states')
     expect((onChange.mock.calls[0][1] as EventState[])[0].trigger).toBe('playerTouch')

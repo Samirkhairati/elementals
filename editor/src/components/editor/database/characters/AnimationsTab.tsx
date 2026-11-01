@@ -5,6 +5,7 @@ import type { Facing } from '../../../../../../shared/engine/types'
 import type { CharacterDef, PlaybackMode } from '../../../../../../shared/engine/characters'
 import { addClip, autoAssignRows, deleteClip, framesFor, renameClip, setDirectional, setFrames, setMirror, updateClip } from '@/lib/characterEdit'
 import { sheetGrid } from '../../../../../../shared/engine/sprites'
+import { Select } from '../../ui/fields'
 import { EdButton, Field, FieldRow, IconButton, InfoTip, NumberField, Section, Segmented, SliderNumber, TextField, Toggle } from '../../ui/controls'
 import { AnimationPreview } from './AnimationPreview'
 import { FramePicker } from './FramePicker'
@@ -84,9 +85,7 @@ export function AnimationsTab({ def, onChange, images, sizes, clipCounts = {}, o
             <div className="flex items-center gap-1.5">
               <label className="ed-label" htmlFor="animation-sheet">Sheet</label>
               <InfoTip>The picture this animation takes its frames from.</InfoTip>
-              <select id="animation-sheet" aria-label="Sheet" className="ed-input w-auto min-w-[110px]" value={clip.sheet} onChange={(e) => run(() => updateClip(def, current, { sheet: e.target.value }))}>
-                {sheetKeys.map((k) => <option key={k} value={k}>{k}</option>)}
-              </select>
+              <Select id="animation-sheet" aria-label="Sheet" className="w-auto min-w-[110px]" value={clip.sheet} options={sheetKeys.map((k) => ({ value: k }))} onChange={(v) => run(() => updateClip(def, current, { sheet: v }))} />
             </div>
             <IconButton tone="danger" className="ml-auto" title="Delete this animation" aria-label="Delete animation" onClick={() => run(() => { const r = deleteClip(def, current); return r.def })}><Trash2 className="h-3.5 w-3.5" /></IconButton>
           </div>
@@ -97,10 +96,7 @@ export function AnimationsTab({ def, onChange, images, sizes, clipCounts = {}, o
                 <FieldRow>
                   <Segmented<Facing> aria-label="Direction" value={facing} options={FACINGS.map((f) => ({ value: f, label: FACING_LABEL[f] }))} onChange={setFacing} />
                   <span className="ed-label">Use</span>
-                  <select aria-label="Use frames of" className="ed-input w-auto min-w-[120px]" value={mirrored ?? ''} onChange={(e) => run(() => setMirror(def, current, facing, (e.target.value || null) as Facing | null))}>
-                    <option value="">own frames</option>
-                    {FACINGS.filter((f) => f !== facing).map((f) => <option key={f} value={f}>mirror of {FACING_LABEL[f]}</option>)}
-                  </select>
+                  <Select aria-label="Use frames of" className="w-auto min-w-[120px]" value={mirrored ?? ''} options={[{ value: '', label: 'own frames' }, ...FACINGS.filter((f) => f !== facing).map((f) => ({ value: f as string, label: `mirror of ${FACING_LABEL[f]}` }))]} onChange={(v) => run(() => setMirror(def, current, facing, (v || null) as Facing | null))} />
                   <InfoTip>Re-use another direction’s frames flipped sideways, e.g. left = right flipped. Saves drawing both.</InfoTip>
                   <EdButton size="sm" className="ml-auto" title="Gives the first four rows to down, left, right and up in that order. You can change any row afterwards." onClick={() => size && run(() => autoAssignRows(def, current, sheetGrid(sheet, size.width, size.height).columns))}><Wand2 /> Auto-assign rows</EdButton>
                 </FieldRow>

@@ -1,3 +1,4 @@
+import { chooseOption } from '@/test/helpers'
 import React, { useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
@@ -150,17 +151,19 @@ describe('EventEditor: state header', () => {
   it('changes the trigger and explains it in plain language', () => {
     const { onChange, last } = setup([state('p1')])
     const trigger = screen.getByRole('combobox', { name: 'Trigger' })
-    expect(within(trigger).getAllByRole('option').map((o) => o.textContent)).toEqual(['Action button', 'Player touch', 'Event touch', 'Autorun', 'Parallel'])
+    fireEvent.click(trigger)
+    expect(within(screen.getByRole('listbox')).getAllByRole('option').map((o) => o.textContent)).toEqual(['Action button', 'Player touch', 'Event touch', 'Autorun', 'Parallel'])
+    fireEvent.click(trigger)
     expect(screen.getByText(/presses the action button while facing this entity/)).toBeInTheDocument()
-    fireEvent.change(trigger, { target: { value: 'autorun' } })
+    chooseOption(trigger, 'autorun')
     expect(onChange).toHaveBeenCalledTimes(1)
     expect(last()[0].trigger).toBe('autorun')
     expect(screen.getByText(/blocks the player until it finishes/)).toBeInTheDocument()
-    fireEvent.change(trigger, { target: { value: 'playerTouch' } })
+    chooseOption(trigger, 'playerTouch')
     expect(screen.getByText(/walks onto or into this entity/)).toBeInTheDocument()
-    fireEvent.change(trigger, { target: { value: 'eventTouch' } })
+    chooseOption(trigger, 'eventTouch')
     expect(screen.getByText(/another entity/)).toBeInTheDocument()
-    fireEvent.change(trigger, { target: { value: 'parallel' } })
+    chooseOption(trigger, 'parallel')
     expect(screen.getByText(/in the background/)).toBeInTheDocument()
   })
 
@@ -177,12 +180,12 @@ describe('EventEditor: state header', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'Face player when triggered' }))
     expect(last()[0].faceOnInteract).toBe(false)
     const solid = screen.getByRole('combobox', { name: 'Solid' })
-    expect(solid).toHaveValue('inherit')
-    fireEvent.change(solid, { target: { value: 'nonsolid' } })
+    expect(solid).toHaveTextContent('Inherit from Collider')
+    chooseOption(solid, 'nonsolid')
     expect(last()[0].solid).toBe(false)
-    fireEvent.change(solid, { target: { value: 'solid' } })
+    chooseOption(solid, 'solid')
     expect(last()[0].solid).toBe(true)
-    fireEvent.change(solid, { target: { value: 'inherit' } })
+    chooseOption(solid, 'inherit')
     expect(last()[0].solid).toBeNull()
     expect(onChange).toHaveBeenCalledTimes(4)
   })
@@ -203,7 +206,7 @@ describe('EventEditor: state header', () => {
 
     fireEvent.click(within(editor).getByRole('checkbox', { name: 'Override visibility' }))
     expect(last()[0].appearance).toEqual({ visible: true })
-    fireEvent.change(within(editor).getByLabelText('Visibility while active'), { target: { value: 'hidden' } })
+    chooseOption(within(editor).getByRole('combobox', { name: 'Visibility while active' }), 'hidden')
     expect(last()[0].appearance).toEqual({ visible: false })
 
     fireEvent.click(within(editor).getByRole('checkbox', { name: 'Override sprite' }))
@@ -214,7 +217,7 @@ describe('EventEditor: state header', () => {
 
     // the chest asset has an "open" animation, so animation becomes a select
     fireEvent.click(within(editor).getByRole('checkbox', { name: 'Override animation' }))
-    fireEvent.change(within(editor).getByLabelText('Animation'), { target: { value: 'open' } })
+    chooseOption(within(editor).getByRole('combobox', { name: 'Animation' }), 'open')
     expect(last()[0].appearance.animation).toBe('open')
 
     fireEvent.click(within(editor).getByRole('checkbox', { name: 'Override frame' }))
@@ -440,8 +443,8 @@ describe('EventEditor: robustness', () => {
     const { last } = setup([state('p1', [], { name: 'One' })])
     const solid = screen.getByRole('combobox', { name: 'Solid' })
     const trigger = screen.getByRole('combobox', { name: 'Trigger' })
-    fireEvent.change(solid, { target: { value: 'solid' } })
-    fireEvent.change(trigger, { target: { value: 'parallel' } })
+    chooseOption(solid, 'solid')
+    chooseOption(trigger, 'parallel')
     expect(last()[0]).toMatchObject({ solid: true, trigger: 'parallel' })
   })
 })

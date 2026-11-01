@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, screen, within } from '@testing-library/react'
 import type { Condition } from '../../../../../shared/engine/types'
 import { ConditionsEditor, defaultCondition } from './ConditionsEditor'
+import { chooseOption } from '@/test/helpers'
 import { makeEnv, renderWithEnv } from './eventTestUtils'
 
 function setup(conditions: Condition[], env = makeEnv()) {
@@ -54,7 +55,7 @@ describe('ConditionsEditor', () => {
     const { onChange } = setup([{ kind: 'switch', id: 'met', value: true }])
     const row = document.querySelector('[data-condition-kind="switch"]') as HTMLElement
     expect(within(row).getByRole('button', { name: /Met the guard/ })).toBeInTheDocument()
-    fireEvent.change(within(row).getByLabelText('Condition 1 value'), { target: { value: 'off' } })
+    chooseOption(within(row).getByRole('combobox', { name: 'Condition 1 value' }), 'off')
     expect(onChange).toHaveBeenLastCalledWith([{ kind: 'switch', id: 'met', value: false }])
     fireEvent.click(within(row).getByRole('button', { name: /Met the guard/ }))
     fireEvent.click(screen.getByRole('option', { name: /Door open/ }))
@@ -64,7 +65,7 @@ describe('ConditionsEditor', () => {
   it('variable row: picker, operator and number', () => {
     const { onChange } = setup([{ kind: 'variable', id: 'badges', op: '==', value: 0 }])
     expect(screen.getByRole('button', { name: /Badges earned/ })).toBeInTheDocument()
-    fireEvent.change(screen.getByLabelText('Condition 1 comparison'), { target: { value: '>=' } })
+    chooseOption(screen.getByRole('combobox', { name: 'Condition 1 comparison' }), '>=')
     expect(onChange).toHaveBeenLastCalledWith([{ kind: 'variable', id: 'badges', op: '>=', value: 0 }])
     const num = screen.getByLabelText('Condition 1 number')
     fireEvent.change(num, { target: { value: '3' } })
@@ -74,25 +75,30 @@ describe('ConditionsEditor', () => {
 
   it('offers all six comparison operators', () => {
     setup([{ kind: 'variable', id: 'badges', op: '==', value: 0 }])
-    expect(within(screen.getByLabelText('Condition 1 comparison')).getAllByRole('option')).toHaveLength(6)
+    fireEvent.click(screen.getByRole('combobox', { name: 'Condition 1 comparison' }))
+    expect(within(screen.getByRole('listbox')).getAllByRole('option')).toHaveLength(6)
   })
 
   it('self switch row: A-D and ON/OFF', () => {
     const { onChange } = setup([{ kind: 'selfSwitch', key: 'A', value: true }])
-    const select = screen.getByLabelText('Condition 1 self switch')
-    expect(within(select).getAllByRole('option').map((o) => o.textContent)).toEqual(['A', 'B', 'C', 'D'])
-    fireEvent.change(select, { target: { value: 'C' } })
+    const select = screen.getByRole('combobox', { name: 'Condition 1 self switch' })
+    fireEvent.click(select)
+    expect(within(screen.getByRole('listbox')).getAllByRole('option').map((o) => o.textContent)).toEqual(['A', 'B', 'C', 'D'])
+    fireEvent.click(select) // close again
+    chooseOption(select, 'C')
     expect(onChange).toHaveBeenLastCalledWith([{ kind: 'selfSwitch', key: 'C', value: true }])
-    fireEvent.change(screen.getByLabelText('Condition 1 value'), { target: { value: 'off' } })
+    chooseOption(screen.getByRole('combobox', { name: 'Condition 1 value' }), 'off')
     expect(onChange).toHaveBeenLastCalledWith([{ kind: 'selfSwitch', key: 'A', value: false }])
   })
 
   it('self switch row keeps a custom name selectable', () => {
     const { onChange } = setup([{ kind: 'selfSwitch', key: 'opened', value: false }])
-    const select = screen.getByLabelText('Condition 1 self switch')
-    expect(select).toHaveValue('opened')
-    expect(within(select).getAllByRole('option').map((o) => o.textContent)).toEqual(['A', 'B', 'C', 'D', 'opened'])
-    fireEvent.change(select, { target: { value: 'B' } })
+    const select = screen.getByRole('combobox', { name: 'Condition 1 self switch' })
+    expect(select).toHaveTextContent('opened')
+    fireEvent.click(select)
+    expect(within(screen.getByRole('listbox')).getAllByRole('option').map((o) => o.textContent)).toEqual(['A', 'B', 'C', 'D', 'opened'])
+    fireEvent.click(select)
+    chooseOption(select, 'B')
     expect(onChange).toHaveBeenLastCalledWith([{ kind: 'selfSwitch', key: 'B', value: false }])
   })
 
@@ -101,7 +107,7 @@ describe('ConditionsEditor', () => {
     const row = document.querySelector('[data-condition-kind="stage"]') as HTMLElement
     expect(within(row).getByRole('button', { name: /Lost cat/ })).toBeInTheDocument()
     expect(within(row).getByRole('button', { name: /Found/ })).toBeInTheDocument()
-    fireEvent.change(within(row).getByLabelText('Condition 1 comparison'), { target: { value: '<' } })
+    chooseOption(within(row).getByRole('combobox', { name: 'Condition 1 comparison' }), '<')
     expect(onChange).toHaveBeenLastCalledWith([{ kind: 'stage', id: 'cat', op: '<', value: 'found' }])
     fireEvent.click(within(row).getByRole('button', { name: /Found/ }))
     fireEvent.click(screen.getByRole('option', { name: /Done/ }))
@@ -145,7 +151,7 @@ describe('ConditionsEditor', () => {
 
   it('changing the kind replaces the row with that kind default', () => {
     const { onChange } = setup([{ kind: 'switch', id: 'met', value: false }])
-    fireEvent.change(screen.getByLabelText('Condition 1 type'), { target: { value: 'variable' } })
+    chooseOption(screen.getByRole('combobox', { name: 'Condition 1 type' }), 'variable')
     expect(onChange).toHaveBeenCalledWith([{ kind: 'variable', id: '', op: '==', value: 0 }])
   })
 

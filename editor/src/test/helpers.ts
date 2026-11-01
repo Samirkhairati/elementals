@@ -1,3 +1,4 @@
+import { fireEvent, screen, within } from '@testing-library/react'
 import type { EntityData, Layer, MapData } from '@/types/editor'
 
 export function makeLayer(id: string, overrides: Partial<Layer> = {}): Layer {
@@ -39,4 +40,18 @@ export function installElectronAPI(overrides: Record<string, AnyFn | undefined> 
 
 export function uninstallElectronAPI() {
   delete (window as unknown as { electronAPI?: unknown }).electronAPI
+}
+
+/** Opens a themed `Select` (its trigger element) and picks the option with this value. */
+export function chooseOption(trigger: HTMLElement, value: string) {
+  fireEvent.click(trigger)
+  const list = within(document.body).getByRole('listbox')
+  const option = list.querySelector<HTMLElement>(`[role="option"][data-value="${value.replace(/"/g, '\\"')}"]`)
+  if (!option) throw new Error(`The dropdown has no option "${value}"`)
+  fireEvent.click(option)
+}
+
+/** `chooseOption` for the dropdown with this accessible name. */
+export function pickOption(name: string | RegExp, value: string) {
+  chooseOption(screen.getByRole('combobox', { name }), value)
 }

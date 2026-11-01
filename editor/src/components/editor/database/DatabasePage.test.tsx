@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor, within, fireEvent } from '@testing-library/react'
 import { RouterProvider, createMemoryHistory, createRootRoute, createRoute, createRouter } from '@tanstack/react-router'
 import type { CharacterDef } from '../../../../../shared/engine/characters'
-import { installElectronAPI, uninstallElectronAPI } from '@/test/helpers'
+import { chooseOption, installElectronAPI, uninstallElectronAPI } from '@/test/helpers'
 import { DatabasePage } from './DatabasePage'
 
 const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
@@ -145,7 +145,7 @@ describe('Graphics (read-only)', () => {
     renderAt('/database?table=graphics&id=props/chest.png')
     const detail = await screen.findByTestId('graphic-detail')
     expect(screen.getByTestId('graphic-grid').style.background).toBe('')
-    fireEvent.change(within(detail).getByLabelText("Overlay a character's cut"), { target: { value: 'objects/chest:sheet' } })
+    chooseOption(within(detail).getByRole('combobox', { name: "Overlay a character's cut" }), 'objects/chest:sheet')
     expect(screen.getByTestId('graphic-grid').getAttribute('style')).toContain('64px')
   })
 

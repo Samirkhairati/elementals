@@ -1,3 +1,4 @@
+import { NumberField } from '../ui/controls'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 
@@ -29,11 +30,11 @@ export function CreateMapDialog({ open, name, width, height, setName, setWidth, 
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1">
                 <label className="ed-label">Width (Tiles)</label>
-                <Input type="number" min={1} max={500} value={width} onChange={e => setWidth(parseInt(e.target.value) || 1)} />
+                <NumberField aria-label="Width (tiles)" min={1} max={500} value={width} onCommit={setWidth} />
               </div>
               <div className="flex flex-col gap-1">
                 <label className="ed-label">Height (Tiles)</label>
-                <Input type="number" min={1} max={500} value={height} onChange={e => setHeight(parseInt(e.target.value) || 1)} />
+                <NumberField aria-label="Height (tiles)" min={1} max={500} value={height} onCommit={setHeight} />
               </div>
             </div>
           </div>

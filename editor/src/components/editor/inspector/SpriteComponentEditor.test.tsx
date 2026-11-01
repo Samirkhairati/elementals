@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- tests build partial editor contexts and entity props */
+import { chooseOption } from '@/test/helpers'
 import React from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, screen, within } from '@testing-library/react'
@@ -105,7 +106,7 @@ describe('SpriteComponentEditor', () => {
     expect(viewport().dataset.frameIndex).toBe('0')
     fireEvent.click(screen.getByRole('button', { name: 'Next frame' }))
     expect(onChange).toHaveBeenCalledWith('frame', 1)
-    fireEvent.change(screen.getByLabelText('Animation'), { target: { value: 'open' } })
+    chooseOption(screen.getByRole('combobox', { name: 'Animation' }), 'open')
     expect(onChange).toHaveBeenCalledWith('animation', 'open')
   })
 
@@ -199,10 +200,12 @@ describe('SpriteComponentEditor: animations of a v2 character', () => {
 
   it('offers every animation of the character in a dropdown, Automatic first', () => {
     const { onChange } = setupV2(spriteValue({ animation: 'wave' }))
-    const select = screen.getByLabelText('Animation') as HTMLSelectElement
-    expect([...select.options].map((o) => o.text)).toEqual(['Automatic', 'idle', 'walk', 'wave'])
-    expect(select.value).toBe('wave')
-    fireEvent.change(select, { target: { value: '' } })
+    const select = screen.getByRole('combobox', { name: 'Animation' })
+    expect(select).toHaveTextContent('wave')
+    fireEvent.click(select)
+    expect(within(screen.getByRole('listbox')).getAllByRole('option').map((o) => o.textContent)).toEqual(['Automatic', 'idle', 'walk', 'wave'])
+    fireEvent.click(select)
+    chooseOption(select, '')
     expect(onChange).toHaveBeenCalledWith('animation', '')
   })
 

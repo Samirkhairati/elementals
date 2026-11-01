@@ -3,6 +3,7 @@ import type { CharacterDef } from '../../../../../../shared/engine/characters'
 import { CHARACTER_PROFILES, unmetProfileRequirements } from '../../../../../../shared/engine/profiles'
 import type { FacingMode } from '../../../../../../shared/engine/characters'
 import { facingChangeImpact, setBinding, setFacingMode, setPivot, setTags } from '@/lib/characterEdit'
+import { Select } from '../../ui/fields'
 import { EdButton, Field, FieldRow, InfoTip, NumberField, Segmented, TextField } from '../../ui/controls'
 import { PivotPicker } from './PivotPicker'
 
@@ -57,10 +58,7 @@ export function SetupTab({ id, def, onChange }: Props) {
               <tr key={key}>
                 <th className="w-24 text-left font-normal">{key}</th>
                 <td>
-                  <select aria-label={`Binding ${key}`} className="ed-input w-auto min-w-[120px]" value={def.bindings[key] ?? ''} onChange={(e) => onChange(setBinding(def, key, e.target.value || null))}>
-                    <option value="">(none)</option>
-                    {clips.map((c) => <option key={c} value={c}>{c}</option>)}
-                  </select>
+                  <Select aria-label={`Binding ${key}`} className="w-auto min-w-[120px]" value={def.bindings[key] ?? ''} options={[{ value: '', label: '(none)' }, ...clips.map((c) => ({ value: c }))]} onChange={(v) => onChange(setBinding(def, key, v || null))} />
                 </td>
               </tr>
             ))}
@@ -74,19 +72,13 @@ export function SetupTab({ id, def, onChange }: Props) {
 
       <Field label="Still frame" info="The picture shown when no animation is playing.">
         <FieldRow>
-          <select aria-label="Still sheet" className="ed-input w-auto min-w-[100px]" value={def.still?.sheet ?? ''} onChange={(e) => onChange(e.target.value ? { ...def, still: { sheet: e.target.value, frame: def.still?.frame ?? 0 } } : (({ still: _s, ...rest }) => rest as CharacterDef)(def))}>
-            <option value="">(none)</option>
-            {Object.keys(def.sheets).map((k) => <option key={k} value={k}>{k}</option>)}
-          </select>
+          <Select aria-label="Still sheet" className="w-auto min-w-[100px]" value={def.still?.sheet ?? ''} options={[{ value: '', label: '(none)' }, ...Object.keys(def.sheets).map((k) => ({ value: k }))]} onChange={(v) => onChange(v ? { ...def, still: { sheet: v, frame: def.still?.frame ?? 0 } } : (({ still: _s, ...rest }) => rest as CharacterDef)(def))} />
           {def.still && <NumberField aria-label="Still frame" size="xs" min={0} value={def.still.frame} onCommit={(frame) => onChange({ ...def, still: { sheet: def.still!.sheet, frame } })} />}
         </FieldRow>
       </Field>
 
       <Field label="Profile" info="A checklist for characters that must behave the same way (for example, anything that can be swapped in as the player). Custom has no checklist.">
-        <select aria-label="Profile" className="ed-input w-auto min-w-[160px]" value={def.profile ?? ''} onChange={(e) => onChange(e.target.value ? { ...def, profile: e.target.value } : (({ profile: _p, ...rest }) => rest as CharacterDef)(def))}>
-          <option value="">Custom</option>
-          {Object.values(CHARACTER_PROFILES).map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
-        </select>
+        <Select aria-label="Profile" className="w-auto min-w-[160px]" value={def.profile ?? ''} options={[{ value: '', label: 'Custom' }, ...Object.values(CHARACTER_PROFILES).map((p) => ({ value: p.id, label: p.label }))]} onChange={(v) => onChange(v ? { ...def, profile: v } : (({ profile: _p, ...rest }) => rest as CharacterDef)(def))} />
       </Field>
       {def.profile && CHARACTER_PROFILES[def.profile] && (
         <ul aria-label="Profile checklist" className="text-ed-label">

@@ -1,13 +1,13 @@
 // Conditions builder, used for state conditions and the `conditional` command's `conditions` field.
 // Every row is one condition; all rows must hold (AND).
 
+import { Select } from '../ui/fields'
 import React, { useRef, useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import type { ComparisonOp, Condition, SelfSwitchKey } from '../../../../../shared/engine/types'
 import { COMPARISON_OPS, SELF_SWITCH_KEYS } from '../../../../../shared/engine/constants'
 import { validateConditions } from '../../../../../shared/engine/commands'
-import { cn } from '@/lib/utils'
-import { DraftNumber, DraftText, IconButton, Popover, SmallButton, selectClass } from './primitives'
+import { DraftNumber, DraftText, IconButton, Popover, SmallButton } from './primitives'
 import { StagePicker, StageValuePicker, SwitchPicker, VariablePicker } from './pickers'
 import { useEventEnv } from './eventEnv'
 import { buildValidationContext } from './eventModel'
@@ -48,10 +48,7 @@ const OP_LABELS: Record<ComparisonOp, string> = {
 
 function OnOffSelect({ value, onChange, label }: { value: boolean; onChange: (v: boolean) => void; label: string }) {
   return (
-    <select aria-label={label} value={value ? 'on' : 'off'} onChange={(e) => onChange(e.target.value === 'on')} className={cn(selectClass, 'w-16 shrink-0')}>
-      <option value="on">ON</option>
-      <option value="off">OFF</option>
-    </select>
+    <Select aria-label={label} value={value ? 'on' : 'off'} options={[{ value: 'on', label: 'ON' }, { value: 'off', label: 'OFF' }]} onChange={(v) => onChange(v === 'on')} className="w-16 shrink-0" />
   )
 }
 
@@ -61,21 +58,7 @@ function ConditionRow({ condition, index, onChange, onRemove, problem }: { condi
   return (
     <li className="space-y-1 rounded border border-border/60 bg-background/40 p-1.5" data-condition-kind={condition.kind} title={problem}>
       <div className="flex items-center gap-1.5">
-        <select
-          aria-label={`Condition ${n} type`}
-          value={condition.kind}
-          onChange={(e) => {
-            const kind = e.target.value as ConditionKind
-            if (kind !== condition.kind) onChange(defaultCondition(kind))
-          }}
-          className={selectClass}
-        >
-          {CONDITION_KINDS.map((k) => (
-            <option key={k.kind} value={k.kind}>
-              {k.label}
-            </option>
-          ))}
-        </select>
+        <Select aria-label={`Condition ${n} type`} value={condition.kind} options={CONDITION_KINDS.map((k) => ({ value: k.kind, label: k.label }))} onChange={(v) => { const kind = v as ConditionKind; if (kind !== condition.kind) onChange(defaultCondition(kind)) }} />
         <IconButton title={`Remove condition ${n}`} danger onClick={onRemove}>
           <Trash2 className="h-3 w-3" />
         </IconButton>
@@ -95,18 +78,7 @@ function ConditionRow({ condition, index, onChange, onRemove, problem }: { condi
             <div className="w-full">
               <VariablePicker value={condition.id} onChange={(id) => onChange({ ...condition, id })} />
             </div>
-            <select
-              aria-label={`Condition ${n} comparison`}
-              value={condition.op}
-              onChange={(e) => onChange({ ...condition, op: e.target.value as ComparisonOp })}
-              className={cn(selectClass, 'min-w-[7rem] flex-1')}
-            >
-              {COMPARISON_OPS.map((op) => (
-                <option key={op} value={op}>
-                  {OP_LABELS[op]}
-                </option>
-              ))}
-            </select>
+            <Select aria-label={`Condition ${n} comparison`} value={condition.op} options={COMPARISON_OPS.map((op) => ({ value: op, label: OP_LABELS[op] }))} onChange={(v) => onChange({ ...condition, op: v as ComparisonOp })} className="min-w-[7rem] flex-1" />
             <DraftNumber aria-label={`Condition ${n} number`} value={condition.value} onCommit={(value) => onChange({ ...condition, value })} className="w-20 shrink-0" />
           </>
         )}
@@ -115,18 +87,7 @@ function ConditionRow({ condition, index, onChange, onRemove, problem }: { condi
             <div className="w-full">
               <StagePicker value={condition.id} onChange={(id) => onChange({ ...condition, id, value: id === condition.id ? condition.value : '' })} />
             </div>
-            <select
-              aria-label={`Condition ${n} comparison`}
-              value={condition.op}
-              onChange={(e) => onChange({ ...condition, op: e.target.value as ComparisonOp })}
-              className={cn(selectClass, 'min-w-[7rem] flex-1')}
-            >
-              {COMPARISON_OPS.map((op) => (
-                <option key={op} value={op}>
-                  {OP_LABELS[op]}
-                </option>
-              ))}
-            </select>
+            <Select aria-label={`Condition ${n} comparison`} value={condition.op} options={COMPARISON_OPS.map((op) => ({ value: op, label: OP_LABELS[op] }))} onChange={(v) => onChange({ ...condition, op: v as ComparisonOp })} className="min-w-[7rem] flex-1" />
             <div className="min-w-[8rem] flex-1">
               <StageValuePicker stageId={condition.id} value={condition.value} onChange={(value) => onChange({ ...condition, value })} />
             </div>
@@ -134,18 +95,7 @@ function ConditionRow({ condition, index, onChange, onRemove, problem }: { condi
         )}
         {condition.kind === 'selfSwitch' && (
           <>
-            <select
-              aria-label={`Condition ${n} self switch`}
-              value={condition.key}
-              onChange={(e) => onChange({ ...condition, key: e.target.value as SelfSwitchKey })}
-              className={cn(selectClass, 'w-20 shrink-0')}
-            >
-              {(SELF_SWITCH_KEYS.includes(condition.key) ? SELF_SWITCH_KEYS : [...SELF_SWITCH_KEYS, condition.key]).map((k) => (
-                <option key={k} value={k}>
-                  {k}
-                </option>
-              ))}
-            </select>
+            <Select aria-label={`Condition ${n} self switch`} value={condition.key} options={(SELF_SWITCH_KEYS.includes(condition.key) ? SELF_SWITCH_KEYS : [...SELF_SWITCH_KEYS, condition.key]).map((k) => ({ value: k }))} onChange={(v) => onChange({ ...condition, key: v as SelfSwitchKey })} className="w-20 shrink-0" />
             <span className="shrink-0 text-[11px] text-muted-foreground">is</span>
             <OnOffSelect label={`Condition ${n} value`} value={condition.value} onChange={(value) => onChange({ ...condition, value })} />
           </>

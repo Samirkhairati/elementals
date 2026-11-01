@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { PRESET_LABELS, newCharacter, slugify, suggestGrid, type Preset } from '@/lib/characterEdit'
 import { isValidCharacterId } from '../../../../../../shared/engine/graphics'
+import { Select } from '../../ui/fields'
 import { EdButton, Field, FieldRow, InfoTip, Segmented, TextField } from '../../ui/controls'
 import type { DatabaseData } from '../useDatabaseData'
 
@@ -43,10 +44,7 @@ export function NewCharacterWizard({ data, open, onOpenChange, onCreated }: Prop
           <DialogDescription id="new-character-desc">Pick a picture, say what it is, and give it a name. You can change everything afterwards.</DialogDescription>
         </DialogHeader>
         <Field label="Picture" stack info="The picture file this character is cut from. Images live in Graphics (import new ones there).">
-          <select aria-label="Picture" className="ed-input" value={image} onChange={(e) => setImage(e.target.value)}>
-            <option value="">Choose a graphic…</option>
-            {graphics.map((g) => <option key={g.id} value={g.id}>{g.id} ({g.width}×{g.height})</option>)}
-          </select>
+          <Select aria-label="Picture" value={image} placeholder="Choose a graphic…" options={graphics.map((g) => ({ value: g.id, label: `${g.id} (${g.width}×${g.height})` }))} onChange={setImage} />
         </Field>
         {graphic && images[graphic.id] && <img src={images[graphic.id]} alt="Chosen picture" className="max-h-32 self-start rounded border border-border" style={{ imageRendering: 'pixelated' }} />}
         <Field label="It is a" stack info="Actors have four directions (walk, idle). An object is one picture; an animated prop plays its frames in a loop.">

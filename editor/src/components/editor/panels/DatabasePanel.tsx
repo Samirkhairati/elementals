@@ -1,3 +1,5 @@
+import { Radio } from '../ui/fields'
+import { NumberField as SharedNumberField } from '../ui/controls'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Check, ChevronDown, ChevronUp, Copy, Pencil, Plus, Search, Trash2, TriangleAlert } from 'lucide-react'
 import type { CommonEvent } from '../../../../../shared/engine/common'
@@ -116,27 +118,7 @@ function NameField({ value, rowId, validate, onCommit, label }: { value: string;
 }
 
 function NumberField({ value, onCommit, label }: { value: number; onCommit: (n: number) => void; label: string }) {
-  const [draft, setDraft] = useState<string | null>(null)
-  const commit = () => {
-    if (draft === null) return
-    const n = Number(draft)
-    if (draft.trim() !== '' && Number.isFinite(n) && n !== value) onCommit(n)
-    setDraft(null)
-  }
-  return (
-    <input
-      type="number"
-      aria-label={label}
-      value={draft ?? String(value)}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={commit}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') commit()
-        else if (e.key === 'Escape') setDraft(null)
-      }}
-      className="h-6 w-full min-w-0 rounded border border-input/60 bg-background/50 px-1.5 text-right text-xs font-mono outline-none focus:ring-1 focus:ring-primary"
-    />
-  )
+  return <SharedNumberField aria-label={label} value={value} integer={false} step={1} onCommit={onCommit} />
 }
 
 /** Folder path of an entry: committed on blur/Enter, Escape reverts. */
@@ -495,10 +477,7 @@ function StagesSection({ stages, usage, query, onAdd, onRename, onRemove, onAddV
                                 onCommit={(name) => onRenameValue(stage.id, value.id, name)}
                               />
                             </div>
-                            <label className="flex shrink-0 items-center gap-0.5 text-[10px] text-muted-foreground" title="The value a new game starts with">
-                              <input type="radio" name={`initial-${stage.id}`} checked={stage.initial === value.id} onChange={() => onInitial(stage.id, value.id)} aria-label={`${value.name} is the starting value`} />
-                              start
-                            </label>
+                            <Radio className="shrink-0 text-[10px] text-muted-foreground" checked={stage.initial === value.id} onChange={() => onInitial(stage.id, value.id)} aria-label={`${value.name} is the starting value`} label="start" />
                             <button type="button" title="Move earlier" aria-label={`Move ${value.name} earlier`} disabled={index === 0} onClick={() => onMoveValue(stage.id, value.id, -1)} className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-accent disabled:opacity-30">
                               <ChevronUp className="h-3 w-3" />
                             </button>

@@ -1,3 +1,4 @@
+import { Select } from '../../ui/fields'
 import { useMemo, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { groupReferences } from '@/lib/referenceIndex'
@@ -15,10 +16,7 @@ export function UsedByTab({ data, id }: { data: DatabaseData; id: string }) {
     <div className="flex flex-col gap-3" data-testid="used-by-tab">
       <label className="ed-hint flex items-center gap-2">
         Animation
-        <select aria-label="Filter by animation" className="ed-input w-auto min-w-[120px]" value={clip} onChange={(e) => setClip(e.target.value)}>
-          <option value="">all</option>
-          {Object.keys(def?.clips ?? {}).map((c) => <option key={c} value={c}>{c} · {clipCounts[c] ?? 0}</option>)}
-        </select>
+        <Select aria-label="Filter by animation" className="w-auto min-w-[120px]" value={clip} options={[{ value: '', label: 'all' }, ...Object.keys(def?.clips ?? {}).map((c) => ({ value: c, label: `${c} · ${clipCounts[c] ?? 0}` }))]} onChange={setClip} />
       </label>
       {groups.length === 0 ? <p className="ed-hint">{clip ? `No map or event plays “${clip}”.` : 'Nothing uses this character yet.'}</p> : groups.map((g) => (
         <section key={g.map || 'others'}>

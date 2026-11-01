@@ -1,6 +1,7 @@
 // The parameter form of one command, generated from the catalog's FieldDefs. Every FieldKind has a real
 // control here (no raw-JSON fallbacks).
 
+import { ColorField, Select } from '../ui/fields'
 import React, { useState } from 'react'
 import { Plus, Trash2, X } from 'lucide-react'
 import type { ChoiceOption, Command, CommandTarget, Condition, FieldDef, RouteStep } from '../../../../../shared/engine/types'
@@ -9,7 +10,7 @@ import { ConditionsEditor } from './ConditionsEditor'
 import { ChoicesEditor, RouteEditor } from './RouteChoicesEditors'
 import { WarpTilePicker } from './WarpTilePicker'
 import { CommonEventPicker, FacingPicker, MapPicker, SpritePicker, StagePicker, StageValuePicker, SwitchPicker, TargetPicker, VariablePicker } from './pickers'
-import { CheckRow, DraftNumber, DraftText, DraftTextarea, FieldRow, IconButton, SmallButton, inputClass, selectClass } from './primitives'
+import { CheckRow, DraftNumber, DraftText, DraftTextarea, FieldRow, IconButton, SmallButton, inputClass } from './primitives'
 import { useEventEnv } from './eventEnv'
 
 export type ParamPatch = (patch: Record<string, unknown>, pruneBranches?: string[]) => void
@@ -135,21 +136,14 @@ function FieldControl({ field, command, params, onPatch, id }: FieldControlProps
       const value = asString(raw)
       const options = field.options ?? []
       return (
-        <select id={id} value={value} onChange={(e) => set(e.target.value)} className={selectClass}>
-          {!options.some((o) => o.value === value) && <option value={value}>{value === '' ? '(none)' : `${value} (invalid)`}</option>}
-          {options.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
+        <Select id={id} value={value} options={[...(options.some((o) => o.value === value) ? [] : [{ value, label: value === '' ? '(none)' : `${value} (invalid)` }]), ...options.map((o) => ({ value: o.value, label: o.label }))]} onChange={set} />
       )
     }
     case 'color': {
       const value = asString(raw)
       return (
         <div className="flex items-center gap-1.5">
-          <input id={id} type="color" aria-label={`${field.label} picker`} value={/^#[0-9a-fA-F]{6}$/.test(value) ? value : '#000000'} onChange={(e) => set(e.target.value)} className="h-7 w-9 shrink-0 cursor-pointer rounded border border-input bg-transparent p-0.5" />
+          <ColorField aria-label={`${field.label} picker`} value={/^#[0-9a-fA-F]{6}$/.test(value) ? value : '#000000'} onChange={set} className="w-28 shrink-0" />
           <DraftText aria-label={`${field.label} hex`} value={value} placeholder="#rrggbb" onCommit={set} />
         </div>
       )

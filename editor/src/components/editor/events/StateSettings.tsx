@@ -1,12 +1,13 @@
 // Everything about a state except its commands: name, trigger, conditions, solidity and appearance override.
 
+import { Select } from '../ui/fields'
 import React, { useState } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import type { EventState, EventTrigger, StateAppearance } from '../../../../../shared/engine/types'
 import { EVENT_TRIGGERS, TRIGGER_LABELS } from '../../../../../shared/engine/constants'
 import { ConditionsEditor } from './ConditionsEditor'
 import { FacingPicker, SpritePicker } from './pickers'
-import { CheckRow, DraftNumber, DraftText, FieldRow, Group, selectClass } from './primitives'
+import { CheckRow, DraftNumber, DraftText, FieldRow, Group } from './primitives'
 import { useEventEnv } from './eventEnv'
 
 export const TRIGGER_HELP: Record<EventTrigger, string> = {
@@ -41,24 +42,14 @@ function AppearanceEditor({ appearance, onChange }: { appearance: StateAppearanc
     <div className="space-y-0.5" data-testid="appearance-editor">
       <p className="text-[10px] text-muted-foreground">While this state is active, these replace the entity’s own Sprite settings. Anything not overridden stays as it is.</p>
       <OverrideRow label="Visibility" active={ap.visible !== undefined} onToggle={(on) => set('visible', on ? true : undefined)}>
-        <select aria-label="Visibility while active" value={ap.visible === false ? 'hidden' : 'visible'} onChange={(e) => set('visible', e.target.value === 'visible')} className={selectClass}>
-          <option value="visible">Visible</option>
-          <option value="hidden">Hidden</option>
-        </select>
+        <Select aria-label="Visibility while active" value={ap.visible === false ? 'hidden' : 'visible'} options={[{ value: 'visible', label: 'Visible' }, { value: 'hidden', label: 'Hidden' }]} onChange={(v) => set('visible', v === 'visible')} />
       </OverrideRow>
       <OverrideRow label="Sprite" active={ap.asset !== undefined} onToggle={(on) => set('asset', on ? '' : undefined)}>
         <SpritePicker value={ap.asset ?? ''} onChange={(asset) => set('asset', asset)} facing={ap.facing} frame={ap.frame} animation={ap.animation} />
       </OverrideRow>
       <OverrideRow label="Animation" active={ap.animation !== undefined} onToggle={(on) => set('animation', on ? '' : undefined)}>
         {animations.length > 0 ? (
-          <select aria-label="Animation" value={ap.animation ?? ''} onChange={(e) => set('animation', e.target.value)} className={selectClass}>
-            <option value="">(static frame)</option>
-            {animations.map((a) => (
-              <option key={a} value={a}>
-                {a}
-              </option>
-            ))}
-          </select>
+          <Select aria-label="Animation" value={ap.animation ?? ''} options={[{ value: '', label: '(static frame)' }, ...animations.map((a) => ({ value: a }))]} onChange={(v) => set('animation', v)} />
         ) : (
           <DraftText aria-label="Animation" value={ap.animation ?? ''} placeholder="animation name, empty = static frame" onCommit={(v) => set('animation', v)} />
         )}
@@ -84,13 +75,7 @@ export function StateSettings({ state, onChange }: { state: EventState; onChange
         <FieldRow label="State name">{(id) => <DraftText id={id} value={state.name} placeholder="e.g. After the quest" onCommit={(name) => onChange({ name })} />}</FieldRow>
         <FieldRow label="Trigger" help={TRIGGER_HELP[state.trigger]}>
           {(id) => (
-            <select id={id} value={state.trigger} onChange={(e) => onChange({ trigger: e.target.value as EventTrigger })} className={selectClass}>
-              {EVENT_TRIGGERS.map((t) => (
-                <option key={t} value={t}>
-                  {TRIGGER_LABELS[t]}
-                </option>
-              ))}
-            </select>
+            <Select id={id} value={state.trigger} options={EVENT_TRIGGERS.map((t) => ({ value: t, label: TRIGGER_LABELS[t] }))} onChange={(v) => onChange({ trigger: v as EventTrigger })} />
           )}
         </FieldRow>
       </Group>
@@ -104,16 +89,7 @@ export function StateSettings({ state, onChange }: { state: EventState; onChange
         />
         <FieldRow label="Solid" help="Solid entities block the player. “Inherit” keeps the Collider’s setting.">
           {(id) => (
-            <select
-              id={id}
-              value={state.solid === null ? 'inherit' : state.solid ? 'solid' : 'nonsolid'}
-              onChange={(e) => onChange({ solid: e.target.value === 'inherit' ? null : e.target.value === 'solid' })}
-              className={selectClass}
-            >
-              <option value="inherit">Inherit from Collider</option>
-              <option value="solid">Solid (blocks movement)</option>
-              <option value="nonsolid">Not solid (walk through)</option>
-            </select>
+            <Select id={id} value={state.solid === null ? 'inherit' : state.solid ? 'solid' : 'nonsolid'} options={[{ value: 'inherit', label: 'Inherit from Collider' }, { value: 'solid', label: 'Solid (blocks movement)' }, { value: 'nonsolid', label: 'Not solid (walk through)' }]} onChange={(v) => onChange({ solid: v === 'inherit' ? null : v === 'solid' })} />
           )}
         </FieldRow>
         <div className="border-t border-border/50 pt-1.5">

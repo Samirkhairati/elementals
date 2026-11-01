@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react'
 import { ChevronDown, ChevronRight, Copy, Grid3x3, Upload } from 'lucide-react'
 import { sheetFrameRect } from '../../../../../shared/engine/characters'
 import { buildGraphicTree, formatBytes, graphicUsage, unusedGraphics, type GraphicTreeNode } from '@/lib/databaseModel'
+import { Checkbox, Select } from '../ui/fields'
 import { Badge, EdButton, InfoTip, Segmented } from '../ui/controls'
 import { ImageThumb, Tile, TileGroups, groupByFolder } from './browse'
 import type { DatabaseData } from './useDatabaseData'
@@ -105,13 +106,10 @@ export function GraphicDetail({ data, id }: { data: DatabaseData; id: string }) 
       </div>
       <div className="flex flex-wrap items-center gap-3">
         <Segmented value={String(zoom)} options={ZOOMS.map((z) => ({ value: String(z), label: `${z}×` }))} onChange={(v) => setZoom(Number(v) as (typeof ZOOMS)[number])} aria-label="Zoom" />
-        <label className="ed-hint flex items-center gap-1"><input type="checkbox" checked={pixelGrid} onChange={(e) => setPixelGrid(e.target.checked)} /> Pixel grid</label>
+        <Checkbox className="ed-hint" checked={pixelGrid} onChange={setPixelGrid} label="Pixel grid" />
         <label className="ed-hint flex items-center gap-1">
           <Grid3x3 className="h-3.5 w-3.5" /> Overlay a character’s cut
-          <select className="ed-input" value={overlay} onChange={(e) => setOverlay(e.target.value)} aria-label="Overlay a character's cut">
-            <option value="">none</option>
-            {usage.map((u) => <option key={`${u.characterId}:${u.sheet}`} value={`${u.characterId}:${u.sheet}`}>{u.characterName} · {u.sheet}</option>)}
-          </select>
+          <Select className="w-auto min-w-[140px]" value={overlay} aria-label="Overlay a character's cut" options={[{ value: '', label: 'none' }, ...usage.map((u) => ({ value: `${u.characterId}:${u.sheet}`, label: `${u.characterName} · ${u.sheet}` }))]} onChange={setOverlay} />
           <InfoTip>Draws the frame grid a character uses on this image, so you can check how it is cut. It changes nothing.</InfoTip>
         </label>
       </div>

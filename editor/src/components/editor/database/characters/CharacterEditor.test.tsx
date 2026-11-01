@@ -4,7 +4,7 @@ import { RouterProvider, createMemoryHistory, createRootRoute, createRoute, crea
 import type { CharacterDef } from '../../../../../../shared/engine/characters'
 import { validateCharacter } from '../../../../../../shared/engine/characters'
 import { newCharacter } from '@/lib/characterEdit'
-import { installElectronAPI, uninstallElectronAPI } from '@/test/helpers'
+import { chooseOption, installElectronAPI, uninstallElectronAPI } from '@/test/helpers'
 import { DatabasePage } from '../DatabasePage'
 
 const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
@@ -37,7 +37,7 @@ afterEach(() => uninstallElectronAPI())
 const frame = (n: number) => screen.getByLabelText(`Frame ${n}`)
 const click = (el: HTMLElement, init: object = {}) => { fireEvent.mouseDown(el, init); fireEvent.mouseUp(el, init) }
 const save = () => fireEvent.click(screen.getByRole('button', { name: /Save/ }))
-const choose = (label: string, value: string) => fireEvent.change(screen.getByLabelText(label), { target: { value } })
+const choose = (label: string, value: string) => chooseOption(screen.getByRole('combobox', { name: label }), value)
 
 async function open() {
   await screen.findByTestId('animations-tab')
@@ -48,7 +48,7 @@ describe('wizard', () => {
     const { saved } = setup()
     fireEvent.click(await screen.findByRole('button', { name: /New character/ }))
     const dialog = await screen.findByRole('dialog')
-    fireEvent.change(within(dialog).getByLabelText('Picture'), { target: { value: 'sprites/hero/run.png' } })
+    chooseOption(within(dialog).getByRole('combobox', { name: 'Picture' }), 'sprites/hero/run.png')
     expect(within(dialog).getByTestId('grid-suggestion')).toHaveTextContent('Cut as 4×4 frames of 32×48 px.')
     fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'Old man' } })
     fireEvent.blur(within(dialog).getByLabelText('Name'))
@@ -69,7 +69,7 @@ describe('wizard', () => {
     fireEvent.click(await screen.findByRole('button', { name: /New character/ }))
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByRole('button', { name: 'Create' })).toBeDisabled()
-    fireEvent.change(within(dialog).getByLabelText('Picture'), { target: { value: 'props/ball.png' } })
+    chooseOption(within(dialog).getByRole('combobox', { name: 'Picture' }), 'props/ball.png')
     fireEvent.change(within(dialog).getByLabelText('Id'), { target: { value: 'characters/hero' } })
     fireEvent.blur(within(dialog).getByLabelText('Id'))
     expect(within(dialog).getByText('A character with this id already exists.')).toBeInTheDocument()
@@ -321,10 +321,10 @@ describe('Used by', () => {
     expect(within(tab).getByText('Town')).toBeInTheDocument()
     expect(within(tab).getAllByRole('link', { name: 'Open' }).length).toBe(2) // Sprite + Play Animation node
     expect(screen.getByRole('button', { name: /Used in \d+/ })).toHaveTextContent(/Used in [2-9]/) // includes the NPC prefab
-    fireEvent.change(within(tab).getByLabelText('Filter by animation'), { target: { value: 'walk' } })
+    chooseOption(within(tab).getByRole('combobox', { name: 'Filter by animation' }), 'walk')
     expect(within(tab).getAllByRole('link', { name: 'Open' }).length).toBe(1)
     expect(within(tab).getByText(/Play Animation node/)).toBeInTheDocument()
-    fireEvent.change(within(tab).getByLabelText('Filter by animation'), { target: { value: 'idle' } })
+    chooseOption(within(tab).getByRole('combobox', { name: 'Filter by animation' }), 'idle')
     expect(within(tab).getByText(/No map or event plays “idle”/)).toBeInTheDocument()
     expect(within(tab).getByText('sprites/hero/walk.png')).toBeInTheDocument()
   })

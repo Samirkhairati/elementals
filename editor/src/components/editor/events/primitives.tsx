@@ -1,7 +1,9 @@
 // Small building blocks shared by the event editor: compact inputs that commit on blur (so typing does
 // not create one undo step per keystroke), a portal-aware popover, field rows and icon buttons.
 
-import React, { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { Checkbox } from '../ui/fields'
+import { PortalContainerContext, PortalContainerProvider } from '../../ui/portal-container'
+import React, { useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { cn } from '@/lib/utils'
 
@@ -13,8 +15,7 @@ export const selectClass =
 
 // ── popover ─────────────────────────────────────────────────────────────────────────────────────
 
-const PortalContainerContext = createContext<HTMLElement | null>(null)
-export const PortalContainerProvider = PortalContainerContext.Provider
+export { PortalContainerProvider }
 
 interface PopoverProps {
   open: boolean
@@ -242,8 +243,8 @@ interface DraftNumberProps extends Omit<React.InputHTMLAttributes<HTMLInputEleme
   onCommit: (value: number) => void
 }
 
-/** Number input: commits a finite number on blur / Enter; anything else reverts to the stored value. */
-export const DraftNumber = React.forwardRef<HTMLInputElement, DraftNumberProps>(function DraftNumber({ value, onCommit, className, onBlur, onKeyDown, ...rest }, ref) {
+/** Number input (text box with ↑/↓ stepping, no browser spinner): commits a finite number on blur / Enter; anything else reverts to the stored value. */
+export const DraftNumber = React.forwardRef<HTMLInputElement, DraftNumberProps>(function DraftNumber({ value, onCommit, className, onBlur, onKeyDown, step, ...rest }, ref) {
   const stored = Number.isFinite(value) ? String(value) : ''
   const [draft, setDraft] = useState<string | null>(null)
   const latest = useRef({ draft, stored, onCommit })
@@ -272,7 +273,12 @@ export const DraftNumber = React.forwardRef<HTMLInputElement, DraftNumberProps>(
     <input
       ref={ref}
       {...rest}
-      type="number"
+      type="text"
+      inputMode="decimal"
+      role="spinbutton"
+      aria-valuenow={Number.isFinite(value) ? value : undefined}
+      aria-valuemin={typeof rest.min === 'number' ? rest.min : undefined}
+      aria-valuemax={typeof rest.max === 'number' ? rest.max : undefined}
       value={draft ?? stored}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={(e) => {
@@ -287,6 +293,15 @@ export const DraftNumber = React.forwardRef<HTMLInputElement, DraftNumberProps>(
           e.stopPropagation()
           latest.current.draft = null
           setDraft(null)
+        } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+          // the arrows a native number box has, without its spinner
+          e.preventDefault()
+          const base = Number(draft ?? stored)
+          const by = (Number(step) > 0 ? Number(step) : 1) * (e.shiftKey ? 10 : 1) * (e.key === 'ArrowUp' ? 1 : -1)
+          const next = Math.round(((Number.isFinite(base) ? base : 0) + by) * 1e6) / 1e6
+          latest.current.draft = null
+          setDraft(null)
+          if (next !== Number(stored)) latest.current.onCommit(next)
         }
       }}
       className={cn(inputClass, 'text-right', className)}
@@ -387,16 +402,12 @@ export function SectionTitle({ children, right }: { children: React.ReactNode; r
   )
 }
 
-/** A native checkbox styled as a compact labelled toggle. */
+/** A themed checkbox with its label and an optional help line. */
 export function CheckRow({ checked, onChange, label, help, disabled }: { checked: boolean; onChange: (v: boolean) => void; label: string; help?: string; disabled?: boolean }) {
-  const id = useId()
   return (
     <div className="py-0.5">
-      <label htmlFor={id} className="flex cursor-pointer items-center gap-2 text-ed-body">
-        <input id={id} type="checkbox" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} className="h-3.5 w-3.5 accent-primary" />
-        <span>{label}</span>
-      </label>
-      {help && <p className="ml-5 text-[10px] leading-snug text-muted-foreground/80">{help}</p>}
+      <Checkbox checked={checked} disabled={disabled} onChange={onChange} label={label} />
+      {help && <p className="ml-6 text-[10px] leading-snug text-muted-foreground/80">{help}</p>}
     </div>
   )
 }

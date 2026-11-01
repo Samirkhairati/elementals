@@ -1,3 +1,4 @@
+import { Select } from '../../ui/fields'
 import React from 'react'
 import { ComponentFieldDef } from '@/types/editor'
 import { Field, NumberField, TextField, Toggle } from '../../ui/controls'
@@ -46,13 +47,7 @@ export function ComponentFieldEditor({ field, value, onChange }: ComponentFieldE
     case 'select':
       return (
         <Field label={label} hint={hint}>
-          <select className="ed-input" aria-label={label} value={String(value ?? '')} onChange={(e) => onChange(e.target.value)}>
-            {(field.options || []).map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+          <Select aria-label={label} value={String(value ?? '')} options={(field.options || []).map((opt) => ({ value: String(opt.value), label: opt.label }))} onChange={onChange} />
         </Field>
       )
 

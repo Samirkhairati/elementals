@@ -1,3 +1,4 @@
+import { chooseOption } from '@/test/helpers'
 import React from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, within } from '@testing-library/react'
@@ -40,7 +41,9 @@ describe('RouteEditor', () => {
 
   it('adds several tiles of movement at once (one change)', () => {
     const onChange = setup([{ type: 'wait', value: 100 }])
-    fireEvent.change(screen.getByLabelText('Tiles per move step'), { target: { value: '3' } })
+    const tiles = screen.getByLabelText('Tiles per move step')
+    fireEvent.change(tiles, { target: { value: '3' } })
+    fireEvent.blur(tiles)
     fireEvent.click(screen.getByRole('button', { name: 'Add step: Move right' }))
     expect(onChange).toHaveBeenCalledTimes(1)
     expect(onChange).toHaveBeenCalledWith([{ type: 'wait', value: 100 }, { type: 'right' }, { type: 'right' }, { type: 'right' }])
@@ -50,7 +53,7 @@ describe('RouteEditor', () => {
 
   it('edits per-step parameters', () => {
     const onChange = setup([{ type: 'turn', value: 'down' }, { type: 'wait', value: 500 }, { type: 'speed', value: 100 }])
-    fireEvent.change(screen.getByLabelText('Step 1 direction'), { target: { value: 'up' } })
+    chooseOption(screen.getByRole('combobox', { name: 'Step 1 direction' }), 'up')
     expect(onChange).toHaveBeenLastCalledWith([{ type: 'turn', value: 'up' }, { type: 'wait', value: 500 }, { type: 'speed', value: 100 }])
     const ms = screen.getByLabelText('Step 2 milliseconds')
     fireEvent.change(ms, { target: { value: '800' } })

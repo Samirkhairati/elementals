@@ -110,7 +110,7 @@ describe('DatabasePanel', () => {
     expect(within(switchRow('met')).getByLabelText('Switch name')).toHaveValue('Met the guard')
     expect(within(switchRow('met')).getByText('met')).toBeInTheDocument()
     expect(within(variableRow('badges')).getByLabelText('Variable name')).toHaveValue('Badges earned')
-    expect(within(variableRow('badges')).getByLabelText('Initial value of Badges earned')).toHaveValue(2)
+    expect(within(variableRow('badges')).getByLabelText('Initial value of Badges earned')).toHaveValue('2')
     expect(screen.getByRole('columnheader', { name: 'Initial' })).toBeInTheDocument()
   })
 

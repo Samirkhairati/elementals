@@ -1,3 +1,4 @@
+import { Select } from '../ui/fields'
 import React, { useEffect, useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, Grid3X3, ImageOff, Pause, Play, RotateCcw, ScanLine, TriangleAlert, X } from 'lucide-react'
 import type { Facing } from '../../../../../shared/engine/types'
@@ -165,10 +166,7 @@ export function SpriteComponentEditor({ value, components, onChange, onChangeMan
               <div className="flex flex-col gap-2">
                 {clipNames.length > 0 && (
                   <Field label="Animation" info="Automatic follows what the character does (idle, walk, run). Pick an animation to play it all the time.">
-                    <select className="ed-input" aria-label="Animation" value={clipNames.includes(animation) ? animation : ''} onChange={(e) => onChange('animation', e.target.value)}>
-                      <option value="">Automatic</option>
-                      {clipNames.map((n) => <option key={n} value={n}>{n}</option>)}
-                    </select>
+                    <Select aria-label="Animation" value={clipNames.includes(animation) ? animation : ''} options={[{ value: '', label: 'Automatic' }, ...clipNames.map((n) => ({ value: n }))]} onChange={(v) => onChange('animation', v)} />
                   </Field>
                 )}
                 <Field label="Facing">
@@ -207,19 +205,7 @@ export function SpriteComponentEditor({ value, components, onChange, onChangeMan
             {!isCharacter && (
               <div className="flex flex-col gap-2">
                 <Field label="Animation">
-                  <select
-                    className="ed-input"
-                    aria-label="Animation"
-                    value={hasAnimation ? animation : ''}
-                    onChange={(e) => onChange('animation', e.target.value)}
-                  >
-                    <option value="">Static frame</option>
-                    {animationNames.map((n) => (
-                      <option key={n} value={n}>
-                        {n}
-                      </option>
-                    ))}
-                  </select>
+                  <Select aria-label="Animation" value={hasAnimation ? animation : ''} options={[{ value: '', label: 'Static frame' }, ...animationNames.map((n) => ({ value: n }))]} onChange={(v) => onChange('animation', v)} />
                   {hasAnimation && (
                     <IconButton title={playing ? 'Pause' : 'Play'} aria-label={playing ? 'Pause preview' : 'Play preview'} onClick={() => setPlaying((p) => !p)}>
                       {playing ? <Pause /> : <Play />}

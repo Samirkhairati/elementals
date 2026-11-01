@@ -1,6 +1,7 @@
 // Small shared editor controls. They only compose the design-token classes from src/index.css
 // (.ed-field, .ed-input, .ed-seg, ...), so every panel gets the same heights, paddings and label column.
 
+import { Slider } from './fields'
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Info, Maximize, Minus, Plus } from 'lucide-react'
@@ -478,7 +479,7 @@ export function FieldRow({ children, className }: { children: React.ReactNode; c
 export function SliderNumber({ value, onCommit, min, max, step = 1, unit, label }: { value: number; onCommit: (v: number) => void; min: number; max: number; step?: number; unit?: string; label: string }) {
   return (
     <div className="flex items-center gap-2">
-      <input type="range" aria-label={`${label} slider`} className="min-w-16 flex-1" min={min} max={max} step={step} value={Math.min(max, Math.max(min, value))} onChange={(e) => onCommit(Number(e.target.value))} />
+      <Slider aria-label={`${label} slider`} min={min} max={max} step={step} value={Math.min(max, Math.max(min, value))} onChange={onCommit} />
       <NumberField aria-label={label} size="sm" value={value} min={min} step={step} unit={unit} onCommit={onCommit} />
     </div>
   )

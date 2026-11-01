@@ -4,6 +4,7 @@ import { fireEvent, screen, within } from '@testing-library/react'
 import type { Command, FieldKind } from '../../../../../shared/engine/types'
 import { COMMAND_CATALOG } from '../../../../../shared/engine/commands'
 import { ParamForm } from './ParamForm'
+import { chooseOption } from '@/test/helpers'
 import { cmd, makeEnv, renderWithEnv } from './eventTestUtils'
 
 function setup(command: Command, env = makeEnv()) {
@@ -32,7 +33,7 @@ describe('ParamForm: every FieldKind has a real control', () => {
     const { onPatch } = setup(cmd('w', 'wait', { ms: 500 }))
     expect(within(field('Duration')).getByText('(ms)')).toBeInTheDocument()
     const input = within(field('Duration')).getByRole('spinbutton')
-    expect(input).toHaveValue(500)
+    expect(input).toHaveValue('500')
     fireEvent.change(input, { target: { value: '750' } })
     expect(onPatch).not.toHaveBeenCalled()
     fireEvent.blur(input)
@@ -100,8 +101,8 @@ describe('ParamForm: every FieldKind has a real control', () => {
   it('select: changes the value; unknown stored values stay visible', () => {
     const { onPatch } = setup(cmd('v', 'setVariable', { id: 'badges', op: 'set', operand: 'const', value: 1 }))
     const select = within(field('Operation')).getByRole('combobox')
-    expect(select).toHaveValue('set')
-    fireEvent.change(select, { target: { value: 'mul' } })
+    expect(select).toHaveTextContent('Set')
+    chooseOption(select, 'mul')
     expect(onPatch).toHaveBeenCalledWith({ op: 'mul' })
   })
 
@@ -110,23 +111,25 @@ describe('ParamForm: every FieldKind has a real control', () => {
     expect(field('Value')).toBeTruthy()
     expect(field('Minimum')).toBeNull()
     expect(field('Source variable')).toBeNull()
-    fireEvent.change(within(field('Operand')).getByRole('combobox'), { target: { value: 'random' } })
+    chooseOption(within(field('Operand')).getByRole('combobox'), 'random')
     expect(onPatch).toHaveBeenCalledWith({ operand: 'random' })
   })
 
   it('shows random range fields when the operand is random', () => {
     setup(cmd('v', 'setVariable', { id: 'badges', operand: 'random', min: 2, max: 9 }))
-    expect(within(field('Minimum')).getByRole('spinbutton')).toHaveValue(2)
-    expect(within(field('Maximum')).getByRole('spinbutton')).toHaveValue(9)
+    expect(within(field('Minimum')).getByRole('spinbutton')).toHaveValue('2')
+    expect(within(field('Maximum')).getByRole('spinbutton')).toHaveValue('9')
     expect(field('Value')).toBeNull()
   })
 
-  it('color: native picker and hex text', () => {
+  it('color: themed picker and hex text', () => {
     const { onPatch } = setup(cmd('t', 'tintScreen', { color: '#112233' }))
-    const picker = screen.getByLabelText('Colour picker')
-    expect(picker).toHaveValue('#112233')
-    fireEvent.change(picker, { target: { value: '#ff0000' } })
-    expect(onPatch).toHaveBeenCalledWith({ color: '#ff0000' })
+    const picker = screen.getByRole('button', { name: 'Colour picker' })
+    expect(picker).toHaveTextContent('#112233')
+    fireEvent.click(picker)
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Colour picker' })).getByRole('button', { name: 'Use #ef4444' }))
+    expect(onPatch).toHaveBeenCalledWith({ color: '#ef4444' })
+    fireEvent.pointerDown(document.body)
     const hex = screen.getByLabelText('Colour hex')
     fireEvent.change(hex, { target: { value: '#00ff00' } })
     fireEvent.blur(hex)
@@ -328,8 +331,8 @@ describe('ParamForm: every FieldKind has a real control', () => {
     expect(screen.getByText('Destination tile (column, row).')).toBeInTheDocument()
     const col = screen.getByRole('spinbutton', { name: 'Tile column' })
     const row = screen.getByRole('spinbutton', { name: 'Tile row' })
-    expect(col).toHaveValue(1)
-    expect(row).toHaveValue(2)
+    expect(col).toHaveValue('1')
+    expect(row).toHaveValue('2')
     fireEvent.change(col, { target: { value: '7' } })
     fireEvent.blur(col)
     expect(onPatch).toHaveBeenCalledWith({ x: 7 })
@@ -388,7 +391,7 @@ describe('ParamForm: every FieldKind has a real control', () => {
   it('conditions: embeds the conditions builder', () => {
     const c = cmd('i', 'conditional', { conditions: [{ kind: 'switch', id: 'met', value: true }] })
     const { onPatch } = setup(c)
-    fireEvent.change(screen.getByLabelText('Condition 1 value'), { target: { value: 'off' } })
+    chooseOption(screen.getByRole('combobox', { name: 'Condition 1 value' }), 'off')
     expect(onPatch).toHaveBeenCalledWith({ conditions: [{ kind: 'switch', id: 'met', value: false }] })
   })
 

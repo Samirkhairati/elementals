@@ -1,11 +1,11 @@
 // Editors for the two list-valued parameters: move-route steps and choice options.
 
+import { Select } from '../ui/fields'
 import React, { useState } from 'react'
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react'
 import type { ChoiceOption, Facing, RouteStep, RouteStepType } from '../../../../../shared/engine/types'
 import { FACINGS } from '../../../../../shared/engine/constants'
-import { cn } from '@/lib/utils'
-import { DraftNumber, DraftText, IconButton, SmallButton, selectClass } from './primitives'
+import { DraftNumber, DraftText, IconButton, SmallButton } from './primitives'
 
 // ── route ───────────────────────────────────────────────────────────────────────────────────────
 
@@ -97,13 +97,7 @@ export function RouteEditor({ steps, onChange }: { steps: RouteStep[]; onChange:
               <span className="w-4 shrink-0 text-right text-[10px] text-muted-foreground">{i + 1}</span>
               <span className="min-w-0 flex-1 truncate text-[11px]">{STEP_LABELS[step.type] ?? step.type}</span>
               {step.type === 'turn' && (
-                <select aria-label={`Step ${i + 1} direction`} value={String(step.value ?? 'down')} onChange={(e) => patch(i, { type: 'turn', value: e.target.value as Facing })} className={cn(selectClass, 'w-20')}>
-                  {FACINGS.map((f) => (
-                    <option key={f} value={f}>
-                      {f}
-                    </option>
-                  ))}
-                </select>
+                <Select aria-label={`Step ${i + 1} direction`} value={String(step.value ?? 'down')} options={FACINGS.map((f) => ({ value: f }))} onChange={(v) => patch(i, { type: 'turn', value: v as Facing })} className="w-20" />
               )}
               {step.type === 'wait' && (
                 <>
@@ -135,14 +129,13 @@ export function RouteEditor({ steps, onChange }: { steps: RouteStep[]; onChange:
           <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Add step</span>
           <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
             tiles
-            <input
-              type="number"
+            <DraftNumber
               min={1}
               max={32}
               value={count}
               aria-label="Tiles per move step"
-              onChange={(e) => setCount(Math.max(1, Math.min(32, Math.round(Number(e.target.value)) || 1)))}
-              className="h-5 w-10 rounded border border-input bg-background/60 px-1 text-right text-[11px]"
+              onCommit={(v) => setCount(Math.max(1, Math.min(32, Math.round(v) || 1)))}
+              className="h-5 w-10 px-1 text-[11px]"
             />
           </label>
         </div>

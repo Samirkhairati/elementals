@@ -5,6 +5,7 @@ import type { GraphicInfo } from '../../../../../../shared/engine/graphics'
 import { addSheet, cutFromGrid, gridOf, removeSheet, sheetSummary, sheetUsers, updateSheet } from '@/lib/characterEdit'
 import { readImagePixels } from '@/lib/imagePixels'
 import { describeDetection, detectSheetGrid } from '@/lib/sheetDetect'
+import { Select } from '../../ui/fields'
 import { EdButton, Field, FieldRow, IconButton, InfoTip, NumberField, Section } from '../../ui/controls'
 import { PivotPicker } from './PivotPicker'
 import { SheetGridPreview } from './SheetGridPreview'
@@ -51,10 +52,7 @@ export function SheetsTab({ def, onChange, graphics, images = {} }: Props) {
         return (
           <Section key={key} title={key} summary={sheetSummary(sheet, size)} info="One picture and how it is cut into frames.">
             <Field label="Image" info="The picture file this sheet is cut from. Images live in Graphics; you can pick one that other characters already use.">
-              <select aria-label={`Image of ${key}`} className="ed-input w-auto min-w-[160px]" value={sheet.image} onChange={(e) => onChange(updateSheet(def, key, { image: e.target.value }))}>
-                {!sizeOf(sheet.image) && <option value={sheet.image}>{sheet.image} (missing)</option>}
-                {graphics.map((g) => <option key={g.id} value={g.id}>{g.id}</option>)}
-              </select>
+              <Select aria-label={`Image of ${key}`} className="w-auto min-w-[160px]" value={sheet.image} onChange={(v) => onChange(updateSheet(def, key, { image: v }))} options={[...(sizeOf(sheet.image) ? [] : [{ value: sheet.image, label: `${sheet.image} (missing)` }]), ...graphics.map((g) => ({ value: g.id }))]} />
             </Field>
             {size && images[sheet.image] && (
               <div className="flex flex-wrap items-start gap-3">
@@ -108,10 +106,7 @@ export function SheetsTab({ def, onChange, graphics, images = {} }: Props) {
         )
       })}
       <FieldRow>
-        <select aria-label="Add a sheet from" className="ed-input w-auto min-w-[160px]" value="" onChange={(e) => { const g = sizeOf(e.target.value); if (g) onChange(addSheet(def, g.id, g, 'sheet').def) }}>
-          <option value="">+ Add sheet…</option>
-          {graphics.map((g) => <option key={g.id} value={g.id}>{g.id}</option>)}
-        </select>
+        <Select aria-label="Add a sheet from" className="w-auto min-w-[160px]" value="" placeholder="+ Add sheet…" options={graphics.map((g) => ({ value: g.id }))} onChange={(v) => { const g = sizeOf(v); if (g) onChange(addSheet(def, g.id, g, 'sheet').def) }} />
         <Plus className="h-3.5 w-3.5 text-muted-foreground" />
         <span className="ed-hint">Pick an image from Graphics (import new ones in the Graphics table).</span>
       </FieldRow>
