@@ -7,6 +7,7 @@ import type { ChoiceOption, Command, CommandTarget, Condition, FieldDef, RouteSt
 import { getCommandDef, isFieldVisible } from '../../../../../shared/engine/commands'
 import { ConditionsEditor } from './ConditionsEditor'
 import { ChoicesEditor, RouteEditor } from './RouteChoicesEditors'
+import { WarpTilePicker } from './WarpTilePicker'
 import { CommonEventPicker, FacingPicker, MapPicker, SpritePicker, StagePicker, StageValuePicker, SwitchPicker, TargetPicker, VariablePicker } from './pickers'
 import { CheckRow, DraftNumber, DraftText, DraftTextarea, FieldRow, IconButton, SmallButton, inputClass, selectClass } from './primitives'
 import { useEventEnv } from './eventEnv'
@@ -184,16 +185,21 @@ function FieldControl({ field, command, params, onPatch, id }: FieldControlProps
       return <TargetPicker id={id} value={raw as CommandTarget | undefined} onChange={set} />
     case 'position': {
       const [kx, ky] = field.keys ?? ['x', 'y']
+      const tileX = asNumber(params[kx] ?? def?.defaultParams[kx])
+      const tileY = asNumber(params[ky] ?? def?.defaultParams[ky])
       return (
+        <div className="space-y-2">
+        {command.type === 'warp' && <WarpTilePicker mapId={asString(params.map)} x={tileX} y={tileY} onPick={(col, row) => onPatch({ [kx]: col, [ky]: row })} />}
         <div className="grid grid-cols-2 gap-2">
           <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
             Column (x)
-            <DraftNumber aria-label="Tile column" min={0} step={1} value={asNumber(params[kx] ?? def?.defaultParams[kx])} onCommit={(v) => onPatch({ [kx]: Math.round(v) })} />
+            <DraftNumber aria-label="Tile column" min={0} step={1} value={tileX} onCommit={(v) => onPatch({ [kx]: Math.round(v) })} />
           </label>
           <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
             Row (y)
-            <DraftNumber aria-label="Tile row" min={0} step={1} value={asNumber(params[ky] ?? def?.defaultParams[ky])} onCommit={(v) => onPatch({ [ky]: Math.round(v) })} />
+            <DraftNumber aria-label="Tile row" min={0} step={1} value={tileY} onCommit={(v) => onPatch({ [ky]: Math.round(v) })} />
           </label>
+        </div>
         </div>
       )
     }
