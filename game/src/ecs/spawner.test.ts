@@ -176,9 +176,9 @@ describe('real map files', () => {
     expect(files.length).toBeGreaterThan(0);
   });
 
-  // The real maps use the real sprites (public/data/sprites.json), not the handful in the test fixture.
+  // The real maps use the real characters (public/data/characters.json), not the handful in the test fixture.
   const realSprites = new SpriteRegistry();
-  realSprites.load(JSON.parse(readFileSync(new URL('../../public/data/sprites.json', import.meta.url), 'utf8')));
+  realSprites.load(JSON.parse(readFileSync(new URL('../../public/data/characters.json', import.meta.url), 'utf8')));
 
   it.each(files)('%s: entities (if any) hydrate with zero problems', (file) => {
     const data = JSON.parse(readFileSync(new URL(file, dir), 'utf8'));
