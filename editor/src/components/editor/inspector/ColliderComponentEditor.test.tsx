@@ -1,9 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- tests build partial editor contexts and entity props */
 import React from 'react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, screen } from '@testing-library/react'
 import { ColliderComponentEditor } from './ColliderComponentEditor'
 import { renderWithEditor, assetMap, characterMeta, makeAsset } from '@/test/editorContext'
+import { setSnapToTile } from '@/lib/snapPref'
 
 const hero = makeAsset('characters/hero', characterMeta()) // 32x48 frame, pivot bottom-centre
 
@@ -137,6 +138,56 @@ describe('ColliderComponentEditor', () => {
     fireEvent.mouseDown(screen.getByTestId('collider-body'), { clientX: ax, clientY: ay - 16 * z, button: 0 })
     fireEvent.mouseUp(window, { clientX: ax + 8 * z, clientY: ay - 16 * z - 4 * z })
     expect(onChangeMany).toHaveBeenCalledWith({ width: 32, height: 32, offsetX: 8, offsetY: -4 })
+  })
+
+  describe('magnet (snap to tiles)', () => {
+    afterEach(() => setSnapToTile(false))
+    const magnet = () => screen.getByRole('button', { name: 'Snap to tiles' })
+
+    it('starts off, and dragging then snaps to 4px as before', () => {
+      setup()
+      expect(magnet()).toHaveAttribute('aria-pressed', 'false')
+    })
+
+    it('with the magnet on, dragging the body moves in whole tiles and Shift places freely', () => {
+      const { onChangeMany } = setup()
+      fireEvent.click(magnet())
+      expect(magnet()).toHaveAttribute('aria-pressed', 'true')
+      const { ax, ay, z } = geo()
+      fireEvent.mouseDown(screen.getByTestId('collider-body'), { clientX: ax, clientY: ay - 16 * z, button: 0 })
+      fireEvent.mouseUp(window, { clientX: ax + 40 * z, clientY: ay - 16 * z + 20 * z })
+      expect(onChangeMany).toHaveBeenLastCalledWith({ width: 32, height: 32, offsetX: 32, offsetY: 32 })
+      fireEvent.mouseDown(screen.getByTestId('collider-body'), { clientX: ax, clientY: ay - 16 * z, button: 0 })
+      fireEvent.mouseUp(window, { clientX: ax + 10 * z, clientY: ay - 16 * z, shiftKey: true })
+      expect(onChangeMany).toHaveBeenLastCalledWith({ width: 32, height: 32, offsetX: 10, offsetY: 0 })
+    })
+
+    it('with the magnet on, the number fields commit whole tiles and sizes never snap to nothing', () => {
+      const { onChange } = setup()
+      fireEvent.click(magnet())
+      const w = screen.getByLabelText('Width')
+      fireEvent.change(w, { target: { value: '40' } })
+      fireEvent.blur(w)
+      expect(onChange).toHaveBeenLastCalledWith('width', 32)
+      fireEvent.change(w, { target: { value: '70' } })
+      fireEvent.blur(w)
+      expect(onChange).toHaveBeenLastCalledWith('width', 64)
+      const h = screen.getByLabelText('Height')
+      fireEvent.change(h, { target: { value: '3' } })
+      fireEvent.blur(h)
+      expect(onChange).toHaveBeenLastCalledWith('height', 32)
+      const ox = screen.getByLabelText('Offset X')
+      fireEvent.change(ox, { target: { value: '50' } })
+      fireEvent.blur(ox)
+      expect(onChange).toHaveBeenLastCalledWith('offsetX', 64)
+    })
+
+    it('the arrow keys step by a tile while the magnet is on', () => {
+      const { onChange } = setup()
+      fireEvent.click(magnet())
+      fireEvent.keyDown(screen.getByLabelText('Offset X'), { key: 'ArrowUp' })
+      expect(onChange).toHaveBeenLastCalledWith('offsetX', 32)
+    })
   })
 
   it('Escape cancels a gesture and Enter commits it', () => {

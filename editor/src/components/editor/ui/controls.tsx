@@ -4,7 +4,7 @@
 import { Slider } from './fields'
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Info, Maximize, Minus, Plus } from 'lucide-react'
+import { Info, Magnet, Maximize, Minus, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 // ── Field row ───────────────────────────────────────────────────────────────────────────────────
@@ -426,6 +426,21 @@ export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(f
     />
   )
 })
+
+/** The magnet: when on, sizes and offsets snap to whole tiles (hold Shift while dragging to place freely). */
+export function SnapToggle({ on, onChange, step }: { on: boolean; onChange: (on: boolean) => void; step: number }) {
+  return (
+    <IconButton
+      title={on ? `Snapping to ${step} px tiles (hold Shift to place freely)` : `Snap to ${step} px tiles`}
+      aria-label="Snap to tiles"
+      aria-pressed={on}
+      active={on}
+      onClick={() => onChange(!on)}
+    >
+      <Magnet />
+    </IconButton>
+  )
+}
 
 // ── Misc ────────────────────────────────────────────────────────────────────────────────────────
 

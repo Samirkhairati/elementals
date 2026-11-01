@@ -25,6 +25,7 @@ import {
   type Handle,
   type Rect,
 } from '@/lib/entityVisuals'
+import { snapValue } from '@/lib/snapPref'
 import { drawResolvedSprite, resolveSprite, useSpriteImagesVersion } from '@/lib/spriteImages'
 import { ZoomControls } from '../ui/controls'
 
@@ -57,7 +58,8 @@ export interface EntityViewportProps {
   onColliderChange?: (patch: ColliderPatch) => void
   /** Drag the sprite to change its offset; commits once per gesture. */
   onSpriteOffsetChange?: (offsetX: number, offsetY: number) => void
-  /** 1px normally, 8px with Shift. */
+  /** Snap grid in px (a tile) while the magnet is on; Shift places freely. Without it: 4px for the collider, 1px (8px with Shift) for the sprite. */
+  snapStep?: number
   className?: string
   children?: React.ReactNode
 }
@@ -90,6 +92,7 @@ export function EntityViewport({
   collider = null,
   onColliderChange,
   onSpriteOffsetChange,
+  snapStep,
   className,
   children,
 }: EntityViewportProps) {
@@ -290,10 +293,15 @@ export function EntityViewport({
       if (g.kind !== 'collider') return startRect
       const dx = p.x - g.startPointer.x
       const dy = p.y - g.startPointer.y
-      const step = ev.shiftKey ? 0 : COLLIDER_SNAP
-      return g.handle === 'body'
+      const tiles = snapStep !== undefined && !ev.shiftKey
+      const step = ev.shiftKey ? 0 : tiles ? 1 : COLLIDER_SNAP
+      const free = g.handle === 'body'
         ? moveRect(g.startRect, dx, dy, { step })
         : resizeRect(g.startRect, g.handle, dx, dy, { step, fromCenter: !!ev.altKey })
+      if (!tiles) return free
+      // Magnet on: the size and the offset the drag produces are whole tiles (the same values the number fields accept).
+      const props = rectToColliderProps(free)
+      return colliderLocalRect({ width: snapValue(props.width, snapStep, snapStep), height: snapValue(props.height, snapStep, snapStep), offsetX: snapValue(props.offsetX, snapStep), offsetY: snapValue(props.offsetY, snapStep) })
     }
     startGesture(
       { kind: 'collider', handle, startPointer: start, startRect },
@@ -315,7 +323,7 @@ export function EntityViewport({
     const start = toLocal(e)
     const startOffset = { x: sprite.offsetX ?? 0, y: sprite.offsetY ?? 0 }
     const compute = (p: { x: number; y: number }, ev: { shiftKey?: boolean }) => {
-      const step = ev.shiftKey ? 8 : 1
+      const step = snapStep ? (ev.shiftKey ? 1 : snapStep) : ev.shiftKey ? 8 : 1
       return { x: snapTo(startOffset.x + p.x - start.x, step), y: snapTo(startOffset.y + p.y - start.y, step) }
     }
     startGesture(

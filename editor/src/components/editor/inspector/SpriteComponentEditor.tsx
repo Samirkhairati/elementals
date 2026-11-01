@@ -7,7 +7,9 @@ import { sheetGrid } from '../../../../../shared/engine/sprites'
 import { normalizeCollider } from '@/lib/entityVisuals'
 import { getSpriteImageSize, useSpriteImagesVersion } from '@/lib/spriteImages'
 import { useEditorSelector, type EditorContextValue } from '../layout/EditorContext'
-import { Badge, EdButton, Field, IconButton, InfoTip, NumberField, SectionTitle, Segmented, useAnimationClock } from '../ui/controls'
+import { TILE_SIZE as SNAP_TILE } from '../../../../../shared/engine/constants'
+import { snapValue, useSnapToTile } from '@/lib/snapPref'
+import { Badge, EdButton, Field, IconButton, InfoTip, NumberField, SectionTitle, Segmented, SnapToggle, useAnimationClock } from '../ui/controls'
 import { SpriteThumb } from '../sprites/SpriteThumb'
 import { EntityViewport } from './EntityViewport'
 import { SpritePicker, splitAssetId } from './SpritePicker'
@@ -28,6 +30,7 @@ export function SpriteComponentEditor({ value, components, onChange, onChangeMan
   const meta = asset?.meta
   const isCharacter = meta?.kind === 'character'
 
+  const [snap, setSnap] = useSnapToTile()
   const [pickerOpen, setPickerOpen] = useState(false)
   const [phase, setPhase] = useState<Phase>('idle')
   const [playing, setPlaying] = useState(true)
@@ -159,6 +162,7 @@ export function SpriteComponentEditor({ value, components, onChange, onChangeMan
               showTileGrid={showGrid}
               collider={collider}
               showSpriteFrame
+              snapStep={snap ? SNAP_TILE : undefined}
               onSpriteOffsetChange={(x, y) => onChangeMany({ offsetX: x, offsetY: y })}
             />
 
@@ -234,19 +238,22 @@ export function SpriteComponentEditor({ value, components, onChange, onChangeMan
         <SectionTitle
           info="Shifts the graphic from the entity's anchor, in pixels. Opacity, tint and flipping are not part of the Sprite; they will become a separate component."
           actions={
+            <div className="flex items-center gap-1">
+              <SnapToggle on={snap} onChange={setSnap} step={SNAP_TILE} />
             <EdButton size="sm" disabled={offsetX === 0 && offsetY === 0} onClick={() => onChangeMany({ offsetX: 0, offsetY: 0 })} title="Put the sprite back on its anchor">
               <RotateCcw />
               Reset offset
             </EdButton>
+            </div>
           }
         >
           Placement
         </SectionTitle>
         <Field label="Offset X" hint="Shifts the graphic from the anchor (px)">
-          <NumberField value={offsetX} unit="px" onCommit={(v) => onChange('offsetX', v)} aria-label="Offset X" />
+          <NumberField value={offsetX} step={snap ? SNAP_TILE : 1} unit="px" onCommit={(v) => onChange('offsetX', snap ? snapValue(v, SNAP_TILE) : v)} aria-label="Offset X" />
         </Field>
         <Field label="Offset Y" hint="Shifts the graphic from the anchor (px)">
-          <NumberField value={offsetY} unit="px" onCommit={(v) => onChange('offsetY', v)} aria-label="Offset Y" />
+          <NumberField value={offsetY} step={snap ? SNAP_TILE : 1} unit="px" onCommit={(v) => onChange('offsetY', snap ? snapValue(v, SNAP_TILE) : v)} aria-label="Offset Y" />
         </Field>
         <Field label="Scale">
           <NumberField value={Number(value.scale) || 1} min={0.1} max={8} step={0.25} integer={false} onCommit={(v) => onChange('scale', v)} aria-label="Scale" />
