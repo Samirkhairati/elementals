@@ -121,9 +121,9 @@ logs and skips it until the system exists)
 **Flow**
 * ● `conditional` {conditions: Condition[]} — branches `then`, `else`.
 * ● `branchStage` {id, cases: valueId[]} — one branch per listed value of the stage, plus `default`.
-* ● `loop` — branch `body`; ● `breakLoop`; ● `exitEvent`.
+* ○ legacy tree commands `loop` / `breakLoop` / `exitEvent`: only exist in old command trees and are converted by `commandsToGraph` (a wire back, a wire out of the cycle, an `end` node); graphs cannot contain them.
 * ● `wait` {ms}; ● `comment` {text}.
-* ● `callCommonEvent` {id} — runs a common event (project/common) with the same self and local flags.
+* ● `callCommonEvent` {id} — runs a common event (`project/common/<id>.json`, `{ version: 1, id, name, folder?, graph }`) with the same self and local flags; its `end` returns to the caller; nesting is limited to 16 and call cycles are validation errors (`common-cycle`). The sync writes them to `data/common.json`.
 
 **State**
 * ● `setSwitch` {id, value}; ● `setVariable` {id, op: set|add|sub|mul|div|mod, operand: const|variable|random};
@@ -157,7 +157,7 @@ Parameter details as built (`shared/engine/commands.ts` is authoritative):
 * `setVariable`: `id`, `op`, `operand`, plus `value` (const), `sourceId` (variable) or `min`/`max` (random).
 * `warp`: `map`, `x`, `y` (tile coordinates), `facing` (`''` = keep), `fade`. `moveRoute.steps` is `{ type, value? }[]`
   (`turn` takes a facing, `wait` ms, `speed` px/s). `conditional.conditions` is a `Condition[]`.
-* Validation (`validateCommands`): unknown commands, wrong types, dangling switch/variable/map/sprite/entity references
+* Validation (`validateGraph`; `validateCommands` remains only for un-migrated command trees): unknown commands, wrong types, dangling switch/variable/map/sprite/entity references
   (only when the id lists are given), `breakLoop` outside a loop, empty/duplicate choices and duplicate ids are errors; unset
   required parameters (a warp without map yet) are warnings, so freshly placed prefabs validate.
 

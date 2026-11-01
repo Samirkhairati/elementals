@@ -36,7 +36,7 @@ GameFlags         switches / variables / stages / local flags (mapId/entityId/na
 Inventory         in-memory item counts (hasItem, giveItem, removeItem)
 conditions.ts     evaluateCondition(s)
 StateSelector     active state = last state whose conditions hold; applies appearance + solid overrides when the state CHANGES
-EventInterpreter  async, cancellable event-graph runner (one cursor along the node wires); handlers in commands/*.ts.
+EventInterpreter  async, cancellable event-graph runner (one cursor along the node wires; `callCommonEvent` recurses into `ctx.getCommonEvent(id)`, depth 16); handlers in commands/*.ts.
                   runs `state.graph` (stored as a graph since schemaVersion 4)
 EventRuntime      owns state, clock, state selector, running interpreters, the `event` input lock
 TriggerSystem     ECS system (priority 350): decides when events start

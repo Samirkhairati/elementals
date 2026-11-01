@@ -5,22 +5,14 @@ import {
   COMMAND_CATEGORIES,
   cloneCommands,
   commandsInCategory,
-  countCommands,
   createCommand,
   createSequentialIdGenerator,
   describeCondition,
-  duplicateCommand,
-  findCommand,
   getBranchDefs,
   getCommandDef,
-  insertCommand,
-  moveCommand,
-  removeCommand,
   summarizeCommand,
-  updateCommandParams,
   validateCommands,
   validateConditions,
-  walkCommands,
 } from '../../../shared/engine/index'
 import type { Command } from '../../../shared/engine/index'
 
@@ -166,118 +158,7 @@ function tree(): Command[] {
   ]
 }
 
-describe('tree helpers', () => {
-  it('walkCommands visits depth first in order, with positions, and can stop', () => {
-    const seen: string[] = []
-    walkCommands(tree(), (cmd, info) => {
-      seen.push(`${cmd.id}@${info.path.join('/')}:${info.depth}:${info.parent?.id ?? '-'}:${info.branch ?? '-'}`)
-    })
-    expect(seen).toEqual([
-      'text@0:0:-:-',
-      'cond@1:0:-:-',
-      'wait@1/then/0:1:cond:then',
-      'loop@1/then/1:1:cond:then',
-      'break@1/then/1/body/0:2:loop:body',
-      'note@1/else/0:1:cond:else',
-      'exit@2:0:-:-',
-    ])
-    const visited: string[] = []
-    walkCommands(tree(), (cmd) => {
-      visited.push(cmd.id)
-      return cmd.id !== 'wait'
-    })
-    expect(visited).toEqual(['text', 'cond', 'wait'])
-    expect(countCommands(tree())).toBe(7)
-  })
-
-  it('findCommand returns path info or null', () => {
-    const info = findCommand(tree(), 'break')!
-    expect(info).toMatchObject({ path: [1, 'then', 1, 'body', 0], parentId: 'loop', branch: 'body', index: 0, depth: 2 })
-    expect(info.command.type).toBe('breakLoop')
-    expect(findCommand(tree(), 'text')).toMatchObject({ path: [0], parentId: null, branch: null, index: 0, depth: 0 })
-    expect(findCommand(tree(), 'nope')).toBeNull()
-    expect(findCommand([], 'x')).toBeNull()
-  })
-
-  it('insertCommand inserts at root and in branches, immutably, clamping the index', () => {
-    const t = tree()
-    const snapshot = structuredClone(t)
-    const n = mk('wait')
-    const root = insertCommand(t, { parentId: null, index: 1 }, n)
-    expect(root.map((c) => c.id)).toEqual(['text', n.id, 'cond', 'exit'])
-    expect(insertCommand(t, { parentId: null, index: 99 }, n).at(-1)).toBe(n)
-    expect(insertCommand(t, { parentId: null, index: -5 }, n)[0]).toBe(n)
-    const deep = insertCommand(t, { parentId: 'loop', branch: 'body', index: 0 }, n)
-    expect(findCommand(deep, n.id)!.path).toEqual([1, 'then', 1, 'body', 0])
-    expect(findCommand(deep, 'break')!.path).toEqual([1, 'then', 1, 'body', 1])
-    expect(t).toEqual(snapshot) // input untouched
-    expect(deep[0]).toBe(t[0]) // structural sharing for untouched parts
-    expect(deep[2]).toBe(t[2])
-  })
-
-  it('insertCommand refuses unusable locations by returning the same tree', () => {
-    const t = tree()
-    const n = mk('wait')
-    expect(insertCommand(t, { parentId: 'nope', branch: 'then', index: 0 }, n)).toBe(t)
-    expect(insertCommand(t, { parentId: 'cond', index: 0 }, n)).toBe(t)
-    expect(insertCommand(t, { parentId: 'cond', branch: 'bogus', index: 0 }, n)).toBe(t)
-    expect(insertCommand(t, { parentId: 'text', branch: 'then', index: 0 }, n)).toBe(t) // text has no branches
-  })
-
-  it('insertCommand creates a missing but declared branch (choices)', () => {
-    const choices = mk('showChoices')
-    delete choices.branches
-    const out = insertCommand([choices], { parentId: choices.id, branch: 'opt2', index: 0 }, mk('wait'))
-    expect(out[0].branches!.opt2).toHaveLength(1)
-  })
-
-  it('removeCommand removes subtrees, ignores unknown ids', () => {
-    const t = tree()
-    expect(countCommands(removeCommand(t, 'loop'))).toBe(5)
-    expect(findCommand(removeCommand(t, 'loop'), 'break')).toBeNull()
-    expect(removeCommand(t, 'text').map((c) => c.id)).toEqual(['cond', 'exit'])
-    expect(removeCommand(t, 'zzz')).toBe(t)
-  })
-
-  it('moveCommand moves across lists (index = position after removal) and keeps the subtree', () => {
-    const t = tree()
-    const down = moveCommand(t, 'text', { parentId: null, index: 2 })
-    expect(down.map((c) => c.id)).toEqual(['cond', 'exit', 'text'])
-    const into = moveCommand(t, 'exit', { parentId: 'cond', branch: 'else', index: 0 })
-    expect(findCommand(into, 'exit')!.path).toEqual([1, 'else', 0])
-    const loopOut = moveCommand(t, 'loop', { parentId: null, index: 0 })
-    expect(loopOut[0].id).toBe('loop')
-    expect(findCommand(loopOut, 'break')!.path).toEqual([0, 'body', 0])
-    expect(countCommands(loopOut)).toBe(7)
-    const withinSame = moveCommand(t, 'wait', { parentId: 'cond', branch: 'then', index: 1 })
-    expect(findCommand(withinSame, 'cond')!.command.branches!.then.map((c) => c.id)).toEqual(['loop', 'wait'])
-  })
-
-  it('moveCommand refuses moving into itself or unknown ids', () => {
-    const t = tree()
-    expect(moveCommand(t, 'cond', { parentId: 'cond', branch: 'then', index: 0 })).toBe(t)
-    expect(moveCommand(t, 'cond', { parentId: 'loop', branch: 'body', index: 0 })).toBe(t)
-    expect(moveCommand(t, 'nope', { parentId: null, index: 0 })).toBe(t)
-    expect(moveCommand(t, 'text', { parentId: 'ghost', branch: 'then', index: 0 })).toBe(t)
-  })
-
-  it('duplicateCommand copies the whole subtree with new ids right after the original', () => {
-    const t = tree()
-    const { tree: out, newId } = duplicateCommand(t, 'cond', createSequentialIdGenerator('d'))
-    expect(newId).toBe('d-1')
-    expect(out.map((c) => c.id)).toEqual(['text', 'cond', 'd-1', 'exit'])
-    const copy = out[2]
-    expect(copy.branches!.then.map((c) => c.id)).toEqual(['d-2', 'd-3'])
-    expect(copy.branches!.then[1].branches!.body[0].id).toBe('d-4')
-    expect(copy.branches!.then[1].branches!.body[0].type).toBe('breakLoop')
-    const allIds: string[] = []
-    walkCommands(out, (c) => void allIds.push(c.id))
-    expect(new Set(allIds).size).toBe(allIds.length)
-    const nested = duplicateCommand(t, 'wait')
-    expect(findCommand(nested.tree, nested.newId!)!.path).toEqual([1, 'then', 1])
-    expect(duplicateCommand(t, 'zzz')).toEqual({ tree: t, newId: null })
-  })
-
+describe('cloneCommands', () => {
   it('cloneCommands deep copies, optionally with fresh ids, keeping choice option ids', () => {
     const choices = mk('showChoices')
     choices.branches!.opt1.push(mk('wait'))
@@ -292,18 +173,6 @@ describe('tree helpers', () => {
     expect(fresh[0].branches!.opt1[0].id).not.toBe(choices.branches!.opt1[0].id)
     expect(Object.keys(fresh[0].branches!)).toEqual(['opt1', 'opt2'])
     expect(fresh[0].params).toEqual(choices.params)
-  })
-
-  it('updateCommandParams re-syncs branches for choices', () => {
-    const choices = mk('showChoices')
-    choices.branches!.opt1.push(mk('wait'))
-    const out = updateCommandParams([choices], choices.id, { options: [{ id: 'opt1', label: 'Yes' }, { id: 'opt3', label: 'Maybe' }] })
-    expect(Object.keys(out[0].branches!).sort()).toEqual(['opt1', 'opt2', 'opt3']) // opt2 kept (orphan until user cleans up)
-    expect(out[0].branches!.opt3).toEqual([])
-    expect(out[0].branches!.opt1).toHaveLength(1)
-    const issues = validateCommands(out)
-    expect(issues.find((i) => i.code === 'orphan-branch')?.message).toMatch(/opt2/)
-    expect(updateCommandParams([choices], 'nope', {})).toEqual([choices])
   })
 })
 

@@ -1,6 +1,6 @@
 # Event graphs: specification
 
-Status: proposed. Replaces the RPG-Maker "pages + indented command list" event editor with
+Status: implemented (phases 0–6; see §12 for what was deferred). Replaces the RPG-Maker "pages + indented command list" event editor with
 **states** (what an entity is like right now) whose behaviour is a **node graph**, and reorganises
 switches / variables / self switches into a named, grouped, typed flag system.
 
@@ -625,9 +625,25 @@ while the game runs.
 **Phase 5: Common events.**
 `project/common/`, registry, `callCommonEvent` runtime, Database list, validation, sync scripts.
 
+*Status: done.* Delivered: `shared/engine/common.ts` (model, normaliser, call lists, cycle detection, manifest),
+`callCommonEvent` as `implemented` with a `commonEvent` picker field, validation (`dangling-common`, `common-cycle`
+on every cycle member), the interpreter recursing into the common graph with the same context (`end` returns,
+depth limit 16 stops the run with an error), the game loading `data/common.json`, `sync-assets` bundling
+`project/common/*.json` into that one manifest (instead of copying files to `data/common/` as §7 first said;
+errors for bad JSON, an id that differs from the file name, and cycles), the `get/save/delete-common-event`
+channels (Electron and the browser harness) over `electron/ipc/commonStore.ts`, and a **Common events** section in
+the Database panel (add, rename, caller count and list, delete with confirmation, open in the same canvas without
+state tabs). Ids are slugs fixed at creation (they are file names); renaming changes only the name. Not done:
+folders for common events in the panel UI (the data supports `folder`), editor-wide undo for common event edits.
+
 **Phase 6: Cleanup and docs.**
 Delete tree helpers, `Flow`, `runBranch`, dead tests; update `engine-design.md`, `game-runtime.md`, the
 roadmap (mark §3 delivered / adjust).
+
+*Status: done.* Removed `walkCommands`, `countCommands`, `findCommand`, `insertCommand`, `removeCommand`,
+`moveCommand`, `duplicateCommand`, `updateCommandParams` and their tests. Kept for migration and the legacy
+fallback: `Command`, `createCommand`, `cloneCommands`, `commandsToGraph`, `validateCommands`. The roadmap file
+`roadmaps/event-editor.md` named here is not in this repository, so it was not updated.
 
 **Later (not specced here):** Play-mode node highlighting from `currentNodeId`; save/resume; parameters
 for common events; map-scoped flags; a multi-line dialogue node; fork/parallel branches.
