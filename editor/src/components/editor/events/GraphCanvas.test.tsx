@@ -240,6 +240,31 @@ describe('GraphCanvas', () => {
       expect(commandNodes(dup).filter((n) => n.type === 'showText')).toHaveLength(2)
     })
 
+    it('Delete and Backspace remove the selected node, even when an ancestor swallows the key before it reaches the document', () => {
+      const onChange = vi.fn()
+      render(
+        <div onKeyDown={(e) => e.stopPropagation()}>
+          <Harness initial={sample()} onChange={onChange} />
+        </div>,
+      )
+      fireEvent.click(screen.getByTestId('node-a'))
+      fireEvent.keyDown(screen.getByTestId('graph-canvas'), { key: 'Delete' })
+      expect(onChange).toHaveBeenCalledTimes(1)
+      const g = onChange.mock.calls[0][0] as EventGraph
+      expect(commandNodes(g).map((n) => n.id)).toEqual(['b'])
+      fireEvent.click(screen.getByTestId('node-b'))
+      fireEvent.keyDown(screen.getByTestId('graph-canvas'), { key: 'Backspace' })
+      expect(commandNodes(onChange.mock.calls[1][0] as EventGraph)).toEqual([])
+    })
+
+    it('Delete never removes Start', () => {
+      const onChange = vi.fn()
+      render(<Harness initial={sample()} onChange={onChange} />)
+      fireEvent.click(document.querySelector('[data-node-type="start"]') as HTMLElement)
+      fireEvent.keyDown(screen.getByTestId('graph-canvas'), { key: 'Delete' })
+      expect(onChange).not.toHaveBeenCalled()
+    })
+
     it('Disconnect removes the wires of the selected node', () => {
       const onChange = vi.fn()
       render(<Harness initial={sample()} onChange={onChange} />)

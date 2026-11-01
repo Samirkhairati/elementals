@@ -325,6 +325,23 @@ function Canvas({ graph, onChange, selectedId, onSelect, issues, summaryContext,
     [commit, onSelect, selectedNodeIds, selectedFrameIds, withFrameContents],
   )
 
+  // Delete / Backspace. React Flow's own delete key listens on `document`, which the event editor dialog never
+  // lets these keys reach (it stops them so the map editor's shortcuts stay quiet), so the canvas handles them.
+  const deleteSelection = useCallback(() => {
+    let next = graphRef.current
+    for (const id of selectedEdges) {
+      const edge = edgesOf(next).find((e) => e.id === id)
+      if (edge) next = disconnect(next, edge.from, edge.port)
+    }
+    next = deleteNodes(next, selectedNodeIds)
+    for (const id of selectedFrameIds) next = removeFrame(next, id)
+    if (next === graphRef.current) return
+    setSelected(new Set())
+    setSelectedEdges(new Set())
+    onSelect(null)
+    commit(next)
+  }, [commit, onSelect, selectedEdges, selectedNodeIds, selectedFrameIds])
+
   const paste = useCallback(async () => {
     const fragment = await readFragmentClipboard()
     if (!fragment) return
@@ -369,7 +386,10 @@ function Canvas({ graph, onChange, selectedId, onSelect, issues, summaryContext,
     if (isTyping(e.target) || palette) return
     const mod = e.ctrlKey || e.metaKey
     const key = e.key.toLowerCase()
-    if (mod && key === 'c') {
+    if (!mod && (e.key === 'Delete' || e.key === 'Backspace')) {
+      e.preventDefault()
+      deleteSelection()
+    } else if (mod && key === 'c') {
       e.preventDefault()
       void copySelection()
     } else if (mod && key === 'x') {
@@ -429,7 +449,7 @@ function Canvas({ graph, onChange, selectedId, onSelect, issues, summaryContext,
         onPaneMouseMove={(e) => {
           pointer.current = rf.screenToFlowPosition({ x: e.clientX, y: e.clientY })
         }}
-        deleteKeyCode={['Backspace', 'Delete']}
+        deleteKeyCode={null}
         multiSelectionKeyCode={['Shift', 'Meta', 'Control']}
         fitView
         fitViewOptions={{ maxZoom: 1, padding: 0.3 }}
