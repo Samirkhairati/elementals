@@ -112,6 +112,15 @@ export function TilesetsPanel({
     )
   }
 
+  if (activeLayerType === 'image') {
+    return (
+      <div className="ed-empty">
+        <p>Image Layer</p>
+        <p className="ed-hint">Images are not painted from tilesets. Use Add in the layer's properties, then click the map.</p>
+      </div>
+    )
+  }
+
   if (activeLayerType === 'collision') {
     return (
       <div className="ed-empty">

@@ -9,7 +9,7 @@ import type { EntityLike } from './engine/migrate.ts'
 import { validateEntity } from './engine/validate.ts'
 
 /** Mirrors `LayerType` in editor/src/types/editor.ts (checked at compile time by the editor tests). */
-export const LAYER_TYPES = ['tile', 'collision', 'terrain', 'objects', 'encounters'] as const
+export const LAYER_TYPES = ['tile', 'collision', 'terrain', 'objects', 'encounters', 'image'] as const
 
 /**
  * Canonical component names (mirrors `ComponentType` in editor/src/types/editor.ts, checked at compile
@@ -70,6 +70,31 @@ export interface ValidateEditorMapOptions {
 /** Entity-level problems already reported by the raw structural checks in validateEditorMap. */
 const RAW_COVERED_CODES = new Set(['bad-entity', 'bad-id', 'bad-name', 'bad-position', 'bad-components', 'missing-transform', 'unknown-component', 'duplicate-id'])
 
+function validateImages(images: unknown, label: string, errors: string[], warnings: string[]) {
+  if (!Array.isArray(images)) {
+    errors.push(`${label}: images must be an array`)
+    return
+  }
+  const seen = new Set<string>()
+  images.forEach((item: unknown, i: number) => {
+    const ip = `${label}: images[${i}]`
+    if (!isRecord(item)) {
+      errors.push(`${ip} is not an object`)
+      return
+    }
+    if (typeof item.id !== 'string' || item.id.length === 0) errors.push(`${ip}: id must be a non-empty string`)
+    else if (seen.has(item.id)) errors.push(`${ip}: duplicate image id "${item.id}"`)
+    else seen.add(item.id)
+    if (typeof item.assetId !== 'string' || item.assetId.length === 0) errors.push(`${ip}: assetId must be a non-empty string`)
+    if (!isFiniteNumber(item.x) || !isFiniteNumber(item.y)) errors.push(`${ip}: x/y must be finite numbers`)
+    if (item.z !== undefined && !isFiniteNumber(item.z)) errors.push(`${ip}: z must be a finite number`)
+    if (item.scale !== undefined && (!isFiniteNumber(item.scale) || item.scale <= 0)) errors.push(`${ip}: scale must be a positive number`)
+    if (item.opacity !== undefined && (!isFiniteNumber(item.opacity) || item.opacity < 0 || item.opacity > 1)) {
+      warnings.push(`${ip}: opacity should be between 0 and 1`)
+    }
+  })
+}
+
 export function validateEditorMap(data: unknown, options: ValidateEditorMapOptions = {}): ValidationResult {
   const errors: string[] = []
   const warnings: string[] = []
@@ -121,6 +146,11 @@ export function validateEditorMap(data: unknown, options: ValidateEditorMapOptio
       if (typeof layer.name === 'string') {
         const exported = layer.type === 'collision' ? 'collision' : layer.name
         exportedNames.set(exported, (exportedNames.get(exported) ?? 0) + 1)
+      }
+
+      if (layer.images !== undefined) {
+        if (layer.type !== 'image') warnings.push(`${label}: only image layers keep "images"; they are dropped on export`)
+        validateImages(layer.images, label, errors, warnings)
       }
 
       if (layer.data === undefined) return

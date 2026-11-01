@@ -3,12 +3,27 @@
 
 import type { EngineEntity } from './engine/types.ts'
 
-export type EditorLayerType = 'tile' | 'collision' | 'terrain' | 'objects' | 'encounters'
+export type EditorLayerType = 'tile' | 'collision' | 'terrain' | 'objects' | 'encounters' | 'image'
 
 export interface EditorTile {
   tilesetId: string
   x: number
   y: number
+}
+
+/** One freely placed image of an `image` layer: a sprite asset drawn at a pixel position (the sprite's anchor). */
+export interface EditorImageItem {
+  id: string
+  /** Sprite asset id (project/sprites). */
+  assetId: string
+  x: number
+  y: number
+  /** Draw order inside the layer (ties keep array order). */
+  z?: number
+  scale?: number
+  flipX?: boolean
+  flipY?: boolean
+  opacity?: number
 }
 
 export interface EditorLayer {
@@ -19,6 +34,8 @@ export interface EditorLayer {
   locked?: boolean
   z?: number
   data?: Record<number | string, EditorTile>
+  /** `image` layers only. */
+  images?: EditorImageItem[]
 }
 
 export interface EditorEntity {
@@ -39,6 +56,8 @@ export interface EditorMap {
   layers: EditorLayer[]
   entities?: EditorEntity[]
   entityFolders?: unknown[]
+  /** Editor view only: how many layers are above the Entities row in the layer list (0 or missing = on top). Not exported. */
+  entitiesIndex?: number
   /** 2 = canonical engine components (see shared/engine). Missing = legacy (1); migrateMap upgrades it. */
   schemaVersion?: number
   fileName?: string
@@ -75,8 +94,23 @@ export interface TiledTileset {
   tilewidth: number
 }
 
+export interface TiledObject {
+  id: number
+  name: string
+  type: string
+  x: number
+  y: number
+  width: number
+  height: number
+  rotation: number
+  visible: boolean
+  properties?: TiledProperty[]
+}
+
 export interface TiledLayer {
-  data: number[]
+  /** Absent on object groups (image layers). */
+  data?: number[]
+  objects?: TiledObject[]
   height: number
   id: number
   name: string

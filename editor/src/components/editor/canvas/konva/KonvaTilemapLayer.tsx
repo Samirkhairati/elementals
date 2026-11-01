@@ -1,27 +1,60 @@
 import React from 'react'
 import { Shape, Group } from 'react-konva'
 import { Layer as MapLayer, MapData } from '@/types/editor'
+import type { SpriteAssetInfo } from '../../../../../../shared/engine/types'
+import { drawResolvedSprite, resolveSprite, useSpriteImagesVersion } from '@/lib/spriteImages'
+import { renderOrder, sortedImages } from '@/lib/layerOrder'
+
+const NO_ASSETS: Record<string, SpriteAssetInfo> = {}
 
 interface KonvaTilemapLayerProps {
   layers: MapLayer[]
   images: Record<string, HTMLImageElement>
   activeMap: MapData
+  spriteAssets?: Record<string, SpriteAssetInfo>
+  /** The image being dragged and where the mouse has it right now; drawn there instead of at its saved position. */
+  dragRef?: React.MutableRefObject<{ id: string; x: number; y: number } | null>
 }
 
 export const KonvaTilemapLayer = React.memo(function KonvaTilemapLayer({
   layers,
   images,
   activeMap,
+  spriteAssets = NO_ASSETS,
+  dragRef,
 }: KonvaTilemapLayerProps) {
-  // Render in reverse order so bottom layer renders first, matching DOM layers.slice().reverse()
-  const visibleLayers = layers
-    .slice()
-    .reverse()
-    .filter(l => l.visible)
+  // Redraw image layers once a sprite sheet they use finishes loading.
+  const imagesVersion = useSpriteImagesVersion()
+
+  // Bottom layer of the list first: what the layer list shows is what draws.
+  const visibleLayers = renderOrder(layers).filter(l => l.visible)
 
   return (
     <Group listening={false}>
-      {visibleLayers.map(layer => (
+      {visibleLayers.map(layer => layer.type === 'image' ? (
+        <Shape
+          key={`${layer.id}:${imagesVersion}`}
+          listening={false}
+          perfectDrawEnabled={false}
+          shadowForStrokeEnabled={false}
+          sceneFunc={(context) => {
+            const ctx = context._context as CanvasRenderingContext2D
+            for (const item of sortedImages(layer.images)) {
+              const resolved = resolveSprite(spriteAssets[item.assetId], { scale: item.scale ?? 1 })
+              if (!resolved) continue
+              const drag = dragRef?.current
+              const at = drag && drag.id === item.id ? drag : item
+              drawResolvedSprite(ctx, resolved, {
+                anchorX: at.x,
+                anchorY: at.y,
+                opacity: item.opacity,
+                mirrorX: !!item.flipX,
+                mirrorY: !!item.flipY,
+              })
+            }
+          }}
+        />
+      ) : (
         <Shape
           key={layer.id}
           listening={false}

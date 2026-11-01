@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import type { CopiedTile, TileSelection } from '@/types/editor'
-import { anchoredTile, brushPaint, bucketFill, erase, rectangleFill, type TileMap } from './paintOps'
+import { anchoredTile, brushPaint, bucketFill, erase, fillCells, floodRegion, rectangleFill, type TileMap } from './paintOps'
 
 const size = { width: 5, height: 4 }
 const idx = (x: number, y: number) => y * size.width + x
@@ -271,5 +271,33 @@ describe('anchoredTile', () => {
     expect(anchoredTile(stamp, 2, 0, { x: 0, y: 0 })).toEqual(t(0, 0))
     expect(anchoredTile(stamp, -1, 0, { x: 0, y: 0 })).toEqual(t(1, 0))
     expect(anchoredTile(stamp, 0, -1, { x: 0, y: 0 })).toEqual(t(0, 1))
+  })
+})
+
+describe('floodRegion / fillCells', () => {
+  it('finds the 4-connected region of equal cells', () => {
+    // wall at x=2 splits the 5x4 map; the region of (0,0) is the left part only
+    const data: TileMap = {}
+    for (let y = 0; y < size.height; y++) data[idx(2, y)] = t(9)
+    const region = floodRegion(data, size, 0, 0)!
+    expect(region).toHaveLength(2 * size.height)
+    expect(region.every((i) => i % size.width < 2)).toBe(true)
+  })
+
+  it('is null outside the map', () => {
+    expect(floodRegion({}, size, -1, 0)).toBeNull()
+  })
+
+  it('fillCells writes the selection into exactly the given cells', () => {
+    const out = fillCells({}, size, [idx(0, 0), idx(1, 0)], single(t(4)), 'discontinuous', { x: 0, y: 0 })!
+    expect(out).toEqual({ [idx(0, 0)]: t(4), [idx(1, 0)]: t(4) })
+  })
+
+  it('a region found on one layer can be filled on another (multi-layer bucket)', () => {
+    const primary: TileMap = { [idx(0, 0)]: t(1) } // a one-cell island on the primary layer
+    const region = floodRegion(primary, size, 0, 0)!
+    expect(region).toEqual([idx(0, 0)])
+    const other = fillCells({ [idx(3, 3)]: t(8) }, size, region, single(t(2)), 'discontinuous', { x: 0, y: 0 })!
+    expect(other).toEqual({ [idx(3, 3)]: t(8), [idx(0, 0)]: t(2) })
   })
 })

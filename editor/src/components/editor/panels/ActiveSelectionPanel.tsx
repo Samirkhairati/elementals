@@ -1,19 +1,94 @@
 import { useState } from 'react'
-import { TileSelection, TilesetData } from '@/types/editor'
+import { Pin, PinOff } from 'lucide-react'
+import { CopiedTile, TileSelection, TilesetData } from '@/types/editor'
+import { IconButton } from '../ui/controls'
 
 interface ActiveSelectionPanelProps {
   tileSelection: TileSelection | null
   tilesets: TilesetData[]
+  /** Pinned: a right-drag on the map samples every selected layer and painting writes back to all of them. */
+  pinned?: boolean
+  onTogglePin?: () => void
 }
 
-export function ActiveSelectionPanel({ tileSelection, tilesets }: ActiveSelectionPanelProps) {
+const PIN_TIP =
+  'Pin the selection: right-drag samples every selected layer (Ctrl/Cmd+click layers to pick several; image layers are skipped) and painting puts each layer\'s tiles back on its own layer.'
+const UNPIN_TIP = 'Unpin: right-drag samples only the active layer again.'
+
+const CELL = 32
+
+/** One cell: the tile from its tileset, or the red collision marker. Layers overlap by being drawn in order. */
+function SelectionCell({ tile, dx, dy, tilesets }: { tile: CopiedTile; dx: number; dy: number; tilesets: TilesetData[] }) {
+  if (tile.tilesetId === '__collision__') {
+    return (
+      <div
+        className="absolute border border-red-500/50 bg-red-500/20 overflow-hidden"
+        style={{ left: dx * CELL, top: dy * CELL, width: CELL, height: CELL }}
+      >
+        <div className="absolute w-[50px] h-[2px] bg-red-500/50 origin-center left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rotate-45" />
+        <div className="absolute w-[50px] h-[2px] bg-red-500/50 origin-center left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 -rotate-45" />
+      </div>
+    )
+  }
+  const tileset = tilesets.find((ts) => ts.fileName === tile.tilesetId)
+  if (!tileset) return null
+  return (
+    <div
+      className="absolute"
+      style={{
+        left: dx * CELL,
+        top: dy * CELL,
+        width: CELL,
+        height: CELL,
+        backgroundImage: `url(${tileset.dataUrl})`,
+        backgroundPosition: `-${tile.x * CELL}px -${tile.y * CELL}px`,
+        imageRendering: 'pixelated',
+      }}
+    />
+  )
+}
+
+export function ActiveSelectionPanel({ tileSelection, tilesets, pinned = false, onTogglePin }: ActiveSelectionPanelProps) {
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [isPanning, setIsPanning] = useState(false)
 
+  const header = (
+    <div className="flex h-row shrink-0 items-center gap-1 border-b border-border/60 px-2" data-testid="selection-header">
+      <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
+        {tileSelection?.layers && tileSelection.layers.length > 1 ? (
+          tileSelection.layers.map((part) => (
+            <span key={part.layerId} className="ed-badge" title={`Sampled from ${part.name}`} data-testid="selection-part">
+              {part.name}
+            </span>
+          ))
+        ) : (
+          <span className="ed-hint truncate">{pinned ? 'Pinned: Ctrl/Cmd+click layers, then right-drag' : 'Right-drag on the map to select'}</span>
+        )}
+      </div>
+      <IconButton
+        title={pinned ? UNPIN_TIP : PIN_TIP}
+        aria-label={pinned ? 'Unpin selection' : 'Pin selection'}
+        aria-pressed={pinned}
+        active={pinned}
+        onClick={onTogglePin}
+      >
+        {pinned ? <Pin /> : <PinOff />}
+      </IconButton>
+    </div>
+  )
+
   if (!tileSelection) {
-    return <div className="ed-empty">No tiles selected</div>
+    return (
+      <>
+        {header}
+        <div className="ed-empty">No tiles selected</div>
+      </>
+    )
   }
+
+  // Layers overlap in the preview the way they do on the map: the bottom layer first, the top one last.
+  const overlap = tileSelection.layers && tileSelection.layers.length > 1 ? tileSelection.layers.slice().reverse().map((part) => part.tiles) : [tileSelection.tiles]
 
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault()
@@ -56,65 +131,42 @@ export function ActiveSelectionPanel({ tileSelection, tilesets }: ActiveSelectio
   }
 
   return (
-    <div
-      className={`w-full h-full overflow-hidden flex items-center justify-center ${isPanning ? 'cursor-grabbing' : ''}`}
-      onWheel={handleWheel}
-      onMouseDown={handleMouseDown}
-    >
-      <div style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: 'center' }}>
-        <div
-          className="relative border shadow-sm"
-          style={{
-            width: tileSelection.width * 32,
-            height: tileSelection.height * 32,
-            backgroundImage: 'linear-gradient(45deg, #808080 25%, transparent 25%), linear-gradient(-45deg, #808080 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #808080 75%), linear-gradient(-45deg, transparent 75%, #808080 75%)',
-            backgroundSize: '10px 10px',
-            backgroundPosition: '0 0, 0 5px, 5px -5px, -5px 0px'
-          }}
-        >
-          {tileSelection.tiles.map((t, i) => {
-            if (!t) return null
-            const dx = i % tileSelection.width
-            const dy = Math.floor(i / tileSelection.width)
-            if (t.tilesetId === '__collision__') {
-              return (
-                <div
-                  key={i}
-                  className="absolute border border-red-500/50 bg-red-500/20 overflow-hidden"
-                  style={{
-                    left: dx * 32,
-                    top: dy * 32,
-                    width: 32,
-                    height: 32,
-                  }}
-                >
-                  <div className="absolute w-[50px] h-[2px] bg-red-500/50 origin-center left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rotate-45" />
-                  <div className="absolute w-[50px] h-[2px] bg-red-500/50 origin-center left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 -rotate-45" />
-                </div>
+    <>
+      {header}
+      <div
+        className={`min-h-0 w-full flex-1 overflow-hidden flex items-center justify-center ${isPanning ? 'cursor-grabbing' : ''}`}
+        onWheel={handleWheel}
+        onMouseDown={handleMouseDown}
+      >
+        <div style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: 'center' }}>
+          <div
+            className="relative border shadow-sm"
+            data-testid="selection-preview"
+            style={{
+              width: tileSelection.width * CELL,
+              height: tileSelection.height * CELL,
+              backgroundImage: 'linear-gradient(45deg, #808080 25%, transparent 25%), linear-gradient(-45deg, #808080 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #808080 75%), linear-gradient(-45deg, transparent 75%, #808080 75%)',
+              backgroundSize: '10px 10px',
+              backgroundPosition: '0 0, 0 5px, 5px -5px, -5px 0px',
+            }}
+          >
+            {overlap.map((tiles, layerIndex) =>
+              tiles.map((t, i) =>
+                t ? (
+                  <SelectionCell
+                    key={`${layerIndex}:${i}`}
+                    tile={t}
+                    dx={i % tileSelection.width}
+                    dy={Math.floor(i / tileSelection.width)}
+                    tilesets={tilesets}
+                  />
+                ) : null
               )
-            }
-
-            const tileset = tilesets.find(ts => ts.fileName === t.tilesetId)
-            if (!tileset) return null
-            return (
-              <div
-                key={i}
-                className="absolute"
-                style={{
-                  left: dx * 32,
-                  top: dy * 32,
-                  width: 32,
-                  height: 32,
-                  backgroundImage: `url(${tileset.dataUrl})`,
-                  backgroundPosition: `-${t.x * 32}px -${t.y * 32}px`,
-                  imageRendering: 'pixelated'
-                }}
-              />
-            )
-          })}
-          <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: 'linear-gradient(to right, rgba(255,255,255,0.2) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.2) 1px, transparent 1px)', backgroundSize: '32px 32px' }}></div>
+            )}
+            <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: 'linear-gradient(to right, rgba(255,255,255,0.2) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.2) 1px, transparent 1px)', backgroundSize: '32px 32px' }}></div>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   )
 }

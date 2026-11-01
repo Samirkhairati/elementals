@@ -13,6 +13,8 @@ interface KonvaOverlaysProps {
   rectStart: Pos | null
   rectCurrent: Pos | null
   showGrid?: boolean
+  /** False on image layers: tiles are not painted there, so no brush / eraser highlight. */
+  paintingEnabled?: boolean
 }
 
 export const KonvaOverlays = React.memo(function KonvaOverlays({
@@ -25,6 +27,7 @@ export const KonvaOverlays = React.memo(function KonvaOverlays({
   rectStart,
   rectCurrent,
   showGrid = true,
+  paintingEnabled = true,
 }: KonvaOverlaysProps) {
   const copyBox = getBoundingBox(canvasCopyStart, canvasCopyCurrent)
   const rectBox = !copyBox && activeTool === 'rectangle' ? getBoundingBox(rectStart, rectCurrent) : null
@@ -83,7 +86,7 @@ export const KonvaOverlays = React.memo(function KonvaOverlays({
       )}
 
       {/* Brush hover highlight */}
-      {canvasHover && !canvasCopyStart && activeTool === 'brush' && tileSelection && (
+      {paintingEnabled && canvasHover && !canvasCopyStart && activeTool === 'brush' && tileSelection && (
         <Rect
           x={canvasHover.x * 32}
           y={canvasHover.y * 32}
@@ -97,7 +100,7 @@ export const KonvaOverlays = React.memo(function KonvaOverlays({
       )}
 
       {/* Eraser hover highlight */}
-      {canvasHover && !canvasCopyStart && activeTool === 'eraser' && (
+      {paintingEnabled && canvasHover && !canvasCopyStart && activeTool === 'eraser' && (
         <Rect
           x={canvasHover.x * 32}
           y={canvasHover.y * 32}

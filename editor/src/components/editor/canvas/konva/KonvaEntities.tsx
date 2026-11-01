@@ -56,6 +56,13 @@ interface KonvaEntitiesProps {
   view: CanvasViewSettings
   /** Double-click on an entity that has an Event. */
   onOpenEvent?: (entityId: string) => void
+  /**
+   * The entities can be drawn in two places of the canvas: the sprites (and their pick/drag handles) sit between
+   * the layers where the Entities row of the layer list is, the editing overlays (areas, selection, badges, labels)
+   * go on top of everything so they stay readable. Both parts share `visuals`. Default: everything in one place.
+   */
+  part?: 'all' | 'sprites' | 'overlays'
+  visuals?: React.MutableRefObject<Visuals>
 }
 
 /** Per-entity geometry, derived once per entities/assets change. All rects are relative to the anchor. */
@@ -98,7 +105,7 @@ function buildInfo(entity: EntityData, assets: Record<string, SpriteAssetInfo>):
   }
 }
 
-interface Visuals {
+export interface Visuals {
   hoverId: string | null
   dragId: string | null
   dragX: number
@@ -286,9 +293,12 @@ export const KonvaEntities = React.memo(function KonvaEntities({
   spriteAssets = EMPTY_ASSETS,
   view,
   onOpenEvent,
+  part = 'all',
+  visuals: sharedVisuals,
 }: KonvaEntitiesProps) {
   const imagesVersion = useSpriteImagesVersion()
-  const visuals = useRef<Visuals>({ hoverId: null, dragId: null, dragX: 0, dragY: 0 })
+  const ownVisuals = useRef<Visuals>({ hoverId: null, dragId: null, dragX: 0, dragY: 0 })
+  const visuals = sharedVisuals ?? ownVisuals
 
   const mapWidthPx = activeMap.width * 32
   const mapHeightPx = activeMap.height * 32
@@ -307,7 +317,7 @@ export const KonvaEntities = React.memo(function KonvaEntities({
 
   return (
     <Group>
-      {infos.map((info) => {
+      {part !== 'overlays' && infos.map((info) => {
         const isSelected = info.id === selectedEntityId
         return (
           <KonvaEntityNode
@@ -331,7 +341,7 @@ export const KonvaEntities = React.memo(function KonvaEntities({
       })}
 
       {/* Footprints, badges, labels, hover + selection (one shape, zoom-aware, no React state) */}
-      <Shape
+      {part !== 'sprites' && <Shape
         name="entity-overlays"
         listening={false}
         perfectDrawEnabled={false}
@@ -408,8 +418,7 @@ export const KonvaEntities = React.memo(function KonvaEntities({
             drawLabel(ctx, info.entity.name, ax + b.x + b.w / 2, ay + b.y, s, isSel ? 'selected' : isHover ? 'hover' : 'plain')
           }
         }}
-      />
-
+      />}
     </Group>
   )
 })

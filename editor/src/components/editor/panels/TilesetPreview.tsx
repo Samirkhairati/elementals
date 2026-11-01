@@ -107,6 +107,15 @@ export function TilesetPreview({
     setTilesetSelectionCurrent,
   ])
 
+  if (activeLayerType === 'image') {
+    return (
+      <div className="ed-empty">
+        <p>Image Layer</p>
+        <p className="ed-hint">Pick a sprite with Add in the layer's properties, then click the map to place it.</p>
+      </div>
+    )
+  }
+
   if (activeLayerType === 'collision') {
     return (
       <div className="flex h-full w-full flex-col items-center justify-center gap-3">

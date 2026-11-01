@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react'
+import React, { useCallback, useMemo, useRef } from 'react'
 import { Stage, Layer as KonvaLayer, Rect } from 'react-konva'
 import {
   Layer,
@@ -18,12 +18,14 @@ import { useCanvasViewport } from '@/hooks/editor/canvas/useCanvasViewport'
 import { useCanvasInteraction } from '@/hooks/editor/canvas/useCanvasInteraction'
 import { KonvaTilemapLayer } from './konva/KonvaTilemapLayer'
 import { KonvaOverlays } from './konva/KonvaOverlays'
-import { KonvaEntities } from './konva/KonvaEntities'
+import { KonvaEntities, type Visuals } from './konva/KonvaEntities'
 import { KonvaGhostEntity } from './konva/KonvaGhostEntity'
+import { KonvaGhostImage, KonvaImageItems } from './konva/KonvaImageItems'
 import { CanvasContextMenu } from './CanvasContextMenu'
 import { DebugStatusBadge } from './DebugStatusBadge'
 import { PendingEntityPlacement } from '@/hooks/editor/useEntityPlacement'
 import { useCanvasView } from '@/hooks/editor/canvas/canvasView'
+import { clampEntitiesIndex } from '@/lib/layerOrder'
 import { useEditorSelector, type EditorContextValue } from '@/components/editor/layout/EditorContext'
 import { openEventEditor } from '@/lib/openEventEditor'
 
@@ -68,6 +70,16 @@ interface MapCanvasProps {
   addComponent?: (entityId: string, type: ComponentType) => void
   showEntities?: boolean
   entityFolders?: EntityFolder[]
+  /** Pinned: a right-drag samples every selected layer. */
+  pinSelection?: boolean
+  selectedLayerIds?: readonly string[]
+  /** Image layers */
+  pendingImage?: { assetId: string } | null
+  commitImagePlacement?: (x: number, y: number) => void
+  cancelImagePlacement?: () => void
+  selectedImageId?: string | null
+  setSelectedImageId?: (id: string | null) => void
+  moveImage?: (layerId: string, imageId: string, x: number, y: number) => void
 }
 
 export function MapCanvas({
@@ -106,6 +118,14 @@ export function MapCanvas({
   addComponent,
   showEntities = true,
   entityFolders = [],
+  pinSelection = false,
+  selectedLayerIds = [],
+  pendingImage = null,
+  commitImagePlacement,
+  cancelImagePlacement,
+  selectedImageId = null,
+  setSelectedImageId,
+  moveImage,
 }: MapCanvasProps) {
   // Preload and cache tileset image textures
   const images = useTilesetImages(tilesets)
@@ -170,7 +190,24 @@ export function MapCanvas({
     snapEntityPos,
     selectedEntityId,
     setSelectedEntityId,
+    pinSelection,
+    selectedLayerIds,
+    pendingImage,
+    commitImagePlacement,
+    cancelImagePlacement,
+    clearImageSelection: () => setSelectedImageId?.(null),
   })
+
+  // Where the Entities row sits among the layers: the layers above it draw over the entities, the ones below under them.
+  const entitiesAt = clampEntitiesIndex(activeMap?.entitiesIndex, layers.length)
+  const layersAboveEntities = useMemo(() => layers.slice(0, entitiesAt), [layers, entitiesAt])
+  const layersBelowEntities = useMemo(() => layers.slice(entitiesAt), [layers, entitiesAt])
+  const entityVisuals = useRef<Visuals>({ hoverId: null, dragId: null, dragX: 0, dragY: 0 })
+  // The image being dragged, drawn at the mouse by the image layer itself (see KonvaImageItems).
+  const imageDrag = useRef<{ id: string; x: number; y: number } | null>(null)
+
+  const activeLayer = useMemo(() => layers.find((l) => l.id === activeLayerId) ?? null, [layers, activeLayerId])
+  const isImageLayerActive = activeLayer?.type === 'image'
 
   const handleUpdateTag = useCallback(
     (entityId: string, patch: Record<string, any>) => {
@@ -193,7 +230,7 @@ export function MapCanvas({
             ? 'cursor-grabbing'
             : isSpaceDown
               ? 'cursor-grab'
-              : pendingPlacement
+              : pendingPlacement || pendingImage
                 ? 'cursor-crosshair'
                 : ''
         }`}
@@ -221,28 +258,18 @@ export function MapCanvas({
                 listening={false}
               />
 
-              {/* Tilemap layer rendering */}
+              {/* Layers below the Entities row, the entities, then the layers above them: the layer list's order */}
               <KonvaTilemapLayer
-                layers={layers}
+                layers={layersBelowEntities}
                 images={images}
                 activeMap={activeMap}
+                spriteAssets={spriteAssets}
+                dragRef={imageDrag}
               />
 
-              {/* Grid and tool previews */}
-              <KonvaOverlays
-                activeMap={activeMap}
-                activeTool={activeTool}
-                tileSelection={tileSelection}
-                canvasHover={canvasHover}
-                canvasCopyStart={canvasCopyStart}
-                canvasCopyCurrent={canvasCopyCurrent}
-                rectStart={rectStart}
-                rectCurrent={rectCurrent}
-                showGrid={showGrid}
-              />
-
-              {/* Entities: sprites, footprints, badges, labels, selection and collider editing */}
               <KonvaEntities
+                part="sprites"
+                visuals={entityVisuals}
                 entities={entities}
                 selectedEntityId={selectedEntityId}
                 setSelectedEntityId={setSelectedEntityId || (() => {})}
@@ -256,6 +283,60 @@ export function MapCanvas({
                 spriteAssets={spriteAssets}
                 view={view}
                 onOpenEvent={openEventEditor}
+              />
+
+              <KonvaTilemapLayer
+                layers={layersAboveEntities}
+                images={images}
+                activeMap={activeMap}
+                spriteAssets={spriteAssets}
+                dragRef={imageDrag}
+              />
+
+              {/* Grid and tool previews */}
+              <KonvaOverlays
+                activeMap={activeMap}
+                activeTool={activeTool}
+                tileSelection={tileSelection}
+                canvasHover={canvasHover}
+                canvasCopyStart={canvasCopyStart}
+                canvasCopyCurrent={canvasCopyCurrent}
+                rectStart={rectStart}
+                rectCurrent={rectCurrent}
+                showGrid={showGrid}
+                paintingEnabled={!isImageLayerActive}
+              />
+
+              {/* Pick / drag handles of the active image layer (above the art, below the entities) */}
+              <KonvaImageItems
+                layer={activeLayer}
+                mapWidthPx={mapWidthPx}
+                mapHeightPx={mapHeightPx}
+                selectedImageId={selectedImageId}
+                setSelectedImageId={setSelectedImageId || (() => {})}
+                moveImage={moveImage || (() => {})}
+                snapToGrid={snapToGrid}
+                snapEntityPos={snapEntityPos}
+                spriteAssets={spriteAssets}
+                placing={!!pendingImage}
+                dragRef={imageDrag}
+              />
+
+              {/* Entity areas, selection, badges and labels stay on top of every layer so they remain readable */}
+              <KonvaEntities
+                part="overlays"
+                visuals={entityVisuals}
+                entities={entities}
+                selectedEntityId={selectedEntityId}
+                setSelectedEntityId={setSelectedEntityId || (() => {})}
+                moveEntity={moveEntity || (() => {})}
+                activeMap={activeMap}
+                snapToGrid={snapToGrid}
+                snapEntityPos={snapEntityPos}
+                showEntities={showEntities}
+                entityFolders={entityFolders}
+                spriteAssets={spriteAssets}
+                view={view}
               />
 
               {/* Ghost entity preview during placement mode */}

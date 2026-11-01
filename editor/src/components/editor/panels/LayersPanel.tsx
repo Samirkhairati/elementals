@@ -13,8 +13,11 @@ import {
   Trash2,
   Copy,
   Plus,
+  Image as ImageIcon,
+  Users,
 } from 'lucide-react'
 import { Layer, LayerType } from '@/types/editor'
+import { ENTITIES_ID, moveInStack, stackIds } from '@/lib/layerOrder'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -38,6 +41,8 @@ function getLayerIcon(type: LayerType) {
       return <Box className="text-amber-400" />
     case 'encounters':
       return <Leaf className="text-green-400" />
+    case 'image':
+      return <ImageIcon className="text-violet-400" />
     default:
       return <LayersIcon className="text-gray-400" />
   }
@@ -62,6 +67,7 @@ function NewLayerSubmenu({
       </ContextMenuSubTrigger>
       <ContextMenuSubContent className="w-44">
         <ContextMenuItem onClick={() => createLayerOfType('tile')}>Tile Layer</ContextMenuItem>
+        <ContextMenuItem onClick={() => createLayerOfType('image')}>Image Layer</ContextMenuItem>
         <ContextMenuItem disabled={hasCollision} onClick={() => createLayerOfType('collision')}>
           Collision Layer
         </ContextMenuItem>
@@ -77,12 +83,70 @@ function NewLayerSubmenu({
   )
 }
 
+interface EntitiesRowProps {
+  visible: boolean
+  onToggle?: () => void
+  /** Drag handlers of the stack: the row moves among the layers like a layer does (not set when there is nothing to move past). */
+  drag?: {
+    onDragStart: (e: React.DragEvent) => void
+    onDragOver: (e: React.DragEvent) => void
+    onDragEnd: () => void
+    onDrop: (e: React.DragEvent) => void
+  }
+  /** Where a dragged item would land relative to this row. */
+  dropPosition?: 'top' | 'bottom' | null
+}
+
+function EntitiesRow({ visible, onToggle, drag, dropPosition }: EntitiesRowProps) {
+  return (
+    <div
+      className="ed-row"
+      data-dim={visible ? undefined : 'true'}
+      data-testid="entities-row"
+      title="All entities of the map. Drag to change where they draw among the layers."
+      draggable={!!drag}
+      {...drag}
+    >
+      {dropPosition && (
+        <div
+          className={`absolute left-0 right-0 h-[2px] bg-primary z-30 pointer-events-none rounded-full ${
+            dropPosition === 'top' ? '-top-[2px]' : '-bottom-[2px]'
+          }`}
+        />
+      )}
+      <Users className="text-sky-400" />
+      <span className="ed-row-label">Entities</span>
+      <div className="ed-row-actions">
+        <button
+          type="button"
+          onClick={onToggle}
+          className="ed-iconbtn"
+          title={visible ? 'Hide all entities on the canvas' : 'Show entities on the canvas'}
+          aria-label={visible ? 'Hide entities' : 'Show entities'}
+        >
+          {visible ? <Eye /> : <EyeOff />}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 interface LayersPanelProps {
   /** Whether a map is open (the panel only needs presence, not the map itself). */
   hasActiveMap: boolean
   layers: Layer[]
   activeLayerId: string | null
   setActiveLayerId: (id: string) => void
+  /** Plain click selects one layer; Ctrl/Cmd+click adds it to the multi-selection. Falls back to `setActiveLayerId`. */
+  selectLayer?: (id: string, additive?: boolean) => void
+  /** Layers picked in addition to the active one. */
+  selectedLayerIds?: readonly string[]
+  /** The entities of the map are not a layer: one row that toggles their visibility and can be dragged among the layers. */
+  showEntities?: boolean
+  toggleShowEntities?: () => void
+  /** How many layers are above the Entities row (0 = on top). */
+  entitiesIndex?: number
+  setEntitiesIndex?: (index: number) => void
   setSelectedEntityId?: (id: string | null) => void
   toggleLayerVisibility: (id: string) => void
   toggleLayerLock: (id: string) => void
@@ -104,6 +168,12 @@ export function LayersPanel({
   layers,
   activeLayerId,
   setActiveLayerId,
+  selectLayer,
+  selectedLayerIds = [],
+  showEntities = true,
+  toggleShowEntities,
+  entitiesIndex = 0,
+  setEntitiesIndex,
   setSelectedEntityId,
   toggleLayerVisibility,
   toggleLayerLock,
@@ -173,20 +243,10 @@ export function LayersPanel({
       return
     }
 
-    const oldIndex = layers.findIndex((l) => l.id === draggedLayerId)
-    const baseTargetIndex = layers.findIndex((l) => l.id === targetId)
-
-    if (oldIndex !== -1 && baseTargetIndex !== -1) {
-      let insertIndex = dragOverTarget?.position === 'bottom' ? baseTargetIndex + 1 : baseTargetIndex
-      if (oldIndex < insertIndex) insertIndex--
-
-      if (oldIndex !== insertIndex) {
-        const next = [...layers]
-        const [removed] = next.splice(oldIndex, 1)
-        next.splice(insertIndex, 0, removed)
-        reorderLayers(next)
-      }
-    }
+    // Layers and the Entities row are one stack; only the order changes (no z, no other property).
+    const moved = moveInStack(layers, entitiesIndex, draggedLayerId, targetId, dragOverTarget?.position === 'bottom' ? 'bottom' : 'top')
+    if (moved.layers !== layers) reorderLayers(moved.layers)
+    if (moved.entitiesIndex !== Math.min(entitiesIndex, layers.length)) setEntitiesIndex?.(moved.entitiesIndex)
     setDraggedLayerId(null)
     setDragOverTarget(null)
   }
@@ -202,6 +262,8 @@ export function LayersPanel({
     }, 0)
   }
 
+  const stack = stackIds(layers, entitiesIndex)
+
   const hasCollision = layers.some((l) => l.type === 'collision')
   const hasTerrain = layers.some((l) => l.type === 'terrain')
   const hasEncounters = layers.some((l) => l.type === 'encounters')
@@ -216,6 +278,7 @@ export function LayersPanel({
     return (
       <ContextMenu>
         <ContextMenuTrigger className="block h-full w-full">
+          <EntitiesRow visible={showEntities} onToggle={toggleShowEntities} />
           <div className="ed-empty">
             <p>No layers yet.</p>
             <p className="ed-hint">Right-click here to create a layer.</p>
@@ -238,9 +301,28 @@ export function LayersPanel({
     <ContextMenu>
       <ContextMenuTrigger className="block min-h-full h-full w-full">
         <div className="flex min-h-full h-full w-full flex-col gap-0.5">
-          {layers.map((layer) => {
+          {stack.map((stackId) => {
+            if (stackId === ENTITIES_ID) {
+              return (
+                <EntitiesRow
+                  key={ENTITIES_ID}
+                  visible={showEntities}
+                  onToggle={toggleShowEntities}
+                  drag={{
+                    onDragStart: (e) => handleDragStart(e, ENTITIES_ID),
+                    onDragOver: (e) => handleDragOver(e, ENTITIES_ID),
+                    onDragEnd: handleDragEnd,
+                    onDrop: (e) => handleDrop(e, ENTITIES_ID),
+                  }}
+                  dropPosition={dragOverTarget?.id === ENTITIES_ID && draggedLayerId !== ENTITIES_ID ? dragOverTarget.position : null}
+                />
+              )
+            }
+            const layer = layers.find((l) => l.id === stackId)
+            if (!layer) return null
             const isEditing = editingLayerId === layer.id
             const isSelected = activeLayerId === layer.id
+            const isMulti = !isSelected && selectedLayerIds.includes(layer.id)
             const isDropTarget = dragOverTarget?.id === layer.id && draggedLayerId !== layer.id
 
             return (
@@ -252,8 +334,10 @@ export function LayersPanel({
                     onDragOver={(e) => handleDragOver(e, layer.id)}
                     onDragEnd={handleDragEnd}
                     onDrop={(e) => handleDrop(e, layer.id)}
-                    onClick={() => {
-                      setActiveLayerId(layer.id)
+                    onClick={(e) => {
+                      const additive = e.metaKey || e.ctrlKey
+                      if (selectLayer) selectLayer(layer.id, additive)
+                      else setActiveLayerId(layer.id)
                       setSelectedEntityId?.(null)
                     }}
                     onDoubleClick={() => {
@@ -261,6 +345,7 @@ export function LayersPanel({
                     }}
                     className="ed-row"
                     data-selected={isSelected ? 'true' : undefined}
+                    data-multi={isMulti ? 'true' : undefined}
                   >
                     {/* Horizontal drag indicator line */}
                     {isDropTarget && (
@@ -290,6 +375,10 @@ export function LayersPanel({
                     ) : (
                       <span className="ed-row-label" title={layer.name}>{layer.name}</span>
                     )}
+
+                    <span className="ed-badge" title="Z-index: draw order, higher draws on top" data-testid="layer-z">
+                      z {layer.z ?? 0}
+                    </span>
 
                     {/* Compact status & inline visibility toggle */}
                     <div

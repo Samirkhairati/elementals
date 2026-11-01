@@ -2,7 +2,7 @@
 // Used by the editor's Export button (renderer) and by scripts/export-maps.mjs (Node).
 // Pure TypeScript: no DOM, electron or node imports. Keep syntax type-strippable (no enums etc).
 
-import type { EditorLayer, EditorMap, TilesetInfo, TiledLayer, TiledMap, TiledProperty, TiledTileset } from './mapTypes.ts'
+import type { EditorLayer, EditorMap, TilesetInfo, TiledLayer, TiledMap, TiledObject, TiledProperty, TiledTileset } from './mapTypes.ts'
 import type { EngineEntity } from './engine/types.ts'
 import { SCHEMA_VERSION } from './engine/types.ts'
 import { migrateMap } from './engine/migrate.ts'
@@ -15,7 +15,7 @@ export const COLLISION_DUMMY_IMAGE = 'collision_dummy.png'
 export function collectUsedTilesetIds(map: Pick<EditorMap, 'layers'>): string[] {
   const used = new Set<string>()
   for (const layer of map.layers || []) {
-    if (layer.type === 'collision') continue
+    if (layer.type === 'collision' || layer.type === 'image') continue
     for (const tile of Object.values(layer.data || {})) {
       used.add(tile.tilesetId)
     }
@@ -24,7 +24,34 @@ export function collectUsedTilesetIds(map: Pick<EditorMap, 'layers'>): string[] 
 }
 
 function tiledLayerType(layer: EditorLayer): TiledLayer['type'] {
-  return layer.type === 'objects' ? 'objectgroup' : 'tilelayer'
+  return layer.type === 'objects' || layer.type === 'image' ? 'objectgroup' : 'tilelayer'
+}
+
+/** The images of an image layer as Tiled objects (x/y = the sprite anchor); `nextId` hands out map-unique object ids. */
+function imageObjects(layer: EditorLayer, nextId: () => number): TiledObject[] {
+  const items = (layer.images || []).map((item, index) => ({ item, index }))
+  // Draw order inside the layer: z first, array order for ties.
+  items.sort((a, b) => (a.item.z ?? 0) - (b.item.z ?? 0) || a.index - b.index)
+  return items.map(({ item }) => {
+    const properties: TiledProperty[] = [{ name: 'sprite', type: 'string', value: item.assetId }]
+    if (item.z !== undefined) properties.push({ name: 'z', type: 'int', value: Math.round(item.z) })
+    if (item.scale !== undefined && item.scale !== 1) properties.push({ name: 'scale', type: 'float', value: item.scale })
+    if (item.flipX) properties.push({ name: 'flipX', type: 'bool', value: true })
+    if (item.flipY) properties.push({ name: 'flipY', type: 'bool', value: true })
+    if (item.opacity !== undefined && item.opacity !== 1) properties.push({ name: 'opacity', type: 'float', value: item.opacity })
+    return {
+      id: nextId(),
+      name: item.assetId,
+      type: 'image',
+      x: item.x,
+      y: item.y,
+      width: 0,
+      height: 0,
+      rotation: 0,
+      visible: true,
+      properties,
+    }
+  })
 }
 
 /**
@@ -85,7 +112,28 @@ export function convertEditorMapToTiled(map: EditorMap, tilesets: TilesetInfo[])
     currentGid += 1
   }
 
+  let objectId = 1
+  const nextObjectId = () => objectId++
+
   const exportLayers: TiledLayer[] = layers.map((layer, index) => {
+    if (layer.type === 'image') {
+      const imageLayer: TiledLayer = {
+        id: index + 1,
+        name: layer.name,
+        objects: imageObjects(layer, nextObjectId),
+        opacity: 1,
+        type: 'objectgroup',
+        visible: layer.visible,
+        width: map.width,
+        height: map.height,
+        x: 0,
+        y: 0,
+        properties: [{ name: 'kind', type: 'string', value: 'image' }],
+      }
+      if (layer.z !== undefined) imageLayer.properties!.push({ name: 'z', type: 'int', value: Number(layer.z) })
+      return imageLayer
+    }
+
     const data: number[] = new Array(map.width * map.height).fill(0)
 
     for (const [indexStr, tile] of Object.entries(layer.data || {})) {
@@ -131,7 +179,7 @@ export function convertEditorMapToTiled(map: EditorMap, tilesets: TilesetInfo[])
     infinite: false,
     layers: exportLayers,
     nextlayerid: exportLayers.length + 1,
-    nextobjectid: 1,
+    nextobjectid: objectId,
     orientation: 'orthogonal',
     renderorder: 'right-down',
     tiledversion: '1.10.2',

@@ -1,6 +1,21 @@
 import type { ComponentSchema, ComponentType as EngineComponentType, FieldKind } from '../../../shared/engine/types'
 
-export type LayerType = 'tile' | 'collision' | 'terrain' | 'objects' | 'encounters'
+export type LayerType = 'tile' | 'collision' | 'terrain' | 'objects' | 'encounters' | 'image'
+
+/** One freely placed image of an `image` layer: a sprite asset drawn at a pixel position (the sprite's anchor). */
+export interface ImageItem {
+  id: string
+  /** Sprite asset id (project/sprites). */
+  assetId: string
+  x: number
+  y: number
+  /** Draw order inside the layer (ties keep array order). */
+  z?: number
+  scale?: number
+  flipX?: boolean
+  flipY?: boolean
+  opacity?: number
+}
 
 export interface Layer {
   id: string
@@ -10,6 +25,8 @@ export interface Layer {
   locked: boolean
   z?: number
   data?: Record<number, { tilesetId: string; x: number; y: number }>
+  /** `image` layers only. */
+  images?: ImageItem[]
 }
 
 export interface CopiedTile {
@@ -18,10 +35,21 @@ export interface CopiedTile {
   y: number
 }
 
+/** The cells one source layer contributed to a multi-layer selection. */
+export interface SelectionLayerPart {
+  layerId: string
+  layerType: LayerType
+  name: string
+  tiles: (CopiedTile | null)[]
+}
+
 export interface TileSelection {
   width: number
   height: number
+  /** Flat cells; for a multi-layer selection this is the composite of all parts (topmost visible tile per cell). */
   tiles: (CopiedTile | null)[]
+  /** Set when sampled with the selection pinned over several layers: one part per layer, topmost layer first. */
+  layers?: SelectionLayerPart[]
 }
 
 // Component model comes from the shared engine (shared/engine); the editor-facing shapes below are thin
@@ -85,6 +113,8 @@ export interface MapData {
   layers: Layer[]
   entities?: EntityData[]
   entityFolders?: EntityFolder[]
+  /** Editor view only: how many layers are above the Entities row in the layer list (0 or missing = on top). */
+  entitiesIndex?: number
   /** 2 = canonical engine components. Set when the map is loaded/migrated. */
   schemaVersion?: number
 }

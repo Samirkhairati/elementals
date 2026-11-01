@@ -63,6 +63,7 @@ export interface EditorBaseContextValue
       | 'handleCreateLayer'
       | 'handleRenameLayer'
       | 'updateLayers'
+      | 'setEntitiesIndex'
       | 'activeLayerType'
       | 'activeTool'
       | 'paintMode'
@@ -70,6 +71,17 @@ export interface EditorBaseContextValue
       | 'setPaintMode'
       | 'tileSelection'
       | 'setTileSelection'
+      | 'selectedLayerIds'
+      | 'pinSelection'
+      | 'setPinSelection'
+      | 'pendingImage'
+      | 'startImagePlacement'
+      | 'cancelImagePlacement'
+      | 'selectedImageId'
+      | 'setSelectedImageId'
+      | 'addImage'
+      | 'updateImage'
+      | 'deleteImage'
       | 'isPainting'
       | 'setIsPainting'
       | 'paintStartPos'
@@ -141,6 +153,8 @@ export interface EditorBaseContextValue
 
   // Layers (wrapped to also move focus / clear entity selection)
   setActiveLayerId: (layerId: string | null) => void
+  /** Plain click selects one layer; `additive` (Ctrl/Cmd+click) toggles it in the multi-selection. */
+  selectLayer: (layerId: string, additive?: boolean) => void
   handleCreateLayerOfType: (type: LayerType) => void
   handleDuplicateLayer: (id: string) => void
 

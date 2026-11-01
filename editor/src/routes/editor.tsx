@@ -197,6 +197,13 @@ export function EditorPage() {
     const isLayersDomain = focusedDomain === 'layers' || (!focusedDomain && layerManager.activeLayerId)
     const isMapsDomain = focusedDomain === 'maps' || (!focusedDomain && mapManager.activeMap)
 
+    // A picked image on an image layer goes first (undoable, so no confirmation).
+    const imageLayerId = layerManager.activeLayerId
+    if (layerManager.selectedImageId && imageLayerId && !entityManager.selectedEntityId) {
+      layerManager.deleteImage(imageLayerId, layerManager.selectedImageId)
+      return
+    }
+
     if (isEntitiesDomain && entityManager.selectedEntityId) {
       const entity = entityManager.entities.find(e => e.id === entityManager.selectedEntityId)
       if (entity) {
@@ -236,6 +243,7 @@ export function EditorPage() {
     activeMap: mapManager.activeMap,
     activeLayerId: layerManager.activeLayerId,
     tileSelection: layerManager.tileSelection,
+    pinSelection: layerManager.pinSelection,
     activeTool: layerManager.activeTool,
     paintMode: layerManager.paintMode,
     paintStartPos: layerManager.paintStartPos,
@@ -254,6 +262,15 @@ export function EditorPage() {
       setFocusedDomain('layers')
     },
     [layerManager.setActiveLayerId, entityManager.setSelectedEntityId, setFocusedDomain]
+  )
+
+  const handleSelectLayerExtended = useCallback(
+    (layerId: string, additive = false) => {
+      layerManager.selectLayer(layerId, additive)
+      entityManager.setSelectedEntityId(null)
+      setFocusedDomain('layers')
+    },
+    [layerManager.selectLayer, entityManager.setSelectedEntityId, setFocusedDomain]
   )
 
   const handleSelectEntity = useCallback(
@@ -318,6 +335,18 @@ export function EditorPage() {
     layers: layerManager.layers,
     activeLayerId: layerManager.activeLayerId,
     setActiveLayerId: handleSelectLayer,
+    selectLayer: handleSelectLayerExtended,
+    selectedLayerIds: layerManager.selectedLayerIds,
+    pinSelection: layerManager.pinSelection,
+    setPinSelection: layerManager.setPinSelection,
+    pendingImage: layerManager.pendingImage,
+    startImagePlacement: layerManager.startImagePlacement,
+    cancelImagePlacement: layerManager.cancelImagePlacement,
+    selectedImageId: layerManager.selectedImageId,
+    setSelectedImageId: layerManager.setSelectedImageId,
+    addImage: layerManager.addImage,
+    updateImage: layerManager.updateImage,
+    deleteImage: layerManager.deleteImage,
     toggleLayerVisibility: layerManager.toggleLayerVisibility,
     toggleLayerLock: layerManager.toggleLayerLock,
     handleDeleteLayer: layerManager.handleDeleteLayer,
@@ -327,6 +356,7 @@ export function EditorPage() {
     handleRenameLayer: layerManager.handleRenameLayer,
     handleDuplicateLayer,
     updateLayers: layerManager.updateLayers,
+    setEntitiesIndex: layerManager.setEntitiesIndex,
     activeLayerType: layerManager.activeLayerType,
 
     // Entities domain
@@ -491,11 +521,15 @@ export function EditorPage() {
     dialogs.setRenameInput, dialogs.setRenameDialog, dialogs.setConfirmDialog,
     // Layers
     layerManager.layers, layerManager.activeLayerId, layerManager.activeLayerType,
-    handleSelectLayer, layerManager.toggleLayerVisibility,
+    handleSelectLayer, handleSelectLayerExtended, layerManager.toggleLayerVisibility,
+    layerManager.selectedLayerIds, layerManager.pinSelection, layerManager.setPinSelection,
+    layerManager.pendingImage, layerManager.startImagePlacement, layerManager.cancelImagePlacement,
+    layerManager.selectedImageId, layerManager.setSelectedImageId,
+    layerManager.addImage, layerManager.updateImage, layerManager.deleteImage,
     layerManager.toggleLayerLock, layerManager.handleDeleteLayer,
     layerManager.handleReorderLayers, layerManager.handleCreateLayer,
     handleCreateLayerOfType, layerManager.handleRenameLayer,
-    handleDuplicateLayer, layerManager.updateLayers,
+    handleDuplicateLayer, layerManager.updateLayers, layerManager.setEntitiesIndex,
     layerManager.activeTool, layerManager.paintMode, layerManager.setActiveTool,
     layerManager.setPaintMode, layerManager.tileSelection, layerManager.setTileSelection,
     layerManager.isPainting, layerManager.setIsPainting,

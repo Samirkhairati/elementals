@@ -222,6 +222,11 @@
     border-color: hsl(var(--primary) / 0.45);
     color: hsl(var(--foreground));
   }
+  /* Picked with Ctrl/Cmd+click next to the active layer: same family, quieter than the active row */
+  .ed-row[data-multi='true'] {
+    background: hsl(var(--primary) / 0.12);
+    border-color: hsl(var(--primary) / 0.3);
+  }
   .ed-row[data-dim='true'] {
     opacity: 0.5;
   }

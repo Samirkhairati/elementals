@@ -6,11 +6,11 @@ import {
   TileSelection,
   ActiveTool,
   PaintMode,
-  CopiedTile,
   Pos,
   EntityData,
 } from '@/types/editor'
 import { getBoundingBox } from '@/components/editor/canvas/canvasUtils'
+import { sampleSelection, sampledLayers } from '@/lib/layerSelection'
 import { TileCoords } from './useCanvasViewport'
 import { PendingEntityPlacement } from '@/hooks/editor/useEntityPlacement'
 import {
@@ -45,6 +45,15 @@ interface UseCanvasInteractionProps {
   snapEntityPos?: (rawX: number, rawY: number) => { x: number; y: number }
   selectedEntityId?: string | null
   setSelectedEntityId?: (id: string | null) => void
+  /** Pinned: a right-drag samples every selected layer instead of only the active one. */
+  pinSelection?: boolean
+  /** Layers added with Ctrl/Cmd+click, on top of the active layer. */
+  selectedLayerIds?: readonly string[]
+  /** Image layers: a sprite waiting to be dropped, where the next click puts it, and how a click on empty canvas deselects. */
+  pendingImage?: { assetId: string } | null
+  commitImagePlacement?: (x: number, y: number) => void
+  cancelImagePlacement?: () => void
+  clearImageSelection?: () => void
 }
 
 export function useCanvasInteraction({
@@ -72,9 +81,15 @@ export function useCanvasInteraction({
   commitPlacement,
   cancelPlacement,
   snapToGrid = true,
-  snapEntityPos: _snapEntityPos,
+  snapEntityPos,
   selectedEntityId = null,
   setSelectedEntityId,
+  pinSelection = false,
+  selectedLayerIds = [],
+  pendingImage = null,
+  commitImagePlacement,
+  cancelImagePlacement,
+  clearImageSelection,
 }: UseCanvasInteractionProps) {
   const [canvasHover, setCanvasHover] = useState<Pos | null>(null)
   const [canvasCopyStart, setCanvasCopyStart] = useState<Pos | null>(null)
@@ -173,6 +188,12 @@ export function useCanvasInteraction({
   const activeMapRef = useRef(activeMap)
   useEffect(() => { activeMapRef.current = activeMap }, [activeMap])
 
+  const pinSelectionRef = useRef(pinSelection)
+  useEffect(() => { pinSelectionRef.current = pinSelection }, [pinSelection])
+
+  const selectedLayerIdsRef = useRef(selectedLayerIds)
+  useEffect(() => { selectedLayerIdsRef.current = selectedLayerIds }, [selectedLayerIds])
+
   // ── Canvas Copy / Sampler Commit ─────────────────────────────────────────
   const commitCanvasCopy = useCallback(() => {
     const map = activeMapRef.current
@@ -181,20 +202,11 @@ export function useCanvasInteraction({
 
     const box = getBoundingBox(canvasCopyStartRef.current, canvasCopyCurrentRef.current)
     if (box) {
-      const layer = layersRef.current.find(l => l.id === layerId)
-      const currentData = layer?.data || {}
-      const tiles: (CopiedTile | null)[] = []
-
-      for (let dy = 0; dy < box.height; dy++) {
-        for (let dx = 0; dx < box.width; dx++) {
-          const targetX = box.minX + dx
-          const targetY = box.minY + dy
-          const tileIndex = targetY * map.width + targetX
-          const existing = currentData[tileIndex]
-          tiles.push(existing ? { tilesetId: existing.tilesetId, x: existing.x, y: existing.y } : null)
-        }
-      }
-      setTileSelection({ width: box.width, height: box.height, tiles })
+      // Pinned: every selected layer joins the selection. Otherwise only the active one is sampled.
+      const sourceLayers = pinSelectionRef.current
+        ? sampledLayers(layersRef.current, layerId, selectedLayerIdsRef.current)
+        : layersRef.current.filter(l => l.id === layerId && l.type !== 'image')
+      if (sourceLayers.length > 0) setTileSelection(sampleSelection(sourceLayers, map.width, box))
     }
 
     setCanvasCopyStart(null)
@@ -209,6 +221,7 @@ export function useCanvasInteraction({
       if (!map || !layerId) return
 
       const layer = layersRef.current.find((l) => l.id === layerId)
+      if (layer?.type === 'image') return
       const currentData = layer?.data || {}
       const tileIndex = tileY * map.width + tileX
       const existing = currentData[tileIndex]
@@ -309,6 +322,11 @@ export function useCanvasInteraction({
         return
       }
 
+      if (pendingImage && e.evt.button === 2) {
+        cancelImagePlacement?.()
+        return
+      }
+
       // Right-click tile down: prepare for possible tile drag selection or single-click context menu
       if (e.evt.button === 2) {
         rightClickRef.current = {
@@ -321,6 +339,25 @@ export function useCanvasInteraction({
         isRightDraggingRef.current = false
         setCanvasCopyStart({ x: coords.x, y: coords.y })
         setCanvasCopyCurrent({ x: coords.x, y: coords.y })
+        return
+      }
+
+      // Image layer: a click drops the pending image, otherwise it only deselects (tiles are never painted here).
+      const activeLayer = layersRef.current.find((l) => l.id === activeLayerIdRef.current)
+      if (activeLayer?.type === 'image') {
+        if (e.evt.button === 0) {
+          if (pendingImage && coords.isInside && !activeLayer.locked && activeLayer.visible) {
+            // Same maths as the ghost preview, so the image lands where the preview showed it.
+            const p = stageRef?.current?.getPointerPosition()
+            const stage = stageRef?.current
+            const scale = stage?.scaleX() || 1
+            const world = p && stage ? { x: (p.x - stage.x()) / scale, y: (p.y - stage.y()) / scale } : { x: coords.rawX * 32 + 16, y: coords.rawY * 32 + 32 }
+            const at = snapToGrid && snapEntityPos ? snapEntityPos(world.x, world.y) : { x: Math.round(world.x), y: Math.round(world.y) }
+            commitImagePlacement?.(at.x, at.y)
+          } else {
+            clearImageSelection?.()
+          }
+        }
         return
       }
 
@@ -367,6 +404,11 @@ export function useCanvasInteraction({
       stageRef,
       selectedEntityId,
       setSelectedEntityId,
+      pendingImage,
+      commitImagePlacement,
+      cancelImagePlacement,
+      clearImageSelection,
+      snapEntityPos,
     ]
   )
 

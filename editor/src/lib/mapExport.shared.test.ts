@@ -231,7 +231,9 @@ describe('convertEditorMapToTiled: golden equivalence with the legacy export hoo
     const tilesets = realTilesets()
     const maps = realMaps()
     expect(maps.length).toBeGreaterThan(0)
-    for (const { map } of maps) {
+    for (const { map: full } of maps) {
+      // The legacy hook predates image layers (their export is covered in imageLayer.shared.test.ts), so compare the rest.
+      const map = { ...full, layers: full.layers.filter((l) => l.type !== 'image') }
       expect(serializeTiledMap(convertEditorMapToTiled(map, tilesets))).toBe(legacyConvert(map, tilesets))
     }
   })
@@ -257,21 +259,21 @@ describe('convertEditorMapToTiled: structure', () => {
 
   it('maps tile coordinates to gids with the per-tileset offset', () => {
     const ground = tiled.layers.find((l) => l.name === 'ground')!
-    expect(ground.data.length).toBe(16)
-    expect(ground.data[0]).toBe(65 + 0 * 2 + 1) // grass (1,0)
-    expect(ground.data[3]).toBe(1 + 2 * 8 + 3) // outside (3,2)
-    expect(ground.data.filter((g) => g !== 0).length).toBe(2)
+    expect(ground.data!.length).toBe(16)
+    expect(ground.data![0]).toBe(65 + 0 * 2 + 1) // grass (1,0)
+    expect(ground.data![3]).toBe(1 + 2 * 8 + 3) // outside (3,2)
+    expect(ground.data!.filter((g) => g !== 0).length).toBe(2)
     const deco = tiled.layers.find((l) => l.name === 'deco')!
-    expect(deco.data[2]).toBe(64)
+    expect(deco.data![2]).toBe(64)
     expect(deco.visible).toBe(false)
   })
 
   it('exports collision layers with the dummy gid and the fixed name', () => {
     const col = tiled.layers[0]
     expect(col.name).toBe('collision')
-    expect(col.data[1]).toBe(69)
-    expect(col.data[15]).toBe(69)
-    expect(col.data.filter((g) => g !== 0).length).toBe(2)
+    expect(col.data![1]).toBe(69)
+    expect(col.data![15]).toBe(69)
+    expect(col.data!.filter((g) => g !== 0).length).toBe(2)
   })
 
   it('writes the z property, layer types and sequential ids', () => {

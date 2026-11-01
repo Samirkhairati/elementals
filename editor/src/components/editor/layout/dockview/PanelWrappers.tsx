@@ -77,6 +77,12 @@ const selectLayers = (c: EditorContextValue) => ({
   layers: c.layers,
   activeLayerId: c.activeLayerId,
   setActiveLayerId: c.setActiveLayerId,
+  selectLayer: c.selectLayer,
+  selectedLayerIds: c.selectedLayerIds,
+  showEntities: c.showEntities,
+  toggleShowEntities: c.toggleShowEntities,
+  entitiesIndex: c.activeMap?.entitiesIndex ?? 0,
+  setEntitiesIndex: c.setEntitiesIndex,
   setSelectedEntityId: c.setSelectedEntityId,
   toggleLayerVisibility: c.toggleLayerVisibility,
   toggleLayerLock: c.toggleLayerLock,
@@ -100,6 +106,12 @@ export function LayersWrapper(_props: IDockviewPanelProps) {
         layers={ctx.layers}
         activeLayerId={ctx.activeLayerId}
         setActiveLayerId={ctx.setActiveLayerId}
+        selectLayer={ctx.selectLayer}
+        selectedLayerIds={ctx.selectedLayerIds}
+        showEntities={ctx.showEntities}
+        toggleShowEntities={ctx.toggleShowEntities}
+        entitiesIndex={ctx.entitiesIndex}
+        setEntitiesIndex={ctx.setEntitiesIndex}
         setSelectedEntityId={ctx.setSelectedEntityId}
         toggleLayerVisibility={ctx.toggleLayerVisibility}
         toggleLayerLock={ctx.toggleLayerLock}
@@ -263,6 +275,14 @@ const selectCanvas = (c: EditorContextValue) => ({
   showEntities: c.showEntities,
   entityFolders: c.entityFolders,
   handleAddComponent: c.handleAddComponent,
+  pinSelection: c.pinSelection,
+  selectedLayerIds: c.selectedLayerIds,
+  pendingImage: c.pendingImage,
+  cancelImagePlacement: c.cancelImagePlacement,
+  selectedImageId: c.selectedImageId,
+  setSelectedImageId: c.setSelectedImageId,
+  addImage: c.addImage,
+  updateImage: c.updateImage,
 });
 
 export function CanvasWrapper(props: IDockviewPanelProps) {
@@ -287,6 +307,19 @@ export function CanvasWrapper(props: IDockviewPanelProps) {
 
   const currentLayers = isActive ? ctx.layers : targetMap?.layers || [];
   const currentEntities = isActive ? ctx.entities : targetMap?.entities || [];
+
+  const { addImage, updateImage, activeLayerId, pendingImage } = ctx;
+  // Placement keeps going (Esc or a right-click ends it) so a row of trees is a row of clicks.
+  const commitImagePlacement = useCallback(
+    (x: number, y: number) => {
+      if (activeLayerId && pendingImage) addImage(activeLayerId, { assetId: pendingImage.assetId, x, y })
+    },
+    [addImage, activeLayerId, pendingImage]
+  );
+  const moveImage = useCallback(
+    (layerId: string, imageId: string, x: number, y: number) => updateImage(layerId, imageId, { x, y }),
+    [updateImage]
+  );
 
   const onSelectMap = ctx.onSelectMap;
   const handleActivate = useCallback(() => {
@@ -337,6 +370,14 @@ export function CanvasWrapper(props: IDockviewPanelProps) {
         showEntities={ctx.showEntities}
         entityFolders={ctx.entityFolders}
         addComponent={ctx.handleAddComponent}
+        pinSelection={isActive ? ctx.pinSelection : false}
+        selectedLayerIds={isActive ? ctx.selectedLayerIds : []}
+        pendingImage={isActive ? ctx.pendingImage : null}
+        commitImagePlacement={isActive ? commitImagePlacement : noop}
+        cancelImagePlacement={isActive ? ctx.cancelImagePlacement : noop}
+        selectedImageId={isActive ? ctx.selectedImageId : null}
+        setSelectedImageId={isActive ? ctx.setSelectedImageId : noop}
+        moveImage={isActive ? moveImage : noop}
       />
     </div>
   );
@@ -449,13 +490,20 @@ export function PreviewWrapper(_props: IDockviewPanelProps) {
 const selectActiveSelection = (c: EditorContextValue) => ({
   tileSelection: c.tileSelection,
   tilesets: c.tilesets,
+  pinSelection: c.pinSelection,
+  setPinSelection: c.setPinSelection,
 });
 
 export function ActiveSelectionWrapper(_props: IDockviewPanelProps) {
   const ctx = useEditorSelector(selectActiveSelection);
   return (
-    <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-muted/10 min-h-0 h-full">
-      <ActiveSelectionPanel tileSelection={ctx.tileSelection} tilesets={ctx.tilesets} />
+    <div className="flex-1 overflow-hidden flex flex-col bg-muted/10 min-h-0 h-full">
+      <ActiveSelectionPanel
+        tileSelection={ctx.tileSelection}
+        tilesets={ctx.tilesets}
+        pinned={ctx.pinSelection}
+        onTogglePin={() => ctx.setPinSelection(!ctx.pinSelection)}
+      />
     </div>
   );
 }

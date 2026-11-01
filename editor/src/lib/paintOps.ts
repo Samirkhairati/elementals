@@ -193,3 +193,44 @@ export function rectangleFill(
   }
   return draft.result()
 }
+
+/**
+ * The cell indices of the 4-connected region around (gridX, gridY) that holds the same tile as that cell.
+ * Lets a multi-layer bucket fill decide the region on one layer and apply it to all of them.
+ */
+export function floodRegion(data: TileMap | undefined, size: GridSize, gridX: number, gridY: number): number[] | null {
+  if (!inBounds(size, gridX, gridY)) return null
+  const source = data || {}
+  const targetKey = tileKey(source[cellIndex(size, gridX, gridY)])
+  const queue: Pos[] = [{ x: gridX, y: gridY }]
+  const visited = new Set<number>()
+
+  for (let head = 0; head < queue.length; head++) {
+    const { x, y } = queue[head]
+    const idx = cellIndex(size, x, y)
+    if (visited.has(idx)) continue
+    visited.add(idx)
+    for (const n of [{ x, y: y - 1 }, { x, y: y + 1 }, { x: x - 1, y }, { x: x + 1, y }]) {
+      if (!inBounds(size, n.x, n.y)) continue
+      const nIdx = cellIndex(size, n.x, n.y)
+      if (!visited.has(nIdx) && tileKey(source[nIdx]) === targetKey) queue.push(n)
+    }
+  }
+  return [...visited]
+}
+
+/** Writes the selection (tiled from `anchor`, or random per cell) into the given cells. */
+export function fillCells(
+  data: TileMap | undefined,
+  size: GridSize,
+  cells: number[],
+  selection: TileSelection,
+  mode: PaintMode,
+  anchor: Pos
+): TileMap | null {
+  const draft = new Draft(data)
+  for (const idx of cells) {
+    draft.set(idx, resolveSourceTile(selection, mode, idx % size.width, Math.floor(idx / size.width), anchor))
+  }
+  return draft.result()
+}

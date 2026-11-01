@@ -142,6 +142,9 @@ export interface DrawSpriteOptions {
   anchorY: number
   opacity?: number
   tint?: string
+  /** Mirror the whole sprite around the anchor, horizontally and/or vertically (use with a sprite resolved without `flipX`). */
+  mirrorX?: boolean
+  mirrorY?: boolean
 }
 
 /** Paints a resolved sprite pixel-perfectly (no smoothing), honouring flip, opacity and tint. */
@@ -155,7 +158,11 @@ export function drawResolvedSprite(ctx: CanvasRenderingContext2D, r: ResolvedSpr
   const source: CanvasImageSource = (opts.tint ? tintedSource(r.img, src, opts.tint) : null) ?? r.img
   const sx = source === r.img ? src.x : 0
   const sy = source === r.img ? src.y : 0
-  if (r.flipX) {
+  if (opts.mirrorX || opts.mirrorY) {
+    ctx.translate(opts.anchorX, opts.anchorY)
+    ctx.scale(opts.mirrorX ? -1 : 1, opts.mirrorY ? -1 : 1)
+    ctx.drawImage(source, sx, sy, src.w, src.h, dest.x, dest.y, dest.w, dest.h)
+  } else if (r.flipX) {
     ctx.translate(dx + dest.w, dy)
     ctx.scale(-1, 1)
     ctx.drawImage(source, sx, sy, src.w, src.h, 0, 0, dest.w, dest.h)
