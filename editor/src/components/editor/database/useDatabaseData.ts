@@ -2,11 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { MapData, TilesetData } from '@/types/editor'
 import { migrateLoadedMap } from '@/hooks/editor/useMapManager'
 import { useSpriteAssets, type UseSpriteAssets } from '@/hooks/useSpriteAssets'
+import { buildProjectReferences, type ProjectReferences } from '@/lib/referenceIndex'
 
 export interface DatabaseData {
   sprites: UseSpriteAssets
   tilesets: TilesetData[]
   maps: MapData[]
+  /** Where every character / graphic / tileset / flag is used (one index). */
+  refs: ProjectReferences
   reload: () => Promise<void>
 }
 
@@ -32,5 +35,6 @@ export function useDatabaseData(): DatabaseData {
     await Promise.all([reloadSprites(), loadOthers()])
   }, [reloadSprites, loadOthers])
 
-  return useMemo(() => ({ sprites, tilesets, maps, reload }), [sprites, tilesets, maps, reload])
+  const refs = useMemo(() => buildProjectReferences(maps as never, Object.values(sprites.characters).map((c) => ({ id: c.id, def: c.def }))), [maps, sprites.characters])
+  return useMemo(() => ({ sprites, tilesets, maps, refs, reload }), [sprites, tilesets, maps, refs, reload])
 }

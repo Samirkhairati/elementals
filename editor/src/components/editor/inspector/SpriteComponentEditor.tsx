@@ -12,7 +12,7 @@ import { EntityViewport } from './EntityViewport'
 import { SpritePicker, splitAssetId } from './SpritePicker'
 import type { CustomEditorProps } from './customEditors'
 
-const selectSprites = (c: EditorContextValue) => ({ spriteAssets: c.spriteAssets, spriteList: c.spriteList })
+const selectSprites = (c: EditorContextValue) => ({ spriteAssets: c.spriteAssets, spriteList: c.spriteList, getCharacter: c.getCharacter })
 
 const FACING_ARROWS: Record<Facing, string> = { down: '↓', left: '←', right: '→', up: '↑' }
 const FACING_LABEL: Record<Facing, string> = { down: 'Down', left: 'Left', right: 'Right', up: 'Up' }
@@ -20,7 +20,7 @@ const FACING_LABEL: Record<Facing, string> = { down: 'Down', left: 'Left', right
 type Phase = 'idle' | 'walk' | 'run'
 
 export function SpriteComponentEditor({ value, components, onChange, onChangeMany }: CustomEditorProps) {
-  const { spriteAssets, spriteList } = useEditorSelector(selectSprites)
+  const { spriteAssets, spriteList, getCharacter } = useEditorSelector(selectSprites)
   const assetId: string = value.asset ?? ''
   const asset = assetId ? spriteAssets[assetId] : undefined
   const missing = !!assetId && !asset
@@ -36,6 +36,8 @@ export function SpriteComponentEditor({ value, components, onChange, onChangeMan
   const facing: Facing = FACINGS.includes(value.facing) ? value.facing : 'down'
   const animation: string = value.animation ?? ''
   const animationNames = useMemo(() => Object.keys(meta?.animations ?? {}), [meta])
+  // Every animation of the character (v2), for the clip dropdown and the animation speed.
+  const clipNames = useMemo(() => Object.keys(getCharacter?.(assetId)?.def.clips ?? {}), [getCharacter, assetId])
   const hasAnimation = !isCharacter && !!animation && animationNames.includes(animation)
   const imagesVersion = useSpriteImagesVersion()
   const frameCount = useMemo(() => {
@@ -161,6 +163,14 @@ export function SpriteComponentEditor({ value, components, onChange, onChangeMan
 
             {isCharacter && (
               <div className="flex flex-col gap-2">
+                {clipNames.length > 0 && (
+                  <Field label="Animation" info="Automatic follows what the character does (idle, walk, run). Pick an animation to play it all the time.">
+                    <select className="ed-input" aria-label="Animation" value={clipNames.includes(animation) ? animation : ''} onChange={(e) => onChange('animation', e.target.value)}>
+                      <option value="">Automatic</option>
+                      {clipNames.map((n) => <option key={n} value={n}>{n}</option>)}
+                    </select>
+                  </Field>
+                )}
                 <Field label="Facing">
                   <Segmented
                     aria-label="Facing"
@@ -188,6 +198,11 @@ export function SpriteComponentEditor({ value, components, onChange, onChangeMan
                 </Field>
               </div>
             )}
+
+            <Field label="Anim. speed" info="1 plays animations at the speed set on the character; 2 is twice as fast, 0 freezes them.">
+              <NumberField aria-label="Animation speed" size="sm" step={0.25} unit="×" min={0} max={8} value={Number(value.animSpeed ?? 1)} onCommit={(v) => onChange('animSpeed', v)} />
+              <a className="ed-hint underline" href={`#/database?table=characters&id=${assetId}`} title="Open this character in the Database">Open in Database</a>
+            </Field>
 
             {!isCharacter && (
               <div className="flex flex-col gap-2">

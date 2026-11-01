@@ -12,7 +12,7 @@ const SIZE = { width: 128, height: 192 }
 const graphics = [{ id: 'sprites/hero/walk.png', ...SIZE, bytes: 1, mtimeMs: 0 }, { id: 'sprites/hero/run.png', ...SIZE, bytes: 1, mtimeMs: 0 }, { id: 'props/ball.png', width: 24, height: 24, bytes: 1, mtimeMs: 0 }]
 const images = Object.fromEntries(graphics.map((g) => [g.id, PNG]))
 
-function setup(def: CharacterDef = newCharacter('actor', 'Hero', 'sprites/hero/walk.png', SIZE), path = '/database?table=characters&id=characters/hero') {
+function setup(def: CharacterDef = newCharacter('actor', 'Hero', 'sprites/hero/walk.png', SIZE), path = '/database?table=characters&id=characters/hero', maps: unknown[] = [], extra: Record<string, unknown> = {}) {
   const saved: { id: string; def: CharacterDef }[] = []
   const saveCharacter = vi.fn((id: string, d: CharacterDef) => {
     saved.push({ id, def: d })
@@ -21,8 +21,9 @@ function setup(def: CharacterDef = newCharacter('actor', 'Hero', 'sprites/hero/w
   installElectronAPI({
     getCharacters: () => Promise.resolve({ success: true, characters: [{ id: 'characters/hero', def, images }], graphics, images, folders: [], warnings: [] }),
     getTilesets: () => Promise.resolve({ success: true, tilesets: [] }),
-    getMaps: () => Promise.resolve({ success: true, maps: [] }),
+    getMaps: () => Promise.resolve({ success: true, maps }),
     saveCharacter,
+    ...extra,
   } as never)
   const root = createRootRoute()
   const db = createRoute({ getParentRoute: () => root, path: '/database', component: DatabasePage, validateSearch: (s: Record<string, unknown>) => ({ table: s.table as string | undefined, id: s.id as string | undefined, tab: s.tab as string | undefined }) })
@@ -294,5 +295,117 @@ describe('Setup tab', () => {
     fireEvent.click(screen.getByRole('button', { name: /Revert/ }))
     expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('Hero')
     expect(screen.queryByLabelText('Problems')).toBeNull()
+  })
+})
+
+// ── phase 6: where-used, safe rename, delete guard ──────────────────────────────────────────────
+
+const node = (id: string, type: string, params: Record<string, unknown>) => ({ id, type, params, out: {}, x: 0, y: 0 })
+const townMap = () => ({
+  name: 'Town', fileName: 'town.json', folderPath: null, width: 6, height: 6, schemaVersion: 4, layers: [],
+  entities: [
+    { id: 'npc', name: 'Old man', x: 0, y: 0, components: {
+      Sprite: { asset: 'characters/hero', animation: '' },
+      Event: { states: [{ id: 's1', name: 'Talk', conditions: [], trigger: 'action', faceOnInteract: true, solid: null, appearance: {},
+        graph: { nodes: [node('start', 'start', {}), node('p', 'playAnimation', { target: 'self', animation: 'walk' })], frames: [] } }] },
+    } },
+    { id: 'other', name: 'Other', x: 0, y: 0, components: { Sprite: { asset: 'objects/chest', animation: '' } } },
+  ],
+})
+
+describe('Used by', () => {
+  it('lists the maps, entities and events that use the character, filters by animation, and shows the header count', async () => {
+    setup(undefined, '/database?table=characters&id=characters/hero&tab=used-by', [townMap()])
+    const tab = await screen.findByTestId('used-by-tab')
+    await waitFor(() => expect(within(tab).getByText('Old man')).toBeInTheDocument())
+    expect(within(tab).getByText('Town')).toBeInTheDocument()
+    expect(within(tab).getAllByRole('link', { name: 'Open' }).length).toBe(2) // Sprite + Play Animation node
+    expect(screen.getByRole('button', { name: /Used in \d+/ })).toHaveTextContent(/Used in [2-9]/) // includes the NPC prefab
+    fireEvent.change(within(tab).getByLabelText('Filter by animation'), { target: { value: 'walk' } })
+    expect(within(tab).getAllByRole('link', { name: 'Open' }).length).toBe(1)
+    expect(within(tab).getByText(/Play Animation node/)).toBeInTheDocument()
+    fireEvent.change(within(tab).getByLabelText('Filter by animation'), { target: { value: 'idle' } })
+    expect(within(tab).getByText(/No map or event plays “idle”/)).toBeInTheDocument()
+    expect(within(tab).getByText('sprites/hero/walk.png')).toBeInTheDocument()
+  })
+
+  it('animation counts show next to the animation names', async () => {
+    setup(undefined, '/database?table=characters&id=characters/hero', [townMap()])
+    await open()
+    await waitFor(() => expect(screen.getByRole('button', { name: /^walk/ })).toHaveTextContent(/· \d/))
+  })
+})
+
+describe('rename and delete', () => {
+  it('renaming previews the rewrite, then renames the record and rewrites every map that uses it', async () => {
+    const renameCharacter = vi.fn(() => Promise.resolve({ success: true, id: 'characters/elder' }))
+    const saveMap = vi.fn(() => Promise.resolve({ success: true }))
+    setup(undefined, '/database?table=characters&id=characters/hero', [townMap()], { renameCharacter, saveMap })
+    await open()
+    fireEvent.click(await screen.findByRole('button', { name: 'Rename…' }))
+    const dialog = await screen.findByRole('dialog')
+    const input = within(dialog).getByLabelText('New id')
+    fireEvent.change(input, { target: { value: 'characters/elder' } })
+    fireEvent.blur(input)
+    expect(within(dialog).getByTestId('rename-preview')).toHaveTextContent(/1 map file will be rewritten/)
+    expect(within(dialog).getByTestId('rename-preview')).toHaveTextContent(/Town › Old man › Sprite/)
+    fireEvent.click(within(dialog).getByRole('button', { name: /Rewrite & rename/ }))
+    await waitFor(() => expect(renameCharacter).toHaveBeenCalledWith('characters/hero', 'characters/elder'))
+    await waitFor(() => expect(saveMap).toHaveBeenCalledTimes(1))
+    const saved = saveMap.mock.calls[0] as unknown as [null, string, { entities: { components: { Sprite: { asset: string } } }[] }]
+    expect(saved[1]).toBe('town.json')
+    expect(saved[2].entities[0].components.Sprite.asset).toBe('characters/elder')
+  })
+
+  it('refuses a taken or invalid id and leaves the button disabled', async () => {
+    setup(undefined, '/database?table=characters&id=characters/hero', [townMap()])
+    await open()
+    fireEvent.click(await screen.findByRole('button', { name: 'Rename…' }))
+    const dialog = await screen.findByRole('dialog')
+    const input = within(dialog).getByLabelText('New id')
+    fireEvent.change(input, { target: { value: '../x' } })
+    fireEvent.blur(input)
+    expect(within(dialog).getByRole('alert')).toHaveTextContent(/letters/)
+    expect(within(dialog).getByRole('button', { name: /Rewrite & rename/ })).toBeDisabled()
+  })
+
+  it('delete is blocked with the list of references while the character is used', async () => {
+    const deleteCharacter = vi.fn(() => Promise.resolve({ success: true }))
+    setup(undefined, '/database?table=characters&id=characters/hero', [townMap()], { deleteCharacter })
+    await open()
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete…' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByTestId('delete-blocked')).toHaveTextContent(/Town › Old man › Sprite/)
+    expect(within(dialog).getByRole('button', { name: 'Delete' })).toBeDisabled()
+    expect(deleteCharacter).not.toHaveBeenCalled()
+  })
+
+  it('an unused character can be deleted', async () => {
+    const deleteCharacter = vi.fn(() => Promise.resolve({ success: true }))
+    const spare = newCharacter('prop', 'Spare', 'props/ball.png', { width: 24, height: 24 })
+    setup(undefined, '/database?table=characters&id=objects/spare', [], {
+      deleteCharacter,
+      getCharacters: () => Promise.resolve({ success: true, characters: [{ id: 'objects/spare', def: spare, images }], graphics, images, folders: [], warnings: [] }),
+    })
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete…' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).queryByTestId('delete-blocked')).toBeNull()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }))
+    await waitFor(() => expect(deleteCharacter).toHaveBeenCalledWith('objects/spare'))
+  })
+
+  it('renaming an animation and saving rewrites the maps that name it', async () => {
+    const saveMap = vi.fn(() => Promise.resolve({ success: true }))
+    const { saved } = setup(undefined, '/database?table=characters&id=characters/hero', [townMap()], { saveMap })
+    await open()
+    fireEvent.click(screen.getByRole('button', { name: /^walk/ }))
+    const name = screen.getByRole('textbox', { name: 'Animation name' })
+    fireEvent.change(name, { target: { value: 'stroll' } })
+    fireEvent.blur(name)
+    save()
+    await waitFor(() => expect(saved).toHaveLength(1))
+    await waitFor(() => expect(saveMap).toHaveBeenCalledTimes(1))
+    const written = (saveMap.mock.calls[0] as unknown as [null, string, { entities: { components: { Event: { states: { graph: { nodes: { params: { animation?: string } }[] } }[] } } }[] }])[2]
+    expect(written.entities[0].components.Event.states[0].graph.nodes[1].params.animation).toBe('stroll')
   })
 })

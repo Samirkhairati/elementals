@@ -185,3 +185,34 @@ describe('SpriteComponentEditor', () => {
     expect(Number(viewport().dataset.zoom)).toBe(fitZoom)
   })
 })
+
+describe('SpriteComponentEditor: animations of a v2 character', () => {
+  const def = { version: 2, name: 'Hero', tags: [], facing: 'four', pivot: { x: 0.5, y: 1 }, sheets: {}, clips: { idle: {}, walk: {}, wave: {} }, bindings: {} }
+  function setupV2(value: Record<string, any> = spriteValue()) {
+    const onChange = vi.fn()
+    renderWithEditor(
+      <SpriteComponentEditor entityId="e1" value={value} components={{ Sprite: value }} onChange={onChange} onChangeMany={vi.fn()} />,
+      { spriteAssets: assets, spriteList: [hero, chest], getCharacter: (id: string) => (id === 'characters/hero' ? ({ id, def, images: {} } as any) : undefined) } as any,
+    )
+    return { onChange }
+  }
+
+  it('offers every animation of the character in a dropdown, Automatic first', () => {
+    const { onChange } = setupV2(spriteValue({ animation: 'wave' }))
+    const select = screen.getByLabelText('Animation') as HTMLSelectElement
+    expect([...select.options].map((o) => o.text)).toEqual(['Automatic', 'idle', 'walk', 'wave'])
+    expect(select.value).toBe('wave')
+    fireEvent.change(select, { target: { value: '' } })
+    expect(onChange).toHaveBeenCalledWith('animation', '')
+  })
+
+  it('edits the animation speed and links to the character in the Database', () => {
+    const { onChange } = setupV2()
+    const speed = screen.getByLabelText('Animation speed')
+    fireEvent.change(speed, { target: { value: '2' } })
+    fireEvent.blur(speed)
+    expect(onChange).toHaveBeenCalledWith('animSpeed', 2)
+    expect(screen.getByRole('link', { name: 'Open in Database' })).toHaveAttribute('href', '#/database?table=characters&id=characters/hero')
+  })
+})
+

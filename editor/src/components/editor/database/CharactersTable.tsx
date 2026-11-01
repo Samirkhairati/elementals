@@ -20,6 +20,7 @@ export function CharactersBrowser({ data, query, selected, onSelect }: TableProp
           <button type="button" data-selected={selected === c.id ? 'true' : undefined} className="ed-row flex w-full items-center gap-2 py-0.5 text-left text-ed-label" onClick={() => onSelect(c.id)}>
             <span className="truncate">{c.def.name || c.id}</span>
             <span className="ed-hint truncate">{c.id}</span>
+            <span className="ed-hint" title="Places that use this character">{data.refs.counts('character')[c.id] ?? 0}</span>
             {counts[c.id]?.errors > 0 && <Badge tone="warn" title="Errors">{counts[c.id].errors}</Badge>}
             {counts[c.id]?.errors === 0 && counts[c.id]?.warnings > 0 && <Badge title="Warnings">{counts[c.id].warnings}</Badge>}
           </button>
@@ -29,8 +30,8 @@ export function CharactersBrowser({ data, query, selected, onSelect }: TableProp
   )
 }
 
-export function CharacterDetail({ data, id }: { data: DatabaseData; id: string }) {
-  return <CharacterEditor data={data} id={id} />
+export function CharacterDetail({ data, id, tab, onSelect }: { data: DatabaseData; id: string; tab?: string; onSelect?: (id: string) => void }) {
+  return <CharacterEditor data={data} id={id} tab={tab} onSelect={onSelect} />
 }
 
 export function CharactersToolbar({ data, onSelect }: { data: DatabaseData; onSelect: (id: string) => void }) {

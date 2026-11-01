@@ -16,9 +16,12 @@ interface Props {
   onChange: (def: CharacterDef) => void
   images: Record<string, string>
   sizes: Record<string, { width: number; height: number }>
+  /** Places that use each animation (map sprites, events, bindings). */
+  clipCounts?: Record<string, number>
+  onRenameClip?: (from: string, to: string) => void
 }
 
-export function AnimationsTab({ def, onChange, images, sizes }: Props) {
+export function AnimationsTab({ def, onChange, images, sizes, clipCounts = {}, onRenameClip }: Props) {
   const names = Object.keys(def.clips)
   const [selected, setSelected] = useState(names[0] ?? '')
   const [facing, setFacing] = useState<Facing>('down')
@@ -54,6 +57,7 @@ export function AnimationsTab({ def, onChange, images, sizes }: Props) {
             <li key={n}>
               <button type="button" data-selected={n === current ? 'true' : undefined} className="ed-row flex w-full items-center gap-1 py-0.5 text-left text-ed-label" onClick={() => setSelected(n)}>
                 <span className="truncate">{n}</span>
+                {(clipCounts[n] ?? 0) > 0 && <span className="ed-hint" title="Places that use this animation">· {clipCounts[n]}</span>}
                 {Object.entries(def.bindings).filter(([, c]) => c === n).map(([b]) => <span key={b} className="ed-badge">{b}</span>)}
               </button>
             </li>
@@ -66,7 +70,7 @@ export function AnimationsTab({ def, onChange, images, sizes }: Props) {
           {error && <p role="alert" className="text-destructive">{error}</p>}
           <Field label="Name" info="Used by events to play this animation (Play Animation) and in animation bindings. Letters, digits, dashes and underscores.">
             <FieldRow>
-              <TextField aria-label="Animation name" className="w-40" value={current} onCommit={(v) => run(() => { const next = renameClip(def, current, v.trim()); setSelected(v.trim()); return next })} />
+              <TextField aria-label="Animation name" className="w-40" value={current} onCommit={(v) => run(() => { const next = renameClip(def, current, v.trim()); setSelected(v.trim()); if (v.trim() !== current) onRenameClip?.(current, v.trim()); return next })} />
               <IconButton tone="danger" title="Delete this animation" aria-label="Delete animation" onClick={() => run(() => { const r = deleteClip(def, current); return r.def })}><Trash2 className="h-3.5 w-3.5" /></IconButton>
             </FieldRow>
           </Field>
