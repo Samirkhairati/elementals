@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor, within, fireEvent } from '@testing-library/react'
 import { RouterProvider, createMemoryHistory, createRootRoute, createRoute, createRouter } from '@tanstack/react-router'
 import type { CharacterDef } from '../../../../../shared/engine/characters'
@@ -48,15 +48,16 @@ beforeEach(() => install())
 afterEach(() => uninstallElectronAPI())
 
 describe('Database shell', () => {
-  it('groups the tables, marks Visual read-only and unbuilt tables as planned', async () => {
+  it('groups the tables, marks Visual read-only and lists unbuilt tables as planned', async () => {
     renderAt('/database')
     const nav = await screen.findByRole('navigation', { name: 'Database tables' })
-    for (const g of ['Visual', 'Design', 'World', 'Text', 'Game']) expect(within(nav).getByText(g)).toBeInTheDocument()
-    expect(within(nav).getByLabelText('Read-only')).toBeInTheDocument()
-    for (const name of [/Pokémon/, /Items/, /Moves/]) {
-      const button = within(nav).getByRole('button', { name })
-      expect(button).toBeDisabled()
-      expect(within(button).getByText('Planned')).toBeInTheDocument()
+    for (const g of ['Visual', 'Design', 'World', 'Planned']) expect(within(nav).getByText(g)).toBeInTheDocument()
+    expect(within(within(nav).getByRole('button', { name: /Graphics/ })).getByLabelText('Read-only')).toBeInTheDocument()
+    expect(within(within(nav).getByRole('button', { name: /Characters/ })).queryByLabelText('Read-only')).toBeNull()
+    // the planned tables sit under their own heading, disabled
+    const plannedList = within(nav).getByText('Planned').nextElementSibling as HTMLElement
+    for (const name of [/Dialogue & strings/, /Pokémon/, /Items/, /Moves/]) {
+      expect(within(plannedList).getByRole('button', { name })).toBeDisabled()
     }
     expect(within(nav).getByRole('button', { name: /Graphics/ })).toBeEnabled()
   })
@@ -85,6 +86,47 @@ describe('Database shell', () => {
     fireEvent.change(screen.getByLabelText('Search'), { target: { value: 'walk' } })
     expect(within(tree).queryByText('orphan.png')).toBeNull()
     expect(within(tree).getByText('walk.png')).toBeInTheDocument()
+  })
+})
+
+describe('List and tile views', () => {
+  const store = new Map<string, string>()
+  beforeEach(() => {
+    store.clear()
+    vi.stubGlobal('localStorage', { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v), removeItem: (k: string) => void store.delete(k), clear: () => store.clear() })
+  })
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('characters show their picture in the list and as tiles, and the choice is remembered', async () => {
+    renderAt('/database?table=characters')
+    await screen.findByRole('button', { name: /Chest/ })
+    expect(screen.getAllByTestId('character-thumb').length).toBe(1) // the broken one has no readable image
+    fireEvent.click(screen.getByRole('button', { name: 'Tile view' }))
+    expect(screen.getByRole('button', { name: 'Chest' })).toHaveAttribute('title', expect.stringContaining('objects/chest'))
+    expect(screen.getByText('objects')).toBeInTheDocument() // folder heading
+    expect(store.get('database.view.characters')).toBe('tiles')
+    fireEvent.click(screen.getByRole('button', { name: 'Chest' }))
+    expect(await screen.findByTestId('character-detail')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'List view' }))
+    expect(store.get('database.view.characters')).toBe('list')
+  })
+
+  it('starts in tiles when that was the last choice', async () => {
+    store.set('database.view.characters', 'tiles')
+    renderAt('/database?table=characters')
+    expect(await screen.findByRole('button', { name: 'Chest' })).toHaveAttribute('title', expect.stringContaining('objects/chest'))
+  })
+
+  it('graphics and tilesets have tiles too; maps have no toggle', async () => {
+    renderAt('/database?table=graphics')
+    fireEvent.click(await screen.findByRole('button', { name: 'Tile view' }))
+    expect(await screen.findByRole('button', { name: 'orphan.png' })).toHaveAttribute('title', 'props/orphan.png')
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Database tables' })).getByRole('button', { name: /Tilesets/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Tile view' }))
+    expect(await screen.findByRole('button', { name: 'grass' })).toBeInTheDocument()
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Database tables' })).getByRole('button', { name: /Maps/ }))
+    await screen.findByRole('button', { name: /Town/ })
+    expect(screen.queryByRole('button', { name: 'Tile view' })).toBeNull()
   })
 })
 

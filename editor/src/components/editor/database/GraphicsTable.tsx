@@ -1,13 +1,14 @@
 import React, { useMemo, useState } from 'react'
-import { ChevronDown, ChevronRight, Copy, FileImage, Grid3x3, Upload } from 'lucide-react'
+import { ChevronDown, ChevronRight, Copy, Grid3x3, Upload } from 'lucide-react'
 import { sheetFrameRect } from '../../../../../shared/engine/characters'
 import { buildGraphicTree, formatBytes, graphicUsage, unusedGraphics, type GraphicTreeNode } from '@/lib/databaseModel'
 import { Badge, EdButton, InfoTip, Segmented } from '../ui/controls'
+import { ImageThumb, Tile, TileGroups, groupByFolder } from './browse'
 import type { DatabaseData } from './useDatabaseData'
 import type { TableProps } from './shared'
 import { defaultGraphicId } from '@/lib/databaseModel'
 
-function Tree({ node, depth, selected, onSelect, open, toggle, unused }: { node: GraphicTreeNode; depth: number; selected: string; onSelect: (id: string) => void; open: Set<string>; toggle: (p: string) => void; unused: Set<string> }) {
+function Tree({ node, depth, selected, onSelect, open, toggle, unused, images }: { node: GraphicTreeNode; depth: number; selected: string; onSelect: (id: string) => void; open: Set<string>; toggle: (p: string) => void; unused: Set<string>; images: Record<string, string> }) {
   return (
     <ul role={depth === 0 ? 'tree' : 'group'}>
       {node.children.map((c) =>
@@ -17,18 +18,18 @@ function Tree({ node, depth, selected, onSelect, open, toggle, unused }: { node:
               {open.has(c.path) ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
               {c.name}
             </button>
-            {open.has(c.path) && <Tree node={c} depth={depth + 1} selected={selected} onSelect={onSelect} open={open} toggle={toggle} unused={unused} />}
+            {open.has(c.path) && <Tree node={c} depth={depth + 1} selected={selected} onSelect={onSelect} open={open} toggle={toggle} unused={unused} images={images} />}
           </li>
         ) : (
           <li key={c.path} role="treeitem" aria-selected={selected === c.path}>
             <button
               type="button"
               data-selected={selected === c.path ? 'true' : undefined}
-              className="ed-row flex w-full items-center gap-1 py-0.5 text-left text-ed-label"
+              className="ed-row flex h-auto w-full items-center gap-2 py-0.5 text-left text-ed-label"
               style={{ paddingLeft: depth * 12 + 16 }}
               onClick={() => onSelect(c.path)}
             >
-              <FileImage className="h-3 w-3 shrink-0" />
+              <ImageThumb url={images[c.path]} size={24} />
               <span className="truncate">{c.name}</span>
               {unused.has(c.path) && <Badge title="No character uses this graphic">unused</Badge>}
             </button>
@@ -41,8 +42,8 @@ function Tree({ node, depth, selected, onSelect, open, toggle, unused }: { node:
 
 const folderPaths = (graphics: { id: string }[]): string[] => [...new Set(graphics.flatMap((g) => g.id.split('/').slice(0, -1).map((_, i, parts) => parts.slice(0, i + 1).join('/'))))]
 
-export function GraphicsBrowser({ data, query, selected, onSelect }: TableProps) {
-  const { graphics, characters } = data.sprites
+export function GraphicsBrowser({ data, query, selected, onSelect, mode }: TableProps) {
+  const { graphics, characters, images } = data.sprites
   const tree = useMemo(() => buildGraphicTree(graphics, query), [graphics, query])
   const unused = useMemo(() => new Set(unusedGraphics(graphics, characters)), [graphics, characters])
   const [closed, setClosed] = useState<Set<string>>(new Set())
@@ -51,7 +52,16 @@ export function GraphicsBrowser({ data, query, selected, onSelect }: TableProps)
   const toggle = (p: string) => setClosed((s) => { const n = new Set(s); if (n.has(p)) n.delete(p); else n.add(p); return n })
   if (graphics.length === 0) return <p className="ed-hint p-3">No graphics yet. Import an image to start.</p>
   if (tree.children.length === 0) return <p className="ed-hint p-3">No graphic matches “{query}”.</p>
-  return <Tree node={tree} depth={0} selected={selected} onSelect={onSelect} open={open} toggle={toggle} unused={unused} />
+  if (mode === 'tiles') {
+    const q = query.trim().toLowerCase()
+    const shown = graphics.filter((g) => !q || g.id.toLowerCase().includes(q)).sort((a, b) => (a.id < b.id ? -1 : 1))
+    return (
+      <TileGroups groups={groupByFolder(shown, (g) => g.id)}>
+        {(g) => <Tile key={g.id} selected={selected === g.id} name={g.id.slice(g.id.lastIndexOf('/') + 1)} title={g.id} hint={unused.has(g.id) ? 'unused' : `${g.width}×${g.height}`} thumb={<ImageThumb url={images[g.id]} size={56} />} onClick={() => onSelect(g.id)} />}
+      </TileGroups>
+    )
+  }
+  return <Tree node={tree} depth={0} selected={selected} onSelect={onSelect} open={open} toggle={toggle} unused={unused} images={images} />
 }
 
 const ZOOMS = [1, 2, 4, 8] as const

@@ -2,20 +2,29 @@ import { useMemo } from 'react'
 import { tilesetGrid, tilesetUsage } from '@/lib/databaseModel'
 import { Badge, InfoTip } from '../ui/controls'
 import { TILE_SIZE } from '../../../../../shared/engine/constants'
+import { ImageThumb, Tile, TileGroups } from './browse'
 import type { DatabaseData } from './useDatabaseData'
 import type { TableProps } from './shared'
 
-export function TilesetsBrowser({ data, query, selected, onSelect }: TableProps) {
+export function TilesetsBrowser({ data, query, selected, onSelect, mode }: TableProps) {
   const usage = useMemo(() => tilesetUsage(data.maps), [data.maps])
   const q = query.trim().toLowerCase()
   const list = data.tilesets.filter((t) => !q || t.name.toLowerCase().includes(q) || t.fileName.toLowerCase().includes(q))
   if (data.tilesets.length === 0) return <p className="ed-hint p-3">No tilesets yet. Import them in the Map Editor.</p>
+  if (mode === 'tiles') {
+    return (
+      <TileGroups groups={[{ folder: '', items: list }]}>
+        {(t) => <Tile key={t.fileName} selected={selected === t.fileName} name={t.name} hint={usage[t.fileName]?.length ? undefined : 'unused'} thumb={<ImageThumb url={t.dataUrl} size={56} />} onClick={() => onSelect(t.fileName)} />}
+      </TileGroups>
+    )
+  }
   return (
-    <ul>
+    <ul className="flex flex-col gap-0.5">
       {list.map((t) => (
         <li key={t.fileName}>
-          <button type="button" data-selected={selected === t.fileName ? 'true' : undefined} className="ed-row flex w-full items-center gap-2 py-0.5 text-left text-ed-label" onClick={() => onSelect(t.fileName)}>
-            <span className="truncate">{t.name}</span>
+          <button type="button" data-selected={selected === t.fileName ? 'true' : undefined} className="ed-row flex h-auto w-full items-center gap-2 py-1 text-left text-ed-label" onClick={() => onSelect(t.fileName)}>
+            <ImageThumb url={t.dataUrl} size={32} />
+            <span className="min-w-0 flex-1 truncate">{t.name}</span>
             {!(usage[t.fileName]?.length) && <Badge title="No map paints with this tileset">unused</Badge>}
           </button>
         </li>
