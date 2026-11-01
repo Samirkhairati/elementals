@@ -26,14 +26,15 @@ const REPO_ROOT = path.resolve(__dirname, '../..');
 const PROJECT_DIR = process.env.ELEMENTALS_PROJECT_DIR
   ? path.resolve(process.env.ELEMENTALS_PROJECT_DIR)
   : path.join(REPO_ROOT, 'project');
-const { mapsDir: MAPS_DIR, tilesetsDir: TILESETS_DIR, spritesDir: SPRITES_DIR } = projectDirs(PROJECT_DIR);
+const { mapsDir: MAPS_DIR, tilesetsDir: TILESETS_DIR, charactersDir: CHARACTERS_DIR, graphicsDir: GRAPHICS_DIR } = projectDirs(PROJECT_DIR);
 const DIST_DIR = path.join(__dirname, '../dist');
 
 function ensureDirectories(): void {
   // recursive mkdir is a no-op for existing directories and also creates PROJECT_DIR
   fs.mkdirSync(MAPS_DIR, { recursive: true });
   fs.mkdirSync(TILESETS_DIR, { recursive: true });
-  fs.mkdirSync(SPRITES_DIR, { recursive: true });
+  fs.mkdirSync(CHARACTERS_DIR, { recursive: true });
+  fs.mkdirSync(GRAPHICS_DIR, { recursive: true });
 }
 
 function createWindow(): void {

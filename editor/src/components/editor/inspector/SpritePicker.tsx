@@ -1,10 +1,9 @@
 import React, { useMemo, useState } from 'react'
-import { ImagePlus, Search, X } from 'lucide-react'
+import { Search, X } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import type { SpriteAssetInfo } from '../../../../../shared/engine/types'
 import { EdButton } from '../ui/controls'
 import { SpriteThumb } from '../sprites/SpriteThumb'
-import { ImportSpriteDialog } from '../sprites/ImportSpriteDialog'
 
 interface SpritePickerProps {
   open: boolean
@@ -38,7 +37,6 @@ const KIND_LABEL: Record<string, string> = { character: 'Character', object: 'Ob
 
 export function SpritePicker({ open, onOpenChange, assets, value, onSelect }: SpritePickerProps) {
   const [query, setQuery] = useState('')
-  const [importOpen, setImportOpen] = useState(false)
   const groups = useMemo(() => groupAssets(assets, query), [assets, query])
 
   const pick = (id: string) => {
@@ -69,10 +67,6 @@ export function SpritePicker({ open, onOpenChange, assets, value, onSelect }: Sp
                 onChange={(e) => setQuery(e.target.value)}
               />
             </div>
-            <EdButton onClick={() => setImportOpen(true)}>
-              <ImagePlus />
-              Import sprite…
-            </EdButton>
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto p-4">
@@ -119,7 +113,6 @@ export function SpritePicker({ open, onOpenChange, assets, value, onSelect }: Sp
         </DialogContent>
       </Dialog>
 
-      <ImportSpriteDialog open={importOpen} onOpenChange={setImportOpen} onImported={(id) => pick(id)} />
     </>
   )
 }

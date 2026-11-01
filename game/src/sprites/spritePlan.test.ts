@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildAnimationRegistrations, characterAnimKey, objectAnimKey, spriteSheetRoles, spriteTextureKey, type SpriteAssetMeta } from '@shared/engine/index.ts';
+import { buildAnimationRegistrations, characterAnimKey, objectAnimKey, spriteFileUrl, spriteSheetRoles, spriteTextureKey, type SpriteAssetMeta } from '@shared/engine/index.ts';
 import { createPlannedAnimations, planSpriteLoads } from './spritePlan';
 import { applySpriteProps, hexToTint } from './spriteState';
 import { characterMeta, legacyManifestEntry, manifestEntry, objectMeta, testSprites } from '@/test/helpers';
@@ -9,7 +9,8 @@ import { SpriteRegistry } from '@/data/spriteRegistry';
 import { parseBootParams } from '@/core/bootParams';
 import { paginateLines, normalizeDialogue, moveCursor, dialogueBoxMetrics } from '@/components/dialogueText';
 import { World } from '@/ecs/World';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
+import path from 'node:path';
 
 describe('planSpriteLoads (manifest-driven loading)', () => {
   it('registers walk/run textures for characters and `sheet` for objects with the right frame config', () => {
@@ -57,7 +58,7 @@ describe('planSpriteLoads (manifest-driven loading)', () => {
   });
 
   it('plans the real generated manifest (data/sprites.json)', () => {
-    const raw = JSON.parse(readFileSync(new URL('../../public/data/sprites.json', import.meta.url), 'utf8'));
+    const raw = JSON.parse(readFileSync(new URL('../../public/data/characters.json', import.meta.url), 'utf8'));
     const registry = new SpriteRegistry();
     const result = registry.load(raw);
     expect(result.skipped).toEqual([]);
@@ -127,20 +128,27 @@ describe('clip-based planning (v2 characters)', () => {
 });
 
 describe('golden: the real manifest plans exactly what the v1 code planned', () => {
-  const raw = JSON.parse(readFileSync(new URL('../../public/data/sprites.json', import.meta.url), 'utf8')) as { sprites: Array<{ id: string; meta: SpriteAssetMeta; files: Record<string, string> }> };
+  // The committed v1 sprite.json files (shared/fixtures) are the reference; the game loads data/characters.json.
+  const fixtures = new URL('../../../shared/fixtures/sprites-v1/', import.meta.url);
+  const v1 = readdirSync(fixtures, { recursive: true, encoding: 'utf8' })
+    .filter((f) => f.endsWith('sprite.json'))
+    .map((f) => ({ id: path.dirname(f).split(path.sep).join('/'), meta: JSON.parse(readFileSync(new URL(f, fixtures), 'utf8')) as SpriteAssetMeta }));
+  const raw = JSON.parse(readFileSync(new URL('../../public/data/characters.json', import.meta.url), 'utf8'));
   const registry = new SpriteRegistry();
-  registry.load(raw);
+  const result = registry.load(raw);
   const plan = planSpriteLoads(registry.all());
 
-  it('has characters to compare', () => {
-    expect(raw.sprites.length).toBeGreaterThanOrEqual(10);
-    expect(registry.ids().sort()).toEqual(raw.sprites.map((s) => s.id).sort());
+  it('loads every committed character', () => {
+    expect(result.skipped).toEqual([]);
+    expect(v1.length).toBeGreaterThanOrEqual(10);
+    expect(registry.ids().sort()).toEqual(expect.arrayContaining(v1.map((s) => s.id)));
+    expect(plan.problems).toEqual([]);
   });
 
   it('same texture keys, urls and frame configuration', () => {
-    const expected = raw.sprites.flatMap((s) =>
+    const expected = v1.flatMap((s) =>
       spriteSheetRoles(s.meta).map(({ role, file }) => ({
-        textureKey: spriteTextureKey(s.id, role), url: s.files[file], frameWidth: s.meta.frameWidth, frameHeight: s.meta.frameHeight, margin: s.meta.margin, spacing: s.meta.spacing,
+        textureKey: spriteTextureKey(s.id, role), url: spriteFileUrl(s.id, file), frameWidth: s.meta.frameWidth, frameHeight: s.meta.frameHeight, margin: s.meta.margin, spacing: s.meta.spacing,
       })),
     );
     const byKey = (l: Array<{ textureKey: string }>) => Object.fromEntries(l.map((x) => [x.textureKey, x]));
@@ -148,7 +156,7 @@ describe('golden: the real manifest plans exactly what the v1 code planned', () 
   });
 
   it('same animation keys, texture keys, frames, fps and loop', () => {
-    const expected = raw.sprites.flatMap((s) => buildAnimationRegistrations(s.id, s.meta));
+    const expected = v1.flatMap((s) => buildAnimationRegistrations(s.id, s.meta));
     const byKey = (l: Array<{ key: string }>) => Object.fromEntries(l.map((x) => [x.key, x]));
     expect(plan.animations).toHaveLength(expected.length);
     expect(byKey(plan.animations)).toEqual(byKey(expected));

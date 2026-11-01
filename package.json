@@ -22,6 +22,7 @@
     "maps:check": "node scripts/export-maps.mjs --check",
     "assets:sync": "node scripts/sync-assets.mjs --write",
     "assets:check": "node scripts/sync-assets.mjs --check",
+    "assets:migrate": "node scripts/migrate-characters.mjs",
     "verify": "npm run typecheck && npm run lint && npm run test"
   }
 }

@@ -59,10 +59,15 @@ Generated ids (state, commands) are deterministic (`deterministicId(entityId/...
 twice gives byte-identical output and `npm run maps:check` has no spurious drift. Existing user data is never
 "fixed" (e.g. a 16x8 collider stays 16x8).
 
-## 2. Sprite assets
+## 2. Sprite assets (Characters v2)
 
-Directory per asset under `project/sprites/<id>/` with `sprite.json` (`SpriteAssetMeta`) and its sheet PNGs.
-Ids are the directory path (`characters/player`, `objects/chest`).
+> Characters replaced the v1 sprite kinds; the full model is in [database-and-characters-spec.md](database-and-characters-spec.md).
+> Storage: `project/database/characters/<id>.json` (a `CharacterDef`: sheets + clips + animation bindings) and the images in
+> `project/graphics/<graphicId>` (sheets reference them by id). `npm run assets:sync` copies the graphics characters use to
+> `game/public/graphics/` and writes `data/characters.json`; `npm run assets:migrate` converts a v1 project once.
+> Ids are unchanged (`characters/player`, `objects/chest`), so maps need no migration.
+
+The v1 description below is what `shared/engine/characterMigrate.ts` converts from (kept as the golden reference in `shared/fixtures/sprites-v1/`):
 
 * `character`: sheets `walk` (+ optional `run`); rows = down, left, right, up; `framesPerDirection` frames
   per row; idle = `idleFrame` of the row for the current facing (from the walk sheet).

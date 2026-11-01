@@ -1,0 +1,696 @@
+{
+  "version": 2,
+  "characters": [
+    {
+      "id": "characters/npc-blue",
+      "def": {
+        "version": 2,
+        "name": "NPC Blue",
+        "tags": [],
+        "pivot": {
+          "x": 0.5,
+          "y": 1
+        },
+        "facing": "four",
+        "sheets": {
+          "walk": {
+            "image": "sprites/characters/npc-blue/walk.png",
+            "frameWidth": 32,
+            "frameHeight": 48,
+            "margin": 0,
+            "spacing": 0
+          },
+          "run": {
+            "image": "sprites/characters/npc-blue/run.png",
+            "frameWidth": 32,
+            "frameHeight": 48,
+            "margin": 0,
+            "spacing": 0
+          }
+        },
+        "clips": {
+          "idle": {
+            "sheet": "walk",
+            "fps": 1,
+            "loop": false,
+            "directional": true,
+            "byFacing": {
+              "down": [
+                0
+              ],
+              "left": [
+                4
+              ],
+              "right": [
+                8
+              ],
+              "up": [
+                12
+              ]
+            }
+          },
+          "walk": {
+            "sheet": "walk",
+            "fps": 10,
+            "loop": true,
+            "directional": true,
+            "byFacing": {
+              "down": [
+                0,
+                1,
+                2,
+                3
+              ],
+              "left": [
+                4,
+                5,
+                6,
+                7
+              ],
+              "right": [
+                8,
+                9,
+                10,
+                11
+              ],
+              "up": [
+                12,
+                13,
+                14,
+                15
+              ]
+            }
+          },
+          "run": {
+            "sheet": "run",
+            "fps": 15,
+            "loop": true,
+            "directional": true,
+            "byFacing": {
+              "down": [
+                0,
+                1,
+                2,
+                3
+              ],
+              "left": [
+                4,
+                5,
+                6,
+                7
+              ],
+              "right": [
+                8,
+                9,
+                10,
+                11
+              ],
+              "up": [
+                12,
+                13,
+                14,
+                15
+              ]
+            }
+          }
+        },
+        "bindings": {
+          "idle": "idle",
+          "walk": "walk",
+          "run": "run"
+        }
+      },
+      "files": {
+        "walk": "graphics/sprites/characters/npc-blue/walk.png",
+        "run": "graphics/sprites/characters/npc-blue/run.png"
+      }
+    },
+    {
+      "id": "characters/npc-green",
+      "def": {
+        "version": 2,
+        "name": "NPC Green",
+        "tags": [],
+        "pivot": {
+          "x": 0.5,
+          "y": 1
+        },
+        "facing": "four",
+        "sheets": {
+          "walk": {
+            "image": "sprites/characters/npc-green/walk.png",
+            "frameWidth": 32,
+            "frameHeight": 48,
+            "margin": 0,
+            "spacing": 0
+          },
+          "run": {
+            "image": "sprites/characters/npc-green/run.png",
+            "frameWidth": 32,
+            "frameHeight": 48,
+            "margin": 0,
+            "spacing": 0
+          }
+        },
+        "clips": {
+          "idle": {
+            "sheet": "walk",
+            "fps": 1,
+            "loop": false,
+            "directional": true,
+            "byFacing": {
+              "down": [
+                0
+              ],
+              "left": [
+                4
+              ],
+              "right": [
+                8
+              ],
+              "up": [
+                12
+              ]
+            }
+          },
+          "walk": {
+            "sheet": "walk",
+            "fps": 10,
+            "loop": true,
+            "directional": true,
+            "byFacing": {
+              "down": [
+                0,
+                1,
+                2,
+                3
+              ],
+              "left": [
+                4,
+                5,
+                6,
+                7
+              ],
+              "right": [
+                8,
+                9,
+                10,
+                11
+              ],
+              "up": [
+                12,
+                13,
+                14,
+                15
+              ]
+            }
+          },
+          "run": {
+            "sheet": "run",
+            "fps": 15,
+            "loop": true,
+            "directional": true,
+            "byFacing": {
+              "down": [
+                0,
+                1,
+                2,
+                3
+              ],
+              "left": [
+                4,
+                5,
+                6,
+                7
+              ],
+              "right": [
+                8,
+                9,
+                10,
+                11
+              ],
+              "up": [
+                12,
+                13,
+                14,
+                15
+              ]
+            }
+          }
+        },
+        "bindings": {
+          "idle": "idle",
+          "walk": "walk",
+          "run": "run"
+        }
+      },
+      "files": {
+        "walk": "graphics/sprites/characters/npc-green/walk.png",
+        "run": "graphics/sprites/characters/npc-green/run.png"
+      }
+    },
+    {
+      "id": "characters/npc-red",
+      "def": {
+        "version": 2,
+        "name": "NPC Red",
+        "tags": [],
+        "pivot": {
+          "x": 0.5,
+          "y": 1
+        },
+        "facing": "four",
+        "sheets": {
+          "walk": {
+            "image": "sprites/characters/npc-red/walk.png",
+            "frameWidth": 32,
+            "frameHeight": 48,
+            "margin": 0,
+            "spacing": 0
+          },
+          "run": {
+            "image": "sprites/characters/npc-red/run.png",
+            "frameWidth": 32,
+            "frameHeight": 48,
+            "margin": 0,
+            "spacing": 0
+          }
+        },
+        "clips": {
+          "idle": {
+            "sheet": "walk",
+            "fps": 1,
+            "loop": false,
+            "directional": true,
+            "byFacing": {
+              "down": [
+                0
+              ],
+              "left": [
+                4
+              ],
+              "right": [
+                8
+              ],
+              "up": [
+                12
+              ]
+            }
+          },
+          "walk": {
+            "sheet": "walk",
+            "fps": 10,
+            "loop": true,
+            "directional": true,
+            "byFacing": {
+              "down": [
+                0,
+                1,
+                2,
+                3
+              ],
+              "left": [
+                4,
+                5,
+                6,
+                7
+              ],
+              "right": [
+                8,
+                9,
+                10,
+                11
+              ],
+              "up": [
+                12,
+                13,
+                14,
+                15
+              ]
+            }
+          },
+          "run": {
+            "sheet": "run",
+            "fps": 15,
+            "loop": true,
+            "directional": true,
+            "byFacing": {
+              "down": [
+                0,
+                1,
+                2,
+                3
+              ],
+              "left": [
+                4,
+                5,
+                6,
+                7
+              ],
+              "right": [
+                8,
+                9,
+                10,
+                11
+              ],
+              "up": [
+                12,
+                13,
+                14,
+                15
+              ]
+            }
+          }
+        },
+        "bindings": {
+          "idle": "idle",
+          "walk": "walk",
+          "run": "run"
+        }
+      },
+      "files": {
+        "walk": "graphics/sprites/characters/npc-red/walk.png",
+        "run": "graphics/sprites/characters/npc-red/run.png"
+      }
+    },
+    {
+      "id": "characters/player",
+      "def": {
+        "version": 2,
+        "name": "Player",
+        "tags": [],
+        "pivot": {
+          "x": 0.5,
+          "y": 1
+        },
+        "facing": "four",
+        "sheets": {
+          "walk": {
+            "image": "sprites/characters/player/walk.png",
+            "frameWidth": 32,
+            "frameHeight": 48,
+            "margin": 0,
+            "spacing": 0
+          },
+          "run": {
+            "image": "sprites/characters/player/run.png",
+            "frameWidth": 32,
+            "frameHeight": 48,
+            "margin": 0,
+            "spacing": 0
+          }
+        },
+        "clips": {
+          "idle": {
+            "sheet": "walk",
+            "fps": 1,
+            "loop": false,
+            "directional": true,
+            "byFacing": {
+              "down": [
+                0
+              ],
+              "left": [
+                4
+              ],
+              "right": [
+                8
+              ],
+              "up": [
+                12
+              ]
+            }
+          },
+          "walk": {
+            "sheet": "walk",
+            "fps": 10,
+            "loop": true,
+            "directional": true,
+            "byFacing": {
+              "down": [
+                0,
+                1,
+                2,
+                3
+              ],
+              "left": [
+                4,
+                5,
+                6,
+                7
+              ],
+              "right": [
+                8,
+                9,
+                10,
+                11
+              ],
+              "up": [
+                12,
+                13,
+                14,
+                15
+              ]
+            }
+          },
+          "run": {
+            "sheet": "run",
+            "fps": 15,
+            "loop": true,
+            "directional": true,
+            "byFacing": {
+              "down": [
+                0,
+                1,
+                2,
+                3
+              ],
+              "left": [
+                4,
+                5,
+                6,
+                7
+              ],
+              "right": [
+                8,
+                9,
+                10,
+                11
+              ],
+              "up": [
+                12,
+                13,
+                14,
+                15
+              ]
+            }
+          }
+        },
+        "bindings": {
+          "idle": "idle",
+          "walk": "walk",
+          "run": "run"
+        }
+      },
+      "files": {
+        "walk": "graphics/sprites/characters/player/walk.png",
+        "run": "graphics/sprites/characters/player/run.png"
+      }
+    },
+    {
+      "id": "objects/chest",
+      "def": {
+        "version": 2,
+        "name": "Chest",
+        "tags": [],
+        "pivot": {
+          "x": 0.5,
+          "y": 1
+        },
+        "facing": "none",
+        "sheets": {
+          "sheet": {
+            "image": "sprites/objects/chest/sheet.png",
+            "frameWidth": 32,
+            "frameHeight": 32,
+            "margin": 0,
+            "spacing": 0
+          }
+        },
+        "clips": {},
+        "bindings": {},
+        "still": {
+          "sheet": "sheet",
+          "frame": 0
+        }
+      },
+      "files": {
+        "sheet": "graphics/sprites/objects/chest/sheet.png"
+      }
+    },
+    {
+      "id": "objects/door",
+      "def": {
+        "version": 2,
+        "name": "Door",
+        "tags": [],
+        "pivot": {
+          "x": 0.5,
+          "y": 1
+        },
+        "facing": "none",
+        "sheets": {
+          "sheet": {
+            "image": "sprites/objects/door/sheet.png",
+            "frameWidth": 32,
+            "frameHeight": 32,
+            "margin": 0,
+            "spacing": 0
+          }
+        },
+        "clips": {},
+        "bindings": {},
+        "still": {
+          "sheet": "sheet",
+          "frame": 0
+        }
+      },
+      "files": {
+        "sheet": "graphics/sprites/objects/door/sheet.png"
+      }
+    },
+    {
+      "id": "objects/flower",
+      "def": {
+        "version": 2,
+        "name": "Flower",
+        "tags": [],
+        "pivot": {
+          "x": 0.5,
+          "y": 1
+        },
+        "facing": "none",
+        "sheets": {
+          "sheet": {
+            "image": "sprites/objects/flower/sheet.png",
+            "frameWidth": 32,
+            "frameHeight": 32,
+            "margin": 0,
+            "spacing": 0
+          }
+        },
+        "clips": {
+          "sway": {
+            "sheet": "sheet",
+            "fps": 4,
+            "loop": true,
+            "directional": false,
+            "frames": [
+              0,
+              1,
+              2,
+              1
+            ]
+          }
+        },
+        "bindings": {}
+      },
+      "files": {
+        "sheet": "graphics/sprites/objects/flower/sheet.png"
+      }
+    },
+    {
+      "id": "objects/item-ball",
+      "def": {
+        "version": 2,
+        "name": "Item Ball",
+        "tags": [],
+        "pivot": {
+          "x": 0.5,
+          "y": 1
+        },
+        "facing": "none",
+        "sheets": {
+          "sheet": {
+            "image": "sprites/objects/item-ball/sheet.png",
+            "frameWidth": 32,
+            "frameHeight": 32,
+            "margin": 0,
+            "spacing": 0
+          }
+        },
+        "clips": {},
+        "bindings": {},
+        "still": {
+          "sheet": "sheet",
+          "frame": 0
+        }
+      },
+      "files": {
+        "sheet": "graphics/sprites/objects/item-ball/sheet.png"
+      }
+    },
+    {
+      "id": "objects/pokeball",
+      "def": {
+        "version": 2,
+        "name": "Pokeball",
+        "tags": [],
+        "pivot": {
+          "x": 0.5,
+          "y": 1
+        },
+        "facing": "none",
+        "sheets": {
+          "sheet": {
+            "image": "sprites/objects/pokeball/pokeball.png",
+            "frameWidth": 24,
+            "frameHeight": 24,
+            "margin": 0,
+            "spacing": 0
+          }
+        },
+        "clips": {},
+        "bindings": {},
+        "still": {
+          "sheet": "sheet",
+          "frame": 0
+        }
+      },
+      "files": {
+        "sheet": "graphics/sprites/objects/pokeball/pokeball.png"
+      }
+    },
+    {
+      "id": "objects/sign",
+      "def": {
+        "version": 2,
+        "name": "Wooden Sign",
+        "tags": [],
+        "pivot": {
+          "x": 0.5,
+          "y": 1
+        },
+        "facing": "none",
+        "sheets": {
+          "sheet": {
+            "image": "sprites/objects/sign/sheet.png",
+            "frameWidth": 32,
+            "frameHeight": 32,
+            "margin": 0,
+            "spacing": 0
+          }
+        },
+        "clips": {},
+        "bindings": {},
+        "still": {
+          "sheet": "sheet",
+          "frame": 0
+        }
+      },
+      "files": {
+        "sheet": "graphics/sprites/objects/sign/sheet.png"
+      }
+    }
+  ]
+}

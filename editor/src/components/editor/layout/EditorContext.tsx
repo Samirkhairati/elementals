@@ -167,16 +167,19 @@ export interface EditorBaseContextValue
   // Placement (wrapped to create the entity)
   commitPlacement: (x: number, y: number) => void
 
-  // Sprite assets (project/sprites)
+  // Characters (project/database/characters) and graphics (project/graphics)
   spriteAssets: Sprites['assets']
   spriteList: Sprites['list']
   spriteFolders: Sprites['folders']
   spriteWarnings: Sprites['warnings']
   getSpriteAsset: Sprites['getAsset']
   reloadSprites: Sprites['reload']
+  characters: Sprites['characters']
+  graphics: Sprites['graphics']
+  getCharacter: Sprites['getCharacter']
   pickSpriteFile: Sprites['pickFile']
-  importSprite: Sprites['importSprite']
-  saveSpriteMeta: Sprites['saveMeta']
+  importGraphic: Sprites['importGraphic']
+  saveCharacter: Sprites['saveCharacter']
   renameSprite: Sprites['rename']
   removeSprite: Sprites['remove']
   createSpriteFolder: Sprites['createFolder']

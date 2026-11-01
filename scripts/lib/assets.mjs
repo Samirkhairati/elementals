@@ -1,9 +1,10 @@
-// Library behind scripts/sync-assets.mjs: turns the authored project (project/sprites, project/database.json,
-// project/tilesets) into what the game loads from game/public:
+// Library behind scripts/sync-assets.mjs: turns the authored project (project/database/characters,
+// project/graphics, project/database.json, project/tilesets, project/common) into what the game loads
+// from game/public:
 //
-//   graphics/sprites/<id>/<sheet>.png   copies of every sprite sheet a sprite.json refers to
+//   graphics/<graphicId>                copies of every graphic some character refers to (project/graphics/<graphicId>)
 //   graphics/tilesets/<name>.png        project tilesets the game does not have yet (never overwritten, see --force)
-//   data/sprites.json                   SpriteManifest (shared/engine/sprites.ts): every sprite's meta + web-relative sheet URLs
+//   data/characters.json                CharacterManifest (shared/engine/graphics.ts): every character + web-relative sheet URLs
 //   data/database.json                  the global switches / variables
 //   data/common.json                    the common events (project/common/<id>.json), sorted by id
 //   data/tilesets.json                  every tileset PNG the game has (name = file stem)
@@ -18,15 +19,14 @@ import { parseArgs } from 'node:util'
 import { fileURLToPath } from 'node:url'
 import { readPngSize } from '../../shared/png.ts'
 import {
+  buildCharacterManifest,
   buildCommonManifest,
   buildDatabaseManifest,
+  characterGraphics,
   findCommonCycles,
-  buildSpriteManifest,
-  checkSpriteSheets,
-  checkSpriteStructure,
-  isValidSpriteId,
-  normalizeSpriteMeta,
-  sheetNamesOf,
+  isValidCharacterId,
+  isValidGraphicId,
+  validateCharacterSet,
   validateDatabaseStrict,
 } from './assets-validate.mjs'
 
@@ -41,7 +41,9 @@ export const STATUS = Object.freeze({
 })
 const DRIFT = new Set([STATUS.CREATE, STATUS.UPDATE, STATUS.STALE])
 
-export const SPRITES_OUT = 'graphics/sprites'
+export const GRAPHICS_OUT = 'graphics'
+export const CHARACTERS_SRC = 'database/characters'
+export const GRAPHICS_SRC = 'graphics'
 export const TILESETS_OUT = 'graphics/tilesets'
 
 export function defaultPaths() {
@@ -74,68 +76,61 @@ export function listFilesDeep(dir, filter = () => true) {
   return out
 }
 
-// ── sprites ────────────────────────────────────────────────────────────────
+// ── characters + graphics ──────────────────────────────────────────────────
 
 /**
- * Reads and validates every `sprite.json` below `spritesDir`.
- * Returns { assets: [{ id, dir, meta, sheets: { file: Buffer } }], errors, warnings } sorted by id.
+ * Reads and validates every character below `<projectDir>/database/characters` and the graphics they use.
+ * Returns { characters: [{ id, def }], graphics: { id: Buffer }, errors, warnings } sorted by id.
  */
-export function loadSprites(spritesDir) {
-  const assets = []
+export function loadCharacters(projectDir) {
+  const charsDir = path.join(projectDir, CHARACTERS_SRC)
+  const graphicsDir = path.join(projectDir, GRAPHICS_SRC)
+  const characters = []
   const errors = []
   const warnings = []
-  for (const metaPath of listFilesDeep(spritesDir, (f) => path.basename(f) === 'sprite.json')) {
-    const dir = path.dirname(metaPath)
-    const id = posix(path.relative(spritesDir, dir))
-    const fail = (msg) => errors.push(`sprite "${id || '.'}": ${msg}`)
-    if (id === '') {
-      errors.push('sprites/sprite.json: must live inside an asset directory (sprites/<id>/sprite.json)')
-      continue
-    }
-    if (!isValidSpriteId(id)) {
-      fail('invalid id (use "/"-separated names of letters, digits, "_" and "-")')
-      continue
-    }
-    let raw
+  for (const file of listFilesDeep(charsDir, (f) => f.endsWith('.json'))) {
+    const id = posix(path.relative(charsDir, file)).replace(/\.json$/, '')
+    let def
     try {
-      raw = JSON.parse(fs.readFileSync(metaPath, 'utf8'))
+      def = JSON.parse(fs.readFileSync(file, 'utf8'))
     } catch (e) {
-      fail(`sprite.json is not valid JSON: ${e.message}`)
+      errors.push(`character "${id}": not valid JSON: ${e.message}`)
       continue
     }
-    // Structural check first: only then are the sheet names safe to touch the disk with.
-    const structural = checkSpriteStructure(raw)
-    structural.warnings.forEach((w) => warnings.push(`sprite "${id}": ${w}`))
-    if (structural.errors.length > 0) {
-      structural.errors.forEach(fail)
+    if (!isValidCharacterId(id)) {
+      errors.push(`character "${id}": invalid id (use "/"-separated names of letters, digits, "_" and "-")`)
       continue
     }
-    const sheets = {}
-    const sizes = {}
-    for (const file of sheetNamesOf(raw)) {
+    if (def?.version === 1 || def?.kind !== undefined) {
+      errors.push(`character "${id}": this is a v1 sprite.json; run \`npm run assets:migrate\``)
+      continue
+    }
+    characters.push({ id, def })
+  }
+  characters.sort((a, b) => byName(a.id, b.id))
+
+  // graphics: only the ones characters name (and only valid ids ever touch the disk)
+  const graphics = {}
+  const sizes = {}
+  for (const { def } of characters) {
+    const sheets = def && typeof def === 'object' && def.sheets && typeof def.sheets === 'object' ? def.sheets : {}
+    for (const sheet of Object.values(sheets)) {
+      const image = sheet && typeof sheet === 'object' ? sheet.image : undefined
+      if (typeof image !== 'string' || graphics[image] !== undefined || !isValidGraphicId(image)) continue
       try {
-        const bytes = fs.readFileSync(path.join(dir, file))
-        sizes[file] = readPngSize(bytes)
-        sheets[file] = bytes
+        const bytes = fs.readFileSync(path.join(graphicsDir, image))
+        sizes[image] = readPngSize(bytes)
+        graphics[image] = bytes
       } catch (e) {
-        if (e.code === 'ENOENT') continue // reported by the validator as "does not exist"
-        fail(`sheet "${file}": ${e.message}`)
+        if (e.code !== 'ENOENT') errors.push(`graphic "${image}": ${e.message}`)
       }
     }
-    const checked = checkSpriteSheets(raw, sizes)
-    checked.warnings.forEach((w) => warnings.push(`sprite "${id}": ${w}`))
-    if (checked.errors.length > 0) {
-      checked.errors.forEach(fail)
-      continue
-    }
-    const used = new Set(['sprite.json', ...Object.keys(sheets)])
-    for (const f of fs.readdirSync(dir)) {
-      if (!used.has(f) && !f.startsWith('.')) warnings.push(`sprite "${id}": "${f}" is not used by sprite.json (not copied)`)
-    }
-    assets.push({ id, dir, meta: normalizeSpriteMeta(raw, sizes), sheets })
   }
-  assets.sort((a, b) => byName(a.id, b.id))
-  return { assets, errors, warnings }
+  for (const issue of validateCharacterSet(characters, sizes)) {
+    if (issue.severity === 'error') errors.push(`character "${issue.id}": ${issue.message}`)
+    else if (issue.severity === 'warning') warnings.push(`character "${issue.id}": ${issue.message}`)
+  }
+  return { characters, graphics, errors, warnings }
 }
 
 // ── tilesets ───────────────────────────────────────────────────────────────
@@ -181,13 +176,14 @@ export function planSync({ projectDir, publicDir, force = false }) {
     actions.push({ rel, kind, status, content: buf })
   }
 
-  // sprites
-  const sprites = loadSprites(path.join(projectDir, 'sprites'))
-  errors.push(...sprites.errors)
-  warnings.push(...sprites.warnings)
-  for (const a of sprites.assets) {
-    for (const [file, bytes] of Object.entries(a.sheets)) add(`${SPRITES_OUT}/${a.id}/${file}`, 'sprite-sheet', bytes)
+  // characters and the graphics they use
+  const chars = loadCharacters(projectDir)
+  errors.push(...chars.errors)
+  warnings.push(...chars.warnings)
+  if (fs.existsSync(path.join(projectDir, 'sprites')) && listFilesDeep(path.join(projectDir, 'sprites'), (f) => f.endsWith('sprite.json')).length > 0) {
+    errors.push('project/sprites still holds v1 sprite assets; run `npm run assets:migrate`')
   }
+  for (const [id, bytes] of Object.entries(chars.graphics)) add(`${GRAPHICS_OUT}/${id}`, 'graphic', bytes)
 
   // database
   let database = { version: 1, switches: [], variables: [] }
@@ -244,7 +240,7 @@ export function planSync({ projectDir, publicDir, force = false }) {
   }
 
   // manifests
-  add('data/sprites.json', 'manifest', toJson(buildSpriteManifest(sprites.assets)))
+  add('data/characters.json', 'manifest', toJson(buildCharacterManifest(chars.characters)))
   add('data/database.json', 'manifest', toJson(database))
   add('data/common.json', 'manifest', toJson(common))
   add(
@@ -256,11 +252,20 @@ export function planSync({ projectDir, publicDir, force = false }) {
     })
   )
 
-  // generated sprite files nobody produces any more
-  for (const full of listFilesDeep(path.join(publicDir, SPRITES_OUT))) {
-    const rel = posix(path.relative(publicDir, full))
-    if (!expected.has(rel)) actions.push({ rel, kind: 'sprite-sheet', status: STATUS.STALE, content: null })
+  // generated graphics nobody produces any more: only below the library's top-level folders (and `sprites`),
+  // so the game's own graphics/tilesets, graphics/meta, ... are never touched
+  const roots = new Set(['sprites'])
+  const graphicsSrc = path.join(projectDir, GRAPHICS_SRC)
+  if (fs.existsSync(graphicsSrc)) for (const e of fs.readdirSync(graphicsSrc, { withFileTypes: true })) if (e.isDirectory() && !e.name.startsWith('.')) roots.add(e.name)
+  roots.delete('tilesets')
+  for (const root of roots) {
+    for (const full of listFilesDeep(path.join(publicDir, GRAPHICS_OUT, root))) {
+      const rel = posix(path.relative(publicDir, full))
+      if (!expected.has(rel)) actions.push({ rel, kind: 'graphic', status: STATUS.STALE, content: null })
+    }
   }
+  // the v1 manifest is retired
+  if (fs.existsSync(path.join(publicDir, 'data/sprites.json'))) actions.push({ rel: 'data/sprites.json', kind: 'manifest', status: STATUS.STALE, content: null })
 
   return { actions, errors, warnings }
 }
@@ -307,7 +312,7 @@ export function applyPlan(plan, { publicDir }) {
       applied.push(action)
     } else if (action.status === STATUS.STALE) {
       fs.rmSync(target, { force: true })
-      pruneEmptyDirs(path.join(publicDir, SPRITES_OUT), path.dirname(target))
+      pruneEmptyDirs(path.join(publicDir, GRAPHICS_OUT), path.dirname(target))
       applied.push(action)
     }
   }
@@ -328,15 +333,15 @@ export function syncAssets({ projectDir, publicDir, write = false, force = false
 export const HELP = `Usage: node scripts/sync-assets.mjs [--check | --write] [options]
 
 Generates what the game loads from the authored project data:
-  game/public/graphics/sprites/<id>/*.png   sprite sheets (copies of project/sprites/<id>/*.png)
+  game/public/graphics/<graphicId>          the graphics characters use (copies of project/graphics/<graphicId>)
   game/public/graphics/tilesets/*.png       project tilesets the game lacks (existing files are kept)
-  game/public/data/sprites.json             sprite manifest (ids, metas, sheet URLs)
+  game/public/data/characters.json          character manifest (ids, definitions, sheet URLs)
   game/public/data/database.json            global switches and variables
   game/public/data/common.json              common events (project/common/<id>.json)
   game/public/data/tilesets.json            every tileset PNG the game has
 
   --check            (default) report drift; exit 1 when generated output is missing or stale
-  --write            write missing / changed output and remove stale generated sprite files
+  --write            write missing / changed output and remove stale generated graphics
   --force            with --write: also overwrite existing game tilesets that differ from the project
   --strict           with --check: exit 1 for game tilesets that differ from the project, too
   --project-dir <d>  authored project (default project/)

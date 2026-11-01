@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { SpriteAssetInfo, SpriteAssetMeta } from '../../../shared/engine/types'
-import type { ImportSpriteOptions } from '@/types/electron'
+import { characterToAssetInfo, type CharacterInfo, type GraphicInfo } from '../../../shared/engine/graphics'
+import type { CharacterDef } from '../../../shared/engine/characters'
+import type { SpriteAssetInfo } from '../../../shared/engine/types'
 import { runIpc, type OpResult } from '@/lib/opResult'
 
 export interface SpriteWarning {
@@ -9,28 +10,34 @@ export interface SpriteWarning {
 }
 
 export interface UseSpriteAssets {
-  /** Every sprite asset by id (`characters/player`). */
+  /** Every character by id (`characters/player`) in the `SpriteAssetInfo` view the map screens use. */
   assets: Record<string, SpriteAssetInfo>
   /** The same assets sorted by id (stable between renders while nothing changes). */
   list: SpriteAssetInfo[]
-  /** Every folder under project/sprites (ids like `characters/npcs`), empty ones included, sorted. */
+  /** Every character with its full v2 definition and pictures, by id. */
+  characters: Record<string, CharacterInfo>
+  /** Every image in project/graphics. */
+  graphics: GraphicInfo[]
+  /** Every folder under project/database/characters (ids like `characters/npcs`), empty ones included, sorted. */
   folders: string[]
   loading: boolean
   /** Last load/operation failure, or null. */
   error: string | null
-  /** Assets on disk that were skipped because they are invalid. */
+  /** Files on disk that were skipped because they are invalid. */
   warnings: SpriteWarning[]
   getAsset: (id: string | null | undefined) => SpriteAssetInfo | undefined
+  getCharacter: (id: string | null | undefined) => CharacterInfo | undefined
   /** Re-read everything from disk. */
   reload: () => Promise<void>
   /** Native file picker -> the chosen path (null when cancelled). */
   pickFile: () => Promise<OpResult<{ sourcePath: string | null; defaultName: string }>>
-  importSprite: (sourcePath: string, options: ImportSpriteOptions) => Promise<OpResult<{ asset: SpriteAssetInfo }>>
-  saveMeta: (id: string, meta: SpriteAssetMeta) => Promise<OpResult<{ meta: SpriteAssetMeta }>>
-  /** Rename and/or move to a new id (directory path). Refuses to overwrite. */
+  /** Copies an image into project/graphics under `graphicId` (refuses to overwrite). */
+  importGraphic: (sourcePath: string, graphicId: string) => Promise<OpResult<{ graphic: GraphicInfo; image: string }>>
+  /** Creates or overwrites a character record. */
+  saveCharacter: (id: string, def: CharacterDef) => Promise<OpResult<{ character: CharacterInfo }>>
+  /** Rename and/or move to a new id. Refuses to overwrite. References are NOT rewritten (see the rename flow). */
   rename: (id: string, newId: string) => Promise<OpResult<{ id: string }>>
   remove: (id: string) => Promise<OpResult>
-  /** Folder operations mirror the directories under project/sprites. Renaming / moving changes the ids of the sprites inside. */
   createFolder: (parentId: string | null, name: string) => Promise<OpResult<{ folderId: string }>>
   renameFolder: (folderId: string, newName: string) => Promise<OpResult<{ folderId: string }>>
   moveFolder: (folderId: string, newParentId: string | null) => Promise<OpResult<{ folderId: string }>>
@@ -38,7 +45,8 @@ export interface UseSpriteAssets {
 }
 
 interface State {
-  assets: Record<string, SpriteAssetInfo>
+  characters: Record<string, CharacterInfo>
+  graphics: GraphicInfo[]
   folders: string[]
   loading: boolean
   error: string | null
@@ -46,13 +54,14 @@ interface State {
 }
 
 const api = () => window.electronAPI
+const byId = <T extends { id: string }>(a: T, b: T) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
 
 /**
- * Sprite assets of the project (`project/sprites`). Mutations go through IPC first and update local state from
- * the main process' answer, so the state always mirrors what is on disk.
+ * Characters and graphics of the project (`project/database/characters`, `project/graphics`). Mutations go
+ * through IPC first and update local state from the main process' answer, so the state mirrors the disk.
  */
 export function useSpriteAssets(): UseSpriteAssets {
-  const [state, setState] = useState<State>({ assets: {}, folders: [], loading: true, error: null, warnings: [] })
+  const [state, setState] = useState<State>({ characters: {}, graphics: [], folders: [], loading: true, error: null, warnings: [] })
   // Latest-wins guard for async loads; bumped on unmount so late answers are ignored.
   const [requests] = useState(() => ({ latest: 0 }))
 
@@ -60,8 +69,8 @@ export function useSpriteAssets(): UseSpriteAssets {
     const id = ++requests.latest
     setState((s) => ({ ...s, loading: true }))
     const result = await runIpc(
-      () => api()?.getSprites(),
-      (r) => ({ assets: r.assets ?? [], folders: r.folders ?? [], warnings: r.warnings ?? [] })
+      () => api()?.getCharacters(),
+      (r) => ({ characters: r.characters ?? [], graphics: r.graphics ?? [], folders: r.folders ?? [], warnings: r.warnings ?? [] })
     )
     if (id !== requests.latest) return // a newer reload (or unmount) superseded this one
     if (!result.ok) {
@@ -69,7 +78,8 @@ export function useSpriteAssets(): UseSpriteAssets {
       return
     }
     setState({
-      assets: Object.fromEntries(result.assets.map((a) => [a.id, a])),
+      characters: Object.fromEntries(result.characters.map((c) => [c.id, c])),
+      graphics: result.graphics,
       folders: result.folders,
       loading: false,
       error: null,
@@ -101,32 +111,26 @@ export function useSpriteAssets(): UseSpriteAssets {
     }
   }, [])
 
-  const importSprite = useCallback<UseSpriteAssets['importSprite']>(
-    async (sourcePath, options) => {
+  const importGraphic = useCallback<UseSpriteAssets['importGraphic']>(
+    async (sourcePath, graphicId) => {
       const result = await runIpc(
-        () => api()?.importSprite(sourcePath, options),
-        (r) => ({ asset: r.asset })
+        () => api()?.importGraphic(sourcePath, graphicId),
+        (r) => ({ graphic: r.graphic, image: r.image })
       )
-      if (result.ok) setState((s) => ({ ...s, error: null, assets: { ...s.assets, [result.asset.id]: result.asset } }))
-      return setFailure(result) as OpResult<{ asset: SpriteAssetInfo }>
+      if (result.ok) setState((s) => ({ ...s, error: null, graphics: [...s.graphics.filter((g) => g.id !== result.graphic.id), result.graphic].sort(byId) }))
+      return setFailure(result) as OpResult<{ graphic: GraphicInfo; image: string }>
     },
     [setFailure]
   )
 
-  const saveMeta = useCallback<UseSpriteAssets['saveMeta']>(
-    async (id, meta) => {
+  const saveCharacter = useCallback<UseSpriteAssets['saveCharacter']>(
+    async (id, def) => {
       const result = await runIpc(
-        () => api()?.saveSpriteMeta(id, meta),
-        (r) => ({ meta: r.meta })
+        () => api()?.saveCharacter(id, def),
+        (r) => ({ character: r.character })
       )
-      if (result.ok) {
-        setState((s) => {
-          const current = s.assets[id]
-          if (!current) return s
-          return { ...s, error: null, assets: { ...s.assets, [id]: { ...current, meta: result.meta } } }
-        })
-      }
-      return setFailure(result) as OpResult<{ meta: SpriteAssetMeta }>
+      if (result.ok) setState((s) => ({ ...s, error: null, characters: { ...s.characters, [id]: result.character } }))
+      return setFailure(result) as OpResult<{ character: CharacterInfo }>
     },
     [setFailure]
   )
@@ -134,15 +138,15 @@ export function useSpriteAssets(): UseSpriteAssets {
   const rename = useCallback<UseSpriteAssets['rename']>(
     async (id, newId) => {
       const result = await runIpc(
-        () => api()?.renameSprite(id, newId),
+        () => api()?.renameCharacter(id, newId),
         (r) => ({ id: r.id })
       )
       if (result.ok) {
         setState((s) => {
-          const current = s.assets[id]
+          const current = s.characters[id]
           if (!current) return s
-          const { [id]: _removed, ...rest } = s.assets
-          return { ...s, error: null, assets: { ...rest, [result.id]: { ...current, id: result.id } } }
+          const { [id]: _removed, ...rest } = s.characters
+          return { ...s, error: null, characters: { ...rest, [result.id]: { ...current, id: result.id } } }
         })
       }
       return setFailure(result) as OpResult<{ id: string }>
@@ -153,13 +157,13 @@ export function useSpriteAssets(): UseSpriteAssets {
   const remove = useCallback<UseSpriteAssets['remove']>(
     async (id) => {
       const result = await runIpc(
-        () => api()?.deleteSprite(id),
+        () => api()?.deleteCharacter(id),
         () => ({})
       )
       if (result.ok) {
         setState((s) => {
-          const { [id]: _removed, ...rest } = s.assets
-          return { ...s, error: null, assets: rest }
+          const { [id]: _removed, ...rest } = s.characters
+          return { ...s, error: null, characters: rest }
         })
       }
       return setFailure(result)
@@ -167,76 +171,41 @@ export function useSpriteAssets(): UseSpriteAssets {
     [setFailure]
   )
 
-  // Folder operations can change the ids of many sprites at once, so they re-read the project afterwards.
-  const createFolder = useCallback<UseSpriteAssets['createFolder']>(
-    async (parentId, name) => {
-      const result = await runIpc(
-        () => api()?.createSpriteFolder(parentId, name),
-        (r) => ({ folderId: r.folderId })
-      )
-      if (result.ok) await reload()
-      return setFailure(result) as OpResult<{ folderId: string }>
-    },
+  // Folder operations can change the ids of many characters at once, so they re-read the project afterwards.
+  const folderOp = useCallback(
+    <T extends object>(call: () => Promise<unknown> | undefined, pick: (r: never) => T) =>
+      (async () => {
+        const result = await runIpc(call as never, pick as never)
+        if (result.ok) await reload()
+        return setFailure(result as OpResult<object>) as OpResult<T>
+      })(),
     [reload, setFailure]
   )
+  const createFolder = useCallback<UseSpriteAssets['createFolder']>((parentId, name) => folderOp(() => api()?.createCharacterFolder(parentId, name), (r: { folderId: string }) => ({ folderId: r.folderId }) as never), [folderOp])
+  const renameFolder = useCallback<UseSpriteAssets['renameFolder']>((folderId, newName) => folderOp(() => api()?.renameCharacterFolder(folderId, newName), (r: { folderId: string }) => ({ folderId: r.folderId }) as never), [folderOp])
+  const moveFolder = useCallback<UseSpriteAssets['moveFolder']>((folderId, newParentId) => folderOp(() => api()?.moveCharacterFolder(folderId, newParentId), (r: { folderId: string }) => ({ folderId: r.folderId }) as never), [folderOp])
+  const deleteFolder = useCallback<UseSpriteAssets['deleteFolder']>((folderId) => folderOp(() => api()?.deleteCharacterFolder(folderId), () => ({}) as never), [folderOp])
 
-  const renameFolder = useCallback<UseSpriteAssets['renameFolder']>(
-    async (folderId, newName) => {
-      const result = await runIpc(
-        () => api()?.renameSpriteFolder(folderId, newName),
-        (r) => ({ folderId: r.folderId })
-      )
-      if (result.ok) await reload()
-      return setFailure(result) as OpResult<{ folderId: string }>
-    },
-    [reload, setFailure]
-  )
-
-  const moveFolder = useCallback<UseSpriteAssets['moveFolder']>(
-    async (folderId, newParentId) => {
-      const result = await runIpc(
-        () => api()?.moveSpriteFolder(folderId, newParentId),
-        (r) => ({ folderId: r.folderId })
-      )
-      if (result.ok) await reload()
-      return setFailure(result) as OpResult<{ folderId: string }>
-    },
-    [reload, setFailure]
-  )
-
-  const deleteFolder = useCallback<UseSpriteAssets['deleteFolder']>(
-    async (folderId) => {
-      const result = await runIpc(
-        () => api()?.deleteSpriteFolder(folderId),
-        () => ({})
-      )
-      if (result.ok) await reload()
-      return setFailure(result)
-    },
-    [reload, setFailure]
-  )
-
-  const list = useMemo(
-    () => Object.values(state.assets).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
-    [state.assets]
-  )
-  const getAsset = useCallback(
-    (id: string | null | undefined) => (id ? state.assets[id] : undefined),
-    [state.assets]
-  )
+  const assets = useMemo(() => Object.fromEntries(Object.values(state.characters).map((c) => [c.id, characterToAssetInfo(c) as SpriteAssetInfo])), [state.characters])
+  const list = useMemo(() => Object.values(assets).sort(byId), [assets])
+  const getAsset = useCallback((id: string | null | undefined) => (id ? assets[id] : undefined), [assets])
+  const getCharacter = useCallback((id: string | null | undefined) => (id ? state.characters[id] : undefined), [state.characters])
 
   return {
-    assets: state.assets,
+    assets,
     list,
+    characters: state.characters,
+    graphics: state.graphics,
     folders: state.folders,
     loading: state.loading,
     error: state.error,
     warnings: state.warnings,
     getAsset,
+    getCharacter,
     reload,
     pickFile,
-    importSprite,
-    saveMeta,
+    importGraphic,
+    saveCharacter,
     rename,
     remove,
     createFolder,

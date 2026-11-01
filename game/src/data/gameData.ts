@@ -27,14 +27,14 @@ export function parseTilesetManifest(raw: unknown): TilesetEntry[] {
 
 /** Cache keys the Boot scene stores the manifests under. */
 export const MANIFEST_KEYS = {
-  sprites: "manifest:sprites",
+  characters: "manifest:characters",
   database: "manifest:database",
   common: "manifest:common",
   tilesets: "manifest:tilesets",
 } as const;
 
 export const MANIFEST_URLS = {
-  sprites: "data/sprites.json",
+  characters: "data/characters.json",
   database: "data/database.json",
   common: "data/common.json",
   tilesets: "data/tilesets.json",

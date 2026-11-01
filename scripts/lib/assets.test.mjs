@@ -8,12 +8,12 @@ import {
   STATUS,
   applyPlan,
   defaultPaths,
-  loadSprites,
+  loadCharacters,
   planSync,
   runCli,
   syncAssets,
 } from './assets.mjs'
-import { buildSpriteManifest } from './assets-validate.mjs'
+import { buildCharacterManifest } from './assets-validate.mjs'
 import { makePng, makeTmpDir, snapshot, writeJson } from './test-helpers.mjs'
 
 const SCRIPT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'sync-assets.mjs')
@@ -23,40 +23,34 @@ afterEach(() => {
   while (tmpRoots.length) fs.rmSync(tmpRoots.pop(), { recursive: true, force: true })
 })
 
-const charMeta = (over = {}) => ({
-  version: 1,
-  name: 'Hero',
-  kind: 'character',
-  frameWidth: 32,
-  frameHeight: 48,
-  margin: 0,
-  spacing: 0,
-  pivotX: 0.5,
-  pivotY: 1,
-  character: { sheets: { walk: 'walk.png', run: 'run.png' }, framesPerDirection: 4, idleFrame: 0, walkFps: 10, runFps: 15 },
+const cut = (image, frameWidth, frameHeight) => ({ image, frameWidth, frameHeight, margin: 0, spacing: 0 })
+const row = (n, k) => [0, 1, 2, 3].map((i) => i * n + k)
+const clipRows = (sheet, fps, loop, frames) => ({ sheet, fps, loop, directional: true, byFacing: { down: frames(0), left: frames(1), right: frames(2), up: frames(3) } })
+/** A four-facing hero (walk + run sheets, 4x4 frames of 32x48) and a static ball (24x24). */
+const heroDef = (over = {}) => ({
+  version: 2, name: 'Hero', tags: [], facing: 'four', pivot: { x: 0.5, y: 1 },
+  sheets: { walk: cut('sprites/characters/hero/walk.png', 32, 48), run: cut('sprites/characters/hero/run.png', 32, 48) },
+  clips: {
+    idle: clipRows('walk', 1, false, (r) => [r * 4]),
+    walk: clipRows('walk', 10, true, (r) => [r * 4, r * 4 + 1, r * 4 + 2, r * 4 + 3]),
+    run: clipRows('run', 15, true, (r) => [r * 4, r * 4 + 1, r * 4 + 2, r * 4 + 3]),
+  },
+  bindings: { idle: 'idle', walk: 'walk', run: 'run' },
   ...over,
 })
-const objMeta = (over = {}) => ({
-  version: 1,
-  name: 'Ball',
-  kind: 'object',
-  frameWidth: 24,
-  frameHeight: 24,
-  margin: 0,
-  spacing: 0,
-  pivotX: 0.5,
-  pivotY: 1,
-  sheet: 'ball.png',
+const ballDef = (over = {}) => ({
+  version: 2, name: 'Ball', tags: [], facing: 'none', pivot: { x: 0.5, y: 1 },
+  sheets: { sheet: cut('props/ball.png', 24, 24) }, clips: {}, bindings: {}, still: { sheet: 'sheet', frame: 0 },
   ...over,
 })
 
-/** <root>/project (sprites, tilesets, database.json) and <root>/public (the game's public dir). */
+/** <root>/project (database/characters, graphics, tilesets, database.json) and <root>/public (the game's public dir). */
 function sandbox({ database = {}, withTilesets = true } = {}) {
   const root = makeTmpDir('elementals-assets-')
   tmpRoots.push(root)
   const projectDir = path.join(root, 'project')
   const publicDir = path.join(root, 'game', 'public')
-  fs.mkdirSync(path.join(projectDir, 'sprites'), { recursive: true })
+  fs.mkdirSync(path.join(projectDir, 'database', 'characters'), { recursive: true })
   fs.mkdirSync(publicDir, { recursive: true })
   writeJson(path.join(projectDir, 'database.json'), {
     version: 1,
@@ -69,11 +63,14 @@ function sandbox({ database = {}, withTilesets = true } = {}) {
     projectDir,
     publicDir,
     args: ['--project-dir', projectDir, '--game-dir', path.join(root, 'game')],
-    sprite(id, meta, sheets, png = makePng) {
-      const dir = path.join(projectDir, 'sprites', id)
-      fs.mkdirSync(dir, { recursive: true })
-      writeJson(path.join(dir, 'sprite.json'), meta)
-      for (const [file, [w, h]] of Object.entries(sheets)) fs.writeFileSync(path.join(dir, file), png(w, h))
+    graphic(id, w, h) {
+      const file = path.join(projectDir, 'graphics', id)
+      fs.mkdirSync(path.dirname(file), { recursive: true })
+      fs.writeFileSync(file, makePng(w, h))
+    },
+    character(id, def, graphics = {}) {
+      writeJson(path.join(projectDir, 'database', 'characters', `${id}.json`), def)
+      for (const [gid, [w, h]] of Object.entries(graphics)) sb.graphic(gid, w, h)
     },
     tileset(rel, w = 32, h = 32) {
       const file = path.join(projectDir, 'tilesets', rel)
@@ -96,8 +93,8 @@ function sandbox({ database = {}, withTilesets = true } = {}) {
       return { code, stdout, stderr }
     },
   }
-  sb.sprite('characters/hero', charMeta(), { 'walk.png': [128, 192], 'run.png': [128, 192] })
-  sb.sprite('objects/ball', objMeta(), { 'ball.png': [24, 24] })
+  sb.character('characters/hero', heroDef(), { 'sprites/characters/hero/walk.png': [128, 192], 'sprites/characters/hero/run.png': [128, 192] })
+  sb.character('objects/ball', ballDef(), { 'props/ball.png': [24, 24] })
   if (withTilesets) {
     sb.tileset('Outside/grass.png')
     sb.tileset('Inside/interior.png', 64, 64)
@@ -108,47 +105,54 @@ function sandbox({ database = {}, withTilesets = true } = {}) {
 const find = (plan, rel) => plan.actions.find((a) => a.rel === rel)
 const errorsOf = (sb) => planSync({ projectDir: sb.projectDir, publicDir: sb.publicDir }).errors.join('\n')
 
-describe('loadSprites / manifest', () => {
-  test('loads sorted, validated assets; the manifest has web-relative URLs', () => {
+describe('loadCharacters / manifest', () => {
+  test('loads sorted, validated characters; the manifest has web-relative URLs per sheet key', () => {
     const sb = sandbox()
-    const { assets, errors, warnings } = loadSprites(path.join(sb.projectDir, 'sprites'))
+    const { characters, graphics, errors, warnings } = loadCharacters(sb.projectDir)
     assert.deepEqual(errors, [])
     assert.deepEqual(warnings, [])
-    assert.deepEqual(assets.map((a) => a.id), ['characters/hero', 'objects/ball'])
-    const manifest = buildSpriteManifest(assets)
-    assert.equal(manifest.version, 1)
-    assert.deepEqual(manifest.sprites.map((s) => s.id), ['characters/hero', 'objects/ball'])
-    assert.deepEqual(manifest.sprites[0].files, {
-      'walk.png': 'graphics/sprites/characters/hero/walk.png',
-      'run.png': 'graphics/sprites/characters/hero/run.png',
+    assert.deepEqual(characters.map((c) => c.id), ['characters/hero', 'objects/ball'])
+    assert.deepEqual(Object.keys(graphics).sort(), ['props/ball.png', 'sprites/characters/hero/run.png', 'sprites/characters/hero/walk.png'])
+    const manifest = buildCharacterManifest(characters)
+    assert.equal(manifest.version, 2)
+    assert.deepEqual(manifest.characters[0].files, {
+      walk: 'graphics/sprites/characters/hero/walk.png',
+      run: 'graphics/sprites/characters/hero/run.png',
     })
-    assert.equal(manifest.sprites[1].meta.sheet, 'ball.png')
+    assert.equal(manifest.characters[1].def.sheets.sheet.frameWidth, 24)
   })
 
-  test('warns about unused files', () => {
+  test('only graphics that characters use are loaded', () => {
     const sb = sandbox()
-    fs.writeFileSync(path.join(sb.projectDir, 'sprites/objects/ball/notes.txt'), 'x')
-    const { warnings } = loadSprites(path.join(sb.projectDir, 'sprites'))
-    assert.match(warnings.join(), /notes\.txt/)
+    sb.graphic('unused/thing.png', 8, 8)
+    assert.ok(!('unused/thing.png' in loadCharacters(sb.projectDir).graphics))
   })
 
-  test('a missing sprites directory is just empty', () => {
+  test('warns about frames beyond the sheet', () => {
+    const sb = sandbox()
+    sb.character('objects/ball', ballDef({ clips: { spin: { sheet: 'sheet', fps: 4, loop: true, directional: false, frames: [0, 5] } } }), { 'props/ball.png': [24, 24] })
+    assert.match(loadCharacters(sb.projectDir).warnings.join(), /frame 5/)
+  })
+
+  test('a missing characters directory is just empty', () => {
     const root = makeTmpDir()
     tmpRoots.push(root)
-    assert.deepEqual(loadSprites(path.join(root, 'nope')), { assets: [], errors: [], warnings: [] })
+    assert.deepEqual(loadCharacters(root), { characters: [], graphics: {}, errors: [], warnings: [] })
   })
 })
 
 describe('validation errors (nothing is written)', () => {
+  const charFile = (sb, id) => path.join(sb.projectDir, 'database/characters', `${id}.json`)
   const cases = [
-    ['missing sheet', (sb) => fs.rmSync(path.join(sb.projectDir, 'sprites/characters/hero/run.png')), /sprite "characters\/hero": sheet "run.png" does not exist/],
-    ['frame size does not divide the sheet', (sb) => writeJson(path.join(sb.projectDir, 'sprites/objects/ball/sprite.json'), objMeta({ frameWidth: 25 })), /does not tile sheet "ball.png"/],
-    ['bad kind', (sb) => writeJson(path.join(sb.projectDir, 'sprites/objects/ball/sprite.json'), objMeta({ kind: 'monster' })), /kind must be one of/],
-    ['invalid JSON', (sb) => fs.writeFileSync(path.join(sb.projectDir, 'sprites/objects/ball/sprite.json'), '{nope'), /not valid JSON/],
-    ['sheet is not a PNG', (sb) => fs.writeFileSync(path.join(sb.projectDir, 'sprites/objects/ball/ball.png'), 'text, not a png at all!!'), /sheet "ball.png": Not a PNG/],
-    ['sheet path escapes', (sb) => writeJson(path.join(sb.projectDir, 'sprites/objects/ball/sprite.json'), objMeta({ sheet: '../hero/walk.png' })), /sheet must be a \.png file name/],
-    ['invalid id', (sb) => sb.sprite('bad name', objMeta(), { 'ball.png': [24, 24] }), /invalid id/],
-    ['sprite.json at the root', (sb) => writeJson(path.join(sb.projectDir, 'sprites/sprite.json'), objMeta()), /inside an asset directory/],
+    ['missing graphic', (sb) => fs.rmSync(path.join(sb.projectDir, 'graphics/sprites/characters/hero/run.png')), /character "characters\/hero": .*not in the graphics library/],
+    ['invalid character', (sb) => writeJson(charFile(sb, 'objects/ball'), ballDef({ facing: 'eight' })), /character "objects\/ball": Facing must be/],
+    ['directional clip on a facing-none character', (sb) => writeJson(charFile(sb, 'objects/ball'), ballDef({ clips: { a: { sheet: 'sheet', fps: 1, loop: true, directional: true, byFacing: {} } } })), /no facing/],
+    ['invalid JSON', (sb) => fs.writeFileSync(charFile(sb, 'objects/ball'), '{nope'), /not valid JSON/],
+    ['graphic is not a PNG', (sb) => fs.writeFileSync(path.join(sb.projectDir, 'graphics/props/ball.png'), 'text, not a png at all!!'), /graphic "props\/ball.png": Not a PNG/],
+    ['graphic path escapes', (sb) => writeJson(charFile(sb, 'objects/ball'), ballDef({ sheets: { sheet: cut('../secret.png', 24, 24) } })), /not a valid graphic id/],
+    ['invalid id', (sb) => sb.character('bad name', ballDef(), { 'props/ball.png': [24, 24] }), /invalid id/],
+    ['unmigrated v1 sprite', (sb) => writeJson(charFile(sb, 'objects/ball'), { version: 1, name: 'x', kind: 'object' }), /assets:migrate/],
+    ['v1 sprites left in project/sprites', (sb) => writeJson(path.join(sb.projectDir, 'sprites/objects/old/sprite.json'), { version: 1 }), /project\/sprites still holds/],
     ['broken database', (sb) => writeJson(path.join(sb.projectDir, 'database.json'), { version: 1, switches: [{ id: 'a', name: '' }], variables: [] }), /database\.json: switches\[0\]\.name/],
     ['database JSON', (sb) => fs.writeFileSync(path.join(sb.projectDir, 'database.json'), '{'), /database\.json: not valid JSON/],
     ['tileset name clash', (sb) => sb.tileset('Other/grass.png'), /share the game name "grass"/],
@@ -176,20 +180,20 @@ describe('sync', () => {
     assert.deepEqual(
       applied.map((a) => a.rel).sort(),
       [
+        'data/characters.json',
         'data/common.json',
         'data/database.json',
-        'data/sprites.json',
         'data/tilesets.json',
+        'graphics/props/ball.png',
         'graphics/sprites/characters/hero/run.png',
         'graphics/sprites/characters/hero/walk.png',
-        'graphics/sprites/objects/ball/ball.png',
         'graphics/tilesets/grass.png',
         'graphics/tilesets/interior.png',
       ]
     )
-    assert.deepEqual(fs.readFileSync(path.join(sb.publicDir, 'graphics/sprites/objects/ball/ball.png')), makePng(24, 24))
+    assert.deepEqual(fs.readFileSync(path.join(sb.publicDir, 'graphics/props/ball.png')), makePng(24, 24))
     assert.deepEqual(sb.json('data/database.json').switches, [{ id: 'intro_done', name: 'Intro done' }])
-    assert.deepEqual(sb.json('data/sprites.json').sprites.find((s) => s.id === 'objects/ball').files, { 'ball.png': 'graphics/sprites/objects/ball/ball.png' })
+    assert.deepEqual(sb.json('data/characters.json').characters.find((c) => c.id === 'objects/ball').files, { sheet: 'graphics/props/ball.png' })
   })
 
   test('is idempotent and deterministic', () => {
@@ -203,7 +207,7 @@ describe('sync', () => {
     // a second sandbox with the same inputs gives byte-identical manifests
     const other = sandbox()
     other.sync()
-    for (const f of ['data/sprites.json', 'data/database.json', 'data/tilesets.json', 'data/common.json']) {
+    for (const f of ['data/characters.json', 'data/database.json', 'data/tilesets.json', 'data/common.json']) {
       assert.equal(fs.readFileSync(path.join(other.publicDir, f), 'utf8'), fs.readFileSync(path.join(sb.publicDir, f), 'utf8'))
     }
   })
@@ -211,7 +215,7 @@ describe('sync', () => {
   test('manifests end with a newline and carry no timestamps', () => {
     const sb = sandbox()
     sb.sync()
-    for (const f of ['data/sprites.json', 'data/database.json', 'data/tilesets.json', 'data/common.json']) {
+    for (const f of ['data/characters.json', 'data/database.json', 'data/tilesets.json', 'data/common.json']) {
       const text = fs.readFileSync(path.join(sb.publicDir, f), 'utf8')
       assert.ok(text.endsWith('}\n'), f)
       assert.doesNotMatch(text, /20\d\d-\d\d-\d\d/)
@@ -225,19 +229,22 @@ describe('sync', () => {
     assert.deepEqual(leftovers, [])
   })
 
-  test('copies changed sheets and removes stale generated sprite files and empty dirs', () => {
+  test('copies changed graphics, removes stale generated ones and empty dirs, retires data/sprites.json', () => {
     const sb = sandbox()
     sb.sync()
-    fs.writeFileSync(path.join(sb.projectDir, 'sprites/objects/ball/ball.png'), makePng(48, 24))
-    writeJson(path.join(sb.projectDir, 'sprites/objects/ball/sprite.json'), objMeta({ frameWidth: 48 }))
-    fs.rmSync(path.join(sb.projectDir, 'sprites/characters'), { recursive: true })
+    fs.mkdirSync(path.join(sb.publicDir, 'data'), { recursive: true })
+    fs.writeFileSync(path.join(sb.publicDir, 'data/sprites.json'), '{}')
+    sb.character('objects/ball', ballDef({ sheets: { sheet: cut('props/ball.png', 48, 24) } }), { 'props/ball.png': [48, 24] })
+    fs.rmSync(path.join(sb.projectDir, 'database/characters/characters'), { recursive: true })
     const r = sb.sync()
     const byRel = Object.fromEntries(r.applied.map((a) => [a.rel, a.status]))
-    assert.equal(byRel['graphics/sprites/objects/ball/ball.png'], STATUS.UPDATE)
+    assert.equal(byRel['graphics/props/ball.png'], STATUS.UPDATE)
     assert.equal(byRel['graphics/sprites/characters/hero/walk.png'], STATUS.STALE)
+    assert.equal(byRel['data/sprites.json'], STATUS.STALE)
     assert.equal(fs.existsSync(path.join(sb.publicDir, 'graphics/sprites/characters')), false)
-    assert.deepEqual(sb.json('data/sprites.json').sprites.map((s) => s.id), ['objects/ball'])
-    assert.equal(sb.json('data/sprites.json').sprites[0].meta.frameWidth, 48)
+    assert.equal(fs.existsSync(path.join(sb.publicDir, 'data/sprites.json')), false)
+    assert.deepEqual(sb.json('data/characters.json').characters.map((c) => c.id), ['objects/ball'])
+    assert.equal(sb.json('data/characters.json').characters[0].def.sheets.sheet.frameWidth, 48)
   })
 
   test('never touches maps or other game files', () => {
@@ -311,7 +318,7 @@ describe('CLI', () => {
     const sb = sandbox()
     const r = sb.cli([])
     assert.equal(r.code, 1)
-    assert.match(r.stdout, /create\s+data\/sprites\.json/)
+    assert.match(r.stdout, /create\s+data\/characters\.json/)
     assert.match(r.stderr, /npm run assets:sync/)
     assert.deepEqual(snapshot(sb.publicDir), {})
   })
@@ -327,12 +334,13 @@ describe('CLI', () => {
   test('--check detects outdated and stale generated files', () => {
     const sb = sandbox()
     sb.sync()
-    fs.writeFileSync(path.join(sb.publicDir, 'data/sprites.json'), '{}')
-    fs.writeFileSync(path.join(sb.publicDir, 'graphics/sprites/objects/ball/old.png'), 'x')
+    fs.writeFileSync(path.join(sb.publicDir, 'data/characters.json'), '{}')
+    fs.mkdirSync(path.join(sb.publicDir, 'graphics/props'), { recursive: true })
+    fs.writeFileSync(path.join(sb.publicDir, 'graphics/props/old.png'), 'x')
     const r = sb.cli([])
     assert.equal(r.code, 1)
-    assert.match(r.stdout, /update\s+data\/sprites\.json/)
-    assert.match(r.stdout, /stale\s+graphics\/sprites\/objects\/ball\/old\.png/)
+    assert.match(r.stdout, /update\s+data\/characters\.json/)
+    assert.match(r.stdout, /stale\s+graphics\/props\/old\.png/)
   })
 
   test('differing game tilesets fail --check only with --strict', () => {
@@ -349,7 +357,7 @@ describe('CLI', () => {
     const sb = sandbox()
     const out = path.join(sb.root, 'preview')
     assert.equal(sb.cli(['--write', '--out-dir', out]).code, 0)
-    assert.ok(fs.existsSync(path.join(out, 'data/sprites.json')))
+    assert.ok(fs.existsSync(path.join(out, 'data/characters.json')))
     assert.deepEqual(snapshot(sb.publicDir), {})
   })
 
@@ -388,14 +396,16 @@ describe('the real project', () => {
     assert.deepEqual(plan.actions.filter((a) => [STATUS.CREATE, STATUS.UPDATE, STATUS.STALE].includes(a.status)).map((a) => `${a.status} ${a.rel}`), [])
   })
 
-  test('the player sprite matches how the game used to load it', () => {
+  test('the player matches how the game used to load it', () => {
     const { projectDir } = defaultPaths()
-    const { assets } = loadSprites(path.join(projectDir, 'sprites'))
-    const player = assets.find((a) => a.id === 'characters/player')
+    const { characters } = loadCharacters(projectDir)
+    const player = characters.find((c) => c.id === 'characters/player')
     assert.ok(player)
-    assert.equal(player.meta.frameWidth, 32)
-    assert.equal(player.meta.frameHeight, 48)
-    assert.deepEqual(player.meta.character, { sheets: { walk: 'walk.png', run: 'run.png' }, framesPerDirection: 4, idleFrame: 0, walkFps: 10, runFps: 15 })
+    assert.equal(player.def.facing, 'four')
+    assert.deepEqual(player.def.sheets.walk, { image: 'sprites/characters/player/walk.png', frameWidth: 32, frameHeight: 48, margin: 0, spacing: 0 })
+    assert.deepEqual(player.def.bindings, { idle: 'idle', walk: 'walk', run: 'run' })
+    assert.equal(player.def.clips.walk.fps, 10)
+    assert.equal(player.def.clips.run.fps, 15)
   })
 })
 

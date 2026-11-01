@@ -50,7 +50,8 @@ describe('channel table', () => {
       projectDir: root,
       mapsDir: path.join(root, 'maps'),
       tilesetsDir: path.join(root, 'tilesets'),
-      spritesDir: path.join(root, 'sprites'),
+      charactersDir: path.join(root, 'database', 'characters'),
+      graphicsDir: path.join(root, 'graphics'),
     });
   });
 });
@@ -59,7 +60,7 @@ describe('channels end to end (real temp project)', () => {
   it('lists empty collections for an empty project', async () => {
     expect(await call('get-maps')).toMatchObject({ success: true, maps: [], folders: [] });
     expect(await call('get-tilesets')).toMatchObject({ success: true, tilesets: [] });
-    expect(await call('get-sprites')).toMatchObject({ success: true, assets: [] });
+    expect(await call('get-characters')).toMatchObject({ success: true, characters: [], graphics: [] });
     expect(await call('get-database')).toMatchObject({ success: true, database: { version: 2, switches: [], variables: [], stages: [] } });
     expect(await call('get-common-events')).toMatchObject({ success: true, events: [] });
   });
@@ -72,22 +73,30 @@ describe('channels end to end (real temp project)', () => {
     expect(listed.maps.map((m) => m.name)).toEqual(['Town']);
   });
 
-  it('runs the sprite workflow', async () => {
+  it('runs the character workflow', async () => {
     const png = path.join(root, 'ball.png');
     fs.writeFileSync(png, makePng(24, 24));
-    const imported = (await call('import-sprite', png, { name: 'Ball', kind: 'object' })) as { success: true; asset: { id: string; meta: Record<string, unknown> } };
-    expect(imported.asset.id).toBe('objects/ball');
-    const saved = await call('save-sprite-meta', 'objects/ball', { ...imported.asset.meta, pivotY: 0.5 });
-    expect(saved).toMatchObject({ success: true, meta: { pivotY: 0.5 } });
-    expect(await call('rename-sprite', 'objects/ball', 'objects/orb')).toEqual({ success: true, id: 'objects/orb' });
-    expect(((await call('get-sprites')) as { assets: unknown[] }).assets).toHaveLength(1);
-    expect(await call('delete-sprite', 'objects/orb')).toEqual({ success: true });
-    expect(((await call('get-sprites')) as { assets: unknown[] }).assets).toHaveLength(0);
+    const imported = (await call('import-graphic', png, 'props/ball.png')) as { success: true; graphic: { id: string; width: number } };
+    expect(imported.graphic).toMatchObject({ id: 'props/ball.png', width: 24 });
+    const def = {
+      version: 2, name: 'Ball', tags: [], facing: 'none', pivot: { x: 0.5, y: 1 },
+      sheets: { sheet: { image: 'props/ball.png', frameWidth: 24, frameHeight: 24, margin: 0, spacing: 0 } },
+      clips: {}, bindings: {}, still: { sheet: 'sheet', frame: 0 },
+    };
+    expect(await call('save-character', 'objects/ball', def)).toMatchObject({ success: true, character: { id: 'objects/ball' } });
+    expect(await call('rename-character', 'objects/ball', 'objects/orb')).toEqual({ success: true, id: 'objects/orb' });
+    const listed = (await call('get-characters')) as { characters: { id: string; images: Record<string, string> }[]; graphics: { id: string }[] };
+    expect(listed.characters.map((c) => c.id)).toEqual(['objects/orb']);
+    expect(Object.keys(listed.characters[0].images)).toEqual(['props/ball.png']);
+    expect(listed.graphics.map((g) => g.id)).toEqual(['props/ball.png']);
+    expect(await call('delete-character', 'objects/orb')).toEqual({ success: true });
+    expect(((await call('get-characters')) as { characters: unknown[] }).characters).toHaveLength(0);
   });
 
   it('returns errors instead of throwing', async () => {
-    expect(await call('delete-sprite', '../x')).toMatchObject({ success: false });
-    expect(await call('import-sprite', '/nope.png', { name: 'x', kind: 'object' })).toMatchObject({ success: false });
+    expect(await call('delete-character', '../x')).toMatchObject({ success: false });
+    expect(await call('import-graphic', '/nope.png', 'x.png')).toMatchObject({ success: false });
+    expect(await call('save-character', 'a', { version: 2, name: 'A', sheets: { s: { image: 'missing.png' } }, clips: {}, bindings: {} })).toMatchObject({ success: false, error: expect.stringMatching(/does not exist/) });
     expect(await call('save-database', { version: 1, switches: [{ id: 'a', name: '' }], variables: [] })).toMatchObject({ success: false, error: expect.stringMatching(/name/) });
     expect(await call('save-map', '../x', 'a.json', {})).toMatchObject({ success: false });
   });

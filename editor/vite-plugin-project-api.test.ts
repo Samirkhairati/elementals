@@ -51,7 +51,7 @@ async function call(channel: string, args: unknown[] = [], options: CallOptions 
 describe('serving the project channels', () => {
   it('serves every channel of the Electron table plus the browser stand-ins', () => {
     expect(handler.channels).toEqual(
-      expect.arrayContaining(['get-maps', 'get-tilesets', 'get-sprites', 'get-database', 'save-map', 'import-sprite', 'export-map', 'stage-upload'])
+      expect.arrayContaining(['get-maps', 'get-tilesets', 'get-characters', 'get-database', 'save-map', 'import-graphic', 'export-map', 'stage-upload'])
     );
   });
 
@@ -99,9 +99,9 @@ describe('path traversal is refused exactly like in the stores', () => {
     ['create-map', ['x', 10, 10, '../escape']],
     ['create-folder', [null, '../up']],
     ['rename-map-folder', ['../x', 'y']],
-    ['delete-sprite', ['../x']],
-    ['rename-sprite', ['a', '../b']],
-    ['save-sprite-meta', ['../x', {}]],
+    ['delete-character', ['../x']],
+    ['rename-character', ['a', '../b']],
+    ['save-character', ['../x', {}]],
   ])('%s %j', async (channel, args) => {
     const parent = path.dirname(projectDir);
     const before = fs.readdirSync(parent);
@@ -155,16 +155,16 @@ describe('request guard rails', () => {
 describe('uploads and imports', () => {
   const b64 = (b: Buffer) => b.toString('base64');
 
-  it('stages an upload and imports it as a sprite and as a tileset', async () => {
+  it('stages an upload and imports it as a graphic and as a tileset', async () => {
     const staged = await call('stage-upload', ['../../ball.png', b64(makePng(24, 24))]);
     expect(staged.body).toMatchObject({ success: true, defaultName: 'ball' });
     const sourcePath = staged.body.sourcePath as string;
     expect(path.basename(sourcePath)).toBe('ball.png');
 
-    const sprite = await call('import-sprite', [sourcePath, { name: 'Ball', kind: 'object' }]);
-    expect(sprite.body).toMatchObject({ success: true, asset: { id: 'objects/ball' } });
-    expect(fs.existsSync(path.join(projectDir, 'sprites/objects/ball/sprite.json'))).toBe(true);
-    expect(((await call('get-sprites')).body.assets as unknown[]).length).toBe(1);
+    const graphic = await call('import-graphic', [sourcePath, 'props/ball.png']);
+    expect(graphic.body).toMatchObject({ success: true, graphic: { id: 'props/ball.png' } });
+    expect(fs.existsSync(path.join(projectDir, 'graphics/props/ball.png'))).toBe(true);
+    expect(((await call('get-characters')).body.graphics as unknown[]).length).toBe(1);
 
     const tileset = await call('import-tileset', [sourcePath, 'Ball tiles', null]);
     expect(tileset.body).toMatchObject({ success: true });
@@ -174,12 +174,12 @@ describe('uploads and imports', () => {
   it('refuses to import files that were not staged', async () => {
     const outside = path.join(tmp.create(), 'secret.png');
     fs.writeFileSync(outside, makePng(8, 8));
-    for (const channel of ['import-sprite', 'import-tileset']) {
-      const r = await call(channel, [outside, channel === 'import-sprite' ? { name: 'x', kind: 'object' } : 'x']);
+    for (const channel of ['import-graphic', 'import-tileset']) {
+      const r = await call(channel, [outside, channel === 'import-graphic' ? 'x.png' : 'x']);
       expect(r.body).toMatchObject({ success: false, error: expect.stringMatching(/staged/) });
     }
-    expect((await call('import-sprite', ['relative.png', { name: 'x', kind: 'object' }])).body.success).toBe(false);
-    expect(fs.existsSync(path.join(projectDir, 'sprites'))).toBe(false);
+    expect((await call('import-graphic', ['relative.png', 'x.png'])).body.success).toBe(false);
+    expect(fs.existsSync(path.join(projectDir, 'graphics'))).toBe(false);
   });
 
   it('refuses a symlink in the staging area that points outside of it', async () => {
@@ -188,7 +188,7 @@ describe('uploads and imports', () => {
     const secret = path.join(tmp.create(), 'secret.png');
     fs.writeFileSync(secret, makePng(8, 8));
     fs.symlinkSync(secret, path.join(dir, 'link.png'));
-    const r = await call('import-sprite', [path.join(dir, 'link.png'), { name: 'x', kind: 'object' }]);
+    const r = await call('import-graphic', [path.join(dir, 'link.png'), 'x.png']);
     expect(r.body).toMatchObject({ success: false, error: expect.stringMatching(/staged/) });
   });
 

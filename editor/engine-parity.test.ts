@@ -4,73 +4,31 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { defaultSpriteMeta, previewFrame, validateSpriteMeta as sharedValidateSpriteMeta } from '../shared/engine/sprites';
+import { previewFrame, validateSpriteMeta as sharedValidateSpriteMeta } from '../shared/engine/sprites';
 import { clipFrameAt, clipFrames, effectiveFps, resolveClip } from '../shared/engine/characters';
 import { migrateCharacter } from '../shared/engine/characterMigrate';
 import { FACINGS } from '../shared/engine/constants';
 import type { SpriteAssetMeta } from '../shared/engine/types';
+import { isValidCharacterId as sharedIsValidCharacterId, isValidGraphicId as sharedIsValidGraphicId } from '../shared/engine/graphics';
 import { normalizeDatabase as sharedNormalizeDatabase, validateDatabase as sharedValidateDatabase } from '../shared/engine/database';
-import { makePng, makeTempDirTracker } from './electron/__testutils__/helpers';
+import { makeTempDirTracker } from './electron/__testutils__/helpers';
 import { normalizeDatabase, validateDatabase } from './electron/ipc/databaseStore';
-import { validateSpriteMeta } from './electron/ipc/spriteMeta';
-import { importSprite } from './electron/ipc/spriteStore';
-import { TilesetCache } from './electron/ipc/tilesetCache';
+import { isValidCharacterId, isValidGraphicId } from './electron/ipc/characterStore';
 
 const REPO = path.resolve(__dirname, '..');
 const tmp = makeTempDirTracker();
 beforeEach(() => undefined);
 afterEach(() => tmp.cleanup());
 
-const base = { version: 1, name: 'X', margin: 0, spacing: 0, pivotX: 0.5, pivotY: 1, frameWidth: 32, frameHeight: 48 };
-const character = { ...base, kind: 'character', character: { sheets: { walk: 'walk.png' }, framesPerDirection: 4, idleFrame: 0, walkFps: 8, runFps: 12 } };
-const object = { ...base, kind: 'object', sheet: 'sheet.png', frameWidth: 24, frameHeight: 24 };
-
-const metaCases: [string, unknown, boolean][] = [
-  ['character', character, true],
-  ['character with run sheet', { ...character, character: { ...character.character, sheets: { walk: 'walk.png', run: 'run.png' } } }, true],
-  ['object', object, true],
-  ['animated', { ...object, kind: 'animated', animations: { idle: { frames: [0], fps: 8, loop: true } } }, true],
-  ['wrong version', { ...object, version: 2 }, false],
-  ['unknown kind', { ...object, kind: 'monster' }, false],
-  ['zero frame width', { ...object, frameWidth: 0 }, false],
-  ['fractional frame height', { ...object, frameHeight: 2.5 }, false],
-  ['negative margin', { ...object, margin: -1 }, false],
-  ['pivot above 1', { ...object, pivotY: 2 }, false],
-  ['object without sheet', { ...object, sheet: undefined }, false],
-  ['character without section', { ...character, character: undefined }, false],
-  ['idleFrame outside the row', { ...character, character: { ...character.character, idleFrame: 4 } }, false],
-  ['zero fps', { ...character, character: { ...character.character, walkFps: 0 } }, false],
-  ['animation without frames', { ...object, animations: { a: { frames: [], fps: 1, loop: true } } }, false],
-  ['animation with negative frame', { ...object, animations: { a: { frames: [-1], fps: 1, loop: true } } }, false],
-  ['animation with bad loop', { ...object, animations: { a: { frames: [0], fps: 1, loop: 1 } } }, false],
-  ['not an object', 'sprite', false],
-];
-
-describe('sprite meta validation agrees with shared/engine', () => {
-  it.each(metaCases)('%s', (_label, meta, ok) => {
-    expect(sharedValidateSpriteMeta(meta).ok).toBe(ok);
-    expect(validateSpriteMeta(meta).ok).toBe(ok);
+describe('id rules agree with shared/engine', () => {
+  const ids = ['characters/player', 'a', 'a/b-c_d', '', '/a', 'a/', 'a//b', '../x', 'a/../b', '-a', 'a b', 'a.png', 'Ünï', 'a/B9', 'x\0y', 5, null, undefined];
+  it.each(ids.map((i) => [i] as [unknown]))('character id %j', (id) => {
+    expect(isValidCharacterId(id)).toBe(sharedIsValidCharacterId(id));
   });
-
-  it('is stricter only where file access is involved (unsafe sheet names)', () => {
-    const evil = { ...object, sheet: '../../secret.png' };
-    expect(sharedValidateSpriteMeta(evil).ok).toBe(true); // the shared check does not touch files
-    expect(validateSpriteMeta(evil).ok).toBe(false);
+  const graphics = ['sprites/player/walk.png', 'a.png', 'a.PNG', 'a/b.png', 'a.gif', 'a', '.png', '../a.png', 'a/../b.png', 'a b.png', '/a.png', 'a//b.png', 'a/.png', 5, null];
+  it.each(graphics.map((i) => [i] as [unknown]))('graphic id %j', (id) => {
+    expect(isValidGraphicId(id)).toBe(sharedIsValidGraphicId(id));
   });
-});
-
-describe('imported sprites start from the shared defaults', () => {
-  const dims: Record<string, [number, number]> = { character: [128, 192], object: [24, 24], animated: [96, 32] };
-  for (const kind of ['character', 'object', 'animated'] as const) {
-    it(kind, () => {
-      const root = tmp.create();
-      const src = path.join(root, 'src.png');
-      const [w, h] = dims[kind];
-      fs.writeFileSync(src, makePng(w, h));
-      const { asset } = importSprite(path.join(root, 'sprites'), new TilesetCache(), src, { name: 'Thing', kind });
-      expect(asset.meta).toEqual(defaultSpriteMeta(kind, { sheetWidth: w, sheetHeight: h, name: 'Thing' }));
-    });
-  }
 });
 
 describe('database rules agree with shared/engine', () => {
@@ -94,22 +52,7 @@ describe('database rules agree with shared/engine', () => {
   });
 });
 
-describe('the committed project data passes both validators', () => {
-  const spritesDir = path.join(REPO, 'project', 'sprites');
-  const metas = fs.existsSync(spritesDir)
-    ? fs
-        .readdirSync(spritesDir, { recursive: true, encoding: 'utf8' })
-        .filter((f) => f.endsWith('sprite.json'))
-        .map((f) => [f, JSON.parse(fs.readFileSync(path.join(spritesDir, f), 'utf8'))] as const)
-    : [];
-
-  it('has sprites to check', () => {
-    expect(metas.length).toBeGreaterThanOrEqual(2);
-  });
-  it.each(metas.map(([f, m]) => [f, m] as [string, unknown]))('%s', (_f, meta) => {
-    expect(sharedValidateSpriteMeta(meta)).toMatchObject({ ok: true });
-    expect(validateSpriteMeta(meta)).toMatchObject({ ok: true });
-  });
+describe('the committed project data passes the validators', () => {
   it('database.json', () => {
     const raw = JSON.parse(fs.readFileSync(path.join(REPO, 'project', 'database.json'), 'utf8'));
     expect(sharedValidateDatabase(raw)).toMatchObject({ ok: true, warnings: [] });
@@ -120,7 +63,7 @@ describe('the committed project data passes both validators', () => {
 describe('character v2 rules agree with the v1 preview the editor still uses', () => {
   // The v1 preview (previewFrame) and the v2 clip maths must show the same frame for the same facing,
   // animation and time, so migrated characters look identical in the editor preview and in the game.
-  const spritesDir = path.join(REPO, 'project', 'sprites');
+  const spritesDir = path.join(REPO, 'shared', 'fixtures', 'sprites-v1');
   const metas = fs
     .readdirSync(spritesDir, { recursive: true, encoding: 'utf8' })
     .filter((f) => f.endsWith('sprite.json'))

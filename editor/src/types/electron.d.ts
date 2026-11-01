@@ -1,19 +1,10 @@
 import type { CommonEvent } from '../../../shared/engine/common';
-import type { GameDatabase, SpriteAssetInfo, SpriteAssetMeta, SpriteKind } from '../../../shared/engine/types';
+import type { CharacterDef } from '../../../shared/engine/characters';
+import type { CharacterInfo, GraphicInfo } from '../../../shared/engine/graphics';
+import type { GameDatabase } from '../../../shared/engine/types';
 
 /** Result of every project-data call: `success: false` carries a readable `error`. */
 type IpcFailure = { success: false; error: string; canceled?: boolean };
-
-interface ImportSpriteOptions {
-  /** Explicit asset id (directory path under project/sprites); wins over `name`. */
-  id?: string;
-  /** Display name; the id is derived from it (`characters/<slug>` / `objects/<slug>`) when no id is given. */
-  name?: string;
-  kind: SpriteKind;
-  /** Default: the whole image (object/animated) or a quarter of it (character, 4 x 4 grid). */
-  frameWidth?: number;
-  frameHeight?: number;
-}
 
 interface TilesetData {
   name: string;
@@ -44,16 +35,16 @@ interface ElectronAPI {
   exportMap: (jsonData: string, defaultName: string) => Promise<{ success: boolean; canceled?: boolean; filePath?: string; error?: string }>;
   /** Absolute path of a dropped file. The browser harness stages the bytes and returns the staged path. */
   getPathForFile: (file: File) => string | Promise<string>;
-  getSprites: () => Promise<({ success: true; assets: SpriteAssetInfo[]; folders: string[]; warnings: { file: string; error: string }[] }) | IpcFailure>;
+  getCharacters: () => Promise<({ success: true; characters: CharacterInfo[]; graphics: GraphicInfo[]; folders: string[]; warnings: { file: string; error: string }[] }) | IpcFailure>;
   pickSpriteFile: () => Promise<({ success: true; sourcePath: string; defaultName: string }) | IpcFailure>;
-  importSprite: (sourcePath: string, options: ImportSpriteOptions) => Promise<({ success: true; asset: SpriteAssetInfo }) | IpcFailure>;
-  saveSpriteMeta: (id: string, meta: SpriteAssetMeta) => Promise<({ success: true; meta: SpriteAssetMeta }) | IpcFailure>;
-  renameSprite: (id: string, newId: string) => Promise<({ success: true; id: string }) | IpcFailure>;
-  deleteSprite: (id: string) => Promise<({ success: true }) | IpcFailure>;
-  createSpriteFolder: (parentId: string | null, name: string) => Promise<({ success: true; folderId: string }) | IpcFailure>;
-  renameSpriteFolder: (folderId: string, newName: string) => Promise<({ success: true; folderId: string }) | IpcFailure>;
-  moveSpriteFolder: (folderId: string, newParentId: string | null) => Promise<({ success: true; folderId: string }) | IpcFailure>;
-  deleteSpriteFolder: (folderId: string) => Promise<({ success: true }) | IpcFailure>;
+  saveCharacter: (id: string, def: CharacterDef) => Promise<({ success: true; character: CharacterInfo }) | IpcFailure>;
+  renameCharacter: (id: string, newId: string) => Promise<({ success: true; id: string }) | IpcFailure>;
+  deleteCharacter: (id: string) => Promise<({ success: true }) | IpcFailure>;
+  importGraphic: (sourcePath: string, graphicId: string) => Promise<({ success: true; graphic: GraphicInfo; image: string }) | IpcFailure>;
+  createCharacterFolder: (parentId: string | null, name: string) => Promise<({ success: true; folderId: string }) | IpcFailure>;
+  renameCharacterFolder: (folderId: string, newName: string) => Promise<({ success: true; folderId: string }) | IpcFailure>;
+  moveCharacterFolder: (folderId: string, newParentId: string | null) => Promise<({ success: true; folderId: string }) | IpcFailure>;
+  deleteCharacterFolder: (folderId: string) => Promise<({ success: true }) | IpcFailure>;
   getDatabase: () => Promise<({ success: true; database: GameDatabase }) | IpcFailure>;
   saveDatabase: (database: GameDatabase) => Promise<({ success: true; database: GameDatabase }) | IpcFailure>;
   getCommonEvents: () => Promise<({ success: true; events: CommonEvent[]; warnings: { file: string; error: string }[] }) | IpcFailure>;
@@ -69,4 +60,4 @@ declare global {
   }
 }
 
-export type { ImportSpriteOptions };
+export {};

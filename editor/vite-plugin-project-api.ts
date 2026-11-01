@@ -10,7 +10,7 @@
  *  - Requests must be POST + `Content-Type: application/json` (cross-origin pages cannot send that without a
  *    CORS preflight, which is never answered), carry a loopback `Host`, and any `Origin` must equal the Host.
  *  - All paths go through the stores (`resolveInside`): traversal, absolute paths and symlink escapes are refused.
- *  - Imports (`import-tileset`, `import-sprite`) may only read files this harness staged itself
+ *  - Imports (`import-tileset`, `import-graphic`) may only read files this harness staged itself
  *    (`stage-upload`), never arbitrary paths on disk.
  */
 import crypto from 'node:crypto';
@@ -30,7 +30,7 @@ export const MAX_UPLOAD_BYTES = 32 * 1024 * 1024;
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
 
 export interface ApiHandlerOptions {
-  /** Project directory (maps/, tilesets/, sprites/, database.json). */
+  /** Project directory (maps/, tilesets/, graphics/, database/characters/, database.json). */
   projectDir: string;
   /** Where staged uploads live. Default: a fresh directory under os.tmpdir(), created on first upload. */
   stagingDir?: string;
@@ -120,7 +120,7 @@ export function createApiHandler(options: ApiHandlerOptions): ApiHandler {
   const channels: Record<string, ChannelFn> = {
     ...projectChannels,
     'import-tileset': guarded(projectChannels['import-tileset']),
-    'import-sprite': guarded(projectChannels['import-sprite']),
+    'import-graphic': guarded(projectChannels['import-graphic']),
     // The browser has no save dialog: hand the JSON back and let the page download it.
     'export-map': (jsonData: unknown, defaultName: unknown) =>
       typeof jsonData === 'string'

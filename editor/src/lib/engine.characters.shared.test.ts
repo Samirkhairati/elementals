@@ -28,7 +28,7 @@ import {
 } from '../../../shared/engine/index'
 import type { CharacterDef, ClipDef, SpriteAssetMeta } from '../../../shared/engine/index'
 
-const SPRITES = path.resolve(__dirname, '../../../project/sprites')
+const SPRITES = path.resolve(__dirname, '../../../shared/fixtures/sprites-v1')
 const assets: [string, SpriteAssetMeta][] = fs
   .readdirSync(SPRITES, { recursive: true, encoding: 'utf8' })
   .filter((f) => f.endsWith('sprite.json'))

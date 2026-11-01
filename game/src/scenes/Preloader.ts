@@ -17,9 +17,9 @@ export class Preloader extends Scene {
 
   preload() {
     // Manifests (already in the cache, loaded by Boot)
-    const loaded = spriteRegistry.load(this.cache.json.get(MANIFEST_KEYS.sprites));
-    for (const s of loaded.skipped) console.warn(`[Preloader] sprite "${s.id}" skipped: ${s.reason}`);
-    if (loaded.loaded.length === 0) console.warn("[Preloader] no sprite assets in data/sprites.json (run `npm run assets:sync`)");
+    const loaded = spriteRegistry.load(this.cache.json.get(MANIFEST_KEYS.characters));
+    for (const s of loaded.skipped) console.warn(`[Preloader] character "${s.id}" skipped: ${s.reason}`);
+    if (loaded.loaded.length === 0) console.warn("[Preloader] no characters in data/characters.json (run `npm run assets:sync`)");
     setGameDatabase(this.cache.json.get(MANIFEST_KEYS.database));
     setGameCommonEvents(this.cache.json.get(MANIFEST_KEYS.common));
     const tilesets = setGameTilesets(this.cache.json.get(MANIFEST_KEYS.tilesets));

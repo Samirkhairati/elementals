@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// Placeholder sprite generator. Writes small, deterministic pixel-art assets under project/sprites so the
+// Placeholder sprite generator. Writes small, deterministic pixel-art assets under project/graphics and
+// project/database/characters (Character v2) so the
 // engine has real content to show in the editor and game (see docs/engine-design.md, section 2).
 //
 //   node scripts/tools/gen-placeholder-sprites.mjs          write (idempotent: unchanged files are left alone)
@@ -12,9 +13,12 @@ import fs from 'node:fs'
 import path from 'node:path'
 import zlib from 'node:zlib'
 import { fileURLToPath } from 'node:url'
+import { spriteMetaToCharacter } from '../../shared/engine/characterMigrate.ts'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
-export const PROJECT_SPRITES = path.resolve(HERE, '../../project/sprites')
+export const PROJECT_DIR = path.resolve(HERE, '../../project')
+export const PLAYER_FIXTURE = path.resolve(HERE, '../../shared/fixtures/sprites-v1/characters/player/sprite.json')
+export const PLAYER_GRAPHICS = path.join(PROJECT_DIR, 'graphics/sprites/characters/player')
 
 // ── tiny PNG codec ──────────────────────────────────────────────────────────────────────────────
 
@@ -528,15 +532,16 @@ const objectMeta = (name, extra = {}) => ({
 })
 
 /**
- * Everything this tool owns: `{ 'objects/sign/sprite.json': Buffer, ... }`, keyed by path relative to
- * project/sprites. `readPlayerSheet(file)` supplies the player's PNG bytes for the recolours.
+ * Everything this tool owns, keyed by path relative to project/: the sheets (`graphics/sprites/<id>/<file>`)
+ * and the Character v2 records (`database/characters/<id>.json`). `readPlayerSheet(file)` supplies the
+ * player's PNG bytes for the recolours (and 'sprite.json' = the player's v1 description).
  */
 export function buildAssets(readPlayerSheet) {
   const files = {}
   const json = (v) => Buffer.from(JSON.stringify(v, null, 2) + '\n')
   const add = (id, meta, sheets) => {
-    files[`${id}/sprite.json`] = json(meta)
-    for (const [file, img] of Object.entries(sheets)) files[`${id}/${file}`] = encodePng(img)
+    files[`database/characters/${id}.json`] = json(spriteMetaToCharacter(id, meta))
+    for (const [file, img] of Object.entries(sheets)) files[`graphics/sprites/${id}/${file}`] = encodePng(img)
   }
 
   add('objects/sign', objectMeta('Wooden Sign'), { 'sheet.png': drawSign() })
@@ -568,21 +573,20 @@ export function buildAssets(readPlayerSheet) {
 
 function main(argv) {
   const check = argv.includes('--check')
-  const playerDir = path.join(PROJECT_SPRITES, 'characters/player')
-  const files = buildAssets((f) => fs.readFileSync(path.join(playerDir, f)))
+  const files = buildAssets((f) => fs.readFileSync(f === 'sprite.json' ? PLAYER_FIXTURE : path.join(PLAYER_GRAPHICS, f)))
   let changed = 0
   for (const [rel, bytes] of Object.entries(files)) {
-    const abs = path.join(PROJECT_SPRITES, rel)
+    const abs = path.join(PROJECT_DIR, rel)
     const current = fs.existsSync(abs) ? fs.readFileSync(abs) : null
     if (current && current.equals(bytes)) continue
     changed++
     if (check) {
-      console.error(`${current ? 'differs' : 'missing'}: project/sprites/${rel}`)
+      console.error(`${current ? 'differs' : 'missing'}: project/${rel}`)
       continue
     }
     fs.mkdirSync(path.dirname(abs), { recursive: true })
     fs.writeFileSync(abs, bytes)
-    console.log(`wrote project/sprites/${rel}`)
+    console.log(`wrote project/${rel}`)
   }
   if (check) return changed ? 1 : 0
   if (!changed) console.log('placeholder sprites already up to date')

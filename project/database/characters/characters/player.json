@@ -1,0 +1,117 @@
+{
+  "version": 2,
+  "name": "Player",
+  "tags": [],
+  "pivot": {
+    "x": 0.5,
+    "y": 1
+  },
+  "facing": "four",
+  "sheets": {
+    "walk": {
+      "image": "sprites/characters/player/walk.png",
+      "frameWidth": 32,
+      "frameHeight": 48,
+      "margin": 0,
+      "spacing": 0
+    },
+    "run": {
+      "image": "sprites/characters/player/run.png",
+      "frameWidth": 32,
+      "frameHeight": 48,
+      "margin": 0,
+      "spacing": 0
+    }
+  },
+  "clips": {
+    "idle": {
+      "sheet": "walk",
+      "fps": 1,
+      "loop": false,
+      "directional": true,
+      "byFacing": {
+        "down": [
+          0
+        ],
+        "left": [
+          4
+        ],
+        "right": [
+          8
+        ],
+        "up": [
+          12
+        ]
+      }
+    },
+    "walk": {
+      "sheet": "walk",
+      "fps": 10,
+      "loop": true,
+      "directional": true,
+      "byFacing": {
+        "down": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "left": [
+          4,
+          5,
+          6,
+          7
+        ],
+        "right": [
+          8,
+          9,
+          10,
+          11
+        ],
+        "up": [
+          12,
+          13,
+          14,
+          15
+        ]
+      }
+    },
+    "run": {
+      "sheet": "run",
+      "fps": 15,
+      "loop": true,
+      "directional": true,
+      "byFacing": {
+        "down": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "left": [
+          4,
+          5,
+          6,
+          7
+        ],
+        "right": [
+          8,
+          9,
+          10,
+          11
+        ],
+        "up": [
+          12,
+          13,
+          14,
+          15
+        ]
+      }
+    }
+  },
+  "bindings": {
+    "idle": "idle",
+    "walk": "walk",
+    "run": "run"
+  }
+}

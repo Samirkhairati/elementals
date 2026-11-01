@@ -1,7 +1,7 @@
 # Editor browser harness
 
 The editor normally needs Electron: its preload exposes `window.electronAPI`, which reads and writes the
-project files (`project/maps`, `project/tilesets`, `project/sprites`, `project/database.json`). The harness lets
+project files (`project/maps`, `project/tilesets`, `project/graphics`, `project/database/characters`, `project/database.json`). The harness lets
 the **same editor UI run in a plain browser** against the **real project files**, so every developer, agent and QA
 pass can open it, click through it, and read the console without a desktop app.
 

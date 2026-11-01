@@ -3,7 +3,7 @@ import * as commonStore from './commonStore.js';
 import * as databaseStore from './databaseStore.js';
 import * as mapStore from './mapStore.js';
 import { toResult } from './result.js';
-import * as spriteStore from './spriteStore.js';
+import * as characterStore from './characterStore.js';
 import { TilesetCache } from './tilesetCache.js';
 import * as tilesetStore from './tilesetStore.js';
 
@@ -21,7 +21,8 @@ export interface ProjectDirs {
   projectDir: string;
   mapsDir: string;
   tilesetsDir: string;
-  spritesDir: string;
+  charactersDir: string;
+  graphicsDir: string;
 }
 
 export function projectDirs(projectDir: string): ProjectDirs {
@@ -30,14 +31,16 @@ export function projectDirs(projectDir: string): ProjectDirs {
     projectDir: root,
     mapsDir: path.join(root, 'maps'),
     tilesetsDir: path.join(root, 'tilesets'),
-    spritesDir: path.join(root, 'sprites'),
+    charactersDir: path.join(root, 'database', 'characters'),
+    graphicsDir: path.join(root, 'graphics'),
   };
 }
 
 export function createProjectChannels(projectDir: string): Record<string, ChannelFn> {
-  const { projectDir: root, mapsDir, tilesetsDir, spritesDir } = projectDirs(projectDir);
+  const { projectDir: root, mapsDir, tilesetsDir, charactersDir, graphicsDir } = projectDirs(projectDir);
+  const roots = { charactersDir, graphicsDir };
   const tilesetCache = new TilesetCache();
-  const spriteCache = new TilesetCache();
+  const imageCache = new TilesetCache();
 
   return {
     // ── tilesets ──
@@ -83,27 +86,25 @@ export function createProjectChannels(projectDir: string): Record<string, Channe
     'move-map': (fileName: string, oldFolder: string | null, newFolder: string | null) =>
       toResult(() => mapStore.moveMap(mapsDir, fileName, oldFolder, newFolder)),
 
-    // ── sprites ──
-    'get-sprites': () =>
+    // ── characters + graphics ──
+    'get-characters': () =>
       toResult(() => {
-        const result = spriteStore.listSprites(spritesDir, spriteCache);
-        for (const w of result.warnings) console.warn(`[sprites] ${w.file}: ${w.error}`);
+        const result = characterStore.listCharacters(roots, imageCache);
+        for (const w of result.warnings) console.warn(`[characters] ${w.file}: ${w.error}`);
         return result;
       }),
-    'import-sprite': (sourcePath: string, options: spriteStore.ImportSpriteOptions) =>
-      toResult(() => spriteStore.importSprite(spritesDir, spriteCache, sourcePath, options)),
-    'save-sprite-meta': (id: string, meta: unknown) => toResult(() => spriteStore.saveSpriteMeta(spritesDir, id, meta)),
-    'rename-sprite': (id: string, newId: string) =>
-      toResult(() => spriteStore.renameSprite(spritesDir, spriteCache, id, newId)),
-    'delete-sprite': (id: string) => toResult(() => spriteStore.deleteSprite(spritesDir, spriteCache, id)),
-    'create-sprite-folder': (parentId: string | null, name: string) =>
-      toResult(() => spriteStore.createSpriteFolder(spritesDir, parentId ?? null, name)),
-    'rename-sprite-folder': (folderId: string, newName: string) =>
-      toResult(() => spriteStore.renameSpriteFolder(spritesDir, spriteCache, folderId, newName)),
-    'move-sprite-folder': (folderId: string, newParentId: string | null) =>
-      toResult(() => spriteStore.moveSpriteFolder(spritesDir, spriteCache, folderId, newParentId ?? null)),
-    'delete-sprite-folder': (folderId: string) =>
-      toResult(() => spriteStore.deleteSpriteFolder(spritesDir, spriteCache, folderId)),
+    'save-character': (id: string, def: unknown) => toResult(() => characterStore.saveCharacter(roots, imageCache, id, def)),
+    'rename-character': (id: string, newId: string) => toResult(() => characterStore.renameCharacter(roots, id, newId)),
+    'delete-character': (id: string) => toResult(() => characterStore.deleteCharacter(roots, id)),
+    'import-graphic': (sourcePath: string, graphicId: string) =>
+      toResult(() => characterStore.importGraphic(graphicsDir, imageCache, sourcePath, graphicId)),
+    'create-character-folder': (parentId: string | null, name: string) =>
+      toResult(() => characterStore.createCharacterFolder(charactersDir, parentId ?? null, name)),
+    'rename-character-folder': (folderId: string, newName: string) =>
+      toResult(() => characterStore.renameCharacterFolder(charactersDir, folderId, newName)),
+    'move-character-folder': (folderId: string, newParentId: string | null) =>
+      toResult(() => characterStore.moveCharacterFolder(charactersDir, folderId, newParentId ?? null)),
+    'delete-character-folder': (folderId: string) => toResult(() => characterStore.deleteCharacterFolder(charactersDir, folderId)),
 
     // ── database ──
     'get-database': () => toResult(() => databaseStore.getDatabase(root)),

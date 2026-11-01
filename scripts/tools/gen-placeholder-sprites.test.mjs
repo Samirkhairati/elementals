@@ -2,16 +2,15 @@ import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
-import { PROJECT_SPRITES, buildAssets, decodePng, encodePng, recolourPixel } from './gen-placeholder-sprites.mjs'
-import { validateSpriteMeta } from '../../shared/engine/sprites.ts'
-import { validateSpriteMeta as strictValidate } from '../../editor/electron/ipc/spriteMeta.ts'
+import { PLAYER_FIXTURE, PLAYER_GRAPHICS, buildAssets, decodePng, encodePng, recolourPixel } from './gen-placeholder-sprites.mjs'
+import { validateCharacter } from '../../shared/engine/characters.ts'
+import { spriteMetaToCharacter } from '../../shared/engine/characterMigrate.ts'
 
-const playerDir = path.join(PROJECT_SPRITES, 'characters/player')
-const readPlayer = (f) => fs.readFileSync(path.join(playerDir, f))
+const readPlayer = (f) => fs.readFileSync(f === 'sprite.json' ? PLAYER_FIXTURE : path.join(PLAYER_GRAPHICS, f))
 const files = buildAssets(readPlayer)
 const ids = Object.keys(files)
-  .filter((f) => f.endsWith('/sprite.json'))
-  .map((f) => f.slice(0, -'/sprite.json'.length))
+  .filter((f) => f.startsWith('database/characters/'))
+  .map((f) => f.slice('database/characters/'.length, -'.json'.length))
 
 describe('placeholder sprite generator', () => {
   test('is deterministic', () => {
@@ -39,43 +38,42 @@ describe('placeholder sprite generator', () => {
   })
 
   for (const id of ids) {
-    test(`${id}: valid metadata and sheets tile exactly`, () => {
-      const meta = JSON.parse(files[`${id}/sprite.json`].toString())
-      assert.deepEqual(validateSpriteMeta(meta).errors, [])
-      assert.deepEqual(strictValidate(meta).errors ?? [], [])
-      const sheets = meta.kind === 'character' ? Object.values(meta.character.sheets) : [meta.sheet]
-      for (const file of sheets) {
-        const img = decodePng(files[`${id}/${file}`])
-        assert.equal(img.width % meta.frameWidth, 0, `${file} width`)
-        assert.equal(img.height % meta.frameHeight, 0, `${file} height`)
-        if (meta.kind === 'character') {
-          assert.equal(img.width / meta.frameWidth, meta.character.framesPerDirection)
-          assert.equal(img.height / meta.frameHeight, 4)
+    test(`${id}: a valid character whose sheets tile exactly`, () => {
+      const def = JSON.parse(files[`database/characters/${id}.json`].toString())
+      assert.deepEqual(validateCharacter(def).errors, [])
+      for (const sheet of Object.values(def.sheets)) {
+        const img = decodePng(files[`graphics/${sheet.image}`])
+        assert.equal(img.width % sheet.frameWidth, 0, `${sheet.image} width`)
+        assert.equal(img.height % sheet.frameHeight, 0, `${sheet.image} height`)
+        if (def.facing === 'four') {
+          assert.equal(img.width / sheet.frameWidth, def.clips.walk.byFacing.down.length)
+          assert.equal(img.height / sheet.frameHeight, 4)
         }
-        assert.ok(img.data.some((v, i) => i % 4 === 3 && v > 0), `${file} is not empty`)
+        assert.ok(img.data.some((v, i) => i % 4 === 3 && v > 0), `${sheet.image} is not empty`)
       }
     })
   }
 
   test('object frame counts and the flower animation', () => {
-    const sheet = (id) => decodePng(files[`${id}/sheet.png`])
+    const sheet = (id) => decodePng(files[`graphics/sprites/${id}/sheet.png`])
     assert.equal(sheet('objects/sign').width, 32)
     assert.equal(sheet('objects/item-ball').width, 32)
     assert.equal(sheet('objects/chest').width, 64)
     assert.equal(sheet('objects/door').width, 64)
     assert.equal(sheet('objects/flower').width, 96)
-    const flower = JSON.parse(files['objects/flower/sprite.json'].toString())
-    assert.equal(flower.kind, 'animated')
-    assert.deepEqual(flower.animations.sway, { frames: [0, 1, 2, 1], fps: 4, loop: true })
+    const flower = JSON.parse(files['database/characters/objects/flower.json'].toString())
+    assert.equal(flower.facing, 'none')
+    assert.deepEqual(flower.clips.sway, { sheet: 'sheet', fps: 4, loop: true, directional: false, frames: [0, 1, 2, 1] })
   })
 
   test('NPCs keep the player layout and differ from it in colour only', () => {
-    const player = JSON.parse(readPlayer('sprite.json').toString())
+    const player = spriteMetaToCharacter('characters/player', JSON.parse(readPlayer('sprite.json').toString()))
     const playerWalk = decodePng(readPlayer('walk.png'))
     for (const key of ['npc-red', 'npc-blue', 'npc-green']) {
-      const meta = JSON.parse(files[`characters/${key}/sprite.json`].toString())
-      assert.deepEqual({ ...meta, name: player.name }, player)
-      const walk = decodePng(files[`characters/${key}/walk.png`])
+      const def = JSON.parse(files[`database/characters/characters/${key}.json`].toString())
+      const swapImages = (d) => JSON.parse(JSON.stringify(d).replaceAll(`sprites/characters/${key}/`, 'sprites/characters/player/'))
+      assert.deepEqual({ ...swapImages(def), name: player.name }, player)
+      const walk = decodePng(files[`graphics/sprites/characters/${key}/walk.png`])
       assert.equal(walk.width, playerWalk.width)
       let differing = 0
       for (let i = 0; i < walk.width * walk.height; i++) {
