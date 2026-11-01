@@ -1,6 +1,9 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import { Plus } from 'lucide-react'
 import { characterCounts } from '@/lib/databaseModel'
-import { Badge } from '../ui/controls'
+import { Badge, EdButton } from '../ui/controls'
+import { CharacterEditor } from './characters/CharacterEditor'
+import { NewCharacterWizard } from './characters/NewCharacterWizard'
 import type { DatabaseData } from './useDatabaseData'
 import type { TableProps } from './shared'
 
@@ -27,12 +30,15 @@ export function CharactersBrowser({ data, query, selected, onSelect }: TableProp
 }
 
 export function CharacterDetail({ data, id }: { data: DatabaseData; id: string }) {
-  const c = data.sprites.characters[id]
-  if (!c) return <p className="ed-hint p-4">Pick a character on the left.</p>
+  return <CharacterEditor data={data} id={id} />
+}
+
+export function CharactersToolbar({ data, onSelect }: { data: DatabaseData; onSelect: (id: string) => void }) {
+  const [open, setOpen] = useState(false)
   return (
-    <div className="flex flex-col gap-2 p-4" data-testid="character-detail">
-      <h2 className="text-ed-title">{c.def.name}</h2>
-      <p className="ed-hint">{c.id} · facing {c.def.facing} · {Object.keys(c.def.sheets).length} sheets · {Object.keys(c.def.clips).length} animations</p>
+    <div className="border-b border-border p-2">
+      <EdButton size="sm" onClick={() => setOpen(true)}><Plus /> New character…</EdButton>
+      <NewCharacterWizard data={data} open={open} onOpenChange={setOpen} onCreated={onSelect} />
     </div>
   )
 }

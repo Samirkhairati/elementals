@@ -4,7 +4,7 @@ import { Bug, Grid3x3, Image, Lock, Map as MapIcon, MessageSquareText, Package, 
 import { DATABASE_TABLES, GROUP_LABELS, characterCounts, getTable, unusedGraphics, type DatabaseTable, type TableGroup } from '@/lib/databaseModel'
 import { Badge, InfoTip } from '../ui/controls'
 import { useDatabaseData, type DatabaseData } from './useDatabaseData'
-import { CharacterDetail, CharactersBrowser } from './CharactersTable'
+import { CharacterDetail, CharactersBrowser, CharactersToolbar } from './CharactersTable'
 import { FlagsTable } from './FlagsTable'
 import { GraphicDetail, GraphicsBrowser, ImportGraphic } from './GraphicsTable'
 import { MapDetail, MapsBrowser } from './MapsTable'
@@ -32,7 +32,7 @@ interface TableView {
 const VIEWS: Record<string, TableView> = {
   graphics: { Browser: GraphicsBrowser, Detail: GraphicDetail, Toolbar: ImportGraphic },
   tilesets: { Browser: TilesetsBrowser, Detail: TilesetDetail },
-  characters: { Browser: CharactersBrowser, Detail: CharacterDetail },
+  characters: { Browser: CharactersBrowser, Detail: CharacterDetail, Toolbar: CharactersToolbar },
   maps: { Browser: MapsBrowser, Detail: MapDetail },
   flags: { Browser: () => null, Detail: () => null, full: FlagsTable },
 }

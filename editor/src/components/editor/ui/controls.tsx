@@ -183,6 +183,8 @@ interface NumberFieldProps {
   'aria-label'?: string
   className?: string
   align?: 'left' | 'right'
+  /** Compact widths (spec §8.8): xs 56px for 1-2 digit integers, sm 72px for numbers with units. Default fills the row. */
+  size?: 'xs' | 'sm'
 }
 
 /** Right padding that leaves room for a unit label drawn at 10px (about 6.5px per character) plus gaps. */
@@ -211,6 +213,7 @@ export function NumberField({
   id,
   className,
   align = 'right',
+  size,
   ...rest
 }: NumberFieldProps) {
   const [draft, setDraft] = useState<string | null>(null)
@@ -234,7 +237,7 @@ export function NumberField({
   }
 
   return (
-    <div className={cn('ed-input-wrap w-full', className)}>
+    <div className={cn('ed-input-wrap', size === 'xs' ? 'w-14' : size === 'sm' ? 'w-[72px]' : 'w-full', className)}>
       <input
         ref={inputRef}
         id={id}
@@ -462,4 +465,38 @@ export function useAnimationClock(running: boolean): number {
     return () => cancelAnimationFrame(raf)
   }, [running])
   return tick
+}
+
+// ── Compact layout helpers (spec §8.8) ──────────────────────────────────────────────────────────
+
+/** Related values on one line: `W [32] × H [48]`. */
+export function FieldRow({ children, className }: { children: React.ReactNode; className?: string }) {
+  return <div className={cn('flex flex-wrap items-center gap-x-2 gap-y-1', className)}>{children}</div>
+}
+
+/** A slider and its number together (fps, speed, scale). */
+export function SliderNumber({ value, onCommit, min, max, step = 1, unit, label }: { value: number; onCommit: (v: number) => void; min: number; max: number; step?: number; unit?: string; label: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <input type="range" aria-label={`${label} slider`} className="min-w-16 flex-1" min={min} max={max} step={step} value={Math.min(max, Math.max(min, value))} onChange={(e) => onCommit(Number(e.target.value))} />
+      <NumberField aria-label={label} size="sm" value={value} min={min} step={step} unit={unit} onCommit={onCommit} />
+    </div>
+  )
+}
+
+/** Collapsible section that shows a one-line summary while closed. */
+export function Section({ title, summary, info, defaultOpen = true, children }: { title: React.ReactNode; summary?: React.ReactNode; info?: React.ReactNode; defaultOpen?: boolean; children: React.ReactNode }) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <section className="rounded border border-border">
+      <div className="flex items-center gap-2 px-2 py-1">
+        <button type="button" aria-expanded={open} className="flex flex-1 items-center gap-2 text-left text-ed-label" onClick={() => setOpen(!open)}>
+          <span className="font-medium">{title}</span>
+          {!open && summary ? <span className="ed-hint truncate">{summary}</span> : null}
+        </button>
+        {info ? <InfoTip>{info}</InfoTip> : null}
+      </div>
+      {open ? <div className="flex flex-col gap-2 border-t border-border p-2">{children}</div> : null}
+    </section>
+  )
 }
