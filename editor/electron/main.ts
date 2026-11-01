@@ -5,7 +5,8 @@ import { fileURLToPath } from 'url';
 import { setupMenu } from './menu.js';
 import { registerProjectHandlers } from './ipc/projectHandlers.js';
 import { projectDirs } from './ipc/projectApi.js';
-import { getWorktreeName } from './worktreeName.js';
+import os from 'os';
+import { formatWindowTitle, getWorktreeName } from './worktreeName.js';
 import { isAllowedNavigation, parsePort } from './devServer.js';
 
 // Dev-only workaround for editor freezes: prevent macOS App Nap & idle process suspension.
@@ -38,7 +39,7 @@ function ensureDirectories(): void {
 function createWindow(): void {
   const port = parsePort(process.env.PORT);
   const worktree = getWorktreeName(REPO_ROOT);
-  const title = `Elementals Editor — [${worktree}] (Port: ${port})`;
+  const title = formatWindowTitle(worktree, port, PROJECT_DIR, os.homedir());
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -62,7 +63,7 @@ function createWindow(): void {
   });
 
   win.setTitle(title);
-  setupMenu(win);
+  setupMenu(win, PROJECT_DIR);
 
   const policy = { isPackaged: app.isPackaged, port, distDir: DIST_DIR };
   win.webContents.on('will-navigate', (event, url) => {

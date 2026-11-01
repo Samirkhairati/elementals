@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 
 const built: { template: unknown } = { template: null }
+const openPath = vi.fn((_path: string) => Promise.resolve(''))
 vi.mock('electron', () => ({
   app: { name: 'Elementals' },
+  shell: { openPath: (p: string) => openPath(p) },
   Menu: {
     buildFromTemplate: (template: unknown) => {
       built.template = template
@@ -31,6 +33,21 @@ function find(items: Item[], ...path: string[]): Item | undefined {
   }
   return found
 }
+
+describe('File > Reveal Project Folder', () => {
+  it('opens the project folder the editor saves to', () => {
+    setupMenu({ webContents: { send: vi.fn() } } as never, '/work/elementals/project')
+    const item = find(built.template as Item[], 'File', 'Reveal Project Folder')
+    expect(item).toBeDefined()
+    item?.click?.()
+    expect(openPath).toHaveBeenCalledWith('/work/elementals/project')
+  })
+
+  it('is left out when no project folder is given', () => {
+    setupMenu({ webContents: { send: vi.fn() } } as never)
+    expect(find(built.template as Item[], 'File', 'Reveal Project Folder')).toBeUndefined()
+  })
+})
 
 describe('View > Appearance > Select Tabs', () => {
   const send = vi.fn()

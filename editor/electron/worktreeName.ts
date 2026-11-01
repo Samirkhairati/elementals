@@ -21,6 +21,15 @@ const defaultExec: ExecFn = (file, args, options) =>
   });
 
 /**
+ * Window title: worktree, port and the project folder maps are saved to (home shown as `~`), so a
+ * second checkout can never be mistaken for the first.
+ */
+export function formatWindowTitle(worktree: string, port: number, projectDir: string, home?: string): string {
+  const shown = home && (projectDir === home || projectDir.startsWith(`${home}${path.sep}`)) ? `~${projectDir.slice(home.length)}` : projectDir;
+  return `Elementals Editor — [${worktree}] (Port: ${port}) — ${shown}`;
+}
+
+/**
  * Name shown in the window title: `WORKTREE_NAME` (set by the dev script) first, then the
  * current git branch (`detached@<sha>` on a detached HEAD), then the repo folder name.
  * Never throws.

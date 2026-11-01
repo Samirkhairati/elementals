@@ -1,6 +1,7 @@
-import { app, BrowserWindow, Menu } from 'electron';
+import { app, BrowserWindow, Menu, shell } from 'electron';
 
-export function setupMenu(win: BrowserWindow) {
+/** `projectDir` is the folder the editor reads and writes; File > Reveal Project Folder opens it. */
+export function setupMenu(win: BrowserWindow, projectDir?: string) {
   const isMac = process.platform === 'darwin';
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const template: any[] = [
@@ -24,7 +25,20 @@ export function setupMenu(win: BrowserWindow) {
       : []),
     {
       label: 'File',
-      submenu: [isMac ? { role: 'close' } : { role: 'quit' }],
+      submenu: [
+        ...(projectDir
+          ? [
+              {
+                label: 'Reveal Project Folder',
+                click: () => {
+                  void shell.openPath(projectDir);
+                },
+              },
+              { type: 'separator' },
+            ]
+          : []),
+        isMac ? { role: 'close' } : { role: 'quit' },
+      ],
     },
     {
       label: 'Edit',

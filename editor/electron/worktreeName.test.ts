@@ -1,8 +1,28 @@
 import path from 'path';
 import { describe, expect, it, vi } from 'vitest';
-import { getWorktreeName, type ExecFn } from './worktreeName';
+import { formatWindowTitle, getWorktreeName, type ExecFn } from './worktreeName';
 
 const ROOT = path.join('/repos', 'elementals-wt1');
+
+describe('formatWindowTitle', () => {
+  const home = path.join('/Users', 'me');
+
+  it('shows the worktree, port and the project folder with the home directory as ~', () => {
+    const project = path.join(home, 'dev', 'elementals', 'project');
+    expect(formatWindowTitle('main', 5174, project, home)).toBe(`Elementals Editor — [main] (Port: 5174) — ~${path.sep}dev${path.sep}elementals${path.sep}project`);
+  });
+
+  it('keeps the full path outside the home directory and when there is no home', () => {
+    const project = path.join('/srv', 'elementals', 'project');
+    expect(formatWindowTitle('wt', 7474, project, home)).toBe(`Elementals Editor — [wt] (Port: 7474) — ${project}`);
+    expect(formatWindowTitle('wt', 7474, project)).toBe(`Elementals Editor — [wt] (Port: 7474) — ${project}`);
+  });
+
+  it('does not treat a sibling folder that starts with the home name as inside it', () => {
+    const project = path.join('/Users', 'me2', 'project');
+    expect(formatWindowTitle('wt', 1, project, home)).toContain(project);
+  });
+});
 
 function fakeExec(responses: Record<string, string | Error>): ReturnType<typeof vi.fn<ExecFn>> {
   return vi.fn<ExecFn>((_file, args) => {
