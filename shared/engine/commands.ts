@@ -959,6 +959,14 @@ export function validateCommandParams(
     });
   }
 
+  if (cmd.type === 'warp' && typeof params.map === 'string') {
+    const size = ctx.mapSizes?.[params.map];
+    const { x, y } = params;
+    if (size && typeof x === 'number' && typeof y === 'number' && (x < 0 || y < 0 || x >= size.width || y >= size.height)) {
+      report('error', 'warp-out-of-bounds', `Tile (${x}, ${y}) is outside the map (${size.width}×${size.height} tiles)`);
+    }
+  }
+
   if (cmd.type === 'conditional' && Array.isArray(params.conditions) && params.conditions.length === 0) {
     report('warning', 'missing-param', 'Conditional Branch has no conditions (it always takes the Then branch)');
   }

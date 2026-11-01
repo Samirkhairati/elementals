@@ -7,6 +7,7 @@
 import type {
   Command,
   EventGraph,
+  GraphFrame,
   GraphIssue,
   GraphNode,
   IssueSeverity,
@@ -281,20 +282,25 @@ export function addNodeFrom(graph: EventGraph, node: GraphNode, from?: { nodeId:
   return next;
 }
 
-/** A copy of some nodes that can be pasted into any graph: wires between them are kept, the rest dropped. */
+/** A copy of some nodes (and frames) that can be pasted into any graph: wires between them are kept, the rest dropped. */
 export interface GraphFragment {
   /** Positions are relative to the top-left of the selection. */
   nodes: GraphNode[];
+  /** Frames copied with the nodes, positioned the same way. */
+  frames?: GraphFrame[];
 }
 
-/** Copies the given nodes (never `start`). Wires to nodes outside the selection are dropped. */
-export function extractFragment(graph: EventGraph, ids: readonly string[]): GraphFragment {
+/** Copies the given nodes (never `start`) and frames. Wires to nodes outside the selection are dropped. */
+export function extractFragment(graph: EventGraph, ids: readonly string[], frameIds: readonly string[] = []): GraphFragment {
   const wanted = new Set(ids);
   const chosen = graph.nodes.filter((n) => wanted.has(n.id) && n.type !== GRAPH_START);
+  const frames = graph.frames.filter((f) => frameIds.includes(f.id));
   const inside = new Set(chosen.map((n) => n.id));
-  const minX = chosen.length ? Math.min(...chosen.map((n) => n.x)) : 0;
-  const minY = chosen.length ? Math.min(...chosen.map((n) => n.y)) : 0;
-  return {
+  const xs = [...chosen.map((n) => n.x), ...frames.map((f) => f.x)];
+  const ys = [...chosen.map((n) => n.y), ...frames.map((f) => f.y)];
+  const minX = xs.length ? Math.min(...xs) : 0;
+  const minY = ys.length ? Math.min(...ys) : 0;
+  const fragment: GraphFragment = {
     nodes: chosen.map((n) => ({
       id: n.id,
       type: n.type,
@@ -304,10 +310,12 @@ export function extractFragment(graph: EventGraph, ids: readonly string[]): Grap
       y: n.y - minY,
     })),
   };
+  if (frames.length > 0) fragment.frames = frames.map((f) => ({ ...f, x: f.x - minX, y: f.y - minY }));
+  return fragment;
 }
 
-/** Adds a fragment with fresh ids at `at` (the top-left of the pasted group). Returns the new node ids. */
-export function pasteFragment(graph: EventGraph, fragment: GraphFragment, at: { x: number; y: number }, idFn: IdFn = newId): { graph: EventGraph; ids: string[] } {
+/** Adds a fragment with fresh ids at `at` (the top-left of the pasted group). Returns the new node and frame ids. */
+export function pasteFragment(graph: EventGraph, fragment: GraphFragment, at: { x: number; y: number }, idFn: IdFn = newId): { graph: EventGraph; ids: string[]; frameIds: string[] } {
   const fresh = new Map(fragment.nodes.filter((n) => n.type !== GRAPH_START).map((n) => [n.id, idFn()]));
   const pasted: GraphNode[] = fragment.nodes
     .filter((n) => fresh.has(n.id))
@@ -319,7 +327,12 @@ export function pasteFragment(graph: EventGraph, fragment: GraphFragment, at: { 
       x: n.x + at.x,
       y: n.y + at.y,
     }));
-  return { graph: { ...graph, nodes: [...graph.nodes, ...pasted] }, ids: pasted.map((n) => n.id) };
+  const frames: GraphFrame[] = (fragment.frames ?? []).map((f) => ({ ...f, id: idFn(), x: f.x + at.x, y: f.y + at.y }));
+  return {
+    graph: { ...graph, nodes: [...graph.nodes, ...pasted], frames: [...graph.frames, ...frames] },
+    ids: pasted.map((n) => n.id),
+    frameIds: frames.map((f) => f.id),
+  };
 }
 
 // ── queries ─────────────────────────────────────────────────────────────────────────────────────
@@ -445,10 +458,7 @@ export function validateGraph(graph: unknown, ctx: ValidationContext = {}): Grap
 
   const typed = { nodes: valid, frames: [] } as EventGraph;
   if (starts.length > 0) {
-    const live = reachableFromStart(typed);
-    for (const node of valid) {
-      if (node.type !== GRAPH_START && node.id && !live.has(node.id)) add(node.id, 'warning', 'unreachable', 'Nothing leads to this node, so it never runs');
-    }
+    // Nodes nothing leads to are allowed (scratch space, parked ideas): they never run and are not a problem.
     for (const id of findYieldlessCycles(typed)) {
       add(id, 'error', 'cycle-without-wait', 'This loop never waits (add a Wait or Show Text inside it), so it would freeze the game');
     }

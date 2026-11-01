@@ -185,9 +185,21 @@ describe('contexts and problems', () => {
       stageIds: ['cat'],
       stageValues: { cat: ['none', 'found', 'done'] },
       mapIds: ['town', 'cave'],
+      mapSizes: {},
       spriteIds: ['characters/hero', 'objects/chest'],
       entityIds: ['self-1', 'e2'],
     })
+  })
+
+  it('reports a warp to a tile outside the destination map', () => {
+    const sized = { ...env, maps: [{ id: 'town', name: 'Town', width: 30, height: 20 }, ...env.maps.filter((m) => m.id !== 'town')] }
+    const ctx = buildValidationContext(sized)
+    expect(ctx.mapSizes).toEqual({ town: { width: 30, height: 20 } })
+    const bad = collectProblems([state('p1', [cmd('w', 'warp', { map: 'town', x: 25, y: 25 })])], ctx)
+    expect(bad.find((p) => p.code === 'warp-out-of-bounds')).toMatchObject({ nodeId: 'w', severity: 'error' })
+    expect(bad.find((p) => p.code === 'warp-out-of-bounds')?.message).toContain('(25, 25)')
+    const ok = collectProblems([state('p1', [cmd('w', 'warp', { map: 'town', x: 29, y: 19 })])], ctx)
+    expect(ok.find((p) => p.code === 'warp-out-of-bounds')).toBeUndefined()
   })
 
   it('collects problems from conditions, appearance and nodes, errors first', () => {
@@ -213,7 +225,7 @@ describe('contexts and problems', () => {
     expect(worstSeverity([{ severity: 'warning' }, { severity: 'error' }])).toBe('error')
   })
 
-  it('reports graph problems on the node: unreachable nodes and loops that never wait', () => {
+  it('reports loops that never wait on the node, and does not mind floating nodes', () => {
     const s = state('p1')
     s.graph = {
       nodes: [
@@ -225,7 +237,7 @@ describe('contexts and problems', () => {
     }
     const problems = collectProblems([s], buildValidationContext(env))
     expect(problems.find((p) => p.code === 'cycle-without-wait')).toMatchObject({ nodeId: 'j', severity: 'error', scope: 'node' })
-    expect(problems.find((p) => p.code === 'unreachable')).toMatchObject({ nodeId: 'lost', severity: 'warning' })
+    expect(problems.find((p) => p.nodeId === 'lost')).toBeUndefined()
   })
 
   it('groups node issues by node id and skips issues without one', () => {

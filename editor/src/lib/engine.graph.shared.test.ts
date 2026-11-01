@@ -221,6 +221,19 @@ describe('graph edits', () => {
       expect(r.graph.nodes.slice(0, 4)).toEqual(g.nodes)
     })
 
+    it('carries frames along, positioned relative to the selection, with fresh ids when pasted', () => {
+      const framed = { ...g, frames: [{ id: 'f1', title: 'Intro', color: '#64748b', x: 280, y: 80, w: 400, h: 200 }] }
+      const f = extractFragment(framed, ['a', 'b'], ['f1'])
+      expect(f.frames).toEqual([{ id: 'f1', title: 'Intro', color: '#64748b', x: 0, y: 0, w: 400, h: 200 }])
+      expect(f.nodes.map((n) => [n.x, n.y])).toEqual([[20, 20], [280, 80]])
+      expect(extractFragment(framed, ['a']).frames).toBeUndefined()
+      const r = pasteFragment(framed, f, { x: 100, y: 700 }, seq())
+      expect(r.frameIds).toHaveLength(1)
+      expect(r.frameIds[0]).not.toBe('f1')
+      expect(r.graph.frames).toHaveLength(2)
+      expect(r.graph.frames[1]).toMatchObject({ id: r.frameIds[0], title: 'Intro', x: 100, y: 700, w: 400, h: 200 })
+    })
+
     it('a pasted fragment can be pasted again; start in a fragment is skipped', () => {
       const f = extractFragment(g, ['a'])
       const idFn = seq()
@@ -303,12 +316,12 @@ describe('validateGraph', () => {
     expect(c).toContain('edge-into-start@b')
   })
 
-  it('warns about unreachable nodes and rejects tree-only commands', () => {
+  it('rejects tree-only commands but lets unconnected nodes float without a problem', () => {
     const g = graphOf(node('s', 'start', { next: 'l' }), node('l', 'loop'), node('x', 'wait'))
     const c = codes(g)
     expect(c).toContain('legacy-flow-node@l')
-    expect(c).toContain('unreachable@x')
-    expect(validateGraph(g).find((i) => i.code === 'unreachable')?.severity).toBe('warning')
+    expect(c.some((code) => code.endsWith('@x'))).toBe(false)
+    expect(validateGraph(g).find((i) => i.code === 'unreachable')).toBeUndefined()
   })
 
   it('rejects a loop with nothing that waits', () => {

@@ -379,6 +379,8 @@ export interface ValidationContext {
   /** Value ids of each stage, for `stageValue` fields. */
   stageValues?: Record<string, string[]>;
   mapIds?: string[];
+  /** Size in tiles of each map id, so a warp to a tile outside the map can be reported. */
+  mapSizes?: Record<string, { width: number; height: number }>;
   spriteIds?: string[];
   /** Editor ids of entities (for `{ entity: id }` targets). */
   entityIds?: string[];

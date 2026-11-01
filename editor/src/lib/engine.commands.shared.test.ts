@@ -188,6 +188,15 @@ describe('validateCommands', () => {
     expect(validateCommands([cond], { switchIds: ['s1'] })).toEqual([])
   })
 
+  it('reports a warp to a tile outside the destination map, only when the map size is known', () => {
+    const ctx = { mapIds: ['town'], mapSizes: { town: { width: 30, height: 20 } } }
+    expect(codes([mk('warp', { map: 'town', x: 25, y: 25 })], ctx)).toEqual(['error:warp-out-of-bounds'])
+    expect(codes([mk('warp', { map: 'town', x: -1, y: 0 })], ctx)).toContain('error:warp-out-of-bounds')
+    expect(codes([mk('warp', { map: 'town', x: 30, y: 0 })], ctx)).toEqual(['error:warp-out-of-bounds'])
+    expect(codes([mk('warp', { map: 'town', x: 29, y: 19 })], ctx)).toEqual([])
+    expect(codes([mk('warp', { map: 'town', x: 99, y: 99 })], { mapIds: ['town'] })).toEqual([])
+  })
+
   it('reports unknown command types with path and id', () => {
     const issues = validateCommands([mk('wait'), { id: 'q', type: 'teleport', params: {} }])
     expect(issues).toEqual([{ commandId: 'q', path: [1], severity: 'error', code: 'unknown-command', message: 'Unknown command type "teleport"' }])

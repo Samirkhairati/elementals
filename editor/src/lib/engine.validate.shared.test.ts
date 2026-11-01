@@ -153,7 +153,7 @@ describe('validateEntity: Event', () => {
     expect(find('unknown-command')).toMatchObject({ nodeId: 'u', path: 'components.Event.states[0].graph.nodes[u]' })
     expect(find('unknown-port')).toMatchObject({ nodeId: 'st', path: 'components.Event.states[0].graph.nodes[st].out.bogus' })
     expect(find('dangling-edge')).toMatchObject({ nodeId: 'lost' })
-    expect(find('unreachable')).toMatchObject({ nodeId: 'lost', severity: 'warning' })
+    expect(find('unreachable')).toBeUndefined()
   })
 
   it('a state with neither a graph nor commands is an error', () => {

@@ -404,12 +404,12 @@ describe('EventEditor: problems', () => {
     expect(screen.getByTestId('node-a')).toBeInTheDocument()
   })
 
-  it('reports a node nothing leads to', () => {
+  it('does not report a node nothing leads to (floating nodes are allowed)', () => {
     const s = state('p1', [cmd('a', 'wait')])
     s.graph = { ...s.graph, nodes: [...s.graph.nodes, { id: 'lost', type: 'wait', params: { ms: 1 }, out: {}, x: 0, y: 300 }] }
     setup([s])
     fireEvent.click(screen.getByRole('tab', { name: /Problems/ }))
-    expect(screen.getByText(/Nothing leads to this node/)).toBeInTheDocument()
+    expect(screen.queryByText(/Nothing leads to this node/)).not.toBeInTheDocument()
   })
 })
 

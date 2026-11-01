@@ -4,6 +4,7 @@
 
 import React, { createContext, useContext, useMemo } from 'react'
 import type { SpriteAssetInfo, SpriteKind, StageDef, SwitchDef, VariableDef } from '../../../../../shared/engine/types'
+import type { MapData, TilesetData } from '@/types/editor'
 import { useEditorSelector, type EditorContextValue } from '../layout/EditorContext'
 
 export interface EventEnv {
@@ -12,8 +13,10 @@ export interface EventEnv {
   switches: SwitchDef[]
   variables: VariableDef[]
   stages: StageDef[]
-  /** Maps of the project; `id` is the file name without `.json`. */
-  maps: { id: string; name: string }[]
+  /** Maps of the project; `id` is the file name without `.json`. The size is what a warp is checked against. */
+  maps: { id: string; name: string; width?: number; height?: number }[]
+  /** What the warp tile picker needs to draw a map; hosts without it (tests) show no preview. */
+  mapPreview?: { getMap: (id: string) => MapData | undefined; tilesets: TilesetData[] }
   sprites: { id: string; name: string; kind: SpriteKind }[]
   /** Common events of the project (`callCommonEvent` targets). */
   commonEvents?: { id: string; name: string }[]
@@ -56,6 +59,7 @@ const selectEnvInputs = (c: EditorContextValue) => ({
   variables: c.variables,
   stages: c.stages,
   maps: c.maps,
+  tilesets: c.tilesets,
   entities: c.entities,
   commonEvents: c.commonEvents,
   spriteList: c.spriteList,
@@ -88,7 +92,8 @@ function ContextBackedEnv({ entityId, children }: { entityId: string; children: 
       switches: c.switches,
       variables: c.variables,
       stages: c.stages,
-      maps: c.maps.map((m) => ({ id: mapIdOf(m.fileName), name: m.name || mapIdOf(m.fileName) })),
+      maps: c.maps.map((m) => ({ id: mapIdOf(m.fileName), name: m.name || mapIdOf(m.fileName), width: m.width, height: m.height })),
+      mapPreview: { getMap: (id) => c.maps.find((m) => mapIdOf(m.fileName) === id), tilesets: c.tilesets },
       sprites: c.spriteList.map((s) => ({ id: s.id, name: s.meta.name || s.id, kind: s.meta.kind })),
       entities: c.entities.map((e) => ({ id: e.id, name: e.name })),
       commonEvents: (c.commonEvents ?? []).map((e) => ({ id: e.id, name: e.name })),

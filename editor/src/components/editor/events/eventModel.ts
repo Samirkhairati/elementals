@@ -250,6 +250,7 @@ export function buildValidationContext(env: Pick<EventEnv, 'switches' | 'variabl
     stageIds: stages.map((s) => s.id),
     stageValues: Object.fromEntries(stages.map((s) => [s.id, s.values.map((v) => v.id)])),
     mapIds: env.maps.map((m) => m.id),
+    mapSizes: Object.fromEntries(env.maps.filter((m) => m.width && m.height).map((m) => [m.id, { width: m.width as number, height: m.height as number }])),
     spriteIds: env.sprites.map((s) => s.id),
     entityIds: env.entities.map((e) => e.id),
     // Without a list (tests, hosts that have none) common event ids are not checked.
