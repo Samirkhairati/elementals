@@ -24,6 +24,7 @@ import { Frame, LayoutGrid, Plus, Scissors } from 'lucide-react'
 import type { EventGraph, GraphIssue, SummaryContext } from '../../../../../shared/engine/types'
 import { GRAPH_START, connect, disconnect, edgesOf, extractFragment, getNode, layoutGraph, moveNode, pasteFragment } from '../../../../../shared/engine/graph'
 import { cn } from '@/lib/utils'
+import { useThemeStore } from '@/store/themeStore'
 import {
   CommandNodeView,
   FrameNodeView,
@@ -41,7 +42,6 @@ import {
   moveFrame,
   readFragmentClipboard,
   removeFrame,
-  snapToGrid,
   updateFrame,
   writeFragmentClipboard,
 } from './graphModel'
@@ -83,6 +83,11 @@ function Canvas({ graph, onChange, selectedId, onSelect, issues, summaryContext,
   const pointer = useRef<{ x: number; y: number }>({ x: 0, y: 0 }) // last pointer position, graph coordinates
   const [selected, setSelected] = useState<Set<string>>(() => new Set(selectedId ? [selectedId] : []))
   const [dragging, setDragging] = useState<Record<string, { x: number; y: number }>>({})
+  // React Flow reports each node's rendered size through `dimensions` changes. The nodes below are rebuilt
+  // on every render, so the sizes must be fed back or the nodes lose them: they flash hidden until
+  // re-measured and the minimap has nothing to draw.
+  const [measured, setMeasured] = useState<Record<string, { width: number; height: number }>>({})
+  const themeMode = useThemeStore((s) => s.mode)
   const [palette, setPalette] = useState<PaletteState | null>(null)
 
   const graphRef = useRef(graph)
@@ -105,7 +110,7 @@ function Canvas({ graph, onChange, selectedId, onSelect, issues, summaryContext,
   const frameCallbacks = useMemo(
     () => ({
       onTitle: (id: string, title: string) => commit(updateFrame(graphRef.current, id, { title })),
-      onResize: (id: string, w: number, h: number, x: number, y: number) => commit(updateFrame(graphRef.current, id, { w: snapToGrid(w), h: snapToGrid(h), x: snapToGrid(x), y: snapToGrid(y) })),
+      onResize: (id: string, w: number, h: number, x: number, y: number) => commit(updateFrame(graphRef.current, id, { w: Math.round(w), h: Math.round(h), x: Math.round(x), y: Math.round(y) })),
     }),
     [commit],
   )
@@ -114,14 +119,14 @@ function Canvas({ graph, onChange, selectedId, onSelect, issues, summaryContext,
     const frames: FrameFlowNode[] = graph.frames.map((f) => {
       const id = `${FRAME_PREFIX}${f.id}`
       const data: FrameNodeData = { frame: f, ...frameCallbacks }
-      return { id, type: 'frame', position: dragging[id] ?? { x: f.x, y: f.y }, style: { width: f.w, height: f.h }, zIndex: -1, selected: selected.has(id), data }
+      return { id, type: 'frame', position: dragging[id] ?? { x: f.x, y: f.y }, style: { width: f.w, height: f.h }, zIndex: -1, selected: selected.has(id), measured: measured[id], data }
     })
     const nodes: CommandFlowNode[] = graph.nodes.map((n) => {
       const data: CommandNodeData = { node: n, issues: issues.get(n.id) ?? [], summaryContext }
-      return { id: n.id, type: 'command', position: dragging[n.id] ?? { x: n.x, y: n.y }, selected: selected.has(n.id), deletable: n.type !== GRAPH_START, data }
+      return { id: n.id, type: 'command', position: dragging[n.id] ?? { x: n.x, y: n.y }, selected: selected.has(n.id), deletable: n.type !== GRAPH_START, measured: measured[n.id], data }
     })
     return [...frames, ...nodes] as Node[]
-  }, [graph.frames, graph.nodes, issues, summaryContext, selected, dragging, frameCallbacks])
+  }, [graph.frames, graph.nodes, issues, summaryContext, selected, dragging, measured, frameCallbacks])
 
   const flowEdges = useMemo<Edge[]>(
     () => edgesOf(graph).map((e) => ({ id: e.id, source: e.from, sourceHandle: e.port, target: e.to, targetHandle: 'in', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } })),
@@ -132,8 +137,13 @@ function Canvas({ graph, onChange, selectedId, onSelect, issues, summaryContext,
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
       let nextSelected: Set<string> | null = null
+      let sizes: Record<string, { width: number; height: number }> | null = null
       for (const c of changes) {
-        if (c.type === 'select') {
+        if (c.type === 'dimensions' && c.dimensions) {
+          const { width, height } = c.dimensions
+          sizes ??= {}
+          sizes[c.id] = { width, height }
+        } else if (c.type === 'select') {
           nextSelected ??= new Set(selected)
           if (c.selected) nextSelected.add(c.id)
           else nextSelected.delete(c.id)
@@ -141,6 +151,13 @@ function Canvas({ graph, onChange, selectedId, onSelect, issues, summaryContext,
           const { id, position } = c as { id: string; position: { x: number; y: number } }
           setDragging((d) => ({ ...d, [id]: position }))
         }
+      }
+      if (sizes) {
+        const fresh = sizes
+        setMeasured((m) => {
+          const changed = Object.keys(fresh).filter((id) => m[id]?.width !== fresh[id].width || m[id]?.height !== fresh[id].height)
+          return changed.length === 0 ? m : { ...m, ...Object.fromEntries(changed.map((id) => [id, fresh[id]])) }
+        })
       }
       if (nextSelected) {
         setSelected(nextSelected)
@@ -157,9 +174,9 @@ function Canvas({ graph, onChange, selectedId, onSelect, issues, summaryContext,
       for (const m of moved) {
         if (m.id.startsWith(FRAME_PREFIX)) {
           const frame = next.frames.find((f) => f.id === m.id.slice(FRAME_PREFIX.length))
-          if (frame) next = moveFrame(next, frame.id, snapToGrid(m.position.x) - frame.x, snapToGrid(m.position.y) - frame.y)
+          if (frame) next = moveFrame(next, frame.id, Math.round(m.position.x) - frame.x, Math.round(m.position.y) - frame.y)
         } else {
-          next = moveNode(next, m.id, snapToGrid(m.position.x), snapToGrid(m.position.y))
+          next = moveNode(next, m.id, Math.round(m.position.x), Math.round(m.position.y))
         }
       }
       setDragging({})
@@ -251,7 +268,7 @@ function Canvas({ graph, onChange, selectedId, onSelect, issues, summaryContext,
   const paste = useCallback(async () => {
     const fragment = await readFragmentClipboard()
     if (!fragment) return
-    const r = pasteFragment(graphRef.current, fragment, { x: snapToGrid(pointer.current.x), y: snapToGrid(pointer.current.y) })
+    const r = pasteFragment(graphRef.current, fragment, { x: Math.round(pointer.current.x), y: Math.round(pointer.current.y) })
     if (r.ids.length === 0) return
     commit(r.graph, r.ids[0])
     setSelected(new Set(r.ids))
@@ -333,19 +350,26 @@ function Canvas({ graph, onChange, selectedId, onSelect, issues, summaryContext,
         }}
         deleteKeyCode={['Backspace', 'Delete']}
         multiSelectionKeyCode={['Shift', 'Meta', 'Control']}
-        snapToGrid
-        snapGrid={[16, 16]}
         fitView
         fitViewOptions={{ maxZoom: 1, padding: 0.3 }}
         minZoom={0.2}
         maxZoom={1.75}
-        colorMode="system"
+        colorMode={themeMode}
         nodesConnectable
         elementsSelectable
       >
         <Background gap={16} />
         <Controls showInteractive={false} />
-        <MiniMap pannable zoomable style={{ width: 140, height: 90 }} className="!hidden xl:!block" />
+        <MiniMap
+          pannable
+          zoomable
+          style={{ width: 140, height: 90 }}
+          className="!hidden xl:!block"
+          bgColor="hsl(var(--card))"
+          maskColor="hsl(var(--background) / 0.65)"
+          nodeColor="hsl(var(--muted-foreground))"
+          nodeStrokeWidth={0}
+        />
       </ReactFlow>
 
       <div className="absolute left-2 top-2 z-10 flex items-center gap-1 rounded-md border border-border bg-background/90 p-1 shadow-sm" role="toolbar" aria-label="Graph tools">
