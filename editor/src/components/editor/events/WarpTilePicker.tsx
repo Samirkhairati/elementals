@@ -52,11 +52,19 @@ export function WarpTilePicker({ mapId, x, y, onPick }: Props) {
     const canvas = canvasRef.current
     const ctx = canvas?.getContext('2d')
     if (!map || !canvas || !ctx) return
+    // Draw at the screen's pixel density, so nothing is stretched (a plain canvas looks soft on retina screens).
+    const dpr = window.devicePixelRatio || 1
+    canvas.width = Math.max(1, Math.round(width * dpr))
+    canvas.height = Math.max(1, Math.round(height * dpr))
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     const k = cell / TILE_SIZE
-    ctx.imageSmoothingEnabled = false
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    // Shrinking a 32 px tile to a few pixels: smooth it properly. Smoothing off would drop pixels and look noisy; at
+    // full size (or larger) keep the pixel art sharp.
+    ctx.imageSmoothingEnabled = cell < TILE_SIZE
+    ctx.imageSmoothingQuality = 'high'
+    ctx.clearRect(0, 0, width, height)
     ctx.fillStyle = '#16181d'
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.fillRect(0, 0, width, height)
 
     // Bottom layer first, like the map canvas; the collision overlay is not scenery.
     for (const layer of map.layers.slice().reverse()) {
@@ -91,17 +99,17 @@ export function WarpTilePicker({ mapId, x, y, onPick }: Props) {
       ctx.restore()
     }
 
-    // Tile grid.
+    // Tile grid: one device pixel wide lines on the cell edges.
     ctx.strokeStyle = 'rgba(255,255,255,0.14)'
-    ctx.lineWidth = 1
+    ctx.lineWidth = 1 / dpr
     ctx.beginPath()
     for (let c = 0; c <= map.width; c++) {
-      ctx.moveTo(c * cell + 0.5, 0)
-      ctx.lineTo(c * cell + 0.5, height)
+      ctx.moveTo(c * cell, 0)
+      ctx.lineTo(c * cell, height)
     }
     for (let r = 0; r <= map.height; r++) {
-      ctx.moveTo(0, r * cell + 0.5)
-      ctx.lineTo(width, r * cell + 0.5)
+      ctx.moveTo(0, r * cell)
+      ctx.lineTo(width, r * cell)
     }
     ctx.stroke()
   }, [map, images, cell, width, height, env, spriteVersion])
@@ -114,10 +122,10 @@ export function WarpTilePicker({ mapId, x, y, onPick }: Props) {
   const box = (t: { col: number; row: number }) => ({ left: t.col * cell, top: t.row * cell, width: cell, height: cell })
 
   return (
-    <div className="space-y-1" data-testid="warp-tile-picker">
-      <div className="max-h-[260px] max-w-full overflow-auto rounded border border-border bg-black/30">
+    <div className="space-y-1.5" data-testid="warp-tile-picker">
+      <div className="max-h-[280px] overflow-auto rounded-md border border-border bg-black/30 p-1.5">
         <div
-          className="relative cursor-crosshair"
+          className="relative mx-auto cursor-crosshair"
           style={{ width, height }}
           onMouseMove={(e) => {
             const t = tileAt(map, e.clientX, e.clientY, e.currentTarget.getBoundingClientRect())
@@ -129,13 +137,14 @@ export function WarpTilePicker({ mapId, x, y, onPick }: Props) {
             if (t) onPick(t.col, t.row)
           }}
         >
-          <canvas ref={canvasRef} width={width} height={height} style={{ width, height }} className="block" aria-label={`Preview of ${map.name}`} role="img" />
+          <canvas ref={canvasRef} style={{ width, height }} className="block" aria-label={`Preview of ${map.name}`} role="img" />
           {selected && <div className="pointer-events-none absolute border-2 border-emerald-400 bg-emerald-400/25" style={box(selected)} data-testid="warp-selected-tile" />}
           {hover && <div className="pointer-events-none absolute border-2 border-white bg-white/25" style={box(hover)} data-testid="warp-hover-tile" />}
         </div>
       </div>
-      <p className="text-[10px] text-muted-foreground">
-        {hover ? `Click to warp to tile (${hover.col}, ${hover.row})` : selected ? `Warps to tile (${selected.col}, ${selected.row})` : `Tile (${x}, ${y}) is outside this ${map.width}×${map.height} map`}
+      <p className="flex items-center justify-between gap-2 text-[10px] text-muted-foreground">
+        <span>{hover ? `Click to warp to tile (${hover.col}, ${hover.row})` : selected ? `Warps to tile (${selected.col}, ${selected.row})` : `Tile (${x}, ${y}) is outside this ${map.width}×${map.height} map`}</span>
+        <span className="shrink-0 font-mono">{map.width}×{map.height} tiles</span>
       </p>
     </div>
   )

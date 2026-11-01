@@ -76,3 +76,42 @@ describe('WarpTilePicker', () => {
     expect(screen.getByText(/was not found/)).toBeInTheDocument()
   })
 })
+
+describe('WarpTilePicker drawing', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
+  function draw(dpr: number, map: MapData) {
+    vi.stubGlobal('devicePixelRatio', dpr)
+    const calls: string[] = []
+    const ctx = new Proxy(
+      { imageSmoothingEnabled: true, imageSmoothingQuality: 'low', lineWidth: 0 } as Record<string, unknown>,
+      { get: (t, k: string) => (k in t ? t[k] : (...args: unknown[]) => void calls.push(`${k}(${args.join(',')})`)), set: (t, k: string, v) => ((t[k] = v), true) },
+    )
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx as unknown as CanvasRenderingContext2D)
+    render(
+      <EventEnvProvider value={makeEnv({ mapPreview: { getMap: () => map, tilesets: [] } })}>
+        <WarpTilePicker mapId="town" x={0} y={0} onPick={() => {}} />
+      </EventEnvProvider>,
+    )
+    return { canvas: screen.getByRole('img') as HTMLCanvasElement, calls, ctx }
+  }
+
+  it('draws at the screen density so nothing is stretched, and draws hairlines one device pixel wide', () => {
+    const { canvas, calls, ctx } = draw(2, town) // 10x8 map -> 20px cells -> 200x160 CSS px
+    expect(canvas.style.width).toBe('200px')
+    expect(canvas.width).toBe(400)
+    expect(canvas.height).toBe(320)
+    expect(calls).toContain('setTransform(2,0,0,2,0,0)')
+    expect(ctx.lineWidth).toBe(0.5)
+  })
+
+  it('smooths the shrunken tiles properly instead of dropping pixels', () => {
+    const { ctx } = draw(1, town) // a 32 px tile is shown at 20 px
+    expect(ctx.imageSmoothingEnabled).toBe(true)
+    expect(ctx.imageSmoothingQuality).toBe('high')
+  })
+})
+
