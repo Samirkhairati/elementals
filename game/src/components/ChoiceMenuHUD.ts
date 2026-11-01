@@ -1,5 +1,6 @@
 import { Scene, GameObjects } from "phaser";
 import { DIALOGUE_LINE_HEIGHT as LINE_HEIGHT, dialogueBoxMetrics, moveCursor } from "./dialogueText";
+import { drawDialoguePanel } from "./dialoguePanel";
 
 /**
  * Choice menu shown above the dialogue box: a cursor row (`*` marks the selection, the font has no
@@ -108,10 +109,7 @@ export class ChoiceMenuHUD {
     const y = Math.max(10, box.y - h - 10);
 
     this.background.clear();
-    this.background.fillStyle(0xffffff, 0.98);
-    this.background.fillRoundedRect(x, y, w, h, 10);
-    this.background.lineStyle(3, 0x000000, 1);
-    this.background.strokeRoundedRect(x, y, w, h, 10);
+    drawDialoguePanel(this.background, x, y, w, h, { radius: 16, alpha: 0.98 });
     this.items.forEach((item, i) => item.setPosition(x + padding, y + padding + i * LINE_HEIGHT));
   }
 }

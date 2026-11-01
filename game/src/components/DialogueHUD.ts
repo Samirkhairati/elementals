@@ -1,4 +1,4 @@
-import { Scene, GameObjects } from "phaser";
+import { Scene, GameObjects, Tweens } from "phaser";
 import { EventBus, Events } from "@/utils/EventBus";
 import {
   DIALOGUE_LINE_HEIGHT as LINE_HEIGHT,
@@ -8,17 +8,20 @@ import {
   paginateLines,
   type DialoguePayload,
 } from "./dialogueText";
+import { DIALOGUE_COLORS, drawDialoguePanel } from "./dialoguePanel";
 
 /**
  * Dialogue box with an optional speaker plate. Long text is word-wrapped to the box (bitmap font) and
  * split into pages; `advance()` shows the next page and returns false after the last one (the caller
- * then closes the box). Tapping the box does the same as the action key.
+ * then closes the box). Tapping the box does the same as the action key. A bobbing arrow at the bottom
+ * right says there is more; a small square marks the last page. The box slides in when it opens.
  */
 export class DialogueHUD {
   private scene: Scene;
   private container: GameObjects.Container;
   private textObject: GameObjects.BitmapText;
-  private promptText: GameObjects.BitmapText;
+  private indicator: GameObjects.Graphics;
+  private indicatorTween?: Tweens.Tween;
   private speakerText: GameObjects.BitmapText;
   private background: GameObjects.Graphics;
   private hitZone: GameObjects.Zone;
@@ -59,9 +62,8 @@ export class DialogueHUD {
     this.speakerText = this.scene.add.bitmapText(0, 0, "PokemonFont", "", LINE_HEIGHT);
     this.container.add(this.speakerText);
 
-    this.promptText = this.scene.add.bitmapText(0, 0, "PokemonFont", "", LINE_HEIGHT);
-    this.promptText.setAlpha(0.7);
-    this.container.add(this.promptText);
+    this.indicator = this.scene.add.graphics();
+    this.container.add(this.indicator);
 
     this.container.setVisible(false);
     this.layout();
@@ -78,6 +80,7 @@ export class DialogueHUD {
     this.container.setVisible(true);
     this.layout();
     this.showPage(0);
+    this.playOpenAnimation();
   }
 
   /** Shows the next page. Returns false when the last page was already showing (nothing changed). */
@@ -89,12 +92,25 @@ export class DialogueHUD {
 
   public hide() {
     this.isVisible = false;
+    this.scene.tweens.killTweensOf(this.container);
+    this.indicatorTween?.stop();
+    this.indicatorTween = undefined;
     this.container.setVisible(false);
   }
 
   public destroy() {
     this.scene.scale.off("resize", this.onResize, this);
+    this.scene.tweens.killTweensOf(this.container);
+    this.indicatorTween?.stop();
     this.container.destroy();
+  }
+
+  /** Slide up a few pixels while fading in; the hit zone stays put so a tap never misses. */
+  private playOpenAnimation() {
+    this.scene.tweens.killTweensOf(this.container);
+    this.container.setAlpha(0);
+    this.container.setY(18);
+    this.scene.tweens.add({ targets: this.container, alpha: 1, y: 0, duration: 140, ease: "Cubic.easeOut" });
   }
 
   private onResize() {
@@ -105,9 +121,7 @@ export class DialogueHUD {
   private showPage(index: number) {
     this.pageIndex = Math.max(0, Math.min(index, this.pages.length - 1));
     this.textObject.setText(this.pages[this.pageIndex]);
-    const more = this.pageIndex < this.pages.length - 1;
-    this.promptText.setText(more ? "* Tap or [Action] to continue" : "* Tap or [Action] to close");
-    this.placePrompt();
+    this.drawIndicator();
   }
 
   /** Recomputes the box from the screen size and re-paginates the current text. */
@@ -121,28 +135,22 @@ export class DialogueHUD {
     this.box = { x: boxX, y: boxY, w: boxWidth, h: boxHeight };
 
     this.background.clear();
-    this.background.fillStyle(0xffffff, 0.96);
-    this.background.fillRoundedRect(boxX, boxY, boxWidth, boxHeight, 10);
-    this.background.lineStyle(3, 0x000000, 1);
-    this.background.strokeRoundedRect(boxX, boxY, boxWidth, boxHeight, 10);
+    drawDialoguePanel(this.background, boxX, boxY, boxWidth, boxHeight, { radius: 18 });
 
     if (this.speaker) {
       this.speakerText.setText(this.speaker);
-      const plateW = this.speakerText.width + 40;
-      const plateH = LINE_HEIGHT + 8;
-      const plateY = boxY - plateH + 6;
-      this.background.fillStyle(0xffffff, 0.96);
-      this.background.fillRoundedRect(boxX + 16, plateY, plateW, plateH, 8);
-      this.background.lineStyle(3, 0x000000, 1);
-      this.background.strokeRoundedRect(boxX + 16, plateY, plateW, plateH, 8);
-      this.speakerText.setPosition(boxX + 36, plateY + 4);
+      const plateW = this.speakerText.width + 48;
+      const plateH = LINE_HEIGHT + 12;
+      const plateY = boxY - plateH + 10;
+      drawDialoguePanel(this.background, boxX + 20, plateY, plateW, plateH, { radius: 12, fill: DIALOGUE_COLORS.plate, alpha: 1 });
+      this.speakerText.setPosition(boxX + 44, plateY + 6);
       this.speakerText.setVisible(true);
     } else {
       this.speakerText.setVisible(false);
     }
 
-    this.textObject.setPosition(boxX + 24, boxY + PADDING);
-    this.textObject.setMaxWidth(boxWidth - 48);
+    this.textObject.setPosition(boxX + 32, boxY + PADDING);
+    this.textObject.setMaxWidth(boxWidth - 64);
 
     if (paginate) {
       this.textObject.setText(this.fullText);
@@ -151,11 +159,35 @@ export class DialogueHUD {
       this.pageIndex = Math.min(this.pageIndex, this.pages.length - 1);
       this.textObject.setText(this.pages[this.pageIndex]);
     }
-    this.placePrompt();
+    this.drawIndicator();
   }
 
-  private placePrompt() {
+  /** The "more" arrow (bobbing) or the "last page" square, at the bottom right of the box. */
+  private drawIndicator() {
     const { x, y, w, h } = this.box;
-    this.promptText.setPosition(x + w - this.promptText.width - 24, y + h - LINE_HEIGHT - 10);
+    const more = this.pageIndex < this.pages.length - 1;
+    const cx = x + w - 44;
+    const cy = y + h - 38;
+
+    this.indicatorTween?.stop();
+    this.indicatorTween = undefined;
+    this.indicator.clear();
+    this.indicator.setPosition(0, 0);
+    this.indicator.fillStyle(DIALOGUE_COLORS.ink, 1);
+    if (more) {
+      this.indicator.fillTriangle(cx - 14, cy - 9, cx + 14, cy - 9, cx, cy + 10);
+      if (this.isVisible) {
+        this.indicatorTween = this.scene.tweens.add({
+          targets: this.indicator,
+          y: 7,
+          duration: 420,
+          ease: "Sine.easeInOut",
+          yoyo: true,
+          repeat: -1,
+        });
+      }
+    } else {
+      this.indicator.fillRoundedRect(cx - 9, cy - 9, 18, 18, 4);
+    }
   }
 }
