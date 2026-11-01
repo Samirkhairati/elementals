@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronDown, ChevronUp, Copy, Plus, Search, Trash2, TriangleAlert } from 'lucide-react'
-import type { StageDef, SwitchDef, VariableDef } from '../../../../../shared/engine/types'
+import { Check, ChevronDown, ChevronUp, Copy, Pencil, Plus, Search, Trash2, TriangleAlert } from 'lucide-react'
+import type { CommonEvent } from '../../../../../shared/engine/common'
+import type { EventGraph, StageDef, SwitchDef, VariableDef } from '../../../../../shared/engine/types'
 import { cn } from '@/lib/utils'
-import { countAccess, countEvents, describeRefs, scanDatabaseUsage, type UsageMap, type UsageRef } from '@/lib/databaseUsage'
+import { countAccess, countEvents, describeRefs, scanCommonEventUsage, scanDatabaseUsage, type UsageMap, type UsageRef } from '@/lib/databaseUsage'
+import { CommonEventDialog } from '../events/CommonEventDialog'
 
 export interface DatabasePanelProps {
   switches: SwitchDef[]
@@ -27,6 +29,12 @@ export interface DatabasePanelProps {
   setStageInitial: (stageId: string, valueId: string) => void
   /** Groups an entry ("Quests/Lost cat"); '' removes the folder. */
   setFolder: (kind: 'switch' | 'variable' | 'stage', id: string, folder: string) => void
+  /** Common events (project/common); the section is hidden when `commonEvents` is not provided. */
+  commonEvents?: CommonEvent[]
+  addCommonEvent?: (name?: string) => string
+  renameCommonEvent?: (id: string, name: string) => void
+  removeCommonEvent?: (id: string) => void
+  setCommonEventGraph?: (id: string, graph: EventGraph) => void
 }
 
 type Kind = 'switch' | 'variable'
@@ -571,11 +579,18 @@ export function DatabasePanel({
   moveStageValue,
   setStageInitial,
   setFolder,
+  commonEvents,
+  addCommonEvent,
+  renameCommonEvent,
+  removeCommonEvent,
+  setCommonEventGraph,
 }: DatabasePanelProps) {
   const [query, setQuery] = useState('')
+  const [editingCommon, setEditingCommon] = useState<string | null>(null)
   const [focusKey, setFocusKey] = useState<string | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
   const usage = useMemo(() => scanDatabaseUsage(maps), [maps])
+  const commonUsage = useMemo(() => scanCommonEventUsage(maps, commonEvents ?? []), [maps, commonEvents])
 
   // Focus (and select) the name of a row that was just added.
   useEffect(() => {
@@ -655,6 +670,117 @@ export function DatabasePanel({
         onInitial={setStageInitial}
         onFolder={(id, folder) => setFolder('stage', id, folder)}
       />
+      {commonEvents && addCommonEvent && renameCommonEvent && removeCommonEvent && setCommonEventGraph && (
+        <>
+          <CommonEventsSection
+            events={commonEvents}
+            usage={commonUsage}
+            query={query}
+            onAdd={() => {
+              setQuery('')
+              const id = addCommonEvent()
+              if (id) setFocusKey(`common:${id}`)
+            }}
+            onRename={renameCommonEvent}
+            onRemove={removeCommonEvent}
+            onOpen={setEditingCommon}
+          />
+          <CommonEventDialog event={commonEvents.find((e) => e.id === editingCommon)} onClose={() => setEditingCommon(null)} onGraphChange={setCommonEventGraph} />
+        </>
+      )}
     </div>
+  )
+}
+
+function CommonEventsSection({
+  events,
+  usage,
+  query,
+  onAdd,
+  onRename,
+  onRemove,
+  onOpen,
+}: {
+  events: CommonEvent[]
+  usage: Record<string, string[]>
+  query: string
+  onAdd: () => void
+  onRename: (id: string, name: string) => void
+  onRemove: (id: string) => void
+  onOpen: (id: string) => void
+}) {
+  const [confirming, setConfirming] = useState<string | null>(null)
+  const q = query.trim().toLowerCase()
+  const visible = q ? events.filter((e) => e.name.toLowerCase().includes(q) || e.id.toLowerCase().includes(q)) : events
+  const validateFor = (row: CommonEvent) => (name: string): string | null => {
+    const n = normalizeName(name)
+    if (!n) return 'Name cannot be empty'
+    return events.some((e) => e.id !== row.id && normalizeName(e.name) === n) ? `Another common event is already called “${name.trim()}”` : null
+  }
+  return (
+    <section aria-label="Common events" data-testid="common-events-section">
+      <div className="flex items-center justify-between gap-2 pb-1 pt-3">
+        <h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Common events <span className="ml-1 rounded bg-muted px-1 font-normal normal-case">{events.length}</span>
+        </h3>
+        <button type="button" onClick={onAdd} className="inline-flex h-6 items-center gap-1 rounded bg-primary px-2 text-[11px] font-medium text-primary-foreground hover:opacity-90">
+          <Plus className="h-3 w-3" /> Add common event
+        </button>
+      </div>
+      {events.length === 0 ? (
+        <p className="rounded border border-dashed border-border/70 px-2 py-3 text-center text-[11px] text-muted-foreground">No common events yet. A common event is a shared graph any event can call, like “Heal the party”.</p>
+      ) : visible.length === 0 ? (
+        <p className="px-2 py-2 text-center text-[11px] text-muted-foreground">No common event matches “{query}”.</p>
+      ) : (
+        <ul className="space-y-1">
+          {visible.map((row) => {
+            const callers = usage[row.id] ?? []
+            return (
+              <li key={row.id} data-row-id={row.id} className="rounded border border-border/50 p-1">
+                <div className="flex items-start gap-1">
+                  <div className="min-w-0 flex-1">
+                    <NameField value={row.name} rowId={`common:${row.id}`} label="Common event name" validate={validateFor(row)} onCommit={(name) => onRename(row.id, name)} />
+                    <CopyId id={row.id} />
+                  </div>
+                  <span className="mt-1 w-14 shrink-0 text-right text-[10px] text-muted-foreground" title={callers.join('\n')}>
+                    {callers.length === 0 ? 'Unused' : `${callers.length} caller${callers.length > 1 ? 's' : ''}`}
+                  </span>
+                  <button type="button" aria-label={`Edit ${row.name}`} title="Open the graph" onClick={() => onOpen(row.id)} className="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground">
+                    <Pencil className="h-3 w-3" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Delete ${row.name}`}
+                    title="Delete"
+                    onClick={() => (callers.length === 0 ? onRemove(row.id) : setConfirming(confirming === row.id ? null : row.id))}
+                    className="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-red-400"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+                {confirming === row.id && (
+                  <div role="alertdialog" className="mt-1 rounded border border-amber-500/40 bg-amber-500/10 p-1.5 text-[11px]">
+                    <p>Still called from:</p>
+                    <ul className="ml-3 list-disc">
+                      {callers.map((c) => (
+                        <li key={c}>{c}</li>
+                      ))}
+                    </ul>
+                    <div className="mt-1 flex gap-1">
+                      <button type="button" onClick={() => { onRemove(row.id); setConfirming(null) }} className="rounded bg-red-600 px-2 py-0.5 text-white">
+                        Delete anyway
+                      </button>
+                      <button type="button" onClick={() => setConfirming(null)} className="rounded border border-border px-2 py-0.5">
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </section>
   )
 }

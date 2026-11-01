@@ -234,6 +234,7 @@ export type FieldKind =
   | 'switch' // global switch picker
   | 'variable' // global variable picker
   | 'stage' // global stage picker
+  | 'commonEvent' // common event picker
   | 'stageValue' // a value of the stage chosen in the param named by `stageKey`
   | 'target' // CommandTarget picker
   | 'position' // map position picker (x,y tile) — params use {x,y}
@@ -342,6 +343,7 @@ export interface SummaryContext {
   /** Name of a value of a stage. */
   stageValueName?: (stageId: string, valueId: string) => string | undefined;
   mapName?: (id: string) => string | undefined;
+  commonEventName?: (id: string) => string | undefined;
   spriteName?: (id: string) => string | undefined;
   entityName?: (id: string) => string | undefined;
 }
@@ -373,6 +375,7 @@ export interface ValidationContext {
   switchIds?: string[];
   variableIds?: string[];
   stageIds?: string[];
+  commonIds?: string[];
   /** Value ids of each stage, for `stageValue` fields. */
   stageValues?: Record<string, string[]>;
   mapIds?: string[];

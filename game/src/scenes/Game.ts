@@ -96,6 +96,7 @@ export class Game extends Scene {
       ui: new BusEventUI(this.cameraEffects),
       maps,
       database: gameData.database,
+      commonEvent: (id) => gameData.common.get(id),
     });
     this.triggerSystem = new TriggerSystem(this.runtime);
     this.triggerSystem.attach();

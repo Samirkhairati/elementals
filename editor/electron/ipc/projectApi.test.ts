@@ -61,6 +61,7 @@ describe('channels end to end (real temp project)', () => {
     expect(await call('get-tilesets')).toMatchObject({ success: true, tilesets: [] });
     expect(await call('get-sprites')).toMatchObject({ success: true, assets: [] });
     expect(await call('get-database')).toMatchObject({ success: true, database: { version: 2, switches: [], variables: [], stages: [] } });
+    expect(await call('get-common-events')).toMatchObject({ success: true, events: [] });
   });
 
   it('creates, saves and lists maps', async () => {
@@ -89,6 +90,15 @@ describe('channels end to end (real temp project)', () => {
     expect(await call('import-sprite', '/nope.png', { name: 'x', kind: 'object' })).toMatchObject({ success: false });
     expect(await call('save-database', { version: 1, switches: [{ id: 'a', name: '' }], variables: [] })).toMatchObject({ success: false, error: expect.stringMatching(/name/) });
     expect(await call('save-map', '../x', 'a.json', {})).toMatchObject({ success: false });
+  });
+
+  it('saves, lists and deletes common events', async () => {
+    const ev = { version: 1, id: 'heal', name: 'Heal', graph: { nodes: [], frames: [] } };
+    expect(await call('save-common-event', ev)).toMatchObject({ success: true, event: { id: 'heal' } });
+    expect(await call('get-common-events')).toMatchObject({ success: true, events: [{ id: 'heal' }] });
+    expect(await call('save-common-event', { ...ev, id: '../x' })).toMatchObject({ success: false });
+    expect(await call('delete-common-event', 'heal')).toMatchObject({ success: true });
+    expect(await call('get-common-events')).toMatchObject({ success: true, events: [] });
   });
 
   it('saves and reads the database', async () => {

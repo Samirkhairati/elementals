@@ -443,7 +443,7 @@ describe('screen and map commands', () => {
 
 describe('planned and unknown commands', () => {
   it('log one warning per command type and carry on', async () => {
-    const planned = ['playSound', 'playMusic', 'tintScreen', 'setWeather', 'runScript', 'callCommonEvent', 'healParty', 'startBattle'];
+    const planned = ['playSound', 'playMusic', 'tintScreen', 'setWeather', 'runScript', 'healParty', 'startBattle'];
     const run = rig.runCommands([
       ...planned.map((t) => cmd(t)),
       ...planned.map((t) => cmd(t)),
@@ -609,5 +609,58 @@ describe('graph interpreter', () => {
     expect(run.finished).toBe(false);
     run.cancel();
     expect(await done).toBe('cancelled');
+  });
+});
+
+describe('callCommonEvent', () => {
+  const common = (id: string, commands: ReturnType<typeof cmd>[]) => {
+    rig.common.set(id, { version: 1, id, name: id, graph: state(commands).graph });
+  };
+
+  it('runs the common graph, then carries on after the call', async () => {
+    common('c1', [cmd('setSwitch', { id: 's1', value: true })]);
+    const run = rig.runCommands([cmd('callCommonEvent', { id: 'c1' }), cmd('setSwitch', { id: 's2', value: true })])!;
+    expect(await run.done).toBe('completed');
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(true);
+    expect(rig.runtime.flags.getSwitch('s2')).toBe(true);
+  });
+
+  it('keeps self and local flags of the caller', async () => {
+    common('c1', [cmd('setSelfSwitch', { key: 'A', value: true })]);
+    const e = rig.add({ id: 'npcA', states: [state([cmd('callCommonEvent', { id: 'c1' })])] });
+    await rig.runtime.start(e, 0, { blocking: true })!.done;
+    expect(rig.runtime.flags.getSelfSwitch(rig.runtime.mapId, 'npcA', 'A')).toBe(true);
+  });
+
+  it('`end` inside a common event returns to the caller only', async () => {
+    common('c1', [cmd('setSwitch', { id: 's1', value: true }), cmd('exitEvent'), cmd('setSwitch', { id: 's2', value: true })]);
+    const run = rig.runCommands([cmd('callCommonEvent', { id: 'c1' }), cmd('setVariable', { id: 'v1', op: 'set', operand: 'const', value: 7 })])!;
+    await run.done;
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(true);
+    expect(rig.runtime.flags.getSwitch('s2')).toBe(false);
+    expect(rig.runtime.flags.getVariable('v1')).toBe(7);
+  });
+
+  it('nested calls work', async () => {
+    common('inner', [cmd('setSwitch', { id: 's1', value: true })]);
+    common('outer', [cmd('callCommonEvent', { id: 'inner' }), cmd('setSwitch', { id: 's2', value: true })]);
+    await rig.runCommands([cmd('callCommonEvent', { id: 'outer' })])!.done;
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(true);
+    expect(rig.runtime.flags.getSwitch('s2')).toBe(true);
+  });
+
+  it('an unknown id warns once and is skipped', async () => {
+    const run = rig.runCommands([cmd('callCommonEvent', { id: 'nope' }), cmd('callCommonEvent', { id: 'nope' }), cmd('setSwitch', { id: 's1', value: true })])!;
+    expect(await run.done).toBe('completed');
+    expect(rig.warnings.filter((w) => w.includes('"nope"'))).toHaveLength(1);
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(true);
+  });
+
+  it('a runaway recursion stops the run with an error at the depth limit', async () => {
+    common('loop', [cmd('callCommonEvent', { id: 'loop' })]);
+    const run = rig.runCommands([cmd('callCommonEvent', { id: 'loop' }), cmd('setSwitch', { id: 's1', value: true })])!;
+    expect(await run.done).toBe('error');
+    expect(rig.warnings.some((w) => w.includes('nested more than 16'))).toBe(true);
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(false);
   });
 });

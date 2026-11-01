@@ -1,4 +1,4 @@
-import { normalizeDatabase, type GameDatabase } from "@shared/engine/index.ts";
+import { normalizeDatabase, parseCommonManifest, type CommonEvent, type GameDatabase } from "@shared/engine/index.ts";
 
 export interface TilesetEntry {
   /** Tiled tileset name; also the Phaser texture key. */
@@ -29,19 +29,22 @@ export function parseTilesetManifest(raw: unknown): TilesetEntry[] {
 export const MANIFEST_KEYS = {
   sprites: "manifest:sprites",
   database: "manifest:database",
+  common: "manifest:common",
   tilesets: "manifest:tilesets",
 } as const;
 
 export const MANIFEST_URLS = {
   sprites: "data/sprites.json",
   database: "data/database.json",
+  common: "data/common.json",
   tilesets: "data/tilesets.json",
 } as const;
 
 /** Data loaded from the manifests, shared by the whole game (filled by the Preloader). */
-export const gameData: { database: GameDatabase; tilesets: TilesetEntry[] } = {
+export const gameData: { database: GameDatabase; tilesets: TilesetEntry[]; common: Map<string, CommonEvent> } = {
   database: normalizeDatabase(null),
   tilesets: [],
+  common: new Map(),
 };
 
 export function setGameDatabase(raw: unknown): GameDatabase {
@@ -52,4 +55,9 @@ export function setGameDatabase(raw: unknown): GameDatabase {
 export function setGameTilesets(raw: unknown): TilesetEntry[] {
   gameData.tilesets = parseTilesetManifest(raw);
   return gameData.tilesets;
+}
+
+export function setGameCommonEvents(raw: unknown): Map<string, CommonEvent> {
+  gameData.common = new Map(parseCommonManifest(raw).map((e) => [e.id, e]));
+  return gameData.common;
 }

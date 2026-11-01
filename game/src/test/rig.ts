@@ -1,4 +1,4 @@
-import { commandsToGraph, createCommand, createDefaultComponent, tileToAnchor, type Command, type EngineEntity, type EventState, type Facing } from "@shared/engine/index.ts";
+import { commandsToGraph, createCommand, createDefaultComponent, tileToAnchor, type Command, type CommonEvent, type EngineEntity, type EventState, type Facing } from "@shared/engine/index.ts";
 import { World } from "@/ecs/World";
 import type { Entity } from "@/ecs/Entity";
 import type { ExpandContext } from "@/ecs/expand";
@@ -159,12 +159,14 @@ export function makeRig(options: { random?: () => number } = {}) {
   const warnings: string[] = [];
   const emitted: Array<{ event: string; payload: unknown }> = [];
   const expandCtx: ExpandContext = { sprites, warn: (m) => warnings.push(m) };
+  const common = new Map<string, CommonEvent>();
   const runtime = new EventRuntime({
     world,
     sprites,
     ui,
     maps,
     database: TEST_DB,
+    commonEvent: (id) => common.get(id),
     warn: (m) => warnings.push(m),
     emit: (event, payload) => emitted.push({ event, payload }),
     random: options.random ?? (() => 0),
@@ -179,6 +181,8 @@ export function makeRig(options: { random?: () => number } = {}) {
     ui,
     maps,
     runtime,
+    /** Common events `callCommonEvent` can reach, by id. */
+    common,
     warnings,
     emitted,
     expandCtx,

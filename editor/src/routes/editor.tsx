@@ -17,6 +17,7 @@ import { useEditorDialogs } from '@/hooks/editor/useEditorDialogs'
 import { useGridSettings } from '@/hooks/editor/useGridSettings'
 import { useSpriteAssets } from '@/hooks/useSpriteAssets'
 import { useDatabase } from '@/hooks/useDatabase'
+import { useCommonEvents } from '@/hooks/useCommonEvents'
 import { useEntityPlacement } from '@/hooks/editor/useEntityPlacement'
 import { exportMap } from '@/hooks/useExportMap'
 
@@ -115,6 +116,7 @@ export function EditorPage() {
   // ── Project assets & game database ───────────────────────────────────────
   const sprites = useSpriteAssets()
   const db = useDatabase()
+  const common = useCommonEvents()
 
   // ── Entity Placement Mode ─────────────────────────────────────────────────
   const entityPlacement = useEntityPlacement()
@@ -455,7 +457,13 @@ export function EditorPage() {
     setStageInitial: db.setStageInitial,
     setDatabaseFolder: db.setFolder,
     reloadDatabase: db.reload,
+    commonEvents: common.events,
+    addCommonEvent: common.addEvent,
+    renameCommonEvent: common.renameEvent,
+    setCommonEventGraph: common.setEventGraph,
+    removeCommonEvent: common.removeEvent,
   }), [
+    common.events, common.addEvent, common.renameEvent, common.setEventGraph, common.removeEvent,
     sprites.assets, sprites.list, sprites.folders, sprites.warnings, sprites.getAsset, sprites.reload, sprites.pickFile,
     sprites.importSprite, sprites.saveMeta, sprites.rename, sprites.remove,
     sprites.createFolder, sprites.renameFolder, sprites.moveFolder, sprites.deleteFolder,

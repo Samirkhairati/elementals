@@ -10,6 +10,7 @@ import type { useTilesetManager } from '@/hooks/editor/useTilesetManager'
 import type { usePaintTools } from '@/hooks/usePaintTools'
 import type { useSpriteAssets } from '@/hooks/useSpriteAssets'
 import type { useDatabase } from '@/hooks/useDatabase'
+import type { useCommonEvents } from '@/hooks/useCommonEvents'
 import type { LayerType, MapData } from '@/types/editor'
 
 // ── Value type ──────────────────────────────────────────────────────────────
@@ -25,6 +26,7 @@ type TilesetManager = ReturnType<typeof useTilesetManager>
 type PaintTools = ReturnType<typeof usePaintTools>
 type Sprites = ReturnType<typeof useSpriteAssets>
 type Db = ReturnType<typeof useDatabase>
+type Common = ReturnType<typeof useCommonEvents>
 
 export type FocusedDomain = 'maps' | 'layers' | 'entities' | 'tilesets' | null
 
@@ -207,6 +209,13 @@ export interface EditorBaseContextValue
   setStageInitial: Db['setStageInitial']
   setDatabaseFolder: Db['setFolder']
   reloadDatabase: Db['reload']
+
+  // Common events (project/common/<id>.json)
+  commonEvents: Common['events']
+  addCommonEvent: Common['addEvent']
+  renameCommonEvent: Common['renameEvent']
+  setCommonEventGraph: Common['setEventGraph']
+  removeCommonEvent: Common['removeEvent']
 }
 
 /** Fields contributed by the Dockview layout (see `EditorDockview`). */

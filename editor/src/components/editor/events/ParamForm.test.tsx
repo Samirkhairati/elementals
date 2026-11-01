@@ -18,7 +18,7 @@ describe('ParamForm: every FieldKind has a real control', () => {
   it('covers every kind used by the catalog', () => {
     const kinds = new Set<FieldKind>()
     for (const def of Object.values(COMMAND_CATALOG)) for (const f of def.params) kinds.add(f.kind)
-    const covered: FieldKind[] = ['number', 'text', 'textarea', 'boolean', 'select', 'color', 'sprite', 'facing', 'map', 'switch', 'variable', 'stage', 'stageValue', 'target', 'position', 'sound', 'item', 'route', 'choices', 'conditions']
+    const covered: FieldKind[] = ['number', 'text', 'textarea', 'boolean', 'select', 'color', 'sprite', 'facing', 'map', 'commonEvent', 'switch', 'variable', 'stage', 'stageValue', 'target', 'position', 'sound', 'item', 'route', 'choices', 'conditions']
     expect([...kinds].filter((k) => !covered.includes(k))).toEqual([])
     // and no command renders raw JSON or crashes with its defaults
     for (const def of Object.values(COMMAND_CATALOG)) {
@@ -173,6 +173,19 @@ describe('ParamForm: every FieldKind has a real control', () => {
   it('map: an unknown map id is flagged', () => {
     setup(cmd('w', 'warp', { map: 'atlantis' }))
     expect(within(field('Map')).getByRole('button', { name: /Missing: atlantis/ })).toBeInTheDocument()
+  })
+
+  it('commonEvent: picks by name and flags an unknown id', () => {
+    const env = makeEnv({ commonEvents: [{ id: 'heal', name: 'Heal party' }] })
+    const { onPatch } = setup(cmd('c', 'callCommonEvent', { id: '' }), env)
+    fireEvent.click(within(field('Common event')).getByRole('button', { name: /Choose common event/ }))
+    fireEvent.click(screen.getByRole('option', { name: /Heal party/ }))
+    expect(onPatch).toHaveBeenCalledWith({ id: 'heal' })
+  })
+
+  it('commonEvent: a missing id is shown as missing', () => {
+    setup(cmd('c', 'callCommonEvent', { id: 'gone' }), makeEnv({ commonEvents: [] }))
+    expect(within(field('Common event')).getByRole('button', { name: /Missing: gone/ })).toBeInTheDocument()
   })
 
   it('switch: picks by name', () => {

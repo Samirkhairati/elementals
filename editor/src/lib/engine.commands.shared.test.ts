@@ -27,7 +27,7 @@ import type { Command } from '../../../shared/engine/index'
 // The catalog of docs/engine-design.md section 3: type -> status.
 const DOC_CATALOG: Record<string, 'implemented' | 'planned'> = {
   showText: 'implemented', showChoices: 'implemented',
-  conditional: 'implemented', branchStage: 'implemented', loop: 'implemented', breakLoop: 'implemented', exitEvent: 'implemented', wait: 'implemented', comment: 'implemented', callCommonEvent: 'planned',
+  conditional: 'implemented', branchStage: 'implemented', loop: 'implemented', breakLoop: 'implemented', exitEvent: 'implemented', wait: 'implemented', comment: 'implemented', callCommonEvent: 'implemented',
   setSwitch: 'implemented', setVariable: 'implemented', setStage: 'implemented', setSelfSwitch: 'implemented',
   setFacing: 'implemented', moveRoute: 'implemented', setVisible: 'implemented', changeSprite: 'implemented', playAnimation: 'implemented', faceTowards: 'implemented',
   warp: 'implemented', fadeScreen: 'implemented', shakeScreen: 'implemented', tintScreen: 'planned', setWeather: 'planned',

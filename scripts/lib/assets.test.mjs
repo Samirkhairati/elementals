@@ -176,6 +176,7 @@ describe('sync', () => {
     assert.deepEqual(
       applied.map((a) => a.rel).sort(),
       [
+        'data/common.json',
         'data/database.json',
         'data/sprites.json',
         'data/tilesets.json',
@@ -202,7 +203,7 @@ describe('sync', () => {
     // a second sandbox with the same inputs gives byte-identical manifests
     const other = sandbox()
     other.sync()
-    for (const f of ['data/sprites.json', 'data/database.json', 'data/tilesets.json']) {
+    for (const f of ['data/sprites.json', 'data/database.json', 'data/tilesets.json', 'data/common.json']) {
       assert.equal(fs.readFileSync(path.join(other.publicDir, f), 'utf8'), fs.readFileSync(path.join(sb.publicDir, f), 'utf8'))
     }
   })
@@ -210,7 +211,7 @@ describe('sync', () => {
   test('manifests end with a newline and carry no timestamps', () => {
     const sb = sandbox()
     sb.sync()
-    for (const f of ['data/sprites.json', 'data/database.json', 'data/tilesets.json']) {
+    for (const f of ['data/sprites.json', 'data/database.json', 'data/tilesets.json', 'data/common.json']) {
       const text = fs.readFileSync(path.join(sb.publicDir, f), 'utf8')
       assert.ok(text.endsWith('}\n'), f)
       assert.doesNotMatch(text, /20\d\d-\d\d-\d\d/)
@@ -395,5 +396,47 @@ describe('the real project', () => {
     assert.equal(player.meta.frameWidth, 32)
     assert.equal(player.meta.frameHeight, 48)
     assert.deepEqual(player.meta.character, { sheets: { walk: 'walk.png', run: 'run.png' }, framesPerDirection: 4, idleFrame: 0, walkFps: 10, runFps: 15 })
+  })
+})
+
+describe('common events', () => {
+  const common = (id, calls = []) => ({
+    version: 1,
+    id,
+    name: id,
+    graph: {
+      nodes: [
+        { id: 's', type: 'start', params: {}, out: calls[0] ? { next: 'c0' } : {}, x: 0, y: 0 },
+        ...calls.map((c, i) => ({ id: `c${i}`, type: 'callCommonEvent', params: { id: c }, out: calls[i + 1] ? { next: `c${i + 1}` } : {}, x: 0, y: 0 })),
+      ],
+      frames: [],
+    },
+  })
+
+  test('are bundled into data/common.json sorted by id; no folder gives an empty list', () => {
+    const sb = sandbox()
+    sb.sync()
+    assert.deepEqual(sb.json('data/common.json'), { version: 1, events: [] })
+    writeJson(path.join(sb.projectDir, 'common', 'b.json'), common('b'))
+    writeJson(path.join(sb.projectDir, 'common', 'a.json'), common('a', ['b']))
+    const r = sb.sync()
+    assert.equal(r.ok, true)
+    assert.deepEqual(sb.json('data/common.json').events.map((e) => e.id), ['a', 'b'])
+  })
+
+  test('bad JSON, an id that differs from the file name and call cycles are errors', () => {
+    const sb = sandbox()
+    fs.mkdirSync(path.join(sb.projectDir, 'common'), { recursive: true })
+    fs.writeFileSync(path.join(sb.projectDir, 'common', 'broken.json'), '{')
+    writeJson(path.join(sb.projectDir, 'common', 'x.json'), common('y'))
+    writeJson(path.join(sb.projectDir, 'common', 'p.json'), common('p', ['q']))
+    writeJson(path.join(sb.projectDir, 'common', 'q.json'), common('q', ['p']))
+    const r = sb.sync()
+    assert.equal(r.ok, false)
+    const text = r.plan.errors.join('\n')
+    assert.match(text, /common\/broken\.json: not valid JSON/)
+    assert.match(text, /common\/x\.json: id "y" does not match/)
+    assert.match(text, /common\/p\.json: .*loop/)
+    assert.match(text, /common\/q\.json: .*loop/)
   })
 })

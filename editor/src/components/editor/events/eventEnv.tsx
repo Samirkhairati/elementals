@@ -15,6 +15,8 @@ export interface EventEnv {
   /** Maps of the project; `id` is the file name without `.json`. */
   maps: { id: string; name: string }[]
   sprites: { id: string; name: string; kind: SpriteKind }[]
+  /** Common events of the project (`callCommonEvent` targets). */
+  commonEvents?: { id: string; name: string }[]
   /** Entities of the active map (the owner included; pickers leave it out). */
   entities: { id: string; name: string }[]
   /** Creates a global switch / variable and returns its id ('' when the database is not loaded yet). */
@@ -55,6 +57,7 @@ const selectEnvInputs = (c: EditorContextValue) => ({
   stages: c.stages,
   maps: c.maps,
   entities: c.entities,
+  commonEvents: c.commonEvents,
   spriteList: c.spriteList,
   getSpriteAsset: c.getSpriteAsset,
   addSwitch: c.addSwitch,
@@ -88,6 +91,7 @@ function ContextBackedEnv({ entityId, children }: { entityId: string; children: 
       maps: c.maps.map((m) => ({ id: mapIdOf(m.fileName), name: m.name || mapIdOf(m.fileName) })),
       sprites: c.spriteList.map((s) => ({ id: s.id, name: s.meta.name || s.id, kind: s.meta.kind })),
       entities: c.entities.map((e) => ({ id: e.id, name: e.name })),
+      commonEvents: (c.commonEvents ?? []).map((e) => ({ id: e.id, name: e.name })),
       addSwitch: (name) => c.addSwitch(name),
       addVariable: (name) => c.addVariable(name),
       addStage: (name) => c.addStage(name),

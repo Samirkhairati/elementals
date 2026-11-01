@@ -166,3 +166,36 @@ export function scanDatabaseUsage(maps: readonly UsageMap[]): DatabaseUsage {
   }
   return usage
 }
+
+/**
+ * Who calls each common event: one line per caller ("Town > Old man (State 2)" or "Common event: Heal"),
+ * duplicates folded. Events nobody calls are absent.
+ */
+export function scanCommonEventUsage(maps: readonly UsageMap[], events: readonly { id: string; name: string; graph: unknown }[]): Record<string, string[]> {
+  const out: Record<string, string[]> = {}
+  const add = (id: string, line: string) => {
+    const list = (out[id] ??= [])
+    if (!list.includes(line)) list.push(line)
+  }
+  const callsOf = (graph: unknown): string[] => {
+    const nodes: unknown[] = isObject(graph) && Array.isArray(graph.nodes) ? graph.nodes : []
+    const ids: string[] = []
+    for (const n of nodes) {
+      if (isObject(n) && n.type === 'callCommonEvent' && isObject(n.params) && typeof n.params.id === 'string' && n.params.id !== '') ids.push(n.params.id)
+    }
+    return ids
+  }
+  for (const map of maps) {
+    for (const entity of map.entities ?? []) {
+      const event = entity.components?.Event
+      if (!isObject(event) || !Array.isArray(event.states)) continue
+      ;(event.states as EventState[]).forEach((state, i) => {
+        if (!isObject(state)) return
+        const stateName = typeof state.name === 'string' && state.name ? state.name : `State ${i + 1}`
+        for (const id of callsOf(state.graph)) add(id, `${map.name || map.fileName} > ${entity.name || entity.id} (${stateName})`)
+      })
+    }
+  }
+  for (const e of events) for (const id of callsOf(e.graph)) if (id !== e.id) add(id, `Common event: ${e.name}`)
+  return out
+}

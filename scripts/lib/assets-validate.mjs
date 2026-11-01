@@ -20,7 +20,9 @@ import {
   validateSpriteMeta as strictValidateSpriteMeta,
 } from '../../editor/electron/ipc/spriteMeta.ts'
 
-export { buildDatabaseManifest, buildSpriteManifest, isValidSpriteId, normalizeSpriteMeta, sheetNamesOf }
+import { buildCommonManifest, findCommonCycles } from '../../shared/engine/common.ts'
+
+export { buildCommonManifest, findCommonCycles, buildDatabaseManifest, buildSpriteManifest, isValidSpriteId, normalizeSpriteMeta, sheetNamesOf }
 
 const unique = (list) => [...new Set(list)]
 const isObject = (v) => typeof v === 'object' && v !== null && !Array.isArray(v)

@@ -36,6 +36,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   deleteSpriteFolder: (folderId: string) => ipcRenderer.invoke('delete-sprite-folder', folderId),
   getDatabase: () => ipcRenderer.invoke('get-database'),
   saveDatabase: (database: unknown) => ipcRenderer.invoke('save-database', database),
+  getCommonEvents: () => ipcRenderer.invoke('get-common-events'),
+  saveCommonEvent: (event: unknown) => ipcRenderer.invoke('save-common-event', event),
+  deleteCommonEvent: (id: string) => ipcRenderer.invoke('delete-common-event', id),
   onTogglePanel: (callback: (panelId: string) => void) => {
     const handler = (_event: unknown, panelId: string) => callback(panelId);
     ipcRenderer.on('dockview-toggle-panel', handler);

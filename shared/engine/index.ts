@@ -10,4 +10,5 @@ export * from './migrate.ts';
 export * from './validate.ts';
 export * from './sprites.ts';
 export * from './database.ts';
+export * from './common.ts';
 export * from './prefabs.ts';

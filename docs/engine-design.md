@@ -123,7 +123,7 @@ logs and skips it until the system exists)
 * ● `branchStage` {id, cases: valueId[]} — one branch per listed value of the stage, plus `default`.
 * ● `loop` — branch `body`; ● `breakLoop`; ● `exitEvent`.
 * ● `wait` {ms}; ● `comment` {text}.
-* ○ `callCommonEvent` {id}.
+* ● `callCommonEvent` {id} — runs a common event (project/common) with the same self and local flags.
 
 **State**
 * ● `setSwitch` {id, value}; ● `setVariable` {id, op: set|add|sub|mul|div|mod, operand: const|variable|random};

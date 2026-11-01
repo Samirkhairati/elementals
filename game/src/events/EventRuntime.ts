@@ -1,4 +1,4 @@
-import type { EventState, GameDatabase } from "@shared/engine/index.ts";
+import type { CommonEvent, EventState, GameDatabase } from "@shared/engine/index.ts";
 import type { World } from "@/ecs/World";
 import type { Entity } from "@/ecs/Entity";
 import { EventComponent } from "@/ecs/components/EventComponent";
@@ -21,6 +21,8 @@ export interface EventRuntimeOptions {
   ui: EventUI;
   maps: MapService;
   database?: Pick<GameDatabase, "switches" | "variables"> & Partial<Pick<GameDatabase, "stages">>;
+  /** Looks up a common event for `callCommonEvent`. */
+  commonEvent?: (id: string) => CommonEvent | undefined;
   /** Locks player input for a reason; returns the release function. Default: `gameState.lockInput`. */
   lockInput?: (reason: string) => () => void;
   /** Fires a custom event on the bus. Default: `EventBus.emit`. */
@@ -72,6 +74,7 @@ export class EventRuntime {
   private readonly emitEvent: (event: string, payload: unknown) => void;
   private readonly warnFn: (message: string) => void;
   private readonly random: () => number;
+  private readonly commonEvent: (id: string) => CommonEvent | undefined;
   private readonly warned = new Set<string>();
   private readonly running = new Map<Entity, RunningEvent>();
   private readonly releases = new Map<RunningEvent, () => void>();
@@ -88,6 +91,7 @@ export class EventRuntime {
     this.emitEvent = options.emit ?? ((event, payload) => void EventBus.emit(event, payload));
     this.warnFn = options.warn ?? ((m) => console.warn(m));
     this.random = options.random ?? Math.random;
+    this.commonEvent = options.commonEvent ?? (() => undefined);
     this.flags = new GameFlags(options.database);
     this.ops = new WorldEntityOps(this.world, options.sprites, (m) => this.warn(m));
     this.states = new StateSelector({
@@ -250,6 +254,7 @@ export class EventRuntime {
       warn: (m) => this.warn(m),
       warnOnce: (key, m) => this.warnOnce(key, m),
       random: this.random,
+      getCommonEvent: (id) => this.commonEvent(id),
     };
   }
 }

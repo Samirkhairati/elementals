@@ -428,6 +428,29 @@ export function MapPicker({ value, onChange, id }: IdPickerProps) {
   )
 }
 
+// ── common events ───────────────────────────────────────────────────────────────────────────────
+
+export function CommonEventPicker({ value, onChange, id }: IdPickerProps) {
+  const env = useEventEnv()
+  const events = useMemo(() => env.commonEvents ?? [], [env.commonEvents])
+  const items = useMemo<PickerItem[]>(() => events.map((e) => ({ id: e.id, label: e.name, sub: e.id === e.name ? undefined : e.id })), [events])
+  const found = events.find((e) => e.id === value)
+  return (
+    <PickerField
+      id={id}
+      label="Choose a common event"
+      items={items}
+      value={value}
+      onSelect={onChange}
+      placeholder="Choose common event…"
+      emptyText="No common events yet. Create one in the Database panel."
+      display={value ? (found ? found.name : `Missing: ${value}`) : undefined}
+      invalid={!!value && !found}
+      title={value && !found ? `Common event "${value}" does not exist` : undefined}
+    />
+  )
+}
+
 // ── sprites ─────────────────────────────────────────────────────────────────────────────────────
 
 const imageCache = new Map<string, HTMLImageElement>()

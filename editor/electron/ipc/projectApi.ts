@@ -1,4 +1,5 @@
 import path from 'path';
+import * as commonStore from './commonStore.js';
 import * as databaseStore from './databaseStore.js';
 import * as mapStore from './mapStore.js';
 import { toResult } from './result.js';
@@ -107,6 +108,16 @@ export function createProjectChannels(projectDir: string): Record<string, Channe
     // ── database ──
     'get-database': () => toResult(() => databaseStore.getDatabase(root)),
     'save-database': (database: unknown) => toResult(() => databaseStore.saveDatabase(root, database)),
+
+    // ── common events ──
+    'get-common-events': () =>
+      toResult(() => {
+        const result = commonStore.listCommonEvents(root);
+        for (const w of result.warnings) console.warn(`[common] ${w.file}: ${w.error}`);
+        return result;
+      }),
+    'save-common-event': (event: unknown) => toResult(() => commonStore.saveCommonEvent(root, event)),
+    'delete-common-event': (id: string) => toResult(() => commonStore.deleteCommonEvent(root, id)),
   };
 }
 

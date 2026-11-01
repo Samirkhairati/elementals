@@ -228,7 +228,7 @@ export function applyTemplate(states: EventState[], stateId: string, template: E
 
 // ── contexts ────────────────────────────────────────────────────────────────────────────────────
 
-export function buildSummaryContext(env: Pick<EventEnv, 'switches' | 'variables' | 'maps' | 'sprites' | 'entities'> & { stages?: EventEnv['stages'] }): SummaryContext {
+export function buildSummaryContext(env: Pick<EventEnv, 'switches' | 'variables' | 'maps' | 'sprites' | 'entities'> & { stages?: EventEnv['stages']; commonEvents?: EventEnv['commonEvents'] }): SummaryContext {
   const stages = env.stages ?? []
   return {
     switchName: (id) => env.switches.find((s) => s.id === id)?.name,
@@ -238,10 +238,11 @@ export function buildSummaryContext(env: Pick<EventEnv, 'switches' | 'variables'
     mapName: (id) => env.maps.find((m) => m.id === id)?.name,
     spriteName: (id) => env.sprites.find((s) => s.id === id)?.name,
     entityName: (id) => env.entities.find((e) => e.id === id)?.name,
+    commonEventName: (id) => env.commonEvents?.find((e) => e.id === id)?.name,
   }
 }
 
-export function buildValidationContext(env: Pick<EventEnv, 'switches' | 'variables' | 'maps' | 'sprites' | 'entities'> & { stages?: EventEnv['stages'] }): ValidationContext {
+export function buildValidationContext(env: Pick<EventEnv, 'switches' | 'variables' | 'maps' | 'sprites' | 'entities'> & { stages?: EventEnv['stages']; commonEvents?: EventEnv['commonEvents'] }): ValidationContext {
   const stages = env.stages ?? []
   return {
     switchIds: env.switches.map((s) => s.id),
@@ -251,6 +252,8 @@ export function buildValidationContext(env: Pick<EventEnv, 'switches' | 'variabl
     mapIds: env.maps.map((m) => m.id),
     spriteIds: env.sprites.map((s) => s.id),
     entityIds: env.entities.map((e) => e.id),
+    // Without a list (tests, hosts that have none) common event ids are not checked.
+    ...(env.commonEvents ? { commonIds: env.commonEvents.map((e) => e.id) } : {}),
   }
 }
 

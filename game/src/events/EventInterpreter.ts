@@ -2,7 +2,9 @@ import {
   COMMAND_CATALOG,
   GRAPH_END,
   GRAPH_JUNCTION,
+  COMMON_EVENT_NODE,
   GRAPH_START,
+  MAX_COMMON_DEPTH,
   NEXT_PORT,
   type EventGraph,
   type GraphNode,
@@ -22,6 +24,8 @@ export const YIELD_EVERY_COMMANDS = 2000;
  *  - async: commands that wait (text, choices, wait, routes, fades) just `await`; time and input come
  *    from the injected services, so the interpreter itself has no Phaser or timer dependency;
  *  - structural nodes (`start`, `junction`, `end`) are handled here, everything else by its command handler;
+ *  - `callCommonEvent` runs the common graph (`ctx.getCommonEvent`) recursively with the same context; its
+ *    `end` returns to the caller, nesting deeper than MAX_COMMON_DEPTH stops the run with an error;
  *  - cancellable: `cancel()` aborts the signal handed to every service, rejects every pending wait and
  *    stops before the next node. `run()` never rejects; it resolves with how the run ended;
  *  - robust: a handler that throws is logged and the run follows `next`, planned/unknown commands warn
@@ -35,7 +39,6 @@ export class EventInterpreter {
   private startedAt: Promise<RunResult> | null = null;
   private result: RunResult | null = null;
   private current: string | null = null;
-  private readonly nodes: Map<string, GraphNode>;
 
   private readonly rt: CommandRuntime;
   public readonly graph: EventGraph;
@@ -44,7 +47,6 @@ export class EventInterpreter {
   constructor(graph: EventGraph, ctx: EventContext) {
     this.graph = graph;
     this.ctx = ctx;
-    this.nodes = new Map(graph.nodes.map((n) => [n.id, n]));
     this.rt = {
       ctx,
       signal: this.controller.signal,
@@ -81,7 +83,7 @@ export class EventInterpreter {
 
   private async execute(): Promise<RunResult> {
     try {
-      await this.walk();
+      await this.walk(this.graph, 0);
       this.result = "completed";
     } catch (err) {
       if (err instanceof CancelledError || this.controller.signal.aborted) this.result = "cancelled";
@@ -116,18 +118,19 @@ export class EventInterpreter {
     });
   }
 
-  private async walk(): Promise<void> {
-    const start = this.graph.nodes.find((n) => n.type === GRAPH_START);
+  private async walk(graph: EventGraph, depth: number): Promise<void> {
+    const start = graph.nodes.find((n) => n.type === GRAPH_START);
     if (!start) {
       this.ctx.warnOnce("graph:no-start", "[Event] graph has no start node; nothing to run");
       return;
     }
+    const nodes = new Map(graph.nodes.map((n) => [n.id, n]));
 
     let cursor: string | undefined = start.out[NEXT_PORT];
     while (cursor !== undefined) {
       if (this.controller.signal.aborted) throw new CancelledError();
 
-      const node = this.nodes.get(cursor);
+      const node = nodes.get(cursor);
       if (!node) {
         this.ctx.warnOnce(`graph:missing:${cursor}`, `[Event] wire leads to missing node "${cursor}"; run ended`);
         return;
@@ -135,10 +138,22 @@ export class EventInterpreter {
       this.current = node.id;
       await this.tick();
 
-      const result = await this.runNode(node);
+      const result = node.type === COMMON_EVENT_NODE ? await this.callCommon(node, depth) : await this.runNode(node);
       if (result === "end") return;
       cursor = node.out[result ? result.port : NEXT_PORT];
     }
+  }
+
+  private async callCommon(node: GraphNode, depth: number): Promise<NodeResult> {
+    const id = typeof node.params.id === "string" ? node.params.id : "";
+    const common = id ? this.ctx.getCommonEvent?.(id) : undefined;
+    if (!common) {
+      this.ctx.warnOnce(`common:missing:${id}`, `[Event] common event "${id}" does not exist; skipped`);
+      return;
+    }
+    if (depth + 1 > MAX_COMMON_DEPTH) throw new Error(`common events are nested more than ${MAX_COMMON_DEPTH} deep (at "${id}")`);
+    await this.walk(common.graph, depth + 1);
+    return;
   }
 
   /** Counts a node; after too many in a row the interpreter waits for the next frame. */

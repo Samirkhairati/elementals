@@ -274,10 +274,10 @@ export const COMMAND_CATALOG: Record<string, CommandDef> = {
     category: 'flow',
     description: 'Run a shared event defined once for the whole game.',
     icon: 'phone-call',
-    params: [{ key: 'id', label: 'Common event', kind: 'text', required: true, placeholder: 'common event id' }],
+    params: [{ key: 'id', label: 'Common event', kind: 'commonEvent', required: true }],
     defaultParams: { id: '' },
-    status: 'planned',
-    summarize: (p) => `Call common event ${str(p.id) || '(none)'}`,
+    status: 'implemented',
+    summarize: (p, ctx) => `Call common event ${named(ctx?.commonEventName, str(p.id)) || '(none)'}`,
   }),
 
   // State
@@ -1067,12 +1067,14 @@ function validateField(field: FieldDef, params: Record<string, unknown>, ctx: Va
     case 'switch':
     case 'variable':
     case 'stage':
+    case 'commonEvent':
     case 'map':
     case 'sprite': {
       if (typeof v !== 'string') return bad('must be an id');
-      const lists = { switch: ctx.switchIds, variable: ctx.variableIds, stage: ctx.stageIds, map: ctx.mapIds, sprite: ctx.spriteIds };
+      const lists = { switch: ctx.switchIds, variable: ctx.variableIds, stage: ctx.stageIds, commonEvent: ctx.commonIds, map: ctx.mapIds, sprite: ctx.spriteIds };
       const list = lists[field.kind];
-      if (list && !list.includes(v)) report('error', `dangling-${field.kind}`, `${field.label}: ${field.kind} "${v}" does not exist`);
+      const code = field.kind === 'commonEvent' ? 'dangling-common' : `dangling-${field.kind}`;
+      if (list && !list.includes(v)) report('error', code, `${field.label}: ${field.kind} "${v}" does not exist`);
       return;
     }
     case 'target':

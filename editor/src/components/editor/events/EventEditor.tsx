@@ -42,6 +42,8 @@ export interface EventEditorProps {
   /** Called once per user edit with the complete new state list. */
   onChange: (states: EventState[]) => void
   className?: string
+  /** Editing a common event: one graph, no state tabs and no state settings. */
+  common?: boolean
 }
 
 const STRUCTURAL_INFO: Record<string, { label: string; description: string }> = {
@@ -50,7 +52,7 @@ const STRUCTURAL_INFO: Record<string, { label: string; description: string }> = 
   [GRAPH_JUNCTION]: { label: 'Reroute', description: 'A point to bend a wire around. Wire a later node back to one to make a loop (the loop must wait somewhere).' },
 }
 
-export function EventEditor({ states: statesProp, onChange, className }: EventEditorProps) {
+export function EventEditor({ states: statesProp, onChange, className, common = false }: EventEditorProps) {
   const env = useEventEnv()
   const states = useMemo(() => (statesProp.length > 0 ? statesProp : [createDefaultEventState()]), [statesProp])
   const statesRef = useRef(states)
@@ -125,6 +127,7 @@ export function EventEditor({ states: statesProp, onChange, className }: EventEd
   return (
     <div className={cn('flex min-h-0 flex-1 text-foreground', className)} data-testid="event-editor">
       {/* states */}
+      {!common && (
       <aside className="w-[210px] shrink-0 border-r border-border bg-muted/20">
         <StateTabs
           states={states}
@@ -154,9 +157,11 @@ export function EventEditor({ states: statesProp, onChange, className }: EventEd
           onMove={(id, delta) => commit(moveState(statesRef.current, id, delta))}
         />
       </aside>
+      )}
 
       {/* state content */}
       <section className="flex min-h-0 min-w-0 flex-1 flex-col" aria-label={`State ${stateIndex + 1}`}>
+        {!common && (
         <div className="shrink-0 border-b border-border">
           <button
             type="button"
@@ -178,6 +183,7 @@ export function EventEditor({ states: statesProp, onChange, className }: EventEd
             </div>
           )}
         </div>
+        )}
         <div className="relative flex min-h-0 flex-1 flex-col">
           <GraphCanvas
             key={state.id}

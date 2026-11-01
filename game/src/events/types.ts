@@ -1,4 +1,4 @@
-import type { CommandTarget, Facing, GraphNode, RouteStep } from "@shared/engine/index.ts";
+import type { CommandTarget, CommonEvent, Facing, GraphNode, RouteStep } from "@shared/engine/index.ts";
 import type { Entity } from "@/ecs/Entity";
 import type { GameFlags } from "./GameFlags";
 import type { Inventory } from "./Inventory";
@@ -93,6 +93,8 @@ export interface EventContext {
   warnOnce(key: string, message: string): void;
   /** Random number in [0, 1). */
   random(): number;
+  /** Common event for `callCommonEvent`; without it every call is skipped with a warning. */
+  getCommonEvent?(id: string): CommonEvent | undefined;
 }
 
 export interface CommandRuntime {

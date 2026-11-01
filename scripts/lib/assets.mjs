@@ -5,6 +5,7 @@
 //   graphics/tilesets/<name>.png        project tilesets the game does not have yet (never overwritten, see --force)
 //   data/sprites.json                   SpriteManifest (shared/engine/sprites.ts): every sprite's meta + web-relative sheet URLs
 //   data/database.json                  the global switches / variables
+//   data/common.json                    the common events (project/common/<id>.json), sorted by id
 //   data/tilesets.json                  every tileset PNG the game has (name = file stem)
 //
 // Planning (planSync) is pure: it reads, validates and compares, and never writes. applyPlan writes.
@@ -17,7 +18,9 @@ import { parseArgs } from 'node:util'
 import { fileURLToPath } from 'node:url'
 import { readPngSize } from '../../shared/png.ts'
 import {
+  buildCommonManifest,
   buildDatabaseManifest,
+  findCommonCycles,
   buildSpriteManifest,
   checkSpriteSheets,
   checkSpriteStructure,
@@ -202,6 +205,23 @@ export function planSync({ projectDir, publicDir, force = false }) {
     warnings.push('database.json not found in the project: generating an empty database')
   }
 
+  // common events: one project/common/<id>.json each, bundled into data/common.json
+  const commonRaw = []
+  const commonDir = path.join(projectDir, 'common')
+  for (const full of listFilesDeep(commonDir, (f) => f.endsWith('.json'))) {
+    const rel = posix(path.relative(projectDir, full))
+    try {
+      const parsed = JSON.parse(fs.readFileSync(full, 'utf8'))
+      if (typeof parsed?.id !== 'string' || parsed.id === '') errors.push(`${rel}: missing "id"`)
+      else if (path.basename(full, '.json') !== parsed.id) errors.push(`${rel}: id "${parsed.id}" does not match the file name`)
+      else commonRaw.push(parsed)
+    } catch (e) {
+      errors.push(`${rel}: not valid JSON: ${e.message}`)
+    }
+  }
+  const common = buildCommonManifest(commonRaw)
+  for (const id of findCommonCycles(common.events)) errors.push(`common/${id}.json: common events call each other in a loop`)
+
   // tilesets: copy the ones the game lacks, then list everything the game has
   const gameTilesetsDir = path.join(publicDir, TILESETS_OUT)
   const gameStems = new Set(
@@ -226,6 +246,7 @@ export function planSync({ projectDir, publicDir, force = false }) {
   // manifests
   add('data/sprites.json', 'manifest', toJson(buildSpriteManifest(sprites.assets)))
   add('data/database.json', 'manifest', toJson(database))
+  add('data/common.json', 'manifest', toJson(common))
   add(
     'data/tilesets.json',
     'manifest',
@@ -311,6 +332,7 @@ Generates what the game loads from the authored project data:
   game/public/graphics/tilesets/*.png       project tilesets the game lacks (existing files are kept)
   game/public/data/sprites.json             sprite manifest (ids, metas, sheet URLs)
   game/public/data/database.json            global switches and variables
+  game/public/data/common.json              common events (project/common/<id>.json)
   game/public/data/tilesets.json            every tileset PNG the game has
 
   --check            (default) report drift; exit 1 when generated output is missing or stale

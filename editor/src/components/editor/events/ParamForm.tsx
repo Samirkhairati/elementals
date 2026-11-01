@@ -7,7 +7,7 @@ import type { ChoiceOption, Command, CommandTarget, Condition, FieldDef, RouteSt
 import { getCommandDef, isFieldVisible } from '../../../../../shared/engine/commands'
 import { ConditionsEditor } from './ConditionsEditor'
 import { ChoicesEditor, RouteEditor } from './RouteChoicesEditors'
-import { FacingPicker, MapPicker, SpritePicker, StagePicker, StageValuePicker, SwitchPicker, TargetPicker, VariablePicker } from './pickers'
+import { CommonEventPicker, FacingPicker, MapPicker, SpritePicker, StagePicker, StageValuePicker, SwitchPicker, TargetPicker, VariablePicker } from './pickers'
 import { CheckRow, DraftNumber, DraftText, DraftTextarea, FieldRow, IconButton, SmallButton, inputClass, selectClass } from './primitives'
 import { useEventEnv } from './eventEnv'
 
@@ -159,6 +159,8 @@ function FieldControl({ field, command, params, onPatch, id }: FieldControlProps
       return <FacingPicker id={id} value={asString(raw)} onChange={set} />
     case 'map':
       return <MapPicker id={id} value={asString(raw)} onChange={set} />
+    case 'commonEvent':
+      return <CommonEventPicker id={id} value={asString(raw)} onChange={set} />
     case 'switch':
       return <SwitchPicker id={id} value={asString(raw)} onChange={set} />
     case 'variable':
@@ -229,7 +231,7 @@ export function ParamForm({ command, onPatch }: { command: Command; onPatch: Par
             </div>
           )
         }
-        const wide = ['textarea', 'route', 'choices', 'conditions', 'position', 'color', 'target', 'sprite', 'switch', 'variable', 'stage', 'stageValue', 'map'].includes(field.kind) || !!field.multiple
+        const wide = ['textarea', 'route', 'choices', 'conditions', 'position', 'color', 'target', 'sprite', 'switch', 'variable', 'stage', 'stageValue', 'map', 'commonEvent'].includes(field.kind) || !!field.multiple
         return (
           <FieldRow key={field.key} label={field.label} help={field.help} required={field.required} unit={field.unit} inline={!wide && field.kind !== 'text' && field.kind !== 'select' && field.kind !== 'sound' && field.kind !== 'item'}>
             {(id) => <FieldControl field={field} command={command} params={params} onPatch={onPatch} id={id} />}

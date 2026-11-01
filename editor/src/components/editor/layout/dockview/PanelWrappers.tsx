@@ -481,6 +481,11 @@ const selectDatabase = (c: EditorContextValue) => ({
   moveStageValue: c.moveStageValue,
   setStageInitial: c.setStageInitial,
   setFolder: c.setDatabaseFolder,
+  commonEvents: c.commonEvents,
+  addCommonEvent: c.addCommonEvent,
+  renameCommonEvent: c.renameCommonEvent,
+  removeCommonEvent: c.removeCommonEvent,
+  setCommonEventGraph: c.setCommonEventGraph,
 });
 
 export function DatabaseWrapper(_props: IDockviewPanelProps) {
@@ -508,6 +513,11 @@ export function DatabaseWrapper(_props: IDockviewPanelProps) {
         moveStageValue={ctx.moveStageValue}
         setStageInitial={ctx.setStageInitial}
         setFolder={ctx.setFolder}
+        commonEvents={ctx.commonEvents}
+        addCommonEvent={ctx.addCommonEvent}
+        renameCommonEvent={ctx.renameCommonEvent}
+        removeCommonEvent={ctx.removeCommonEvent}
+        setCommonEventGraph={ctx.setCommonEventGraph}
       />
     </div>
   );

@@ -110,6 +110,9 @@ export function createBrowserElectronApi(): ElectronAPI {
     deleteSpriteFolder: (folderId: string) => c('delete-sprite-folder', folderId),
     getDatabase: () => c('get-database'),
     saveDatabase: (database: unknown) => c('save-database', database),
+    getCommonEvents: () => c('get-common-events'),
+    saveCommonEvent: (event: unknown) => c('save-common-event', event),
+    deleteCommonEvent: (id: string) => c('delete-common-event', id),
     // There is no native menu in a browser.
     onTogglePanel: () => () => {},
     onResetLayout: () => () => {},
