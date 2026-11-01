@@ -6,13 +6,66 @@
   "height": 20,
   "layers": [
     {
+      "id": "0dccc9a4-4708-4296-a99a-fe4c4fbea1e7",
+      "name": "terrain",
+      "type": "terrain",
+      "visible": true,
+      "locked": false,
+      "data": {}
+    },
+    {
       "id": "0fd82bfa-f69f-4a6b-86a9-13d959b50285",
       "name": "collisions",
       "type": "collision",
       "visible": true,
       "locked": false,
       "data": {
+        "5": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "34": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "35": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
         "36": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "61": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "62": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "63": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "64": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "65": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "66": {
           "tilesetId": "__collision__",
           "x": 0,
           "y": 0
@@ -78,6 +131,11 @@
           "y": 0
         },
         "168": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "182": {
           "tilesetId": "__collision__",
           "x": 0,
           "y": 0
@@ -151,16 +209,283 @@
           "tilesetId": "__collision__",
           "x": 0,
           "y": 0
+        },
+        "334": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "335": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        },
+        "336": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
         }
       }
     },
     {
-      "id": "0dccc9a4-4708-4296-a99a-fe4c4fbea1e7",
-      "name": "terrain",
-      "type": "terrain",
+      "id": "888aef0c-eb04-447e-9fad-f225a388a6fe",
+      "name": "building",
+      "type": "tile",
       "visible": true,
       "locked": false,
-      "data": {}
+      "z": 30,
+      "data": {
+        "153": {
+          "tilesetId": "house.png",
+          "x": 0,
+          "y": 1
+        },
+        "154": {
+          "tilesetId": "house.png",
+          "x": 1,
+          "y": 1
+        },
+        "155": {
+          "tilesetId": "house.png",
+          "x": 2,
+          "y": 1
+        },
+        "156": {
+          "tilesetId": "house.png",
+          "x": 3,
+          "y": 1
+        },
+        "159": {
+          "tilesetId": "house.png",
+          "x": 0,
+          "y": 1
+        },
+        "160": {
+          "tilesetId": "house.png",
+          "x": 1,
+          "y": 1
+        },
+        "161": {
+          "tilesetId": "house.png",
+          "x": 2,
+          "y": 1
+        },
+        "162": {
+          "tilesetId": "house.png",
+          "x": 3,
+          "y": 1
+        },
+        "165": {
+          "tilesetId": "house.png",
+          "x": 0,
+          "y": 1
+        },
+        "166": {
+          "tilesetId": "house.png",
+          "x": 1,
+          "y": 1
+        },
+        "167": {
+          "tilesetId": "house.png",
+          "x": 2,
+          "y": 1
+        },
+        "168": {
+          "tilesetId": "house.png",
+          "x": 3,
+          "y": 1
+        },
+        "183": {
+          "tilesetId": "house.png",
+          "x": 0,
+          "y": 2
+        },
+        "184": {
+          "tilesetId": "house.png",
+          "x": 1,
+          "y": 2
+        },
+        "185": {
+          "tilesetId": "house.png",
+          "x": 2,
+          "y": 2
+        },
+        "186": {
+          "tilesetId": "house.png",
+          "x": 3,
+          "y": 2
+        },
+        "189": {
+          "tilesetId": "house.png",
+          "x": 0,
+          "y": 2
+        },
+        "190": {
+          "tilesetId": "house.png",
+          "x": 1,
+          "y": 2
+        },
+        "191": {
+          "tilesetId": "house.png",
+          "x": 2,
+          "y": 2
+        },
+        "192": {
+          "tilesetId": "house.png",
+          "x": 3,
+          "y": 2
+        },
+        "195": {
+          "tilesetId": "house.png",
+          "x": 0,
+          "y": 2
+        },
+        "196": {
+          "tilesetId": "house.png",
+          "x": 1,
+          "y": 2
+        },
+        "197": {
+          "tilesetId": "house.png",
+          "x": 2,
+          "y": 2
+        },
+        "198": {
+          "tilesetId": "house.png",
+          "x": 3,
+          "y": 2
+        },
+        "303": {
+          "tilesetId": "house.png",
+          "x": 0,
+          "y": 1
+        },
+        "304": {
+          "tilesetId": "house.png",
+          "x": 1,
+          "y": 1
+        },
+        "305": {
+          "tilesetId": "house.png",
+          "x": 2,
+          "y": 1
+        },
+        "306": {
+          "tilesetId": "house.png",
+          "x": 3,
+          "y": 1
+        },
+        "333": {
+          "tilesetId": "house.png",
+          "x": 0,
+          "y": 2
+        },
+        "334": {
+          "tilesetId": "house.png",
+          "x": 1,
+          "y": 2
+        },
+        "335": {
+          "tilesetId": "house.png",
+          "x": 2,
+          "y": 2
+        },
+        "336": {
+          "tilesetId": "house.png",
+          "x": 3,
+          "y": 2
+        },
+        "340": {
+          "tilesetId": "outside.png",
+          "x": 1,
+          "y": 1
+        },
+        "341": {
+          "tilesetId": "outside.png",
+          "x": 2,
+          "y": 1
+        },
+        "343": {
+          "tilesetId": "outside.png",
+          "x": 1,
+          "y": 1
+        },
+        "344": {
+          "tilesetId": "outside.png",
+          "x": 2,
+          "y": 1
+        },
+        "346": {
+          "tilesetId": "outside.png",
+          "x": 1,
+          "y": 1
+        },
+        "347": {
+          "tilesetId": "outside.png",
+          "x": 2,
+          "y": 1
+        },
+        "430": {
+          "tilesetId": "outside.png",
+          "x": 1,
+          "y": 1
+        },
+        "431": {
+          "tilesetId": "outside.png",
+          "x": 2,
+          "y": 1
+        },
+        "433": {
+          "tilesetId": "outside.png",
+          "x": 1,
+          "y": 1
+        },
+        "434": {
+          "tilesetId": "outside.png",
+          "x": 2,
+          "y": 1
+        },
+        "436": {
+          "tilesetId": "outside.png",
+          "x": 1,
+          "y": 1
+        },
+        "437": {
+          "tilesetId": "outside.png",
+          "x": 2,
+          "y": 1
+        },
+        "490": {
+          "tilesetId": "outside.png",
+          "x": 1,
+          "y": 1
+        },
+        "491": {
+          "tilesetId": "outside.png",
+          "x": 2,
+          "y": 1
+        },
+        "493": {
+          "tilesetId": "outside.png",
+          "x": 1,
+          "y": 1
+        },
+        "494": {
+          "tilesetId": "outside.png",
+          "x": 2,
+          "y": 1
+        },
+        "496": {
+          "tilesetId": "outside.png",
+          "x": 1,
+          "y": 1
+        },
+        "497": {
+          "tilesetId": "outside.png",
+          "x": 2,
+          "y": 1
+        }
+      }
     },
     {
       "id": "67f64c4c-e9df-4a93-96e8-0c9e725c49cd",
@@ -169,6 +494,72 @@
       "visible": true,
       "locked": false,
       "data": {}
+    },
+    {
+      "id": "91ef2980-5057-450c-98b7-2a14d6c7d8f0",
+      "name": "Images",
+      "type": "image",
+      "visible": true,
+      "locked": false,
+      "images": [
+        {
+          "assetId": "objects/pokeball",
+          "x": 48,
+          "y": 448,
+          "id": "3937f3d7-d25b-4759-87b9-0e1ff2ba956e"
+        },
+        {
+          "assetId": "objects/pokeball",
+          "x": 48,
+          "y": 448,
+          "id": "92cbe824-dd5c-417c-b9b3-75afbdaea946"
+        },
+        {
+          "assetId": "objects/pokeball",
+          "x": 48,
+          "y": 448,
+          "id": "300a6430-cd0b-40ec-9ce5-da674b6a63f3"
+        },
+        {
+          "assetId": "objects/pokeball",
+          "x": 112,
+          "y": 448,
+          "id": "b2ab1f82-d7c5-4c02-9c3a-76adf4e25575"
+        },
+        {
+          "assetId": "objects/pokeball",
+          "x": 112,
+          "y": 416,
+          "id": "27667671-f83c-43eb-a219-6c73522fe0cf"
+        },
+        {
+          "assetId": "objects/pokeball",
+          "x": 176,
+          "y": 512,
+          "id": "5770595f-65c7-446a-b7f0-292c9c783d74"
+        },
+        {
+          "assetId": "objects/chest",
+          "x": 80,
+          "y": 512,
+          "id": "fe5663c2-52b9-4243-bb6c-44b8a911fcf5"
+        },
+        {
+          "assetId": "objects/chest",
+          "x": 152,
+          "y": 596,
+          "id": "d7f29ad4-8ddc-4589-a4c4-6ee8ad9dad7d",
+          "scale": 3,
+          "flipX": false
+        },
+        {
+          "assetId": "objects/chest",
+          "x": 144,
+          "y": 480,
+          "id": "58f39c03-2206-400b-885d-3016f3aac847"
+        }
+      ],
+      "z": 30
     },
     {
       "id": "6d70e5f7-2ccb-4154-9c6a-0567923bf291",
@@ -532,266 +923,6 @@
           "tilesetId": "outside.png",
           "x": 2,
           "y": 0
-        }
-      }
-    },
-    {
-      "id": "888aef0c-eb04-447e-9fad-f225a388a6fe",
-      "name": "building",
-      "type": "tile",
-      "visible": true,
-      "locked": false,
-      "z": 10,
-      "data": {
-        "153": {
-          "tilesetId": "house.png",
-          "x": 0,
-          "y": 1
-        },
-        "154": {
-          "tilesetId": "house.png",
-          "x": 1,
-          "y": 1
-        },
-        "155": {
-          "tilesetId": "house.png",
-          "x": 2,
-          "y": 1
-        },
-        "156": {
-          "tilesetId": "house.png",
-          "x": 3,
-          "y": 1
-        },
-        "159": {
-          "tilesetId": "house.png",
-          "x": 0,
-          "y": 1
-        },
-        "160": {
-          "tilesetId": "house.png",
-          "x": 1,
-          "y": 1
-        },
-        "161": {
-          "tilesetId": "house.png",
-          "x": 2,
-          "y": 1
-        },
-        "162": {
-          "tilesetId": "house.png",
-          "x": 3,
-          "y": 1
-        },
-        "165": {
-          "tilesetId": "house.png",
-          "x": 0,
-          "y": 1
-        },
-        "166": {
-          "tilesetId": "house.png",
-          "x": 1,
-          "y": 1
-        },
-        "167": {
-          "tilesetId": "house.png",
-          "x": 2,
-          "y": 1
-        },
-        "168": {
-          "tilesetId": "house.png",
-          "x": 3,
-          "y": 1
-        },
-        "183": {
-          "tilesetId": "house.png",
-          "x": 0,
-          "y": 2
-        },
-        "184": {
-          "tilesetId": "house.png",
-          "x": 1,
-          "y": 2
-        },
-        "185": {
-          "tilesetId": "house.png",
-          "x": 2,
-          "y": 2
-        },
-        "186": {
-          "tilesetId": "house.png",
-          "x": 3,
-          "y": 2
-        },
-        "189": {
-          "tilesetId": "house.png",
-          "x": 0,
-          "y": 2
-        },
-        "190": {
-          "tilesetId": "house.png",
-          "x": 1,
-          "y": 2
-        },
-        "191": {
-          "tilesetId": "house.png",
-          "x": 2,
-          "y": 2
-        },
-        "192": {
-          "tilesetId": "house.png",
-          "x": 3,
-          "y": 2
-        },
-        "195": {
-          "tilesetId": "house.png",
-          "x": 0,
-          "y": 2
-        },
-        "196": {
-          "tilesetId": "house.png",
-          "x": 1,
-          "y": 2
-        },
-        "197": {
-          "tilesetId": "house.png",
-          "x": 2,
-          "y": 2
-        },
-        "198": {
-          "tilesetId": "house.png",
-          "x": 3,
-          "y": 2
-        },
-        "303": {
-          "tilesetId": "house.png",
-          "x": 0,
-          "y": 1
-        },
-        "304": {
-          "tilesetId": "house.png",
-          "x": 1,
-          "y": 1
-        },
-        "305": {
-          "tilesetId": "house.png",
-          "x": 2,
-          "y": 1
-        },
-        "306": {
-          "tilesetId": "house.png",
-          "x": 3,
-          "y": 1
-        },
-        "333": {
-          "tilesetId": "house.png",
-          "x": 0,
-          "y": 2
-        },
-        "334": {
-          "tilesetId": "house.png",
-          "x": 1,
-          "y": 2
-        },
-        "335": {
-          "tilesetId": "house.png",
-          "x": 2,
-          "y": 2
-        },
-        "336": {
-          "tilesetId": "house.png",
-          "x": 3,
-          "y": 2
-        },
-        "340": {
-          "tilesetId": "outside.png",
-          "x": 1,
-          "y": 1
-        },
-        "341": {
-          "tilesetId": "outside.png",
-          "x": 2,
-          "y": 1
-        },
-        "343": {
-          "tilesetId": "outside.png",
-          "x": 1,
-          "y": 1
-        },
-        "344": {
-          "tilesetId": "outside.png",
-          "x": 2,
-          "y": 1
-        },
-        "346": {
-          "tilesetId": "outside.png",
-          "x": 1,
-          "y": 1
-        },
-        "347": {
-          "tilesetId": "outside.png",
-          "x": 2,
-          "y": 1
-        },
-        "430": {
-          "tilesetId": "outside.png",
-          "x": 1,
-          "y": 1
-        },
-        "431": {
-          "tilesetId": "outside.png",
-          "x": 2,
-          "y": 1
-        },
-        "433": {
-          "tilesetId": "outside.png",
-          "x": 1,
-          "y": 1
-        },
-        "434": {
-          "tilesetId": "outside.png",
-          "x": 2,
-          "y": 1
-        },
-        "436": {
-          "tilesetId": "outside.png",
-          "x": 1,
-          "y": 1
-        },
-        "437": {
-          "tilesetId": "outside.png",
-          "x": 2,
-          "y": 1
-        },
-        "490": {
-          "tilesetId": "outside.png",
-          "x": 1,
-          "y": 1
-        },
-        "491": {
-          "tilesetId": "outside.png",
-          "x": 2,
-          "y": 1
-        },
-        "493": {
-          "tilesetId": "outside.png",
-          "x": 1,
-          "y": 1
-        },
-        "494": {
-          "tilesetId": "outside.png",
-          "x": 2,
-          "y": 1
-        },
-        "496": {
-          "tilesetId": "outside.png",
-          "x": 1,
-          "y": 1
-        },
-        "497": {
-          "tilesetId": "outside.png",
-          "x": 2,
-          "y": 1
         }
       }
     },
