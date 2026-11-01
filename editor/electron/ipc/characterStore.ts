@@ -54,6 +54,8 @@ export interface GraphicInfo {
 export interface CharacterListing {
   characters: CharacterInfo[];
   graphics: GraphicInfo[];
+  /** data: URL of every graphic by id (the Graphics table previews unused ones too). */
+  images: Record<string, string>;
   /** Every plain folder under project/database/characters (ids, "/"-separated, sorted). */
   folders: string[];
   warnings: ListWarning[];
@@ -139,9 +141,13 @@ export function listCharacters(roots: CharacterRoots, cache: ImageCache): Charac
   characters.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   const graphics = listGraphics(roots.graphicsDir, warnings);
   // keep cached images of unused graphics too (the Graphics table shows them); only forget deleted files
-  for (const g of graphics) live.add(path.join(roots.graphicsDir, g.id));
+  const images: Record<string, string> = {};
+  for (const g of graphics) {
+    live.add(path.join(roots.graphicsDir, g.id));
+    images[g.id] = cache.getDataUrl(path.join(roots.graphicsDir, g.id));
+  }
   cache.retainOnly(live);
-  return { characters, graphics, folders: walked.map(toId).sort(), warnings };
+  return { characters, graphics, images, folders: walked.map(toId).sort(), warnings };
 }
 
 /** Shape checks needed to write safely; semantic validation happens in the renderer and in the sync. */

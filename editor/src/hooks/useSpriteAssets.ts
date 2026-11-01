@@ -18,6 +18,8 @@ export interface UseSpriteAssets {
   characters: Record<string, CharacterInfo>
   /** Every image in project/graphics. */
   graphics: GraphicInfo[]
+  /** data: URL of every graphic by id. */
+  images: Record<string, string>
   /** Every folder under project/database/characters (ids like `characters/npcs`), empty ones included, sorted. */
   folders: string[]
   loading: boolean
@@ -47,6 +49,7 @@ export interface UseSpriteAssets {
 interface State {
   characters: Record<string, CharacterInfo>
   graphics: GraphicInfo[]
+  images: Record<string, string>
   folders: string[]
   loading: boolean
   error: string | null
@@ -61,7 +64,7 @@ const byId = <T extends { id: string }>(a: T, b: T) => (a.id < b.id ? -1 : a.id 
  * through IPC first and update local state from the main process' answer, so the state mirrors the disk.
  */
 export function useSpriteAssets(): UseSpriteAssets {
-  const [state, setState] = useState<State>({ characters: {}, graphics: [], folders: [], loading: true, error: null, warnings: [] })
+  const [state, setState] = useState<State>({ characters: {}, graphics: [], images: {}, folders: [], loading: true, error: null, warnings: [] })
   // Latest-wins guard for async loads; bumped on unmount so late answers are ignored.
   const [requests] = useState(() => ({ latest: 0 }))
 
@@ -70,7 +73,7 @@ export function useSpriteAssets(): UseSpriteAssets {
     setState((s) => ({ ...s, loading: true }))
     const result = await runIpc(
       () => api()?.getCharacters(),
-      (r) => ({ characters: r.characters ?? [], graphics: r.graphics ?? [], folders: r.folders ?? [], warnings: r.warnings ?? [] })
+      (r) => ({ characters: r.characters ?? [], graphics: r.graphics ?? [], images: r.images ?? {}, folders: r.folders ?? [], warnings: r.warnings ?? [] })
     )
     if (id !== requests.latest) return // a newer reload (or unmount) superseded this one
     if (!result.ok) {
@@ -80,6 +83,7 @@ export function useSpriteAssets(): UseSpriteAssets {
     setState({
       characters: Object.fromEntries(result.characters.map((c) => [c.id, c])),
       graphics: result.graphics,
+      images: result.images,
       folders: result.folders,
       loading: false,
       error: null,
@@ -117,7 +121,7 @@ export function useSpriteAssets(): UseSpriteAssets {
         () => api()?.importGraphic(sourcePath, graphicId),
         (r) => ({ graphic: r.graphic, image: r.image })
       )
-      if (result.ok) setState((s) => ({ ...s, error: null, graphics: [...s.graphics.filter((g) => g.id !== result.graphic.id), result.graphic].sort(byId) }))
+      if (result.ok) setState((s) => ({ ...s, error: null, graphics: [...s.graphics.filter((g) => g.id !== result.graphic.id), result.graphic].sort(byId), images: { ...s.images, [result.graphic.id]: result.image } }))
       return setFailure(result) as OpResult<{ graphic: GraphicInfo; image: string }>
     },
     [setFailure]
@@ -196,6 +200,7 @@ export function useSpriteAssets(): UseSpriteAssets {
     list,
     characters: state.characters,
     graphics: state.graphics,
+    images: state.images,
     folders: state.folders,
     loading: state.loading,
     error: state.error,

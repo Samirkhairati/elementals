@@ -1,5 +1,5 @@
 import { Link, useLocation } from "@tanstack/react-router"
-import { FolderTree, Home, Map, Settings } from "lucide-react"
+import { Database, Home, Map, Settings } from "lucide-react"
 import {
   Sidebar,
   SidebarContent,
@@ -16,7 +16,7 @@ import {
 const mainItems = [
   { title: "Home", url: "/", icon: Home },
   { title: "Map Editor", url: "/editor", icon: Map },
-  { title: "Asset Manager", url: "/assets", icon: FolderTree },
+  { title: "Database", url: "/database", icon: Database },
 ]
 
 export function AppSidebar() {

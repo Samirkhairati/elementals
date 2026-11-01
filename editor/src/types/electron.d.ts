@@ -35,7 +35,7 @@ interface ElectronAPI {
   exportMap: (jsonData: string, defaultName: string) => Promise<{ success: boolean; canceled?: boolean; filePath?: string; error?: string }>;
   /** Absolute path of a dropped file. The browser harness stages the bytes and returns the staged path. */
   getPathForFile: (file: File) => string | Promise<string>;
-  getCharacters: () => Promise<({ success: true; characters: CharacterInfo[]; graphics: GraphicInfo[]; folders: string[]; warnings: { file: string; error: string }[] }) | IpcFailure>;
+  getCharacters: () => Promise<({ success: true; characters: CharacterInfo[]; graphics: GraphicInfo[]; images: Record<string, string>; folders: string[]; warnings: { file: string; error: string }[] }) | IpcFailure>;
   pickSpriteFile: () => Promise<({ success: true; sourcePath: string; defaultName: string }) | IpcFailure>;
   saveCharacter: (id: string, def: CharacterDef) => Promise<({ success: true; character: CharacterInfo }) | IpcFailure>;
   renameCharacter: (id: string, newId: string) => Promise<({ success: true; id: string }) | IpcFailure>;
