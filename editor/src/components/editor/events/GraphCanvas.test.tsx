@@ -257,6 +257,44 @@ describe('GraphCanvas', () => {
       expect(commandNodes(onChange.mock.calls[1][0] as EventGraph)).toEqual([])
     })
 
+    it('right-clicking a node opens a menu whose Delete removes just that node', () => {
+      const onChange = vi.fn()
+      render(<Harness initial={sample()} onChange={onChange} />)
+      fireEvent.contextMenu(screen.getByTestId('node-a'))
+      fireEvent.click(screen.getByRole('menuitem', { name: /Delete node/ }))
+      expect(onChange).toHaveBeenCalledTimes(1)
+      expect(commandNodes(onChange.mock.calls[0][0] as EventGraph).map((n) => n.id)).toEqual(['b'])
+      expect(screen.queryByRole('menu')).toBeNull()
+    })
+
+    it('"Delete and reconnect" in the menu joins the neighbours', () => {
+      const onChange = vi.fn()
+      render(<Harness initial={sample()} onChange={onChange} />)
+      fireEvent.contextMenu(screen.getByTestId('node-a'))
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Delete and reconnect' }))
+      const g = onChange.mock.calls[0][0] as EventGraph
+      expect(commandNodes(g).map((n) => n.id)).toEqual(['b'])
+      expect(findStart(g)!.out.next).toBe('b')
+    })
+
+    it('Start has a menu but nothing in it can delete it', () => {
+      const onChange = vi.fn()
+      render(<Harness initial={sample()} onChange={onChange} />)
+      fireEvent.contextMenu(document.querySelector('[data-node-type="start"]') as HTMLElement)
+      expect(screen.getByRole('menuitem', { name: /Delete node/ })).toBeDisabled()
+      expect(onChange).not.toHaveBeenCalled()
+    })
+
+    it('Escape closes the menu without changing anything', () => {
+      const onChange = vi.fn()
+      render(<Harness initial={sample()} onChange={onChange} />)
+      fireEvent.contextMenu(screen.getByTestId('node-b'))
+      expect(screen.getByRole('menu')).toBeInTheDocument()
+      fireEvent.keyDown(screen.getByTestId('graph-canvas'), { key: 'Escape' })
+      expect(screen.queryByRole('menu')).toBeNull()
+      expect(onChange).not.toHaveBeenCalled()
+    })
+
     it('Delete never removes Start', () => {
       const onChange = vi.fn()
       render(<Harness initial={sample()} onChange={onChange} />)

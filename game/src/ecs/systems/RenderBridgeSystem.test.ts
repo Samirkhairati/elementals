@@ -5,6 +5,7 @@ import { RenderBridgeSystem } from './RenderBridgeSystem';
 import { AnimatorComponent } from '../components/AnimatorComponent';
 import { GridMovementComponent } from '../components/GridMovementComponent';
 import { SpriteComponent } from '../components/SpriteComponent';
+import { TransformComponent } from '../components/TransformComponent';
 import { makeRig, type Rig } from '@/test/rig';
 import { characterRegistry, heroDef } from '@/test/characters';
 import { FakeScene } from '@/test/fakePhaser';
@@ -143,5 +144,25 @@ describe('RenderBridgeSystem with an animator', () => {
     const sprite = scene.sprites[0];
     expect(sprite.anims.currentAnim).toBeNull();
     expect(sprite.texture.key).toBe(spriteTextureKey('characters/hero', 'walk'));
+  });
+});
+
+describe('draw order', () => {
+  it('layers by depth first, then whoever stands lower on the screen draws on top', async () => {
+    const { sortDepth } = await import('./RenderBridgeSystem');
+    expect(sortDepth(20, 192)).toBeGreaterThan(sortDepth(20, 160)); // the NPC south of the player covers the player's feet
+    expect(sortDepth(10, 99999)).toBeLessThan(sortDepth(11, 0)); // a lower layer never wins by standing lower
+    expect(sortDepth(20, -50)).toBe(20);
+    expect(sortDepth(20, 1e9)).toBeLessThan(21);
+  });
+
+  it('puts sprites of the same layer in order of their y', () => {
+    const north = hero('down');
+    const south = hero('down');
+    rig.world.getComponent(north.e, TransformComponent)!.y = 160;
+    rig.world.getComponent(south.e, TransformComponent)!.y = 192;
+    frame();
+    const [a, b] = scene.sprites;
+    expect(b.depth).toBeGreaterThan(a.depth);
   });
 });

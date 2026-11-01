@@ -11,6 +11,16 @@ import { completeClip } from "@/sprites/animatorOps";
 const ANIMATION_COMPLETE = "animationcomplete";
 
 /**
+ * Draw order of a sprite: the Transform `depth` picks the layer (characters 20, objects 10, ...), and inside a
+ * layer whatever stands further down the screen draws on top, so a character walking behind another one is hidden
+ * by it and the one in front covers the other's feet. The y part stays below 1, so it never crosses a layer.
+ */
+const Y_SORT_RANGE = 100000;
+export function sortDepth(depth: number, y: number): number {
+  return depth + Math.min(Math.max(y, 0) / Y_SORT_RANGE, 0.999);
+}
+
+/**
  * Mirrors ECS Transform + Sprite (+ Animator) onto Phaser sprites.
  *
  * Position = Transform anchor + Sprite offset, origin = the character pivot. What the sprite shows:
@@ -55,7 +65,7 @@ export class RenderBridgeSystem extends System {
       if (!sprite) {
         sprite = this.scene.add.sprite(x, y, spriteComp.texture, spriteComp.frame);
         sprite.setOrigin(spriteComp.originX, spriteComp.originY);
-        sprite.setDepth(transform.depth);
+        sprite.setDepth(sortDepth(transform.depth, transform.y));
         sprite.setVisible(spriteComp.visible);
         sprite.setAlpha(spriteComp.alpha);
         sprite.setFlipX(flipX);
@@ -76,7 +86,8 @@ export class RenderBridgeSystem extends System {
 
       // Value-checked synchronization to avoid dirtying Phaser transform when unchanged
       if (sprite.x !== x || sprite.y !== y) sprite.setPosition(x, y);
-      if (sprite.depth !== transform.depth) sprite.setDepth(transform.depth);
+      const depth = sortDepth(transform.depth, transform.y);
+      if (sprite.depth !== depth) sprite.setDepth(depth);
       if (sprite.visible !== spriteComp.visible) sprite.setVisible(spriteComp.visible);
       if (sprite.alpha !== spriteComp.alpha) sprite.setAlpha(spriteComp.alpha);
       if (sprite.flipX !== flipX) sprite.setFlipX(flipX);

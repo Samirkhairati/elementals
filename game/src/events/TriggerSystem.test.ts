@@ -119,6 +119,7 @@ describe('action trigger', () => {
     const npc = rig.add({ id: 'walker', col: 5, row: 6, movement: { controller: 'none' }, sprite: { facing: 'left' }, states: [state([say('hello')])] });
     const grid = rig.world.getComponent(npc, GridMovementComponent)!;
     grid.isMoving = true;
+    grid.progress = 0.5;
     triggers.resetTouchState(rig.world);
     triggers.requestAction();
     await step();
@@ -134,11 +135,31 @@ describe('action trigger', () => {
     expect(rig.world.getComponent(npc, AnimatorComponent)!.facing).toBe('up'); // towards the player
   });
 
+  it('an NPC that was only about to step stays on its tile and the text opens at once', async () => {
+    rig.addPlayer(5, 5, 'down');
+    const npc = rig.add({ id: 'walker', col: 5, row: 6, movement: { controller: 'none' }, sprite: { facing: 'left' }, states: [state([say('hello')])] });
+    const grid = rig.world.getComponent(npc, GridMovementComponent)!;
+    const t = rig.world.getComponent(npc, TransformComponent)!;
+    const home = { x: t.x, y: t.y };
+    // the wander AI and the MovementSystem ran earlier in the same frame: the step began a hair ago
+    Object.assign(grid, { isMoving: true, progress: 0.02, startX: home.x, startY: home.y, targetX: home.x + 32, targetY: home.y, pendingDirection: 'right' });
+    t.x = home.x + 0.64;
+    triggers.resetTouchState(rig.world);
+    triggers.requestAction();
+    await step();
+    expect(grid.isMoving).toBe(false);
+    expect(grid.pendingDirection).toBeNull();
+    expect({ x: t.x, y: t.y }).toEqual(home);
+    expect(rig.ui.texts.map((x) => x.text)).toEqual(['hello']);
+    expect(rig.world.getComponent(npc, AnimatorComponent)!.facing).toBe('up');
+  });
+
   it('cancelling the event while the NPC still walks never opens the text', async () => {
     rig.addPlayer(5, 5, 'down');
     const npc = rig.add({ id: 'walker', col: 5, row: 6, movement: { controller: 'none' }, states: [state([say('hello')])] });
     const grid = rig.world.getComponent(npc, GridMovementComponent)!;
     grid.isMoving = true;
+    grid.progress = 0.5;
     triggers.resetTouchState(rig.world);
     triggers.requestAction();
     await step();

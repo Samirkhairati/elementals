@@ -5,6 +5,8 @@ import { EventComponent } from "@/ecs/components/EventComponent";
 import { EntityInfoComponent } from "@/ecs/components/EntityInfoComponent";
 import { ColliderComponent } from "@/ecs/components/ColliderComponent";
 import { GridMovementComponent } from "@/ecs/components/GridMovementComponent";
+import { TransformComponent } from "@/ecs/components/TransformComponent";
+import { MoveRouteComponent } from "@/ecs/components/MoveRouteComponent";
 import type { SpriteRegistry } from "@/data/spriteRegistry";
 import { gameState } from "@/core/GameState";
 import { EventBus, Events } from "@/utils/EventBus";
@@ -16,6 +18,9 @@ import { StateSelector } from "./StateSelector";
 import { WorldEntityOps } from "./WorldEntityOps";
 import { EventInterpreter, type RunResult } from "./EventInterpreter";
 import type { EventContext, EventUI, MapService } from "./types";
+
+/** A step this far along (share of a tile, about 3 px) still counts as "about to move" and is taken back. */
+const FRESH_STEP = 0.1;
 
 export interface EventRuntimeOptions {
   world: World;
@@ -190,7 +195,9 @@ export class EventRuntime {
       const solid = this.world.getComponent(entity, ColliderComponent)?.isSolid ?? false;
       if (solid) this.ops.faceTowards(entity, faceTarget);
     };
-    // An NPC caught mid-step (wandering, a route) finishes that step first: the text must not open while it still walks.
+    // An NPC that only just set off (it was about to move when the player pressed the key) stays where it is;
+    // one further along finishes its step first, so the text never opens while it still walks.
+    if (faceTarget !== undefined) this.holdFreshStep(entity);
     const stepping = this.isStepping(entity);
     if (!stepping) faceNow();
 
@@ -217,6 +224,20 @@ export class EventRuntime {
       return result;
     });
     return run;
+  }
+
+  /** Takes back a step that began this frame (not a route's): the entity stays on its tile instead of drifting off. */
+  private holdFreshStep(entity: Entity): void {
+    const grid = this.world.getComponent(entity, GridMovementComponent);
+    const transform = this.world.getComponent(entity, TransformComponent);
+    if (!grid || !transform || !grid.isMoving || grid.progress >= FRESH_STEP) return;
+    if (this.world.getComponent(entity, MoveRouteComponent)?.active) return;
+    transform.x = grid.startX;
+    transform.y = grid.startY;
+    grid.isMoving = false;
+    grid.progress = 0;
+    grid.pendingDirection = null;
+    grid.holdDuration = 0;
   }
 
   private isStepping(entity: Entity): boolean {

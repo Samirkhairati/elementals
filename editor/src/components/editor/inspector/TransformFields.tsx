@@ -28,7 +28,7 @@ export function TransformFields({ value, onChange, onChangeMany }: TransformFiel
           <NumberField value={row} min={0} unit="row" onCommit={(r) => onChangeMany(tileToPx(col, r))} aria-label="Tile row" />
         </div>
       </Field>
-      <Field label="Depth" hint="Draw order; higher draws on top. Characters 20, objects 10, flat triggers 5.">
+      <Field label="Depth" hint="Draw layer; higher draws on top, and inside a layer whoever stands lower on the map draws on top. Characters 20, objects 10, flat triggers 5.">
         <NumberField value={Number(value.depth) || 0} min={0} max={999} onCommit={(v) => onChange('depth', v)} aria-label="Depth" />
       </Field>
     </div>

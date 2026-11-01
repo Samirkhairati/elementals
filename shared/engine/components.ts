@@ -60,7 +60,7 @@ export const COMPONENT_SCHEMAS: Record<ComponentType, ComponentSchema> = {
     fields: [
       { key: 'x', label: 'Position X', kind: 'number', unit: 'px', step: 16, help: 'Anchor: the bottom-centre of the entity\'s tile.' },
       { key: 'y', label: 'Position Y', kind: 'number', unit: 'px', step: 16, help: 'Anchor: the bottom edge of the entity\'s tile.' },
-      { key: 'depth', label: 'Depth', kind: 'number', min: 0, max: 999, step: 1, help: 'Draw order; higher draws on top. Characters 20, objects 10, flat triggers 5.' },
+      { key: 'depth', label: 'Depth', kind: 'number', min: 0, max: 999, step: 1, help: 'Draw layer; higher draws on top, and inside a layer whoever stands lower on the map draws on top. Characters 20, objects 10, flat triggers 5.' },
     ],
   },
   Sprite: {

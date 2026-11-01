@@ -1,6 +1,6 @@
 // The node canvas of one event state (React Flow). A pure view of an EventGraph: every edit calls
 // `onChange(newGraph)` once; dragging a node updates only local state until the drop, so a drag is one
-// undo step. Shortcuts: Tab / right-click add a node, Delete removes, Ctrl+C/X/V/D copy, cut, paste and
+// undo step. Shortcuts: Tab / right-click on empty canvas add a node, right-click on a node, frame or wire opens its menu, Delete removes, Ctrl+C/X/V/D copy, cut, paste and
 // duplicate, Ctrl+G groups the selection in a frame, F fits the view.
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -21,7 +21,7 @@ import {
   type OnConnectEnd,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { Frame, LayoutGrid, Plus, Scissors, Unplug } from 'lucide-react'
+import { Copy, CopyPlus, Frame, LayoutGrid, Plus, Scissors, Trash2, Unplug } from 'lucide-react'
 import type { EventGraph, GraphIssue, SummaryContext } from '../../../../../shared/engine/types'
 import { GRAPH_START, connect, disconnect, edgesOf, extractFragment, getNode, layoutGraph, moveNode, pasteFragment, reachableFromStart } from '../../../../../shared/engine/graph'
 import { cn } from '@/lib/utils'
@@ -75,6 +75,14 @@ interface PaletteState {
   title: string
 }
 
+interface MenuState {
+  /** Pixels inside the canvas. */
+  x: number
+  y: number
+  /** A wire was right-clicked (its own menu), otherwise the current selection. */
+  edge?: string
+}
+
 const isTyping = (target: EventTarget | null): boolean => {
   const el = target as HTMLElement | null
   return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)
@@ -92,6 +100,7 @@ function Canvas({ graph, onChange, selectedId, onSelect, issues, summaryContext,
   const [measured, setMeasured] = useState<Record<string, { width: number; height: number }>>({})
   const themeMode = useThemeStore((s) => s.mode)
   const [palette, setPalette] = useState<PaletteState | null>(null)
+  const [menu, setMenu] = useState<MenuState | null>(null)
   const [selectedEdges, setSelectedEdges] = useState<Set<string>>(() => new Set())
   // Set while a wire end is being dragged: dropping it on a handle reconnects it, dropping it on nothing removes the wire.
   const reconnected = useRef(false)
@@ -383,6 +392,10 @@ function Canvas({ graph, onChange, selectedId, onSelect, issues, summaryContext,
   }
 
   const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape' && menu) {
+      setMenu(null)
+      return
+    }
     if (isTyping(e.target) || palette) return
     const mod = e.ctrlKey || e.metaKey
     const key = e.key.toLowerCase()
@@ -413,6 +426,31 @@ function Canvas({ graph, onChange, selectedId, onSelect, issues, summaryContext,
     }
   }
 
+  // ── right-click menu ─────────────────────────────────────────────────────────────────────────────
+  const menuAt = (e: React.MouseEvent, extra: Partial<MenuState> = {}) => {
+    e.preventDefault()
+    const box = wrapRef.current?.getBoundingClientRect()
+    setPalette(null)
+    setMenu({ x: Math.max(4, Math.min(e.clientX - (box?.left ?? 0), (box?.width ?? 600) - 200)), y: Math.max(4, Math.min(e.clientY - (box?.top ?? 0), (box?.height ?? 400) - 190)), ...extra })
+  }
+
+  const onNodeContextMenu = (e: React.MouseEvent, node: Node) => {
+    // Right-clicking something outside the selection selects just that; inside it, the menu acts on all of it.
+    if (!selected.has(node.id)) {
+      setSelected(new Set([node.id]))
+      setSelectedEdges(new Set())
+      onSelect(node.id.startsWith(FRAME_PREFIX) ? null : node.id)
+    }
+    menuAt(e)
+  }
+
+  const onEdgeContextMenu = (e: React.MouseEvent, edge: Edge) => {
+    setSelected(new Set())
+    setSelectedEdges(new Set([edge.id]))
+    onSelect(null)
+    menuAt(e, { edge: edge.id })
+  }
+
   const hasNodeSelection = selectedNodeIds.some((id) => getNode(graph, id)?.type !== GRAPH_START)
 
   return (
@@ -438,14 +476,20 @@ function Canvas({ graph, onChange, selectedId, onSelect, issues, summaryContext,
           // Focus the canvas so Ctrl+C / Ctrl+V / Delete reach it even when nothing inside it has focus.
           wrapRef.current?.focus({ preventScroll: true })
           setPalette(null)
+          setMenu(null)
           setSelectedEdges(new Set())
           setSelected(new Set())
           onSelect(null)
         }}
         onPaneContextMenu={(e) => {
           e.preventDefault()
+          setMenu(null)
           openPaletteAtPointer(e.clientX, e.clientY)
         }}
+        onNodeContextMenu={onNodeContextMenu}
+        onEdgeContextMenu={onEdgeContextMenu}
+        onSelectionContextMenu={(e) => menuAt(e)}
+        onMoveStart={() => setMenu(null)}
         onPaneMouseMove={(e) => {
           pointer.current = rf.screenToFlowPosition({ x: e.clientX, y: e.clientY })
         }}
@@ -500,8 +544,108 @@ function Canvas({ graph, onChange, selectedId, onSelect, issues, summaryContext,
         </ToolButton>
       </div>
 
+      {menu && (
+        <div
+          role="menu"
+          aria-label="Node actions"
+          className="absolute z-20 min-w-44 rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-lg"
+          style={{ left: menu.x, top: menu.y }}
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          {menu.edge ? (
+            <MenuItem
+              icon={<Trash2 className="h-3.5 w-3.5" />}
+              label="Delete wire"
+              destructive
+              onClick={() => {
+                const edge = edgesOf(graphRef.current).find((x) => x.id === menu.edge)
+                setMenu(null)
+                setSelectedEdges(new Set())
+                if (edge) commit(disconnect(graphRef.current, edge.from, edge.port))
+              }}
+            />
+          ) : (
+            <>
+              <MenuItem
+                icon={<Trash2 className="h-3.5 w-3.5" />}
+                label={selectedNodeIds.length + selectedFrameIds.length > 1 ? 'Delete selection' : selectedFrameIds.length > 0 ? 'Delete frame' : 'Delete node'}
+                hint="Del"
+                destructive
+                disabled={!hasNodeSelection && selectedFrameIds.length === 0}
+                onClick={() => {
+                  setMenu(null)
+                  deleteSelection()
+                }}
+              />
+              <MenuItem
+                icon={<Scissors className="h-3.5 w-3.5" />}
+                label="Delete and reconnect"
+                disabled={!hasNodeSelection}
+                onClick={() => {
+                  setMenu(null)
+                  removeSelection(true)
+                }}
+              />
+              <MenuSeparator />
+              <MenuItem
+                icon={<CopyPlus className="h-3.5 w-3.5" />}
+                label="Duplicate"
+                hint="Ctrl+D"
+                disabled={!hasNodeSelection && selectedFrameIds.length === 0}
+                onClick={() => {
+                  setMenu(null)
+                  duplicate()
+                }}
+              />
+              <MenuItem
+                icon={<Copy className="h-3.5 w-3.5" />}
+                label="Copy"
+                hint="Ctrl+C"
+                disabled={!hasNodeSelection && selectedFrameIds.length === 0}
+                onClick={() => {
+                  setMenu(null)
+                  void copySelection()
+                }}
+              />
+              <MenuItem
+                icon={<Unplug className="h-3.5 w-3.5" />}
+                label="Disconnect wires"
+                disabled={!hasNodeSelection}
+                onClick={() => {
+                  setMenu(null)
+                  disconnectSelection()
+                }}
+              />
+            </>
+          )}
+        </div>
+      )}
+
       {palette && <NodePalette x={palette.x} y={palette.y} title={palette.title} onPick={pick} onClose={() => setPalette(null)} />}
     </div>
+  )
+}
+
+function MenuSeparator() {
+  return <div role="separator" className="-mx-1 my-1 h-px bg-border" />
+}
+
+function MenuItem({ icon, label, hint, onClick, disabled, destructive }: { icon: React.ReactNode; label: string; hint?: string; onClick: () => void; disabled?: boolean; destructive?: boolean }) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      disabled={disabled}
+      onClick={onClick}
+      className={cn(
+        'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none disabled:pointer-events-none disabled:opacity-40',
+        destructive && 'text-destructive',
+      )}
+    >
+      {icon}
+      <span className="flex-1">{label}</span>
+      {hint && <span className="text-[10px] text-muted-foreground">{hint}</span>}
+    </button>
   )
 }
 
