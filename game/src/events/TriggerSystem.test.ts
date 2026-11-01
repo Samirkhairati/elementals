@@ -114,6 +114,42 @@ describe('action trigger', () => {
     expect(rig.world.getComponent(proud, AnimatorComponent)!.facing).toBe('left');
   });
 
+  it('an NPC caught mid-step finishes the step before it turns and the text opens', async () => {
+    rig.addPlayer(5, 5, 'down');
+    const npc = rig.add({ id: 'walker', col: 5, row: 6, movement: { controller: 'none' }, sprite: { facing: 'left' }, states: [state([say('hello')])] });
+    const grid = rig.world.getComponent(npc, GridMovementComponent)!;
+    grid.isMoving = true;
+    triggers.resetTouchState(rig.world);
+    triggers.requestAction();
+    await step();
+    await step();
+    expect(rig.ui.texts).toEqual([]); // still walking: nothing shown, input already locked
+    expect(gameState.isInputLocked).toBe(true);
+    expect(rig.world.getComponent(npc, AnimatorComponent)!.facing).toBe('left');
+
+    grid.isMoving = false;
+    await step();
+    await step();
+    expect(rig.ui.texts.map((t) => t.text)).toEqual(['hello']);
+    expect(rig.world.getComponent(npc, AnimatorComponent)!.facing).toBe('up'); // towards the player
+  });
+
+  it('cancelling the event while the NPC still walks never opens the text', async () => {
+    rig.addPlayer(5, 5, 'down');
+    const npc = rig.add({ id: 'walker', col: 5, row: 6, movement: { controller: 'none' }, states: [state([say('hello')])] });
+    const grid = rig.world.getComponent(npc, GridMovementComponent)!;
+    grid.isMoving = true;
+    triggers.resetTouchState(rig.world);
+    triggers.requestAction();
+    await step();
+    rig.runtime.cancelAll();
+    grid.isMoving = false;
+    await step();
+    await step();
+    expect(rig.ui.texts).toEqual([]);
+    expect(gameState.isInputLocked).toBe(false);
+  });
+
   it('only triggers action states; other triggers are ignored by the action key', async () => {
     rig.addPlayer(5, 5, 'down');
     rig.add({ id: 'touchy', col: 5, row: 6, states: [state([say('t')], { trigger: 'playerTouch' })] });

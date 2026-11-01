@@ -4,6 +4,7 @@ import type { Entity } from "@/ecs/Entity";
 import { EventComponent } from "@/ecs/components/EventComponent";
 import { EntityInfoComponent } from "@/ecs/components/EntityInfoComponent";
 import { ColliderComponent } from "@/ecs/components/ColliderComponent";
+import { GridMovementComponent } from "@/ecs/components/GridMovementComponent";
 import type { SpriteRegistry } from "@/data/spriteRegistry";
 import { gameState } from "@/core/GameState";
 import { EventBus, Events } from "@/utils/EventBus";
@@ -183,10 +184,15 @@ export class EventRuntime {
     if (blocking && this.blockingRun) return null;
 
     // faceOnInteract: only for solid entities (zones that are not solid do not turn to the player).
-    if (options.faceTarget !== undefined && state.faceOnInteract) {
+    const faceTarget = options.faceTarget;
+    const faceNow = () => {
+      if (faceTarget === undefined || !state.faceOnInteract) return;
       const solid = this.world.getComponent(entity, ColliderComponent)?.isSolid ?? false;
-      if (solid) this.ops.faceTowards(entity, options.faceTarget);
-    }
+      if (solid) this.ops.faceTowards(entity, faceTarget);
+    };
+    // An NPC caught mid-step (wandering, a route) finishes that step first: the text must not open while it still walks.
+    const stepping = this.isStepping(entity);
+    if (!stepping) faceNow();
 
     const entityId = this.world.getComponent(entity, EntityInfoComponent)?.editorId ?? `entity#${entity}`;
     const ctx = this.createContext(entity, entityId);
@@ -200,11 +206,33 @@ export class EventRuntime {
     }
     this.emitBus(Events.EVENT_STARTED, { entity: entityId, map: this.mapId, stateId: state.id, blocking });
 
-    run.done = interpreter.run().then((result) => {
+    const started = stepping
+      ? this.untilStill(run).then(() => {
+          if (this.running.get(entity) === run) faceNow();
+          return interpreter.run();
+        })
+      : interpreter.run();
+    run.done = started.then((result) => {
       this.finish(run, result);
       return result;
     });
     return run;
+  }
+
+  private isStepping(entity: Entity): boolean {
+    return this.world.getComponent(entity, GridMovementComponent)?.isMoving === true;
+  }
+
+  /** Resolves once the entity of `run` stands still (or the run was cancelled meanwhile). */
+  private async untilStill(run: RunningEvent): Promise<void> {
+    const never = new AbortController().signal;
+    while (this.running.get(run.entity) === run && this.isStepping(run.entity)) {
+      try {
+        await this.clock.nextFrame(never);
+      } catch {
+        return;
+      }
+    }
   }
 
   public cancel(entity: Entity): void {
