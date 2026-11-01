@@ -37,7 +37,7 @@ export function CharacterEditor({ data, id, tab: tabParam, onSelect }: { data: D
   const check = useMemo(() => (draft ? validateCharacter(draft, { graphics: new Set(graphics.map((g) => g.id)), imageSizes: sizes }) : null), [draft, graphics, sizes])
   const dirty = !!draft && !!stored && JSON.stringify(draft) !== JSON.stringify(stored.def)
 
-  if (!stored || !draft || !check) return <p className="ed-hint p-4">Pick a character on the left, or create one with “New character…”.</p>
+  if (!stored || !draft || !check) return <p className="ed-hint p-4">Pick a sprite on the left, or create one with “New sprite…”.</p>
 
   const save = async () => {
     const r = await data.sprites.saveCharacter(id, draft)
@@ -63,7 +63,7 @@ export function CharacterEditor({ data, id, tab: tabParam, onSelect }: { data: D
         {dirty && <Badge tone="event">unsaved</Badge>}
         {errors.length > 0 && <Badge tone="warn" title="Errors block saving">{errors.length} error{errors.length === 1 ? '' : 's'}</Badge>}
         {warnings.length > 0 && <Badge title="Warnings do not block saving">{warnings.length} note{warnings.length === 1 ? '' : 's'}</Badge>}
-        <button type="button" className="ed-badge" title="Where this character is used" onClick={() => setTab('used-by')}>Used in {data.refs.counts('character')[id] ?? 0}</button>
+        <button type="button" className="ed-badge" title="Where this sprite is used" onClick={() => setTab('used-by')}>Used in {data.refs.counts('character')[id] ?? 0}</button>
         <div className="ml-auto flex items-center gap-1">
           <EdButton size="sm" onClick={() => setAction('rename')}>Rename…</EdButton>
           <EdButton size="sm" variant="danger" onClick={() => setAction('delete')}>Delete…</EdButton>
@@ -72,7 +72,7 @@ export function CharacterEditor({ data, id, tab: tabParam, onSelect }: { data: D
         </div>
       </header>
       {error && <p role="alert" className="px-4 py-1 text-destructive">{error}</p>}
-      <div className="px-4 py-2"><Segmented<Tab> aria-label="Character sections" value={tab} options={(Object.keys(TAB_LABELS) as Tab[]).map((t) => ({ value: t, label: TAB_LABELS[t] }))} onChange={setTab} /></div>
+      <div className="px-4 py-2"><Segmented<Tab> aria-label="Sprite sections" value={tab} options={(Object.keys(TAB_LABELS) as Tab[]).map((t) => ({ value: t, label: TAB_LABELS[t] }))} onChange={setTab} /></div>
       <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
         {check.issues.length > 0 && (
           <ul aria-label="Problems" className="mb-3 text-ed-label">

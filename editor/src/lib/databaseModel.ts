@@ -21,17 +21,17 @@ export interface DatabaseTable {
 
 export const GROUP_LABELS: Record<TableGroup, string> = { visual: 'Visual', design: 'Design', world: 'World', text: 'Text', game: 'Game' }
 
-export const READONLY_INFO = 'Visual resources are shown exactly as stored. To use one, attach it to a character; to change it, edit the image file.'
+export const READONLY_INFO = 'Visual resources are shown exactly as stored. To use one, attach it to a sprite; to change it, edit the image file.'
 
 /** Adding Pokémon or Items later = adding one entry here and one component in the shell's table map. */
 export const DATABASE_TABLES: readonly DatabaseTable[] = [
   { id: 'graphics', label: 'Graphics', group: 'visual', icon: 'Image', access: 'readonly', status: 'ready', info: READONLY_INFO },
   { id: 'tilesets', label: 'Tilesets', group: 'visual', icon: 'Grid3x3', access: 'readonly', status: 'ready', info: READONLY_INFO },
-  { id: 'characters', label: 'Characters', group: 'design', icon: 'PersonStanding', access: 'editable', status: 'ready', info: 'Anything drawn that can animate: a person, a flower, a chest, a door.' },
+  { id: 'characters', label: 'Sprites', group: 'design', icon: 'PersonStanding', access: 'editable', status: 'ready', info: 'Anything drawn that can animate: a person, a flower, a chest, a door.' },
   { id: 'flags', label: 'Flags', group: 'design', icon: 'ToggleLeft', access: 'editable', status: 'ready', info: 'Switches, variables, stages and common events used by events.' },
   { id: 'maps', label: 'Maps', group: 'world', icon: 'Map', access: 'readonly', status: 'ready', info: 'A read-only overview. Open a map in the Map Editor to change it.' },
   { id: 'text', label: 'Dialogue & strings', group: 'text', icon: 'MessageSquareText', access: 'editable', status: 'planned', info: 'Planned.' },
-  { id: 'pokemon', label: 'Pokémon', group: 'game', icon: 'Bug', access: 'editable', status: 'planned', info: 'Planned: a Pokémon will reference characters and graphics by id.' },
+  { id: 'pokemon', label: 'Pokémon', group: 'game', icon: 'Bug', access: 'editable', status: 'planned', info: 'Planned: a Pokémon will reference sprites and graphics by id.' },
   { id: 'items', label: 'Items', group: 'game', icon: 'Package', access: 'editable', status: 'planned', info: 'Planned.' },
   { id: 'moves', label: 'Moves', group: 'game', icon: 'Zap', access: 'editable', status: 'planned', info: 'Planned.' },
 ]

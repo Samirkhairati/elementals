@@ -25,7 +25,7 @@ describe('suggestGrid / newCharacter', () => {
     expect(a.clips.walk.byFacing?.left).toEqual([4, 5, 6, 7])
     expect(a.clips.walk.followSpeed).toEqual({ reference: 100 })
     const prop = newCharacter('prop', ' ', 'a.png', { width: 24, height: 24 })
-    expect(prop).toMatchObject({ name: 'New character', facing: 'none', still: { sheet: 'sheet', frame: 0 }, clips: {} })
+    expect(prop).toMatchObject({ name: 'New sprite', facing: 'none', still: { sheet: 'sheet', frame: 0 }, clips: {} })
     expect(validateCharacter(prop).ok).toBe(true)
     const anim = newCharacter('animated', 'Flower', 'f.png', { width: 96, height: 32 })
     expect(anim.clips.idle.frames).toEqual([0, 1, 2])

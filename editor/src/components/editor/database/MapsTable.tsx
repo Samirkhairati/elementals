@@ -28,7 +28,7 @@ export function MapDetail({ data, id }: { data: DatabaseData; id: string }) {
       <h2 className="text-ed-title">{summary.name}</h2>
       <p className="ed-hint">{summary.width}×{summary.height} tiles · {summary.layers} layers · {summary.entities} entities</p>
       <section><h3 className="text-ed-label">Tilesets ({summary.tilesets.length})</h3><p>{summary.tilesets.join(', ') || '—'}</p></section>
-      <section><h3 className="text-ed-label">Characters ({summary.characters.length})</h3><p>{summary.characters.join(', ') || '—'}</p></section>
+      <section><h3 className="text-ed-label">Sprites ({summary.characters.length})</h3><p>{summary.characters.join(', ') || '—'}</p></section>
       <Link to="/editor" className="ed-btn w-fit">Open in Map Editor</Link>
     </div>
   )

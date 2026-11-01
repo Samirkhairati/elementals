@@ -733,3 +733,21 @@ describe('layoutGraph', () => {
     expect(g).toEqual(copy)
   })
 })
+
+describe('validateGraph: animations of a sprite the event swaps to', () => {
+  const ctx = { characterClips: { 'objects/chest': { open: { loop: false } }, 'characters/hero': { wave: { loop: false } } }, selfCharacters: ['objects/chest'] }
+  const graph = (swap: boolean): EventGraph => {
+    const ids = seq()
+    const cmds = [
+      ...(swap ? [createCommand('changeSprite', { target: 'self', asset: 'characters/hero' }, ids)] : []),
+      createCommand('playAnimation', { target: 'self', animation: 'wave' }, ids),
+    ]
+    return commandsToGraph(cmds, ids, { layout: false })
+  }
+
+  it('counts a Change Sprite of this event as something self can show', () => {
+    expect(validateGraph(graph(false), ctx).map((i) => i.code)).toEqual(['unknown-clip'])
+    expect(validateGraph(graph(true), ctx).map((i) => i.code)).toEqual([])
+  })
+})
+

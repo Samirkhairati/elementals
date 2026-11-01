@@ -79,7 +79,7 @@ export function EventEditor({ states: statesProp, onChange, className, common = 
   const stateIndex = states.indexOf(state)
   const selected = selectedNodeId ? getNode(state.graph, selectedNodeId) : undefined
 
-  const vctx = useMemo(() => buildValidationContext(env), [env])
+  const vctx = useMemo(() => buildValidationContext(env, states), [env, states])
   const summaryContext = useMemo(() => buildSummaryContext(env), [env])
   const problems = useMemo(() => collectProblems(states, vctx), [states, vctx])
   const counts = countBySeverity(problems)

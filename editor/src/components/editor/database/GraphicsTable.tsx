@@ -32,7 +32,7 @@ function Tree({ node, depth, selected, onSelect, open, toggle, unused, images }:
             >
               <ImageThumb url={images[c.path]} size={24} />
               <span className="truncate">{c.name}</span>
-              {unused.has(c.path) && <Badge title="No character uses this graphic">unused</Badge>}
+              {unused.has(c.path) && <Badge title="No sprite uses this graphic">unused</Badge>}
             </button>
           </li>
         ),
@@ -108,9 +108,9 @@ export function GraphicDetail({ data, id }: { data: DatabaseData; id: string }) 
         <Segmented value={String(zoom)} options={ZOOMS.map((z) => ({ value: String(z), label: `${z}×` }))} onChange={(v) => setZoom(Number(v) as (typeof ZOOMS)[number])} aria-label="Zoom" />
         <Checkbox className="ed-hint" checked={pixelGrid} onChange={setPixelGrid} label="Pixel grid" />
         <label className="ed-hint flex items-center gap-1">
-          <Grid3x3 className="h-3.5 w-3.5" /> Overlay a character’s cut
+          <Grid3x3 className="h-3.5 w-3.5" /> Overlay a sprite’s cut
           <Select className="w-auto min-w-[140px]" value={overlay} aria-label="Overlay a character's cut" options={[{ value: '', label: 'none' }, ...usage.map((u) => ({ value: `${u.characterId}:${u.sheet}`, label: `${u.characterName} · ${u.sheet}` }))]} onChange={setOverlay} />
-          <InfoTip>Draws the frame grid a character uses on this image, so you can check how it is cut. It changes nothing.</InfoTip>
+          <InfoTip>Draws the frame grid a sprite uses on this image, so you can check how it is cut. It changes nothing.</InfoTip>
         </label>
       </div>
       <div className="overflow-auto rounded border border-border" style={{ background: 'repeating-conic-gradient(#8884 0% 25%, transparent 0% 50%) 0 0 / 16px 16px' }}>
@@ -121,7 +121,7 @@ export function GraphicDetail({ data, id }: { data: DatabaseData; id: string }) 
       </div>
       <section>
         <h3 className="text-ed-label">Used by ({usage.length})</h3>
-        {usage.length === 0 ? <p className="ed-hint">No character uses this graphic.</p> : (
+        {usage.length === 0 ? <p className="ed-hint">No sprite uses this graphic.</p> : (
           <ul>{usage.map((u) => <li key={`${u.characterId}:${u.sheet}`}>{u.characterName} <span className="ed-hint">{u.characterId} · sheet {u.sheet}</span></li>)}</ul>
         )}
       </section>

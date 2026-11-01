@@ -90,7 +90,7 @@ const TARGET_FIELD: FieldDef = {
   help: 'Who this applies to: this event, the player or another entity on the map.',
 };
 
-const ANIMATION_HELP = 'Name of an animation defined by the sprite asset.';
+const ANIMATION_HELP = 'One of the animations of the sprite (see the Animations tab of the sprite in the Database).';
 
 function def(d: Omit<CommandDef, 'summarize'> & { summarize: CommandDef['summarize'] }): CommandDef {
   return d;
@@ -416,8 +416,8 @@ export const COMMAND_CATALOG: Record<string, CommandDef> = {
     icon: 'image',
     params: [
       TARGET_FIELD,
-      { key: 'asset', label: 'Sprite', kind: 'sprite', required: true },
-      { key: 'animation', label: 'Animation', kind: 'text', help: ANIMATION_HELP, placeholder: 'optional' },
+      { key: 'asset', label: 'Sprite', kind: 'character', required: true },
+      { key: 'animation', label: 'Animation', kind: 'clip', characterKey: 'asset', help: ANIMATION_HELP, placeholder: 'optional' },
       {
         key: 'persist',
         label: 'Lasts',
@@ -438,7 +438,7 @@ export const COMMAND_CATALOG: Record<string, CommandDef> = {
     icon: 'play',
     params: [
       TARGET_FIELD,
-      { key: 'animation', label: 'Animation', kind: 'text', required: true, help: ANIMATION_HELP, placeholder: 'e.g. open' },
+      { key: 'animation', label: 'Animation', kind: 'clip', required: true, help: ANIMATION_HELP, placeholder: 'e.g. open' },
       { key: 'speed', label: 'Speed', kind: 'number', unit: '×', min: 0, max: 8, step: 0.25, help: '1× is the speed set in the sprite. 2× is twice as fast.' },
       { key: 'wait', label: 'Wait until finished', kind: 'boolean', help: 'Pause this event until the animation finishes. Only works for animations that do not loop.' },
       {
@@ -970,14 +970,19 @@ function validateField(field: FieldDef, params: Record<string, unknown>, ctx: Va
     case 'stage':
     case 'commonEvent':
     case 'map':
-    case 'sprite': {
+    case 'sprite':
+    case 'character': {
       if (typeof v !== 'string') return bad('must be an id');
-      const lists = { switch: ctx.switchIds, variable: ctx.variableIds, stage: ctx.stageIds, commonEvent: ctx.commonIds, map: ctx.mapIds, sprite: ctx.spriteIds };
+      const lists = { switch: ctx.switchIds, variable: ctx.variableIds, stage: ctx.stageIds, commonEvent: ctx.commonIds, map: ctx.mapIds, sprite: ctx.spriteIds, character: ctx.spriteIds };
       const list = lists[field.kind];
-      const code = field.kind === 'commonEvent' ? 'dangling-common' : `dangling-${field.kind}`;
-      if (list && !list.includes(v)) report('error', code, `${field.label}: ${field.kind} "${v}" does not exist`);
+      const code = field.kind === 'commonEvent' ? 'dangling-common' : field.kind === 'character' ? 'unknown-character' : `dangling-${field.kind}`;
+      const what = field.kind === 'character' ? 'sprite' : field.kind;
+      if (list && !list.includes(v)) report('error', code, `${field.label}: ${what} "${v}" does not exist`);
       return;
     }
+    case 'clip':
+      if (typeof v !== 'string') bad('must be a name');
+      return; // whether it exists is checked with the whole command (validateClips)
     case 'target':
       validateTarget(v, field.label, ctx, report);
       return;
@@ -1001,6 +1006,37 @@ function validateField(field: FieldDef, params: Record<string, unknown>, ctx: Va
       return;
     default:
       if (typeof v !== 'string') bad('must be text');
+  }
+}
+
+/** Characters whose clips an animation command is about: its `asset`, or what its target shows; [] when that cannot be known. */
+function clipCharacters(type: string, params: Record<string, unknown>, ctx: ValidationContext): string[] {
+  if (type === 'changeSprite') return typeof params.asset === 'string' && params.asset !== '' ? [params.asset] : [];
+  const target = params.target ?? 'self';
+  if (target === 'self') return ctx.selfCharacters ?? [];
+  if (isRecord(target) && typeof target.entity === 'string') {
+    const character = ctx.entityCharacters?.[target.entity];
+    return character ? [character] : [];
+  }
+  return []; // the player (its outfit can change) and anything unresolvable stay unchecked
+}
+
+/** `unknown-clip` and `wait-on-looping-clip` of changeSprite / playAnimation. Silent when the characters are not known. */
+function validateClips(type: string, params: Record<string, unknown>, ctx: ValidationContext, report: Report): void {
+  const clip = params.animation;
+  if (typeof clip !== 'string' || clip === '' || !ctx.characterClips) return;
+  const known = clipCharacters(type, params, ctx).filter((c) => ctx.characterClips?.[c]);
+  if (known.length === 0) return;
+  const having = known.filter((c) => ctx.characterClips?.[c]?.[clip]);
+  if (having.length === 0) {
+    const owner = known.length === 1 ? `sprite "${known[0]}" has` : 'none of the sprites it can show has';
+    const have = known.length === 1 ? Object.keys(ctx.characterClips[known[0]] ?? {}) : [];
+    report('warning', 'unknown-clip', `Animation "${clip}": ${owner} no such animation${have.length > 0 ? ` (it has: ${have.join(', ')})` : ''}`);
+    return;
+  }
+  const waits = type === 'playAnimation' && params.wait === true;
+  if (waits && (params.then === 'loop' || having.every((c) => ctx.characterClips?.[c]?.[clip]?.loop))) {
+    report('warning', 'wait-on-looping-clip', `Animation "${clip}" repeats forever, so waiting until it finishes would never end`);
   }
 }
 
@@ -1046,6 +1082,8 @@ export function validateCommandParams(
       report('error', 'warp-out-of-bounds', `Tile (${x}, ${y}) is outside the map (${size.width}×${size.height} tiles)`);
     }
   }
+
+  if (cmd.type === 'changeSprite' || cmd.type === 'playAnimation') validateClips(cmd.type, params, ctx, report);
 
   if (cmd.type === 'conditional' && Array.isArray(params.conditions) && params.conditions.length === 0) {
     report('warning', 'missing-param', 'Conditional Branch has no conditions (it always takes the Then branch)');

@@ -7,7 +7,9 @@ import type { CommandTarget, Facing } from '../../../../../shared/engine/types'
 import { previewFrame } from '../../../../../shared/engine/sprites'
 import { cn } from '@/lib/utils'
 import { useEventEnv } from './eventEnv'
-import { Popover, inputClass } from './primitives'
+import { Select } from '../ui/fields'
+import { DraftText, Popover, inputClass } from './primitives'
+import type { EventEnv } from './eventEnv'
 
 // ── generic list picker ─────────────────────────────────────────────────────────────────────────
 
@@ -571,6 +573,53 @@ export function SpritePicker({
       invalid={!!value && !found}
       title={value && !found ? `Sprite "${value}" does not exist` : value || undefined}
       width={300}
+    />
+  )
+}
+
+// ── animation (clip) of a sprite ─────────────────────────────────────────────────────────────────
+
+/** The sprite a target shows, when the editor can tell (this event's entity or another entity of the map); the player's outfit can change, so it is not guessed. */
+export function characterOfTarget(target: CommandTarget | undefined, env: Pick<EventEnv, 'entityId' | 'entityCharacters'>): string | undefined {
+  if (target === undefined || target === 'self') return env.entityCharacters?.[env.entityId]
+  if (typeof target === 'object' && target && typeof target.entity === 'string') return env.entityCharacters?.[target.entity]
+  return undefined
+}
+
+const OTHER_CLIP = '__other__'
+
+/**
+ * Picks one of the animations of `characterId`. Without a known sprite (the player, an unknown entity, a host without
+ * sprites) it is a free text box, and "Other name…" turns the list into one for names the sprite does not list.
+ */
+export function ClipPicker({ id, value, onChange, characterId, optional }: { id?: string; value: string; onChange: (clip: string) => void; characterId?: string; optional?: boolean }) {
+  const env = useEventEnv()
+  const clips = characterId ? env.characterClips?.(characterId) : undefined
+  const [typing, setTyping] = useState(false)
+  if (!clips || typing || (value !== '' && !clips.some((c) => c.id === value))) {
+    return (
+      <div className="flex items-center gap-1.5">
+        <div className="min-w-0 flex-1">
+          <DraftText id={id} value={value} placeholder={optional ? 'optional' : 'e.g. open'} onCommit={onChange} />
+        </div>
+        {clips && (
+          <button type="button" className="shrink-0 text-[11px] text-muted-foreground underline-offset-2 hover:underline" onClick={() => { setTyping(false); if (!clips.some((c) => c.id === value)) onChange('') }}>
+            Pick from the list
+          </button>
+        )}
+      </div>
+    )
+  }
+  return (
+    <Select
+      id={id}
+      value={value}
+      onChange={(v) => (v === OTHER_CLIP ? setTyping(true) : onChange(v))}
+      options={[
+        { value: '', label: optional ? '(none)' : 'Choose an animation…' },
+        ...clips.map((c) => ({ value: c.id, label: c.loop ? c.id : `${c.id} (plays once)` })),
+        { value: OTHER_CLIP, label: 'Other name…' },
+      ]}
     />
   )
 }

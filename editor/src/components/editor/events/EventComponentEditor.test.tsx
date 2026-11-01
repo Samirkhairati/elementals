@@ -175,11 +175,12 @@ describe('with the real editor context', () => {
       variables: [],
       maps: [{ name: 'Town', fileName: 'town.json', folderPath: null }],
       entities: [
-        { id: 'self-1', name: 'Old man' },
-        { id: 'e2', name: 'Guard' },
+        { id: 'self-1', name: 'Old man', components: { Sprite: { asset: 'objects/chest' } } },
+        { id: 'e2', name: 'Guard', components: {} },
       ],
       spriteList: [{ id: 'objects/chest', meta: { name: 'Chest', kind: 'object' } }],
       getSpriteAsset: () => undefined,
+      getCharacter: (id: string) => (id === 'objects/chest' ? { id, def: { clips: { open: { loop: false }, idle: { loop: true } } } } : undefined),
       addSwitch: vi.fn(() => 'new_switch'),
       addVariable: vi.fn(() => 'new_var'),
       handleUndo: vi.fn(),
@@ -207,5 +208,22 @@ describe('with the real editor context', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
     expect((value as unknown as { handleUndo: ReturnType<typeof vi.fn> }).handleUndo).toHaveBeenCalledTimes(1)
     expect(screen.getByRole('button', { name: 'Redo' })).not.toBeDisabled()
+  })
+
+  it('checks animation names against the sprite the entity shows (from the real editor context)', () => {
+    const value = contextValue()
+    render(
+      <StrictMode>
+        <EditorProvider value={value}>
+          <Card states={[state('p1', [cmd('1', 'playAnimation', { target: 'self', animation: 'open', wait: true }), cmd('2', 'playAnimation', { target: 'self', animation: 'slam' }), cmd('3', 'playAnimation', { target: 'self', animation: 'idle', wait: true })])]} />
+        </EditorProvider>
+      </StrictMode>,
+    )
+    const card = screen.getByTestId('event-validation')
+    expect(card).not.toHaveTextContent('OK')
+    const titles = [card, ...card.querySelectorAll('[title]')].map((el) => el.getAttribute('title') ?? '').join('\n')
+    expect(titles).toContain('sprite "objects/chest" has no such animation (it has: open, idle)')
+    expect(titles).toContain('Animation "idle" repeats forever')
+    expect(titles).not.toContain('Animation "open" repeats forever')
   })
 })

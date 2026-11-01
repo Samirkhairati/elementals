@@ -58,7 +58,7 @@ export function slugify(name: string, fallback = 'character'): string {
 export function newCharacter(preset: Preset, name: string, image: string, size: { width: number; height: number }): CharacterDef {
   const grid = suggestGrid(preset, size.width, size.height)
   const sheet: SheetDef = { image, frameWidth: grid.frameWidth, frameHeight: grid.frameHeight, margin: 0, spacing: 0 }
-  const base = { version: 2 as const, name: name.trim() || 'New character', tags: [] as string[], pivot: { x: 0.5, y: 1 } }
+  const base = { version: 2 as const, name: name.trim() || 'New sprite', tags: [] as string[], pivot: { x: 0.5, y: 1 } }
   if (preset === 'actor') {
     const rows = (frames: (row: number) => number[]) => Object.fromEntries(FACINGS.map((f, r) => [f, frames(r)])) as Partial<Record<Facing, number[]>>
     const cycle = (r: number) => Array.from({ length: grid.columns }, (_, i) => r * grid.columns + i)

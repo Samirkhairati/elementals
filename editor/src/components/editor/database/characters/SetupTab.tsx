@@ -27,13 +27,13 @@ export function SetupTab({ id, def, onChange }: Props) {
       <Field label="Name" info="What you'll see in lists and pickers. You can rename it any time; the id (below) is what maps use.">
         <TextField aria-label="Name" value={def.name} onCommit={(v) => onChange({ ...def, name: v })} />
       </Field>
-      <Field label="Id" info="The permanent name maps and events use to refer to this character. Renaming it updates every place it's used (you'll see a preview first).">
-        <code className="text-ed-label" aria-label="Character id">{id}</code>
+      <Field label="Id" info="The permanent name maps and events use to refer to this sprite. Renaming it updates every place it's used (you'll see a preview first).">
+        <code className="text-ed-label" aria-label="Sprite id">{id}</code>
       </Field>
       <Field label="Tags" info="Your own labels, like 'npc' or 'prop', for filtering. They don't affect the game.">
         <TextField aria-label="Tags" placeholder="npc, boss" value={def.tags.join(', ')} onCommit={(v) => onChange(setTags(def, v.split(',')))} />
       </Field>
-      <Field label="Facing" info="Four directions: the character can look down, left, right or up and animations can differ per direction. None: it looks the same from every side.">
+      <Field label="Facing" info="Four directions: the sprite can look down, left, right or up and animations can differ per direction. None: it looks the same from every side.">
         <Segmented<FacingMode> aria-label="Facing" value={def.facing} options={[{ value: 'none', label: 'None' }, { value: 'four', label: 'Four directions' }]} onChange={(v) => (v === def.facing ? undefined : facingChangeImpact(def, v).invalid.length > 0 ? setPendingFacing(v) : onChange(setFacingMode(def, v)))} />
       </Field>
       {pendingFacing && impact && (
@@ -42,7 +42,7 @@ export function SetupTab({ id, def, onChange }: Props) {
           <FieldRow className="mt-1"><EdButton size="sm" variant="primary" onClick={() => { onChange(setFacingMode(def, pendingFacing)); setPendingFacing(null) }}>Change facing</EdButton><EdButton size="sm" onClick={() => setPendingFacing(null)}>Cancel</EdButton></FieldRow>
         </div>
       )}
-      <Field label="Pivot" info="The point of the frame that stands on the spot where the entity is placed. Bottom-centre suits characters; centre suits things that float.">
+      <Field label="Pivot" info="The point of the frame that stands on the spot where the entity is placed. Bottom-centre suits sprites; centre suits things that float.">
         <FieldRow>
           <PivotPicker value={def.pivot} onChange={(p) => onChange(setPivot(def, p))} />
           <NumberField aria-label="Pivot x" size="xs" step={0.1} value={def.pivot.x} min={0} max={1} onCommit={(x) => onChange(setPivot(def, { ...def.pivot, x }))} />
@@ -51,7 +51,7 @@ export function SetupTab({ id, def, onChange }: Props) {
       </Field>
 
       <div>
-        <div className="flex items-center gap-1 text-ed-label font-medium">Animation bindings <InfoTip>Which animation plays automatically for each thing the character does. If a binding is missing, the next best one is used (run → walk → idle).</InfoTip></div>
+        <div className="flex items-center gap-1 text-ed-label font-medium">Animation bindings <InfoTip>Which animation plays automatically for each thing the sprite does. If a binding is missing, the next best one is used (run → walk → idle).</InfoTip></div>
         <table className="w-full text-ed-label" aria-label="Animation bindings">
           <tbody>
             {bindingKeys.map((key) => (
@@ -77,7 +77,7 @@ export function SetupTab({ id, def, onChange }: Props) {
         </FieldRow>
       </Field>
 
-      <Field label="Profile" info="A checklist for characters that must behave the same way (for example, anything that can be swapped in as the player). Custom has no checklist.">
+      <Field label="Profile" info="A checklist for sprites that must behave the same way (for example, anything that can be swapped in as the player). Custom has no checklist.">
         <Select aria-label="Profile" className="w-auto min-w-[160px]" value={def.profile ?? ''} options={[{ value: '', label: 'Custom' }, ...Object.values(CHARACTER_PROFILES).map((p) => ({ value: p.id, label: p.label }))]} onChange={(v) => onChange(v ? { ...def, profile: v } : (({ profile: _p, ...rest }) => rest as CharacterDef)(def))} />
       </Field>
       {def.profile && CHARACTER_PROFILES[def.profile] && (

@@ -53,7 +53,7 @@ describe('Database shell', () => {
     const nav = await screen.findByRole('navigation', { name: 'Database tables' })
     for (const g of ['Visual', 'Design', 'World', 'Planned']) expect(within(nav).getByText(g)).toBeInTheDocument()
     expect(within(within(nav).getByRole('button', { name: /Graphics/ })).getByLabelText('Read-only')).toBeInTheDocument()
-    expect(within(within(nav).getByRole('button', { name: /Characters/ })).queryByLabelText('Read-only')).toBeNull()
+    expect(within(within(nav).getByRole('button', { name: /Sprites/ })).queryByLabelText('Read-only')).toBeNull()
     // the planned tables sit under their own heading, disabled
     const plannedList = within(nav).getByText('Planned').nextElementSibling as HTMLElement
     for (const name of [/Dialogue & strings/, /Pokémon/, /Items/, /Moves/]) {
@@ -68,7 +68,7 @@ describe('Database shell', () => {
     await waitFor(() => expect(within(within(nav).getByRole('button', { name: /Graphics/ })).getByText('3')).toBeInTheDocument())
     expect(within(within(nav).getByRole('button', { name: /Tilesets/ })).getByText('2')).toBeInTheDocument()
     expect(within(within(nav).getByRole('button', { name: /Maps/ })).getByText('1')).toBeInTheDocument()
-    expect(within(within(nav).getByRole('button', { name: /Characters/ })).getByText('1 ✕')).toBeInTheDocument() // the broken one
+    expect(within(within(nav).getByRole('button', { name: /Sprites/ })).getByText('1 ✕')).toBeInTheDocument() // the broken one
   })
 
   it('opens the table named in the URL and selects the deep-linked record', async () => {
@@ -153,7 +153,7 @@ describe('Graphics (read-only)', () => {
     renderAt('/database?table=graphics&id=props/orphan.png')
     const detail = await screen.findByTestId('graphic-detail')
     expect(within(detail).getAllByText('unused').length).toBeGreaterThan(0)
-    expect(within(detail).getByText('No character uses this graphic.')).toBeInTheDocument()
+    expect(within(detail).getByText('No sprite uses this graphic.')).toBeInTheDocument()
   })
 
   it('import copies the picked file under the chosen id and surfaces failures', async () => {

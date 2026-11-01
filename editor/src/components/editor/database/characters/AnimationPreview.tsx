@@ -47,7 +47,7 @@ export function AnimationPreview({ def, clipName, facing, url, size }: Props) {
       <Field label="Speed" info="Only changes this preview, not the saved animation.">
         <SliderNumber label="Preview speed" value={speed} min={0} max={4} step={0.25} unit="×" onCommit={setSpeed} />
       </Field>
-      <Field label="Entity speed" info="Pretend the character moves at this speed to see how “Follow movement speed” behaves.">
+      <Field label="Entity speed" info="Pretend the sprite moves at this speed to see how “Follow movement speed” behaves.">
         <NumberField aria-label="Entity speed" size="sm" value={entitySpeed} min={0} step={10} unit="px/s" onCommit={setEntitySpeed} />
       </Field>
     </div>

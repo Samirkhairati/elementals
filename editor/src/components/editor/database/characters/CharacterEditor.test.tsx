@@ -46,7 +46,7 @@ async function open() {
 describe('wizard', () => {
   it('suggests the cut for the image, derives name → id, and saves a valid actor', async () => {
     const { saved } = setup()
-    fireEvent.click(await screen.findByRole('button', { name: /New character/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /New sprite/ }))
     const dialog = await screen.findByRole('dialog')
     chooseOption(within(dialog).getByRole('combobox', { name: 'Picture' }), 'sprites/hero/run.png')
     expect(within(dialog).getByTestId('grid-suggestion')).toHaveTextContent('Cut as 4×4 frames of 32×48 px.')
@@ -66,13 +66,13 @@ describe('wizard', () => {
 
   it('cannot create without a picture or with a taken id', async () => {
     setup()
-    fireEvent.click(await screen.findByRole('button', { name: /New character/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /New sprite/ }))
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByRole('button', { name: 'Create' })).toBeDisabled()
     chooseOption(within(dialog).getByRole('combobox', { name: 'Picture' }), 'props/ball.png')
     fireEvent.change(within(dialog).getByLabelText('Id'), { target: { value: 'characters/hero' } })
     fireEvent.blur(within(dialog).getByLabelText('Id'))
-    expect(within(dialog).getByText('A character with this id already exists.')).toBeInTheDocument()
+    expect(within(dialog).getByText('A sprite with this id already exists.')).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Create' })).toBeDisabled()
   })
 })

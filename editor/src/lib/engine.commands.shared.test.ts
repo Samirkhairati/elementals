@@ -230,7 +230,7 @@ describe('validateCommands', () => {
     ]
     expect(codes(cmds)).toEqual([])
     const all = validateCommands(cmds, { switchIds: ['a'], variableIds: ['b'], mapIds: ['c'], spriteIds: ['d'], entityIds: ['e'] })
-    expect(all.map((i) => i.code)).toEqual(['dangling-switch', 'dangling-variable', 'dangling-map', 'dangling-sprite', 'dangling-entity'])
+    expect(all.map((i) => i.code)).toEqual(['dangling-switch', 'dangling-variable', 'dangling-map', 'unknown-character', 'dangling-entity'])
     expect(all.every((i) => i.severity === 'error')).toBe(true)
     expect(all[0].message).toMatch(/gone/)
     expect(validateCommands([mk('setSwitch', { id: 'a' })], { switchIds: ['a'] })).toEqual([])
@@ -294,3 +294,44 @@ describe('validateCommands', () => {
     expect(validateConditions('x')[0].code).toBe('bad-conditions')
   })
 })
+
+describe('animation names and waiting (unknown-clip, wait-on-looping-clip)', () => {
+  const characterClips = {
+    'objects/chest': { open: { loop: false }, idle: { loop: true } },
+    'characters/hero': { wave: { loop: false } },
+  }
+  const ctx = { spriteIds: ['objects/chest', 'characters/hero'], characterClips, selfCharacters: ['objects/chest'], entityCharacters: { guard: 'characters/hero' } }
+  const issues = (c: Command, extra = {}) => validateCommands([c], { ...ctx, ...extra }).map((i) => `${i.severity}:${i.code}`)
+
+  it('Change Sprite: an unknown sprite is an error, an unknown animation of a known one a warning', () => {
+    expect(issues(mk('changeSprite', { asset: 'objects/ghost' }))).toEqual(['error:unknown-character'])
+    expect(issues(mk('changeSprite', { asset: 'objects/chest', animation: 'open' }))).toEqual([])
+    expect(issues(mk('changeSprite', { asset: 'objects/chest', animation: 'explode' }))).toEqual(['warning:unknown-clip'])
+    expect(issues(mk('changeSprite', { asset: 'objects/chest', animation: '' }))).toEqual([])
+  })
+
+  it('Play Animation checks the clip against what the target shows', () => {
+    expect(issues(mk('playAnimation', { target: 'self', animation: 'open' }))).toEqual([])
+    expect(issues(mk('playAnimation', { target: 'self', animation: 'wave' }))).toEqual(['warning:unknown-clip'])
+    expect(issues(mk('playAnimation', { target: { entity: 'guard' }, animation: 'wave' }))).toEqual([])
+    expect(issues(mk('playAnimation', { target: { entity: 'guard' }, animation: 'open' }))).toEqual(['warning:unknown-clip'])
+    const [warning] = validateCommands([mk('playAnimation', { target: 'self', animation: 'wave' })], ctx)
+    expect(warning.message).toContain('it has: open, idle')
+  })
+
+  it('stays silent when it cannot know: the player, an unknown entity, no clip lists', () => {
+    expect(issues(mk('playAnimation', { target: 'player', animation: 'anything' }))).toEqual([])
+    expect(issues(mk('playAnimation', { target: { entity: 'nobody' }, animation: 'anything' }))).toEqual([])
+    expect(issues(mk('playAnimation', { target: 'self', animation: 'anything' }), { selfCharacters: [] })).toEqual([])
+    expect(validateCommands([mk('playAnimation', { target: 'self', animation: 'anything' })], { spriteIds: ctx.spriteIds }).map((i) => i.code)).toEqual([])
+  })
+
+  it('waiting for a clip that repeats forever warns; one-shot clips and non-waiting plays are fine', () => {
+    expect(issues(mk('playAnimation', { target: 'self', animation: 'idle', wait: true }))).toEqual(['warning:wait-on-looping-clip'])
+    expect(issues(mk('playAnimation', { target: 'self', animation: 'idle', wait: false }))).toEqual([])
+    expect(issues(mk('playAnimation', { target: 'self', animation: 'open', wait: true }))).toEqual([])
+    // a one-shot clip that is set to repeat afterwards never ends either
+    expect(issues(mk('playAnimation', { target: 'self', animation: 'open', wait: true, then: 'loop' }))).toEqual(['warning:wait-on-looping-clip'])
+  })
+})
+

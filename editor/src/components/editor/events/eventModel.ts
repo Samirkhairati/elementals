@@ -242,9 +242,27 @@ export function buildSummaryContext(env: Pick<EventEnv, 'switches' | 'variables'
   }
 }
 
-export function buildValidationContext(env: Pick<EventEnv, 'switches' | 'variables' | 'maps' | 'sprites' | 'entities'> & { stages?: EventEnv['stages']; commonEvents?: EventEnv['commonEvents'] }): ValidationContext {
+type ValidationEnv = Pick<EventEnv, 'switches' | 'variables' | 'maps' | 'sprites' | 'entities'> & Partial<Pick<EventEnv, 'stages' | 'commonEvents' | 'characterClips' | 'entityCharacters' | 'entityId'>>
+
+/** `states`: the states of the event being checked; their appearances are sprites `self` can show. */
+export function buildValidationContext(env: ValidationEnv, states: readonly EventState[] = []): ValidationContext {
   const stages = env.stages ?? []
+  const clips = env.characterClips
+  const self = [env.entityId ? env.entityCharacters?.[env.entityId] : undefined, ...states.map((s) => s.appearance?.asset)].filter((a): a is string => typeof a === 'string' && a !== '')
   return {
+    // Without a clip lookup (tests, hosts that have none) animation names are not checked.
+    ...(clips
+      ? {
+          characterClips: Object.fromEntries(
+            env.sprites.flatMap((s) => {
+              const list = clips(s.id)
+              return list ? [[s.id, Object.fromEntries(list.map((c) => [c.id, { loop: c.loop }]))]] : []
+            }),
+          ),
+          selfCharacters: [...new Set(self)],
+          entityCharacters: env.entityCharacters ?? {},
+        }
+      : {}),
     switchIds: env.switches.map((s) => s.id),
     variableIds: env.variables.map((v) => v.id),
     stageIds: stages.map((s) => s.id),

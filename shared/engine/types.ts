@@ -231,6 +231,8 @@ export type FieldKind =
   | 'select'
   | 'color'
   | 'sprite' // asset picker
+  | 'character' // a character of the database (the picker of `changeSprite`)
+  | 'clip' // an animation (clip) of a character: of `characterKey`'s param, else of the command's `target`
   | 'facing' // 4-way picker
   | 'map' // map picker
   | 'switch' // global switch picker
@@ -270,6 +272,8 @@ export interface FieldDef {
   multiple?: boolean;
   /** `stageValue` fields: the param holding the stage id whose values are offered. */
   stageKey?: string;
+  /** `clip` fields: the param holding the character whose clips are offered (default: the character of the command's `target`). */
+  characterKey?: string;
 }
 
 /** Props of every component type, by name. */
@@ -389,6 +393,12 @@ export interface ValidationContext {
   /** Size in tiles of each map id, so a warp to a tile outside the map can be reported. */
   mapSizes?: Record<string, { width: number; height: number }>;
   spriteIds?: string[];
+  /** Animations of every known character by id: which exist and whether they repeat forever. */
+  characterClips?: Record<string, Record<string, { loop: boolean }>>;
+  /** Characters the event's own entity can show (its Sprite, state appearances ...); `self` clips are checked against them. */
+  selfCharacters?: string[];
+  /** Character (Sprite asset) of other entities by editor id, for `{ entity: id }` targets. */
+  entityCharacters?: Record<string, string>;
   /** Editor ids of entities (for `{ entity: id }` targets). */
   entityIds?: string[];
 }

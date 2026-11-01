@@ -31,7 +31,7 @@ export function NewCharacterWizard({ data, open, onOpenChange, onCreated }: Prop
   const grid = graphic ? suggestGrid(preset, graphic.width, graphic.height) : null
   const folder = PRESET_FOLDERS[preset]
   const id = idEdit ?? `${folder}/${slugify(name, 'new')}`
-  const idError = useMemo(() => (!isValidCharacterId(id) ? 'Use letters, digits, “-”, “_” and “/”.' : characters[id] ? 'A character with this id already exists.' : ''), [id, characters])
+  const idError = useMemo(() => (!isValidCharacterId(id) ? 'Use letters, digits, “-”, “_” and “/”.' : characters[id] ? 'A sprite with this id already exists.' : ''), [id, characters])
 
   const create = async () => {
     if (!graphic) return
@@ -46,11 +46,11 @@ export function NewCharacterWizard({ data, open, onOpenChange, onCreated }: Prop
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg gap-4" aria-describedby="new-character-desc">
         <DialogHeader className="text-left">
-          <DialogTitle>New character</DialogTitle>
+          <DialogTitle>New sprite</DialogTitle>
           <DialogDescription id="new-character-desc" className="ed-hint">Pick a picture, say what it is and give it a name. You can change everything afterwards.</DialogDescription>
         </DialogHeader>
 
-        <Field label="Picture" stack info="The picture file this character is cut from. Images live in Graphics (import new ones there).">
+        <Field label="Picture" stack info="The picture file this sprite is cut from. Images live in Graphics (import new ones there).">
           <Select aria-label="Picture" value={image} placeholder="Choose a graphic…" options={graphics.map((g) => ({ value: g.id, label: `${g.id} (${g.width}×${g.height})` }))} onChange={setImage} />
         </Field>
         {graphic && (
@@ -75,7 +75,7 @@ export function NewCharacterWizard({ data, open, onOpenChange, onCreated }: Prop
           <Field label="Name" stack>
             <TextField aria-label="Name" value={name} onCommit={setName} placeholder="Old man" />
           </Field>
-          <Field label="Id" stack info="The permanent name maps and events use to refer to this character.">
+          <Field label="Id" stack info="The permanent name maps and events use to refer to this sprite.">
             <TextField aria-label="Id" value={id} onCommit={setIdEdit} />
           </Field>
         </div>

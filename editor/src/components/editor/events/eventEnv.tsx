@@ -28,6 +28,10 @@ export interface EventEnv {
   /** Creates a global stage (with two default values) and returns its id. */
   addStage: (name: string) => string
   getSpriteAsset: (id: string) => SpriteAssetInfo | undefined
+  /** Animations of a sprite (character) with whether they repeat; undefined when the sprite is unknown or the host has none. */
+  characterClips?: (id: string) => { id: string; loop: boolean }[] | undefined
+  /** Sprite of each entity of the active map by editor id (the owner included). */
+  entityCharacters?: Record<string, string>
   /** Editor-wide undo/redo (the dialog is modal, so it offers its own buttons). */
   undo?: () => void
   redo?: () => void
@@ -64,6 +68,7 @@ const selectEnvInputs = (c: EditorContextValue) => ({
   commonEvents: c.commonEvents,
   spriteList: c.spriteList,
   getSpriteAsset: c.getSpriteAsset,
+  getCharacter: c.getCharacter,
   addSwitch: c.addSwitch,
   addVariable: c.addVariable,
   addStage: c.addStage,
@@ -101,6 +106,11 @@ function ContextBackedEnv({ entityId, children }: { entityId: string; children: 
       addVariable: (name) => c.addVariable(name),
       addStage: (name) => c.addStage(name),
       getSpriteAsset: (id) => c.getSpriteAsset(id),
+      characterClips: (id) => {
+        const def = c.getCharacter(id)?.def
+        return def ? Object.entries(def.clips).map(([clip, d]) => ({ id: clip, loop: d.loop })) : undefined
+      },
+      entityCharacters: Object.fromEntries(c.entities.flatMap((e) => (typeof e.components.Sprite?.asset === 'string' && e.components.Sprite.asset ? [[e.id, e.components.Sprite.asset as string]] : []))),
       undo: c.handleUndo,
       redo: c.handleRedo,
       canUndo: c.historyIndex > 0,

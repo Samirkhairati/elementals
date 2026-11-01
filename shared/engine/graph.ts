@@ -446,6 +446,10 @@ export function validateGraph(graph: unknown, ctx: ValidationContext = {}): Grap
   if (starts.length === 0) add('', 'error', 'no-start', 'The graph has no Start node');
   for (const extra of starts.slice(1)) add(extra.id, 'error', 'multiple-start', 'The graph has more than one Start node');
 
+  // `self` can show more than its Sprite: a Change Sprite of this event swaps the character, so its clips count too.
+  const swapped = valid.flatMap((n) => (n.type === 'changeSprite' && isRecord(n.params) && (n.params.target ?? 'self') === 'self' && typeof n.params.asset === 'string' && n.params.asset !== '' ? [n.params.asset] : []));
+  const nodeCtx: ValidationContext = swapped.length > 0 ? { ...ctx, selfCharacters: [...new Set([...(ctx.selfCharacters ?? []), ...swapped])] } : ctx;
+
   for (const node of valid) {
     const params = isRecord(node.params) ? node.params : {};
     if (isStructural(node.type)) {
@@ -453,7 +457,7 @@ export function validateGraph(graph: unknown, ctx: ValidationContext = {}): Grap
     } else if (TREE_ONLY_TYPES.includes(node.type)) {
       add(node.id, 'error', 'legacy-flow-node', `"${node.type}" cannot be used in a graph (use a wire back for loops, End instead of Exit Event)`);
     } else {
-      validateCommandParams({ type: node.type, params: node.params }, ctx, (severity, code, message) => add(node.id, severity, code, message));
+      validateCommandParams({ type: node.type, params: node.params }, nodeCtx, (severity, code, message) => add(node.id, severity, code, message));
     }
 
     const offered = new Set(getPortDefs({ type: node.type, params }).map((p) => p.id));

@@ -53,7 +53,7 @@ export function CharacterActions({ data, id, mode, onClose, onDone }: Props) {
           <>
             <DialogHeader className="text-left">
               <DialogTitle>Rename “{id}”</DialogTitle>
-              <DialogDescription id="character-action-desc">Maps and events refer to a character by id. Renaming updates every place it is used.</DialogDescription>
+              <DialogDescription id="character-action-desc">Maps and events refer to a sprite by id. Renaming updates every place it is used.</DialogDescription>
             </DialogHeader>
             <TextField aria-label="New id" value={to} onCommit={setTo} />
             {plan.problem && <p role="alert" className="text-destructive">{plan.problem}</p>}
@@ -71,13 +71,13 @@ export function CharacterActions({ data, id, mode, onClose, onDone }: Props) {
           <>
             <DialogHeader className="text-left">
               <DialogTitle>Delete “{id}”?</DialogTitle>
-              <DialogDescription id="character-action-desc">{guard.allowed ? 'Nothing uses this character. The record is removed; its graphics stay in the library.' : 'Something still uses this character, so it cannot be deleted.'}</DialogDescription>
+              <DialogDescription id="character-action-desc">{guard.allowed ? 'Nothing uses this sprite. The record is removed; its graphics stay in the library.' : 'Something still uses this sprite, so it cannot be deleted.'}</DialogDescription>
             </DialogHeader>
             {!guard.allowed && (
               <div data-testid="delete-blocked" className="text-ed-label">
                 <p>{summarize(guard.references)}:</p>
                 <ul className="max-h-40 overflow-auto">{guard.references.map((r, i) => <li key={i}>{r.label}</li>)}</ul>
-                <p className="ed-hint">Change those first, or rename the character instead.</p>
+                <p className="ed-hint">Change those first, or rename the sprite instead.</p>
               </div>
             )}
             {error && <p role="alert" className="text-destructive">{error}</p>}

@@ -15,7 +15,7 @@ export function CharactersBrowser({ data, query, selected, onSelect, mode }: Tab
   const sizes = useMemo(() => Object.fromEntries(graphics.map((g) => [g.id, { width: g.width, height: g.height }])), [graphics])
   const q = query.trim().toLowerCase()
   const list = Object.values(characters).filter((c) => !q || c.id.toLowerCase().includes(q) || c.def.name.toLowerCase().includes(q) || c.def.tags.some((t) => t.toLowerCase().includes(q))).sort((a, b) => (a.id < b.id ? -1 : 1))
-  if (list.length === 0) return <p className="ed-hint p-3">No characters{q ? ` match “${query}”` : ' yet'}.</p>
+  if (list.length === 0) return <p className="ed-hint p-3">No sprites{q ? ` match “${query}”` : ' yet'}.</p>
   const used = data.refs.counts('character')
   // Characters, objects and animated props each get their own section.
   const groups = KIND_ORDER.map((k) => ({ folder: KIND_LABELS[k], items: list.filter((c) => characterKind(c.def) === k) })).filter((g) => g.items.length > 0)
@@ -43,7 +43,7 @@ export function CharactersBrowser({ data, query, selected, onSelect, mode }: Tab
                     <span className="truncate text-ed-label text-foreground">{c.def.name || c.id}</span>
                     <span className="ed-hint truncate">{c.id}</span>
                   </span>
-                  <span className="ed-hint" title="Places that use this character">{used[c.id] ?? 0}</span>
+                  <span className="ed-hint" title="Places that use this sprite">{used[c.id] ?? 0}</span>
                   {problem(c.id)}
                 </button>
               </li>
@@ -63,7 +63,7 @@ export function CharactersToolbar({ data, onSelect }: { data: DatabaseData; onSe
   const [open, setOpen] = useState(false)
   return (
     <div className="border-b border-border p-2">
-      <EdButton size="sm" onClick={() => setOpen(true)}><Plus /> New character…</EdButton>
+      <EdButton size="sm" onClick={() => setOpen(true)}><Plus /> New sprite…</EdButton>
       <NewCharacterWizard data={data} open={open} onOpenChange={setOpen} onCreated={onSelect} />
     </div>
   )

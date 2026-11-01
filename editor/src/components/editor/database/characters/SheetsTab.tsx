@@ -51,7 +51,7 @@ export function SheetsTab({ def, onChange, graphics, images = {} }: Props) {
         const users = sheetUsers(def, key)
         return (
           <Section key={key} title={key} summary={sheetSummary(sheet, size)} info="One picture and how it is cut into frames.">
-            <Field label="Image" info="The picture file this sheet is cut from. Images live in Graphics; you can pick one that other characters already use.">
+            <Field label="Image" info="The picture file this sheet is cut from. Images live in Graphics; you can pick one that other sprites already use.">
               <Select aria-label={`Image of ${key}`} className="w-auto min-w-[160px]" value={sheet.image} onChange={(v) => onChange(updateSheet(def, key, { image: v }))} options={[...(sizeOf(sheet.image) ? [] : [{ value: sheet.image, label: `${sheet.image} (missing)` }]), ...graphics.map((g) => ({ value: g.id }))]} />
             </Field>
             {size && images[sheet.image] && (
@@ -94,7 +94,7 @@ export function SheetsTab({ def, onChange, graphics, images = {} }: Props) {
               <FieldRow>
                 <span className="text-ed-label">Pivot override</span>
                 <PivotPicker value={sheet.pivot ?? def.pivot} onChange={(p) => onChange(updateSheet(def, key, { pivot: p }))} />
-                {sheet.pivot && <EdButton size="sm" onClick={() => onChange(updateSheet(def, key, { pivot: undefined }))}>Use the character’s</EdButton>}
+                {sheet.pivot && <EdButton size="sm" onClick={() => onChange(updateSheet(def, key, { pivot: undefined }))}>Use the sprite’s</EdButton>}
                 <InfoTip>Use a different pivot for animations on this sheet, for example when its frames are bigger than the others.</InfoTip>
               </FieldRow>
             </Section>

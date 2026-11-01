@@ -124,17 +124,17 @@ export function AnimationsTab({ def, onChange, images, sizes, clipCounts = {}, o
                 <Field label="Loop" info="On: the animation repeats forever. Off: it plays once and stops on its last frame.">
                   <Toggle aria-label="Loop" checked={clip.loop} onChange={(v) => run(() => updateClip(def, current, { loop: v }))} />
                 </Field>
-                <Field label="Directional" info="Turn on if this animation looks different when the character faces up, down, left or right. Leave off for things that look the same from every side, like a flower.">
+                <Field label="Directional" info="Turn on if this animation looks different when the sprite faces up, down, left or right. Leave off for things that look the same from every side, like a flower.">
                   <Toggle aria-label="Directional" checked={clip.directional} disabled={def.facing === 'none'} onChange={(v) => run(() => setDirectional(def, current, v))} />
                 </Field>
                 <Field label="FPS" info="Frames per second at normal speed. Higher is faster. Events and movement speed can speed it up or slow it down while the game runs.">
                   <SliderNumber label="FPS" value={clip.fps} min={1} max={60} step={1} onCommit={(v) => run(() => updateClip(def, current, { fps: Math.max(1, v) }))} />
                 </Field>
-                <Field label="Follow speed" info="Makes the animation play faster when the character moves faster, so feet don’t slide. “Reference speed” is the movement speed (px/s) at which this FPS looks right.">
+                <Field label="Follow speed" info="Makes the animation play faster when the sprite moves faster, so feet don’t slide. “Reference speed” is the movement speed (px/s) at which this FPS looks right.">
                   <Toggle aria-label="Follow movement speed" checked={!!clip.followSpeed} onChange={(v) => run(() => updateClip(def, current, { followSpeed: v ? { reference: 100 } : undefined }))} />
                 </Field>
                 {clip.followSpeed && (
-                  <Field label="Reference" info="The movement speed in pixels per second at which this animation’s FPS looks right. A character moving twice as fast plays it twice as fast.">
+                  <Field label="Reference" info="The movement speed in pixels per second at which this animation’s FPS looks right. A sprite moving twice as fast plays it twice as fast.">
                     <NumberField aria-label="Reference speed" size="sm" value={clip.followSpeed.reference} min={1} step={10} unit="px/s" onCommit={(v) => run(() => updateClip(def, current, { followSpeed: { reference: Math.max(1, v) } }))} />
                   </Field>
                 )}

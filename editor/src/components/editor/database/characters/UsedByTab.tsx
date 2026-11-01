@@ -18,7 +18,7 @@ export function UsedByTab({ data, id }: { data: DatabaseData; id: string }) {
         Animation
         <Select aria-label="Filter by animation" className="w-auto min-w-[120px]" value={clip} options={[{ value: '', label: 'all' }, ...Object.keys(def?.clips ?? {}).map((c) => ({ value: c, label: `${c} · ${clipCounts[c] ?? 0}` }))]} onChange={setClip} />
       </label>
-      {groups.length === 0 ? <p className="ed-hint">{clip ? `No map or event plays “${clip}”.` : 'Nothing uses this character yet.'}</p> : groups.map((g) => (
+      {groups.length === 0 ? <p className="ed-hint">{clip ? `No map or event plays “${clip}”.` : 'Nothing uses this sprite yet.'}</p> : groups.map((g) => (
         <section key={g.map || 'others'}>
           <h3 className="text-ed-label font-medium">{g.map || 'Prefabs'} </h3>
           <ul>

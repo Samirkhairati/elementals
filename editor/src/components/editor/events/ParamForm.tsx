@@ -9,7 +9,7 @@ import { getCommandDef, isFieldVisible } from '../../../../../shared/engine/comm
 import { ConditionsEditor } from './ConditionsEditor'
 import { ChoicesEditor, RouteEditor } from './RouteChoicesEditors'
 import { WarpTilePicker } from './WarpTilePicker'
-import { CommonEventPicker, FacingPicker, MapPicker, SpritePicker, StagePicker, StageValuePicker, SwitchPicker, TargetPicker, VariablePicker } from './pickers'
+import { ClipPicker, CommonEventPicker, FacingPicker, characterOfTarget, MapPicker, SpritePicker, StagePicker, StageValuePicker, SwitchPicker, TargetPicker, VariablePicker } from './pickers'
 import { CheckRow, DraftNumber, DraftText, DraftTextarea, FieldRow, IconButton, SmallButton, inputClass } from './primitives'
 import { useEventEnv } from './eventEnv'
 
@@ -107,6 +107,7 @@ function StageCasesEditor({ stageId, cases, onChange }: { stageId: string; cases
 }
 
 function FieldControl({ field, command, params, onPatch, id }: FieldControlProps) {
+  const env = useEventEnv()
   const def = getCommandDef(command.type)
   const raw = params[field.key] ?? def?.defaultParams[field.key]
   const set = (value: unknown) => onPatch({ [field.key]: value })
@@ -148,8 +149,11 @@ function FieldControl({ field, command, params, onPatch, id }: FieldControlProps
         </div>
       )
     }
+    case 'character':
     case 'sprite':
       return <SpritePicker id={id} value={asString(raw)} onChange={set} clearLabel={field.required ? undefined : 'No sprite'} />
+    case 'clip':
+      return <ClipPicker id={id} value={asString(raw)} onChange={set} optional={!field.required} characterId={field.characterKey ? asString(params[field.characterKey]) || undefined : characterOfTarget((params.target ?? 'self') as CommandTarget, env)} />
     case 'facing':
       return <FacingPicker id={id} value={asString(raw)} onChange={set} />
     case 'map':
@@ -231,7 +235,7 @@ export function ParamForm({ command, onPatch }: { command: Command; onPatch: Par
             </div>
           )
         }
-        const wide = ['textarea', 'route', 'choices', 'conditions', 'position', 'color', 'target', 'sprite', 'switch', 'variable', 'stage', 'stageValue', 'map', 'commonEvent'].includes(field.kind) || !!field.multiple
+        const wide = ['textarea', 'route', 'choices', 'conditions', 'position', 'color', 'target', 'sprite', 'character', 'clip', 'switch', 'variable', 'stage', 'stageValue', 'map', 'commonEvent'].includes(field.kind) || !!field.multiple
         return (
           <FieldRow key={field.key} label={field.label} help={field.help} required={field.required} unit={field.unit} inline={!wide && field.kind !== 'text' && field.kind !== 'select' && field.kind !== 'sound' && field.kind !== 'item'}>
             {(id) => <FieldControl field={field} command={command} params={params} onPatch={onPatch} id={id} />}

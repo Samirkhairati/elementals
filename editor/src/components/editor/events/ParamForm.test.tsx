@@ -19,7 +19,7 @@ describe('ParamForm: every FieldKind has a real control', () => {
   it('covers every kind used by the catalog', () => {
     const kinds = new Set<FieldKind>()
     for (const def of Object.values(COMMAND_CATALOG)) for (const f of def.params) kinds.add(f.kind)
-    const covered: FieldKind[] = ['number', 'text', 'textarea', 'boolean', 'select', 'color', 'sprite', 'facing', 'map', 'commonEvent', 'switch', 'variable', 'stage', 'stageValue', 'target', 'position', 'sound', 'item', 'route', 'choices', 'conditions']
+    const covered: FieldKind[] = ['number', 'text', 'textarea', 'boolean', 'select', 'color', 'sprite', 'character', 'clip', 'facing', 'map', 'commonEvent', 'switch', 'variable', 'stage', 'stageValue', 'target', 'position', 'sound', 'item', 'route', 'choices', 'conditions']
     expect([...kinds].filter((k) => !covered.includes(k))).toEqual([])
     // and no command renders raw JSON or crashes with its defaults
     for (const def of Object.values(COMMAND_CATALOG)) {
@@ -410,3 +410,50 @@ describe('ParamForm: every FieldKind has a real control', () => {
     expect(screen.getByText(/Unknown command type “mystery”/)).toBeInTheDocument()
   })
 })
+
+describe('ParamForm: animation (clip) picker', () => {
+  const clips = { 'objects/chest': [{ id: 'open', loop: false }, { id: 'idle', loop: true }], 'characters/hero': [{ id: 'wave', loop: false }] }
+  const withClips = () => makeEnv({ characterClips: (id: string) => (clips as Record<string, { id: string; loop: boolean }[]>)[id], entityCharacters: { 'self-1': 'objects/chest', e2: 'characters/hero' } })
+
+  it('Play Animation lists the animations of what the target shows and marks one-shot ones', () => {
+    const { onPatch } = setup(cmd('p', 'playAnimation', { target: 'self', animation: '' }), withClips())
+    const trigger = within(field('Animation')).getByRole('combobox')
+    fireEvent.click(trigger)
+    const list = within(document.body).getByRole('listbox')
+    expect([...list.querySelectorAll('[role="option"]')].map((o) => o.textContent)).toEqual(['Choose an animation…', 'open (plays once)', 'idle', 'Other name…'])
+    fireEvent.click(list.querySelector('[data-value="open"]') as HTMLElement)
+    expect(onPatch).toHaveBeenCalledWith({ animation: 'open' })
+  })
+
+  it('follows the target: another entity offers its own sprite\'s animations', () => {
+    setup(cmd('p', 'playAnimation', { target: { entity: 'e2' }, animation: '' }), withClips())
+    fireEvent.click(within(field('Animation')).getByRole('combobox'))
+    expect([...within(document.body).getByRole('listbox').querySelectorAll('[role="option"]')].map((o) => o.getAttribute('data-value'))).toEqual(['', 'wave', '__other__'])
+  })
+
+  it('Change Sprite offers the animations of the chosen sprite, none when the sprite is empty', () => {
+    const { onPatch } = setup(cmd('c', 'changeSprite', { target: 'self', asset: 'characters/hero', animation: '' }), withClips())
+    chooseOption(within(field('Animation')).getByRole('combobox'), 'wave')
+    expect(onPatch).toHaveBeenCalledWith({ animation: 'wave' })
+  })
+
+  it('is a free text box when the sprite is not known (the player, no sprite lists)', () => {
+    setup(cmd('p', 'playAnimation', { target: 'player', animation: 'cheer' }), withClips())
+    expect(within(field('Animation')).queryByRole('combobox')).toBeNull()
+    expect(within(field('Animation')).getByRole('textbox')).toHaveValue('cheer')
+  })
+
+  it('keeps a name the sprite does not list as text, with a way back to the list', () => {
+    const { onPatch } = setup(cmd('p', 'playAnimation', { target: 'self', animation: 'slam' }), withClips())
+    expect(within(field('Animation')).getByRole('textbox')).toHaveValue('slam')
+    fireEvent.click(within(field('Animation')).getByRole('button', { name: 'Pick from the list' }))
+    expect(onPatch).toHaveBeenCalledWith({ animation: '' })
+  })
+
+  it('"Other name…" switches the list to a text box', () => {
+    setup(cmd('p', 'playAnimation', { target: 'self', animation: '' }), withClips())
+    chooseOption(within(field('Animation')).getByRole('combobox'), '__other__')
+    expect(within(field('Animation')).getByRole('textbox')).toBeInTheDocument()
+  })
+})
+
