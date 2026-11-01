@@ -23,7 +23,7 @@ Options:
   --no-sync     Skip the asset sync (project/ -> game/public) that runs before the servers start.
   -h, --help    Show this help.
 
-Environment overrides (see AGENTS.md): PORT_OFFSET, GAME_PORT, PORT, WORKTREE_NAME.
+Environment overrides (see CLAUDE.md): PORT_OFFSET, GAME_PORT, PORT, WORKTREE_NAME.
 `;
 
 export function parseArgs(argv) {

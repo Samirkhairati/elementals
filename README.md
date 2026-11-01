@@ -44,7 +44,7 @@ Ports are `base + offset * 100`. The main checkout uses offset `0`; each linked 
 | `npm run dev:wt` (offset 1) | `5275` | `5274` |
 | `npm run dev:wt2` (offset 2) | `5375` | `5374` |
 
-Useful flags: `node scripts/dev.mjs --list` (show worktree, offset and ports), `--dry-run` (show commands/env), `--offset N`. Env overrides: `PORT_OFFSET`, `GAME_PORT`, `PORT`, `WORKTREE_NAME`. See [`AGENTS.md`](./AGENTS.md) for the full rules.
+Useful flags: `node scripts/dev.mjs --list` (show worktree, offset and ports), `--dry-run` (show commands/env), `--offset N`. Env overrides: `PORT_OFFSET`, `GAME_PORT`, `PORT`, `WORKTREE_NAME`. See [`CLAUDE.md`](./CLAUDE.md) for the full rules.
 
 ---
 
@@ -62,5 +62,5 @@ On macOS you can also double-click `wt.command`. For a short command from any te
 
 ## 📖 Additional Docs
 
-* See [`AGENTS.md`](./AGENTS.md) for multi-worktree guidelines and architecture details.
+* See [`CLAUDE.md`](./CLAUDE.md) for commands, architecture and conventions.
 * See [`editor/README.md`](./editor/README.md) for editor-specific instructions.

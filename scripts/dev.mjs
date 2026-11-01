@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Unified dev runner: game (Vite) + editor (Vite + Electron), worktree-aware.
-// See AGENTS.md ("Multi-worktree") for the port/offset rules.
+// See CLAUDE.md ("Worktrees and ports") for the port/offset rules.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { formatInstallProblems } from './lib/installs.mjs';
