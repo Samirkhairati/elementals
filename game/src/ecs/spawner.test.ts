@@ -9,6 +9,7 @@ import { EntityInfoComponent } from './components/EntityInfoComponent';
 import { SpriteComponent } from './components/SpriteComponent';
 import { AnimationComponent } from './components/AnimationComponent';
 import { testSprites, firstCommand } from '@/test/helpers';
+import { SpriteRegistry } from '@/data/spriteRegistry';
 import type { ExpandContext } from './expand';
 import { TagComponent } from './components/TagComponent';
 import { AIWanderComponent } from './components/AIWanderComponent';
@@ -173,11 +174,15 @@ describe('real map files', () => {
     expect(files.length).toBeGreaterThan(0);
   });
 
+  // The real maps use the real sprites (public/data/sprites.json), not the handful in the test fixture.
+  const realSprites = new SpriteRegistry();
+  realSprites.load(JSON.parse(readFileSync(new URL('../../public/data/sprites.json', import.meta.url), 'utf8')));
+
   it.each(files)('%s: entities (if any) hydrate with zero problems', (file) => {
     const data = JSON.parse(readFileSync(new URL(file, dir), 'utf8'));
     const w = new World();
     const problems0: string[] = [];
-    const { entities, problems } = hydrateMapEntities(w, data.entities, { sprites, warn: (m) => problems0.push(m) });
+    const { entities, problems } = hydrateMapEntities(w, data.entities, { sprites: realSprites, warn: (m) => problems0.push(m) });
     expect(problems).toEqual([]);
     expect(entities).toHaveLength(Array.isArray(data.entities) ? data.entities.length : 0);
   });
