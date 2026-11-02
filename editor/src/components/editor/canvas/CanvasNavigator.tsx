@@ -73,36 +73,14 @@ export const CanvasNavigator = React.memo(function CanvasNavigator({
   const fitted = sameView(view, fit)
 
   return (
-    <div
-      data-testid="canvas-navigator"
-      className="absolute right-3 top-3 z-40 flex max-w-[calc(100%-1.5rem)] flex-col items-end gap-2"
-      onMouseDown={(e) => e.stopPropagation()}
-      onContextMenu={(e) => e.stopPropagation()}
-    >
-      {open && (
-        <Minimap
-          view={view}
-          dimensions={dimensions}
-          mapWidth={mapWidth}
-          mapHeight={mapHeight}
-          layers={layers}
-          entities={entities}
-          images={images}
-          onCenter={viewport.panToWorld}
-        />
-      )}
-      <div className="flex flex-wrap items-center justify-end gap-1">
-        <button
-          type="button"
-          className="ed-btn"
-          aria-label={open ? 'Hide minimap' : 'Show minimap'}
-          aria-pressed={open}
-          title={open ? 'Hide the minimap' : 'Show the minimap'}
-          onClick={toggle}
-        >
-          <MapIcon />
-          {open ? <ChevronUp /> : <ChevronDown />}
-        </button>
+    <>
+      {/* Zoom bar bottom-left, minimap (and its show/hide button) bottom-right. */}
+      <div
+        data-testid="canvas-zoom"
+        className="absolute bottom-3 left-3 z-40 max-w-[calc(100%-6rem)]"
+        onMouseDown={(e) => e.stopPropagation()}
+        onContextMenu={(e) => e.stopPropagation()}
+      >
         <ZoomControls
           zoom={view.scale}
           minZoom={MIN_CANVAS_ZOOM}
@@ -116,7 +94,37 @@ export const CanvasNavigator = React.memo(function CanvasNavigator({
           fitLabel="Reset view (fit the whole map)"
         />
       </div>
-    </div>
+      <div
+        data-testid="canvas-navigator"
+        className="absolute bottom-3 right-3 z-40 flex flex-col items-end gap-2"
+        onMouseDown={(e) => e.stopPropagation()}
+        onContextMenu={(e) => e.stopPropagation()}
+      >
+        {open && (
+          <Minimap
+            view={view}
+            dimensions={dimensions}
+            mapWidth={mapWidth}
+            mapHeight={mapHeight}
+            layers={layers}
+            entities={entities}
+            images={images}
+            onCenter={viewport.panToWorld}
+          />
+        )}
+        <button
+          type="button"
+          className="ed-btn"
+          aria-label={open ? 'Hide minimap' : 'Show minimap'}
+          aria-pressed={open}
+          title={open ? 'Hide the minimap' : 'Show the minimap'}
+          onClick={toggle}
+        >
+          <MapIcon />
+          {open ? <ChevronUp /> : <ChevronDown />}
+        </button>
+      </div>
+    </>
   )
 })
 

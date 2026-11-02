@@ -257,7 +257,6 @@ const selectCanvas = (c: EditorContextValue) => ({
   setIsPainting: c.setIsPainting,
   paintStartPos: c.paintStartPos,
   setPaintStartPos: c.setPaintStartPos,
-  debugInfo: c.debugInfo,
   handlePaint: c.handlePaint,
   handlePaintBucket: c.handlePaintBucket,
   handleRectangleFill: c.handleRectangleFill,
@@ -351,7 +350,6 @@ export function CanvasWrapper(props: IDockviewPanelProps) {
         setIsPainting={isActive ? ctx.setIsPainting : noop}
         paintStartPos={isActive ? ctx.paintStartPos : null}
         setPaintStartPos={isActive ? ctx.setPaintStartPos : noop}
-        debugInfo={isActive ? ctx.debugInfo : null}
         handlePaint={isActive ? ctx.handlePaint : noop}
         handlePaintBucket={isActive ? ctx.handlePaintBucket : noop}
         handleRectangleFill={isActive ? ctx.handleRectangleFill : noop}

@@ -8,7 +8,6 @@ import {
   TileSelection,
   ActiveTool,
   PaintMode,
-  DebugInfo,
   Pos,
   EntityData,
   ComponentType,
@@ -23,7 +22,6 @@ import { KonvaEntities, type Visuals } from './konva/KonvaEntities'
 import { KonvaGhostEntity } from './konva/KonvaGhostEntity'
 import { KonvaGhostImage, KonvaImageItems } from './konva/KonvaImageItems'
 import { CanvasContextMenu } from './CanvasContextMenu'
-import { DebugStatusBadge } from './DebugStatusBadge'
 import { CanvasNavigator, type ViewportHandle } from './CanvasNavigator'
 import { PendingEntityPlacement } from '@/hooks/editor/useEntityPlacement'
 import { useCanvasView } from '@/hooks/editor/canvas/canvasView'
@@ -48,7 +46,6 @@ interface MapCanvasProps {
   setIsPainting: (v: boolean) => void
   paintStartPos: Pos | null
   setPaintStartPos: (v: Pos | null) => void
-  debugInfo: DebugInfo | null
   handlePaint: (x: number, y: number) => void
   handlePaintBucket: (x: number, y: number) => void
   handleRectangleFill: (start: Pos, end: Pos) => void
@@ -97,7 +94,6 @@ export function MapCanvas({
   setIsPainting,
   paintStartPos: _paintStartPos,
   setPaintStartPos,
-  debugInfo,
   handlePaint,
   handlePaintBucket,
   handleRectangleFill,
@@ -377,16 +373,6 @@ export function MapCanvas({
             images={images}
           />
         )}
-
-        {/* Floating debug status overlay */}
-        <DebugStatusBadge
-          activeTool={activeTool}
-          tileSelection={tileSelection}
-          activeLayerId={activeLayerId}
-          activeMap={activeMap}
-          isPainting={isPainting}
-          debugInfo={debugInfo}
-        />
       </div>
 
       <CanvasContextMenu
