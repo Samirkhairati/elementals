@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { execFile } from 'child_process';
 import { pathToFileURL } from 'url';
 import { errorMessage } from './result.js';
 
@@ -10,11 +11,31 @@ export interface AssetSyncSummary {
   skipped?: string;
 }
 
-interface SyncModule {
-  syncAssets: (opts: { projectDir: string; publicDir: string; write: boolean }) => {
-    plan: { errors: string[] };
-    applied: unknown[];
-  };
+const MARK = '@@assets-sync@@';
+
+// The script imports `shared/*.ts` directly, which needs the repo's Node 24 (it strips types itself). Electron's embedded
+// Node cannot ("Unknown file extension .ts"), so it runs in a child `node`.
+const RUNNER = `const m = await import(process.argv[1]);
+const r = m.syncAssets(JSON.parse(process.argv[2]));
+process.stdout.write('${MARK}' + JSON.stringify({ errors: r.plan.errors, applied: r.applied.length }));`;
+
+function runSync(script: string, options: { projectDir: string; publicDir: string; write: boolean }): Promise<{ errors: string[]; applied: number }> {
+  return new Promise((resolve, reject) => {
+    execFile(
+      'node',
+      ['--no-warnings', '--input-type=module', '-e', RUNNER, pathToFileURL(script).href, JSON.stringify(options)],
+      { timeout: 60_000, maxBuffer: 8 * 1024 * 1024, cwd: path.dirname(script) },
+      (error, stdout, stderr) => {
+        const at = stdout.lastIndexOf(MARK);
+        if (at >= 0) return resolve(JSON.parse(stdout.slice(at + MARK.length)));
+        const code = (error as NodeJS.ErrnoException | null)?.code;
+        if (code === 'ENOENT') return reject(new Error('Node.js (version 24) was not found on the PATH'));
+        const lines = stderr.split('\n').map((l) => l.trim()).filter(Boolean);
+        const reason = lines.find((l) => /^\w*Error\b/.test(l)) ?? lines[0] ?? error?.message ?? 'no result';
+        reject(new Error(reason));
+      }
+    );
+  });
 }
 
 /**
@@ -27,12 +48,11 @@ export async function syncGameAssets(projectDir: string, gameMapsDir: string): P
   const script = path.join(path.resolve(projectDir), '..', 'scripts', 'lib', 'assets.mjs');
   if (!fs.existsSync(script)) return { written: 0, skipped: 'no asset sync script next to the project' };
   try {
-    const mod = (await import(/* @vite-ignore */ pathToFileURL(script).href)) as SyncModule;
     // <public>/data/maps -> <public>
     const publicDir = path.resolve(gameMapsDir, '..', '..');
-    const result = mod.syncAssets({ projectDir: path.resolve(projectDir), publicDir, write: true });
-    if (result.plan.errors.length > 0) return { written: 0, skipped: `asset sync found problems: ${result.plan.errors[0]}` };
-    return { written: result.applied.length };
+    const result = await runSync(script, { projectDir: path.resolve(projectDir), publicDir, write: true });
+    if (result.errors.length > 0) return { written: 0, skipped: `asset sync found problems: ${result.errors[0]}` };
+    return { written: result.applied };
   } catch (e) {
     return { written: 0, skipped: `asset sync failed: ${errorMessage(e)}` };
   }
