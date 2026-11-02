@@ -24,14 +24,6 @@ export function useEditorDialogs(options: UseEditorDialogsOptions) {
   } = options
 
   // Dialog open/data states
-  const [importDialog, setImportDialog] = useState<{
-    open: boolean
-    sourcePath?: string
-    defaultName?: string
-    targetFolder?: string | null
-  }>({ open: false })
-  const [nameInput, setNameInput] = useState('')
-
   const [renameDialog, setRenameDialog] = useState<{
     open: boolean
     type: 'folder' | 'map-folder' | 'map' | 'layer'
@@ -59,30 +51,6 @@ export function useEditorDialogs(options: UseEditorDialogsOptions) {
     description: string
     action: () => void
   }>({ open: false, title: '', description: '', action: () => {} })
-
-  // ── Tileset Import Confirmation ───────────────────────────────────────────
-  const handleConfirmImport = useCallback(async () => {
-    const cleanName = nameInput.trim()
-    if (!cleanName) {
-      alert('Tileset name cannot be empty')
-      return
-    }
-    if (!window.electronAPI || !importDialog.sourcePath) return
-    const res = await window.electronAPI.importTileset(
-      importDialog.sourcePath,
-      cleanName,
-      importDialog.targetFolder || null
-    )
-    if (res.success) {
-      if (importDialog.targetFolder) {
-        setExpandedFolders(prev => new Set(prev).add(importDialog.targetFolder!))
-      }
-      setImportDialog({ open: false })
-      loadData()
-    } else {
-      alert('Import failed: ' + res.error)
-    }
-  }, [nameInput, importDialog, setExpandedFolders, loadData])
 
   // ── Universal Rename Confirmation ─────────────────────────────────────────
   const handleConfirmRename = useCallback(async () => {
@@ -177,11 +145,6 @@ export function useEditorDialogs(options: UseEditorDialogsOptions) {
   }, [createMapData, createMapDialog, setExpandedMapFolders, loadData, onMapCreated])
 
   return {
-    importDialog,
-    setImportDialog,
-    nameInput,
-    setNameInput,
-    handleConfirmImport,
     renameDialog,
     setRenameDialog,
     renameInput,

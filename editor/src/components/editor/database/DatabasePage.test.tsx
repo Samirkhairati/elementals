@@ -155,13 +155,13 @@ describe('Graphics', () => {
     expect(within(pane).getByLabelText('Search')).toHaveValue('')
   })
 
-  it('shows size, where it is used and offers rename, move and delete', async () => {
+  it('shows size, where it is used and offers rename and delete', async () => {
     renderAt('/database?table=graphics&id=props/chest.png')
     const detail = await screen.findByTestId('graphic-detail')
     expect(within(detail).getByText(/64×32 px · 2\.0 KB/)).toBeInTheDocument()
     expect(within(detail).getByText('Chest › sheet sheet')).toBeInTheDocument() // the sprite that is cut from it
     expect(within(detail).getByText('Town › Chest › Sprite')).toBeInTheDocument() // where that sprite ends up
-    expect(within(detail).getByRole('button', { name: /Rename \/ move/ })).toBeEnabled()
+    expect(within(detail).getByRole('button', { name: 'Rename…' })).toBeEnabled()
     expect(within(detail).getByRole('button', { name: 'Delete' })).toBeEnabled()
     expect(within(detail).getByRole('img', { name: 'props/chest.png' })).toBeInTheDocument()
   })
@@ -230,7 +230,7 @@ describe('Graphics', () => {
 
   it('renaming rewrites the sprites that use it, after moving the file, and previews what changes', async () => {
     renderAt('/database?table=graphics&id=props/chest.png')
-    fireEvent.click(await screen.findByRole('button', { name: /Rename \/ move/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Rename…' }))
     const dialog = await screen.findByRole('dialog')
     fireEvent.change(within(dialog).getByLabelText('Picture name'), { target: { value: 'crate' } })
     expect(within(dialog).getByTestId('change-preview')).toHaveTextContent('1 reference in 1 sprite')
@@ -245,7 +245,7 @@ describe('Graphics', () => {
 
   it('refuses an id that is taken', async () => {
     renderAt('/database?table=graphics&id=props/chest.png')
-    fireEvent.click(await screen.findByRole('button', { name: /Rename \/ move/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Rename…' }))
     const dialog = await screen.findByRole('dialog')
     fireEvent.change(within(dialog).getByLabelText('Picture name'), { target: { value: 'orphan' } })
     expect(within(dialog).getByRole('alert')).toHaveTextContent('already exists')
@@ -330,7 +330,7 @@ describe('Tilesets', () => {
 
   it('renaming the file rewrites the tiles in every map that paints with it', async () => {
     renderAt('/database?table=tilesets&id=grass.png')
-    fireEvent.click(await screen.findByRole('button', { name: /Rename \/ move/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Rename…' }))
     const dialog = await screen.findByRole('dialog')
     fireEvent.change(within(dialog).getByLabelText('Tileset file name'), { target: { value: 'meadow' } })
     expect(within(dialog).getByTestId('change-preview')).toHaveTextContent('1 reference in 1 map')
@@ -340,13 +340,16 @@ describe('Tilesets', () => {
     expect(calls).toContainEqual(['renameTilesetFile', null, 'grass.png', 'meadow'])
   })
 
-  it('moving to a folder only moves the file: maps keep working', async () => {
-    renderAt('/database?table=tilesets&id=grass.png')
-    fireEvent.click(await screen.findByRole('button', { name: /Rename \/ move/ }))
-    const dialog = await screen.findByRole('dialog')
-    chooseOption(within(dialog).getByRole('combobox', { name: 'Folder' }), 'Outside')
-    expect(within(dialog).getByText(/Nothing else needs to change/)).toBeInTheDocument()
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Save & update' }))
+  it('dragging a tileset onto a folder only moves the file: maps keep working', async () => {
+    renderAt('/database?table=tilesets')
+    const tree = await screen.findByRole('tree')
+    const grass = within(tree).getByText('grass').closest('button') as HTMLElement
+    const row = within(tree).getByRole('treeitem', { name: 'Outside' }).querySelector('.ed-row') as HTMLElement
+    const data = new Map<string, string>()
+    const dataTransfer = { setData: (k: string, v: string) => data.set(k, v), getData: (k: string) => data.get(k) ?? '', effectAllowed: '', dropEffect: '' }
+    fireEvent.dragStart(grass, { dataTransfer })
+    fireEvent.dragOver(row, { dataTransfer })
+    fireEvent.drop(row, { dataTransfer })
     await waitFor(() => expect(calls).toContainEqual(['moveTileset', 'grass.png', null, 'Outside']))
     expect(calls.some((c) => c[0] === 'saveMap')).toBe(false)
   })

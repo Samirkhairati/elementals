@@ -1,30 +1,17 @@
 import React from 'react';
-import { Plus, Database } from 'lucide-react';
-import { useEditorSelector, type EditorContextValue } from '../EditorContext';
+import { Database } from 'lucide-react';
 
-const selectTilesetActions = (c: EditorContextValue) => ({
-  handlePickFile: c.handlePickFile,
-});
-
-/** Tileset panel header: add a new tileset; renaming and organising them lives in the Database. */
+/** Tileset panel header: tilesets are imported, renamed and organised in the Database; here you only pick them. */
 export function TilesetsActions() {
-  const ctx = useEditorSelector(selectTilesetActions);
   return (
-    <div className="flex items-center space-x-1 px-2">
+    <div className="flex items-center px-2">
       <a
         href="#/database?table=tilesets"
-        className="p-1.5 hover:bg-sidebar-accent rounded-md text-sidebar-foreground transition-colors"
-        title="Rename, move and organise tilesets in the Database"
-        aria-label="Manage tilesets in the Database"
+        className="flex items-center gap-1 text-xs font-medium text-sidebar-foreground hover:bg-sidebar-accent px-2 py-1.5 rounded-md transition-colors"
+        title="Import, rename and organise tilesets in the Database"
       >
-        <Database className="w-4 h-4" />
+        <Database className="w-3.5 h-3.5" /> Manage
       </a>
-      <button
-        onClick={() => ctx.handlePickFile(null)}
-        className="flex items-center gap-1 text-xs font-medium bg-primary text-primary-foreground px-3 py-1.5 rounded-md hover:opacity-90 transition-opacity shadow-sm"
-      >
-        <Plus className="w-3.5 h-3.5" /> Add
-      </button>
     </div>
   );
 }

@@ -1,17 +1,10 @@
 import React from 'react'
-import { ImportTilesetDialog } from '@/components/editor/dialogs/ImportTilesetDialog'
 import { RenameDialog } from '@/components/editor/dialogs/RenameDialog'
 import { ConfirmDialog } from '@/components/editor/dialogs/ConfirmDialog'
 import { CreateMapFolderDialog } from '@/components/editor/dialogs/CreateMapFolderDialog'
 import { CreateMapDialog } from '@/components/editor/dialogs/CreateMapDialog'
 
 interface EditorDialogsProps {
-  importDialog: { open: boolean; sourcePath?: string; defaultName?: string; targetFolder?: string | null }
-  setImportDialog: React.Dispatch<React.SetStateAction<{ open: boolean; sourcePath?: string; defaultName?: string; targetFolder?: string | null }>>
-  nameInput: string
-  setNameInput: (v: string) => void
-  handleConfirmImport: () => void
-
   renameDialog: { open: boolean; type: 'folder' | 'map-folder' | 'map' | 'layer'; oldPath?: string; oldName?: string; targetFolder?: string | null }
   setRenameDialog: React.Dispatch<React.SetStateAction<{ open: boolean; type: 'folder' | 'map-folder' | 'map' | 'layer'; oldPath?: string; oldName?: string; targetFolder?: string | null }>>
   renameInput: string
@@ -35,11 +28,6 @@ interface EditorDialogsProps {
 }
 
 export function EditorDialogs({
-  importDialog,
-  setImportDialog,
-  nameInput,
-  setNameInput,
-  handleConfirmImport,
   renameDialog,
   setRenameDialog,
   renameInput,
@@ -60,13 +48,6 @@ export function EditorDialogs({
 }: EditorDialogsProps) {
   return (
     <>
-      <ImportTilesetDialog
-        open={importDialog.open}
-        nameInput={nameInput}
-        setNameInput={setNameInput}
-        onClose={() => setImportDialog({ open: false })}
-        onConfirm={handleConfirmImport}
-      />
       <RenameDialog
         open={renameDialog.open}
         type={renameDialog.type}

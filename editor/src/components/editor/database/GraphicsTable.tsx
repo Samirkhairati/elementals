@@ -1,11 +1,10 @@
 import { useMemo, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { Copy, FolderPlus, Pencil, Trash2, Upload } from 'lucide-react'
-import { canMoveFolder, folderOfId, graphicDeleteGuard, joinId, leafOfId } from '@/lib/assetOps'
+import { folderOfId, graphicDeleteGuard, joinId, leafOfId } from '@/lib/assetOps'
 import { formatBytes, defaultGraphicId } from '@/lib/databaseModel'
 import { graphicUsage } from '@/lib/databaseModel'
 import type { LibraryItem } from '@/lib/libraryTree'
-import { Select } from '../ui/fields'
 import { Badge, EdButton, Field, InfoTip } from '../ui/controls'
 import { ImageThumb } from './browse'
 import { ImageViewer, type SheetCut } from './ImageViewer'
@@ -15,10 +14,6 @@ import { ReferencesSection } from './ReferencesSection'
 import { FOLDER_NAME, graphicActions, type Outcome } from './graphicActions'
 import type { DatabaseData } from './useDatabaseData'
 import type { TableProps } from './shared'
-
-const TOP = '(top level)'
-const folderOptions = (folders: string[], exclude?: string) => [{ value: TOP, label: 'Top level' }, ...folders.filter((f) => !exclude || canMoveFolder(exclude, f) || f === folderOfId(exclude)).map((f) => ({ value: f }))]
-const toFolder = (v: string): string => (v === TOP ? '' : v)
 
 /** A line that says what the last action did (or why it failed). */
 function StatusLine({ outcome }: { outcome: Outcome | null }) {
@@ -93,22 +88,20 @@ function NewFolder({ parent, actions, onDone, onClose }: { parent: string; actio
 
 function ChangeFolder({ folder, actions, onDone, onClose }: { folder: string; actions: ReturnType<typeof graphicActions>; onDone: (o: Outcome, newPath: string) => void; onClose: () => void }) {
   const [name, setName] = useState(leafOfId(folder))
-  const [parent, setParent] = useState(folderOfId(folder) || TOP)
-  const next = joinId(toFolder(parent), name)
+  const next = joinId(folderOfId(folder), name)
   const valid = FOLDER_NAME.test(name)
   const plan = next === folder ? { ...actions.plan([]), ok: false } : valid ? (actions.folders.includes(next) && next !== folder ? { ...actions.planFolder(folder, next), ok: false, problem: `A folder called “${next}” already exists.` } : actions.planFolder(folder, next)) : { ...actions.plan([]), ok: false, problem: 'Use letters, digits, “-” and “_” in the name.' }
   return (
     <ChangeDialog
       open
-      title={`Rename or move folder “${folder}”`}
-      description="Every picture inside gets a new id. Sprites and maps that use them are updated for you."
+      title={`Rename folder “${folder}”`}
+      description="Every picture inside gets a new id. Sprites and maps that use them are updated for you. To move the folder, drag it onto another folder."
       plan={plan}
       confirmLabel="Rename & update"
       onConfirm={async () => { const r = await actions.changeFolder(folder, next); onDone(r, next); return r.error }}
       onClose={onClose}
     >
       <Field label="Name" stack><input className="ed-input" aria-label="Folder name" value={name} onChange={(e) => setName(e.target.value)} /></Field>
-      <Field label="Inside" stack><Select aria-label="Inside folder" value={parent} options={folderOptions(actions.folders, folder)} onChange={setParent} /></Field>
     </ChangeDialog>
   )
 }
@@ -159,7 +152,7 @@ export function GraphicDetail({ data, id, onSelect }: { data: DatabaseData; id: 
         </button>
         <code className="ed-hint">{copied ? 'copied' : id}</code>
         <span className="ml-auto flex items-center gap-2">
-          <EdButton size="sm" onClick={() => setDialog('change')}><Pencil /> Rename / move…</EdButton>
+          <EdButton size="sm" onClick={() => setDialog('change')}><Pencil /> Rename…</EdButton>
           <EdButton size="sm" variant="danger" onClick={() => setDialog('delete')}><Trash2 /> Delete</EdButton>
         </span>
       </div>
@@ -201,22 +194,21 @@ export function GraphicDetail({ data, id, onSelect }: { data: DatabaseData; id: 
 function ChangeGraphic({ id, data, actions, onDone, onClose }: { id: string; data: DatabaseData; actions: ReturnType<typeof graphicActions>; onDone: (o: Outcome, newId: string) => void; onClose: () => void }) {
   void data
   const [name, setName] = useState(leafOfId(id).replace(/\.png$/i, ''))
-  const [folder, setFolder] = useState(folderOfId(id) || TOP)
-  const next = joinId(toFolder(folder), `${name}.png`)
+  // Moving is done by dragging in the list; this only changes the name.
+  const next = joinId(folderOfId(id), `${name}.png`)
   // Nothing typed yet: the button stays off without scolding.
   const plan = next === id ? { ...actions.plan([]), ok: false } : actions.plan([{ from: id, to: next }])
   return (
     <ChangeDialog
       open
-      title={`Rename or move “${id}”`}
-      description="Sprites and maps that use this picture are updated for you."
+      title={`Rename “${id}”`}
+      description="Sprites and maps that use this picture are updated for you. To move it, drag it onto a folder in the list."
       plan={plan}
       confirmLabel="Rename & update"
       onConfirm={async () => { const r = await actions.rename(id, next); onDone(r, next); return r.error }}
       onClose={onClose}
     >
       <Field label="Name" stack><input className="ed-input" aria-label="Picture name" value={name} onChange={(e) => setName(e.target.value)} /></Field>
-      <Field label="Folder" stack><Select aria-label="Folder" value={folder} options={folderOptions(actions.folders)} onChange={setFolder} /></Field>
       <p className="ed-hint">New id: <code>{next}</code></p>
     </ChangeDialog>
   )

@@ -4,7 +4,6 @@ import { folderOfId, joinId, leafOfId } from '@/lib/assetOps'
 import type { LibraryItem } from '@/lib/libraryTree'
 import { tilesetGrid } from '@/lib/databaseModel'
 import { TILE_SIZE } from '../../../../../shared/engine/constants'
-import { Select } from '../ui/fields'
 import { Badge, EdButton, Field, InfoTip } from '../ui/controls'
 import { ImageThumb } from './browse'
 import { ImageViewer } from './ImageViewer'
@@ -16,9 +15,6 @@ import { folderOfTileset, stemOf, tilesetActions, type TilesetActions } from './
 import type { DatabaseData } from './useDatabaseData'
 import type { TableProps } from './shared'
 
-const TOP = '(top level)'
-const toFolder = (v: string): string => (v === TOP ? '' : v)
-const folderOptions = (folders: string[], exclude?: string) => [{ value: TOP, label: 'Top level' }, ...folders.filter((f) => !exclude || (f !== exclude && !f.startsWith(`${exclude}/`))).map((f) => ({ value: f }))]
 const FILE_STEM = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/
 
 type FolderDialog = { kind: 'new'; parent: string } | { kind: 'change'; folder: string } | { kind: 'delete'; folder: string } | null
@@ -87,21 +83,19 @@ function NewTilesetFolder({ parent, actions, onDone, onClose }: { parent: string
 
 function ChangeTilesetFolder({ folder, actions, onDone, onClose }: { folder: string; actions: TilesetActions; onDone: (o: Outcome) => void; onClose: () => void }) {
   const [name, setName] = useState(leafOfId(folder))
-  const [parent, setParent] = useState(folderOfId(folder) || TOP)
-  const next = joinId(toFolder(parent), name)
+  const next = joinId(folderOfId(folder), name)
   const problem = !FOLDER_NAME.test(name) ? 'Use letters, digits, “-” and “_” in the name.' : next === folder ? '' : actions.folders.includes(next) ? `A folder called “${next}” already exists.` : ''
   return (
     <ChangeDialog
       open
-      title={`Rename or move folder “${folder}”`}
-      description="The tilesets inside keep their file names, so no map changes."
+      title={`Rename folder “${folder}”`}
+      description="The tilesets inside keep their file names, so no map changes. To move the folder, drag it onto another folder."
       plan={{ ok: !problem && next !== folder, problem, changes: [], references: [], characters: [], maps: [] }}
       confirmLabel="Rename"
       onConfirm={async () => { const r = await actions.changeFolder(folder, next); onDone(r); return r.error }}
       onClose={onClose}
     >
       <Field label="Name" stack><input className="ed-input" aria-label="Folder name" value={name} onChange={(e) => setName(e.target.value)} /></Field>
-      <Field label="Inside" stack><Select aria-label="Inside folder" value={parent} options={folderOptions(actions.folders, folder)} onChange={setParent} /></Field>
     </ChangeDialog>
   )
 }
@@ -140,7 +134,7 @@ export function TilesetDetail({ data, id, onSelect }: { data: DatabaseData; id: 
         {size && grid && <span className="ed-hint">{size.w}×{size.h} px · {TILE_SIZE}px tiles · {grid.columns}×{grid.rows} = {grid.count} tiles</span>}
         <code className="ed-hint">{tileset.fileName}</code>
         <span className="ml-auto flex items-center gap-2">
-          <EdButton size="sm" onClick={() => setDialog('edit')}><Pencil /> Rename / move…</EdButton>
+          <EdButton size="sm" onClick={() => setDialog('edit')}><Pencil /> Rename…</EdButton>
           <EdButton size="sm" variant="danger" onClick={() => setDialog('delete')}><Trash2 /> Delete</EdButton>
         </span>
       </div>
@@ -171,17 +165,16 @@ export function TilesetDetail({ data, id, onSelect }: { data: DatabaseData; id: 
 function EditTileset({ tileset, actions, onDone, onClose }: { tileset: DatabaseData['tilesets'][number]; actions: TilesetActions; onDone: (o: Outcome, newId: string) => void; onClose: () => void }) {
   const [typedName, setTypedName] = useState<string | null>(null)
   const [stem, setStem] = useState(stemOf(tileset.fileName))
-  const [folder, setFolder] = useState(folderOfTileset(tileset) || TOP)
   // A tileset without a name of its own is shown by its file name, so its name follows the file name until edited.
   const derived = tileset.name === stemOf(tileset.fileName)
   const name = typedName ?? (derived && FILE_STEM.test(stem) ? stem : tileset.name)
-  const edit = { name, stem, folder: toFolder(folder) }
+  const edit = { name, stem, folder: folderOfTileset(tileset) }
   const plan = FILE_STEM.test(stem) ? actions.plan(tileset, edit) : { ok: false, problem: 'Use letters, digits, “-” and “_” in the file name.', changes: [], references: [], characters: [], maps: [] }
   return (
     <ChangeDialog
       open
-      title={`Rename or move “${tileset.name}”`}
-      description="Maps paint with a tileset by its file name. Changing it rewrites every tile painted from it, in every map."
+      title={`Rename “${tileset.name}”`}
+      description="Maps paint with a tileset by its file name. Changing it rewrites every tile painted from it, in every map. To move it, drag it onto a folder in the list."
       plan={plan}
       confirmLabel="Save & update"
       onConfirm={async () => { const r = await actions.edit(tileset, edit); onDone(r, `${stem}.png`); return r.error }}
@@ -189,7 +182,6 @@ function EditTileset({ tileset, actions, onDone, onClose }: { tileset: DatabaseD
     >
       <Field label="Name" stack info="The name shown in the editor."><input className="ed-input" aria-label="Tileset name" value={name} onChange={(e) => setTypedName(e.target.value)} /></Field>
       <Field label="File name" stack info="The id maps use. Change it only if you want the file renamed; the maps are updated for you."><input className="ed-input" aria-label="Tileset file name" value={stem} onChange={(e) => setStem(e.target.value)} /></Field>
-      <Field label="Folder" stack><Select aria-label="Folder" value={folder} options={folderOptions(actions.folders)} onChange={setFolder} /></Field>
     </ChangeDialog>
   )
 }
@@ -209,17 +201,17 @@ function useImageSize(url?: string): { w: number; h: number } | null {
 /** Toolbar above the list: import a tileset, make a folder. */
 export function TilesetsToolbar({ data, onSelect: onImported }: { data: DatabaseData; onSelect: (id: string) => void }) {
   const actions = tilesetActions(data)
-  const [source, setSource] = useState<{ path: string; name: string; folder: string } | null>(null)
+  const [source, setSource] = useState<{ path: string; name: string } | null>(null)
   const [error, setError] = useState('')
   const [folderOpen, setFolderOpen] = useState(false)
   const pick = async () => {
     const r = await data.tilesetOps.pickFile()
     if (!r.ok) return setError(r.error)
-    if (r.sourcePath) setSource({ path: r.sourcePath, name: r.defaultName, folder: TOP })
+    if (r.sourcePath) setSource({ path: r.sourcePath, name: r.defaultName })
   }
   const submit = async () => {
     if (!source) return
-    const r = await data.tilesetOps.importTileset(source.path, source.name, toFolder(source.folder) || null)
+    const r = await data.tilesetOps.importTileset(source.path, source.name, null)
     if (!r.ok) return setError(r.error)
     setSource(null)
     setError('')
@@ -230,12 +222,11 @@ export function TilesetsToolbar({ data, onSelect: onImported }: { data: Database
       <div className="flex items-center gap-1">
         <EdButton size="sm" onClick={() => void pick()}><Upload /> Import…</EdButton>
         <EdButton size="sm" onClick={() => setFolderOpen(true)}><FolderPlus /> New folder…</EdButton>
-        <InfoTip>Import copies a PNG into the project. The map editor lists the tilesets you add here; you choose them there and add new ones from its tileset panel.</InfoTip>
+        <InfoTip>Import copies a PNG into the project. It lands at the top level; drag it onto a folder to file it. The map editor lists what you add here and lets you pick it.</InfoTip>
       </div>
       {source && (
         <div className="flex flex-col gap-1">
           <input className="ed-input" aria-label="Tileset name" value={source.name} onChange={(e) => setSource({ ...source, name: e.target.value })} />
-          <Select aria-label="Import into folder" value={source.folder} options={folderOptions(actions.folders)} onChange={(v) => setSource({ ...source, folder: v })} />
           <EdButton size="sm" variant="primary" onClick={() => void submit()}>Add</EdButton>
         </div>
       )}

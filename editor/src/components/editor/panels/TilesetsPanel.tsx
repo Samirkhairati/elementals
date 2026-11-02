@@ -12,8 +12,8 @@ interface TilesetsPanelProps {
 }
 
 /**
- * Browse and choose: the tileset tree of the project. Importing happens through the header's Add; renaming, moving
- * into folders and deleting happen in Database › Tilesets, which also rewrites the maps.
+ * Browse and choose: the tileset tree of the project. Importing, renaming, moving
+ * into folders and deleting all happen in Database › Tilesets, which also rewrites the maps.
  */
 export function TilesetsPanel({
   tilesets,
@@ -98,7 +98,7 @@ export function TilesetsPanel({
     return (
       <div className="ed-empty">
         <p>No tilesets yet.</p>
-        <p className="ed-hint">Click Add to import your first tileset.</p>
+        <p className="ed-hint">Import your first tileset in Database › Tilesets.</p>
       </div>
     )
   }

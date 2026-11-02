@@ -126,7 +126,6 @@ export interface EditorBaseContextValue
       | 'setActiveTileset'
       | 'expandedFolders'
       | 'toggleFolder'
-      | 'handlePickFile'
       | 'tilesetDimensions'
       | 'setTilesetDimensions'
       | 'tilesetSelectionStart'

@@ -36,12 +36,7 @@ export function EditorPage() {
   const historyState = useHistory()
 
   // ── Tileset Manager ──────────────────────────────────────────────────────
-  const tilesetManager = useTilesetManager({
-    onOpenImportDialog: (data) => {
-      dialogs.setNameInput(data.defaultName)
-      dialogs.setImportDialog({ open: true, ...data })
-    },
-  })
+  const tilesetManager = useTilesetManager()
 
   // Callbacks handed to the managers are referentially stable (they always run the latest
   // closure), so the managers' own callbacks - and therefore the context value - stay stable too.
@@ -427,7 +422,6 @@ export function EditorPage() {
     setActiveTileset: tilesetManager.setActiveTileset,
     expandedFolders: tilesetManager.expandedFolders,
     toggleFolder: tilesetManager.toggleFolder,
-    handlePickFile: tilesetManager.handlePickFile,
     tilesetDimensions: tilesetManager.tilesetDimensions,
     setTilesetDimensions: tilesetManager.setTilesetDimensions,
     tilesetSelectionStart: tilesetManager.tilesetSelectionStart,
@@ -547,7 +541,7 @@ export function EditorPage() {
     // Tilesets
     tilesetManager.tilesets, tilesetManager.folders, tilesetManager.activeTileset,
     tilesetManager.setActiveTileset, tilesetManager.expandedFolders,
-    tilesetManager.toggleFolder, tilesetManager.handlePickFile,
+    tilesetManager.toggleFolder,
     tilesetManager.tilesetDimensions,
     tilesetManager.setTilesetDimensions, tilesetManager.tilesetSelectionStart,
     tilesetManager.setTilesetSelectionStart, tilesetManager.tilesetSelectionCurrent,

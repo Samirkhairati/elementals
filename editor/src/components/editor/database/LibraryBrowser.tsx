@@ -3,7 +3,7 @@
 // decides what that means (and rewrites references).
 
 import { useMemo, useState } from 'react'
-import { ChevronDown, ChevronRight, Folder, FolderPlus, Pencil, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronRight, FolderPlus, Pencil, Trash2 } from 'lucide-react'
 import { canMoveFolder } from '@/lib/assetOps'
 import { buildLibraryTree, type FolderNode, type LibraryItem } from '@/lib/libraryTree'
 import { Tile } from './browse'
@@ -63,16 +63,18 @@ export function LibraryBrowser({ items, folders, query, mode, selected, onSelect
     if (dragging.kind === 'item') return true
     return canMoveFolder(dragging.key, target)
   }
+  // Handlers stop at the innermost folder, so dropping into a nested folder does not also count for its parents.
   const dropProps = (target: string) => ({
     onDragOver: (e: React.DragEvent) => {
       if (!accepts(target)) return
       e.preventDefault()
+      e.stopPropagation()
       e.dataTransfer.dropEffect = 'move'
       setDropTarget(target)
     },
-    onDragLeave: () => setDropTarget((t) => (t === target ? null : t)),
     onDrop: (e: React.DragEvent) => {
       e.preventDefault()
+      e.stopPropagation()
       const drag = readDrag(e) ?? dragging
       setDropTarget(null)
       setDragging(null)
@@ -82,6 +84,7 @@ export function LibraryBrowser({ items, folders, query, mode, selected, onSelect
   const dragProps = (drag: DragPayload) => ({
     draggable: true,
     onDragStart: (e: React.DragEvent) => {
+      e.stopPropagation()
       e.dataTransfer.setData(DRAG_TYPE, JSON.stringify(drag))
       e.dataTransfer.effectAllowed = 'move'
       setDragging(drag)
@@ -91,57 +94,61 @@ export function LibraryBrowser({ items, folders, query, mode, selected, onSelect
       setDropTarget(null)
     },
   })
+  const isDragged = (kind: DragPayload['kind'], key: string) => dragging?.kind === kind && dragging.key === key
 
-  const folderRow = (node: FolderNode, depth: number) => {
+  const folderRow = (node: FolderNode) => {
     const open = isOpen(node.path)
     return (
-      <div
-        className="ed-row group"
-        data-drop={dropTarget === node.path ? 'true' : undefined}
-        style={{ paddingLeft: 8 + depth * 14 }}
-        {...dropProps(node.path)}
-        {...dragProps({ kind: 'folder', key: node.path })}
-      >
-        <button type="button" className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-ed-label" aria-expanded={open} onClick={() => toggle(node.path)}>
+      <div className="ed-row group" data-dim={isDragged('folder', node.path) ? 'true' : undefined} {...dragProps({ kind: 'folder', key: node.path })}>
+        <button type="button" className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-ed-label font-medium text-foreground" aria-expanded={open} onClick={() => toggle(node.path)}>
           {open ? <ChevronDown className="text-muted-foreground" /> : <ChevronRight className="text-muted-foreground" />}
-          <Folder className="text-primary" />
           <span className="min-w-0 flex-1 truncate">{node.name}</span>
+          <span className="ed-hint tabular-nums opacity-70 group-hover:hidden">{countIn(node)}</span>
         </button>
-        <span className="ed-row-actions opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+        <span className="ed-row-actions hidden group-hover:flex group-focus-within:flex">
           <button type="button" className="ed-iconbtn" title="New folder inside" aria-label={`New folder in ${node.path}`} onClick={() => folderActions.onCreate(node.path)}><FolderPlus /></button>
-          <button type="button" className="ed-iconbtn" title="Rename or move folder" aria-label={`Rename folder ${node.path}`} onClick={() => folderActions.onRename(node.path)}><Pencil /></button>
+          <button type="button" className="ed-iconbtn" title="Rename folder" aria-label={`Rename folder ${node.path}`} onClick={() => folderActions.onRename(node.path)}><Pencil /></button>
           <button type="button" className="ed-iconbtn" data-tone="danger" title="Delete folder" aria-label={`Delete folder ${node.path}`} onClick={() => folderActions.onDelete(node.path)}><Trash2 /></button>
         </span>
       </div>
     )
   }
 
-  const itemRow = (item: LibraryItem, depth: number) => (
+  const itemRow = (item: LibraryItem) => (
     <button
       key={item.key}
       type="button"
       data-selected={selected === item.key ? 'true' : undefined}
-      className="ed-row flex h-auto w-full items-center gap-2 py-0.5 text-left text-ed-label"
-      style={{ paddingLeft: 8 + depth * 14 + 16 }}
+      data-dim={isDragged('item', item.key) ? 'true' : undefined}
+      className="ed-row flex h-auto w-full items-center gap-2 py-1 text-left text-ed-label"
       onClick={() => onSelect(item.key)}
       {...dragProps({ kind: 'item', key: item.key })}
     >
-      {thumb(item, 24)}
+      {thumb(item, 26)}
       <span className="min-w-0 flex-1 truncate">{item.name}</span>
       {badge?.(item)}
     </button>
   )
 
-  const renderList = (node: FolderNode, depth: number): React.ReactNode => (
-    <>
+  // Each level sits in a list with a guide line under its parent's arrow, so depth reads at a glance.
+  const renderList = (node: FolderNode, root = false): React.ReactNode => (
+    <ul role={root ? 'tree' : 'group'} className={root ? 'flex flex-col gap-0.5' : 'ml-[15px] flex flex-col gap-0.5 border-l border-border pl-1'}>
       {node.folders.map((f) => (
-        <li key={f.path} role="treeitem" aria-expanded={isOpen(f.path)} aria-label={f.path}>
-          {folderRow(f, depth)}
-          {isOpen(f.path) && <ul role="group">{renderList(f, depth + 1)}</ul>}
+        <li
+          key={f.path}
+          role="treeitem"
+          aria-expanded={isOpen(f.path)}
+          aria-label={f.path}
+          data-drop={dropTarget === f.path ? 'true' : undefined}
+          className="rounded-md data-[drop=true]:bg-primary/10 data-[drop=true]:ring-1 data-[drop=true]:ring-primary/60"
+          {...dropProps(f.path)}
+        >
+          {folderRow(f)}
+          {isOpen(f.path) && (f.folders.length > 0 || f.items.length > 0 ? renderList(f) : <p className="ed-hint ml-[15px] border-l border-border py-1 pl-3">Empty. Drop pictures here.</p>)}
         </li>
       ))}
-      {node.items.map((i) => <li key={i.key} role="treeitem" aria-selected={selected === i.key}>{itemRow(i, depth)}</li>)}
-    </>
+      {node.items.map((i) => <li key={i.key} role="treeitem" aria-selected={selected === i.key}>{itemRow(i)}</li>)}
+    </ul>
   )
 
   const renderTiles = (node: FolderNode): React.ReactNode[] => [
@@ -168,13 +175,15 @@ export function LibraryBrowser({ items, folders, query, mode, selected, onSelect
   ]
 
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1" data-drop={dropTarget === '' ? 'true' : undefined} {...dropProps('')}>
       {dragging && (
-        <div className="ed-row text-ed-label text-muted-foreground" data-drop={dropTarget === '' ? 'true' : undefined} {...dropProps('')}>
-          Drop here for the top level
+        <div className="ed-row text-ed-label text-muted-foreground" data-drop={dropTarget === '' ? 'true' : undefined}>
+          Drop on a folder to move it there, or here for the top level
         </div>
       )}
-      {mode === 'tiles' ? <div className="flex flex-col gap-3">{renderTiles(tree)}</div> : <ul role="tree" className="flex flex-col gap-0.5">{renderList(tree, 0)}</ul>}
+      {mode === 'tiles' ? <div className="flex flex-col gap-3">{renderTiles(tree)}</div> : renderList(tree, true)}
     </div>
   )
 }
+
+const countIn = (node: FolderNode): number => node.items.length + node.folders.reduce((n, f) => n + countIn(f), 0)

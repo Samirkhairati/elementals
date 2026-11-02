@@ -1,13 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { TilesetData } from '@/types/editor'
 
-interface UseTilesetManagerOptions {
-  onOpenImportDialog?: (data: { sourcePath: string; defaultName: string; targetFolder: string | null }) => void
-}
-
-export function useTilesetManager(options: UseTilesetManagerOptions = {}) {
-  const { onOpenImportDialog } = options
-
+export function useTilesetManager() {
   const [tilesets, setTilesets] = useState<TilesetData[]>([])
   const [folders, setFolders] = useState<string[]>([])
   const [activeTileset, setActiveTileset] = useState<TilesetData | null>(null)
@@ -35,18 +29,6 @@ export function useTilesetManager(options: UseTilesetManagerOptions = {}) {
     })
   }, [])
 
-  const handlePickFile = useCallback(async (targetFolder: string | null = null) => {
-    if (!window.electronAPI) return
-    const res = await window.electronAPI.pickTilesetFile()
-    if (res.success && res.sourcePath) {
-      onOpenImportDialog?.({
-        sourcePath: res.sourcePath,
-        defaultName: res.defaultName || '',
-        targetFolder,
-      })
-    }
-  }, [onOpenImportDialog])
-
   return {
     tilesets,
     setTilesets,
@@ -66,6 +48,5 @@ export function useTilesetManager(options: UseTilesetManagerOptions = {}) {
     setTilesetSelectionCurrent,
     loadTilesets,
     toggleFolder,
-    handlePickFile,
   }
 }
