@@ -5,7 +5,8 @@ import type { GraphicInfo } from '../../../../../../shared/engine/graphics'
 import { addSheet, cutFromGrid, gridOf, removeSheet, sheetSummary, sheetUsers, updateSheet } from '@/lib/characterEdit'
 import { readImagePixels } from '@/lib/imagePixels'
 import { describeDetection, detectSheetGrid } from '@/lib/sheetDetect'
-import { Select } from '../../ui/fields'
+import { PicturePicker } from '../../dialogs/PicturePicker'
+import { GraphicField } from './GraphicField'
 import { EdButton, Field, FieldRow, IconButton, InfoTip, NumberField, Section } from '../../ui/controls'
 import { PivotPicker } from './PivotPicker'
 import { SheetGridPreview } from './SheetGridPreview'
@@ -23,6 +24,7 @@ const CUT_INFO = 'A sheet is cut into an even grid of equal frames, numbered 0, 
 export function SheetsTab({ def, onChange, graphics, images = {} }: Props) {
   const sizeOf = (image: string) => graphics.find((g) => g.id === image)
   const [notes, setNotes] = useState<Record<string, string>>({})
+  const [picking, setPicking] = useState(false)
   const note = (key: string, text: string) => setNotes((n) => ({ ...n, [key]: text }))
 
   const detect = async (key: string) => {
@@ -52,7 +54,7 @@ export function SheetsTab({ def, onChange, graphics, images = {} }: Props) {
         return (
           <Section key={key} title={key} summary={sheetSummary(sheet, size)} info="One picture and how it is cut into frames.">
             <Field label="Image" info="The picture file this sheet is cut from. Images live in Graphics; you can pick one that other sprites already use.">
-              <Select aria-label={`Image of ${key}`} className="w-auto min-w-[160px]" value={sheet.image} onChange={(v) => onChange(updateSheet(def, key, { image: v }))} options={[...(sizeOf(sheet.image) ? [] : [{ value: sheet.image, label: `${sheet.image} (missing)` }]), ...graphics.map((g) => ({ value: g.id }))]} />
+              <GraphicField aria-label={`Image of ${key}`} value={sheet.image} missing={!sizeOf(sheet.image)} graphics={graphics} images={images} onChange={(v) => onChange(updateSheet(def, key, { image: v }))} />
             </Field>
             {size && images[sheet.image] && (
               <div className="flex flex-wrap items-start gap-3">
@@ -106,9 +108,9 @@ export function SheetsTab({ def, onChange, graphics, images = {} }: Props) {
         )
       })}
       <FieldRow>
-        <Select aria-label="Add a sheet from" className="w-auto min-w-[160px]" value="" placeholder="+ Add sheet…" options={graphics.map((g) => ({ value: g.id }))} onChange={(v) => { const g = sizeOf(v); if (g) onChange(addSheet(def, g.id, g, 'sheet').def) }} />
-        <Plus className="h-3.5 w-3.5 text-muted-foreground" />
-        <span className="ed-hint">Pick an image from Graphics (import new ones in the Graphics table).</span>
+        <EdButton size="sm" aria-label="Add a sheet" onClick={() => setPicking(true)}><Plus /> Add sheet…</EdButton>
+        <PicturePicker open={picking} onOpenChange={setPicking} tabs={['graphics']} title="Add a sheet: choose a picture" graphics={graphics} images={images} onPick={(p) => { const g = p.graphicId ? sizeOf(p.graphicId) : undefined; if (g) onChange(addSheet(def, g.id, g, 'sheet').def) }} />
+        <span className="ed-hint">Pick a picture from Graphics (import new ones in the Graphics table).</span>
       </FieldRow>
     </div>
   )

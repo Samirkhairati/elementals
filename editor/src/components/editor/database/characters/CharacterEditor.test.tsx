@@ -39,6 +39,13 @@ const click = (el: HTMLElement, init: object = {}) => { fireEvent.mouseDown(el, 
 const save = () => fireEvent.click(screen.getByRole('button', { name: /Save/ }))
 const choose = (label: string, value: string) => chooseOption(screen.getByRole('combobox', { name: label }), value)
 
+/** Opens a picture field's browser and clicks the tile for this graphic id. */
+async function pickPicture(trigger: HTMLElement, id: string) {
+  fireEvent.click(trigger)
+  const dialogs = await screen.findAllByRole('dialog')
+  fireEvent.click(within(dialogs[dialogs.length - 1]).getByTitle(id))
+}
+
 async function open() {
   await screen.findByTestId('animations-tab')
 }
@@ -48,7 +55,7 @@ describe('wizard', () => {
     const { saved } = setup()
     fireEvent.click(await screen.findByRole('button', { name: /New sprite/ }))
     const dialog = await screen.findByRole('dialog')
-    chooseOption(within(dialog).getByRole('combobox', { name: 'Picture' }), 'sprites/hero/run.png')
+    await pickPicture(within(dialog).getByRole('button', { name: 'Picture' }), 'sprites/hero/run.png')
     expect(within(dialog).getByTestId('grid-suggestion')).toHaveTextContent('Cut as 4×4 frames of 32×48 px.')
     fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'Old man' } })
     fireEvent.blur(within(dialog).getByLabelText('Name'))
@@ -69,7 +76,7 @@ describe('wizard', () => {
     fireEvent.click(await screen.findByRole('button', { name: /New sprite/ }))
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByRole('button', { name: 'Create' })).toBeDisabled()
-    chooseOption(within(dialog).getByRole('combobox', { name: 'Picture' }), 'props/ball.png')
+    await pickPicture(within(dialog).getByRole('button', { name: 'Picture' }), 'props/ball.png')
     fireEvent.change(within(dialog).getByLabelText('Id'), { target: { value: 'characters/hero' } })
     fireEvent.blur(within(dialog).getByLabelText('Id'))
     expect(within(dialog).getByText('A sprite with this id already exists.')).toBeInTheDocument()
@@ -222,7 +229,7 @@ describe('Sheets tab', () => {
     await open()
     fireEvent.click(screen.getByRole('radio', { name: 'Sheets' }))
     expect(screen.getByRole('button', { name: 'Remove sheet walk' })).toBeDisabled()
-    choose('Add a sheet from', 'sprites/hero/run.png')
+    await pickPicture(screen.getByRole('button', { name: 'Add a sheet' }), 'sprites/hero/run.png')
     expect(screen.getByRole('button', { name: 'Remove sheet sheet' })).toBeEnabled()
     fireEvent.click(screen.getByRole('button', { name: 'Remove sheet sheet' }))
     expect(screen.queryByRole('button', { name: 'Remove sheet sheet' })).toBeNull()

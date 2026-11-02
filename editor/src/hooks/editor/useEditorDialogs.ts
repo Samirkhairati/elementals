@@ -32,15 +32,9 @@ export function useEditorDialogs(options: UseEditorDialogsOptions) {
   }>({ open: false })
   const [nameInput, setNameInput] = useState('')
 
-  const [createFolderDialog, setCreateFolderDialog] = useState<{
-    open: boolean
-    parentPath?: string | null
-  }>({ open: false })
-  const [createFolderName, setCreateFolderName] = useState('')
-
   const [renameDialog, setRenameDialog] = useState<{
     open: boolean
-    type: 'folder' | 'tileset' | 'map-folder' | 'map' | 'layer'
+    type: 'folder' | 'map-folder' | 'map' | 'layer'
     oldPath?: string
     oldName?: string
     targetFolder?: string | null
@@ -90,36 +84,6 @@ export function useEditorDialogs(options: UseEditorDialogsOptions) {
     }
   }, [nameInput, importDialog, setExpandedFolders, loadData])
 
-  // ── Create Tileset Folder Confirmation ────────────────────────────────────
-  const handleConfirmCreateFolder = useCallback(async () => {
-    const cleanName = createFolderName.trim()
-    if (!cleanName) {
-      alert('Folder name cannot be empty')
-      return
-    }
-    const targetPath = createFolderDialog.parentPath
-      ? `${createFolderDialog.parentPath}/${cleanName}`
-      : cleanName
-    if (folders.includes(targetPath)) {
-      alert(`A folder named "${cleanName}" already exists in this location.`)
-      return
-    }
-    if (!window.electronAPI) return
-    const res = await window.electronAPI.createFolder(
-      createFolderDialog.parentPath || null,
-      cleanName
-    )
-    if (res.success) {
-      if (createFolderDialog.parentPath) {
-        setExpandedFolders(prev => new Set(prev).add(createFolderDialog.parentPath!))
-      }
-      setCreateFolderDialog({ open: false })
-      loadData()
-    } else {
-      alert(res.error)
-    }
-  }, [createFolderName, createFolderDialog, folders, setExpandedFolders, loadData])
-
   // ── Universal Rename Confirmation ─────────────────────────────────────────
   const handleConfirmRename = useCallback(async () => {
     const cleanName = renameInput.trim()
@@ -134,15 +98,7 @@ export function useEditorDialogs(options: UseEditorDialogsOptions) {
     }
     if (!window.electronAPI) return
     let res
-    if (renameDialog.type === 'folder' && renameDialog.oldPath) {
-      res = await window.electronAPI.renameFolder(renameDialog.oldPath, cleanName)
-    } else if (renameDialog.type === 'tileset' && renameDialog.oldPath) {
-      res = await window.electronAPI.renameTileset(
-        renameDialog.targetFolder || null,
-        renameDialog.oldPath,
-        cleanName
-      )
-    } else if (renameDialog.type === 'map-folder' && renameDialog.oldPath) {
+    if (renameDialog.type === 'map-folder' && renameDialog.oldPath) {
       // Pending debounced autosaves target the old path: write them before the files move.
       await mapSaveQueue.flushAll()
       res = await window.electronAPI.renameMapFolder(renameDialog.oldPath, cleanName)
@@ -226,11 +182,6 @@ export function useEditorDialogs(options: UseEditorDialogsOptions) {
     nameInput,
     setNameInput,
     handleConfirmImport,
-    createFolderDialog,
-    setCreateFolderDialog,
-    createFolderName,
-    setCreateFolderName,
-    handleConfirmCreateFolder,
     renameDialog,
     setRenameDialog,
     renameInput,

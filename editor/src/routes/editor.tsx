@@ -41,13 +41,6 @@ export function EditorPage() {
       dialogs.setNameInput(data.defaultName)
       dialogs.setImportDialog({ open: true, ...data })
     },
-    onOpenCreateFolderDialog: (parentPath, defaultName) => {
-      dialogs.setCreateFolderName(defaultName)
-      dialogs.setCreateFolderDialog({ open: true, parentPath })
-    },
-    onOpenConfirmDialog: (config) => {
-      dialogs.setConfirmDialog({ open: true, ...config })
-    },
   })
 
   // Callbacks handed to the managers are referentially stable (they always run the latest
@@ -433,13 +426,8 @@ export function EditorPage() {
     activeTileset: tilesetManager.activeTileset,
     setActiveTileset: tilesetManager.setActiveTileset,
     expandedFolders: tilesetManager.expandedFolders,
-    selectedFolder: tilesetManager.selectedFolder,
-    setSelectedFolder: tilesetManager.setSelectedFolder,
     toggleFolder: tilesetManager.toggleFolder,
     handlePickFile: tilesetManager.handlePickFile,
-    handleOpenCreateFolderDialog: tilesetManager.handleOpenCreateFolderDialog,
-    handleDeleteFolder: tilesetManager.handleDeleteFolder,
-    handleDrop: tilesetManager.handleDrop,
     tilesetDimensions: tilesetManager.tilesetDimensions,
     setTilesetDimensions: tilesetManager.setTilesetDimensions,
     tilesetSelectionStart: tilesetManager.tilesetSelectionStart,
@@ -559,10 +547,8 @@ export function EditorPage() {
     // Tilesets
     tilesetManager.tilesets, tilesetManager.folders, tilesetManager.activeTileset,
     tilesetManager.setActiveTileset, tilesetManager.expandedFolders,
-    tilesetManager.selectedFolder, tilesetManager.setSelectedFolder,
     tilesetManager.toggleFolder, tilesetManager.handlePickFile,
-    tilesetManager.handleOpenCreateFolderDialog, tilesetManager.handleDeleteFolder,
-    tilesetManager.handleDrop, tilesetManager.tilesetDimensions,
+    tilesetManager.tilesetDimensions,
     tilesetManager.setTilesetDimensions, tilesetManager.tilesetSelectionStart,
     tilesetManager.setTilesetSelectionStart, tilesetManager.tilesetSelectionCurrent,
     tilesetManager.setTilesetSelectionCurrent, tilesetManager.hoverTile,

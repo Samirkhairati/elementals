@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { PRESET_FOLDERS, PRESET_LABELS, newCharacter, slugify, suggestGrid, type Preset } from '@/lib/characterEdit'
 import { isValidCharacterId } from '../../../../../../shared/engine/graphics'
-import { Select } from '../../ui/fields'
+import { GraphicField } from './GraphicField'
 import { EdButton, Field, Segmented, TextField } from '../../ui/controls'
 import type { DatabaseData } from '../useDatabaseData'
 
@@ -51,7 +51,7 @@ export function NewCharacterWizard({ data, open, onOpenChange, onCreated }: Prop
         </DialogHeader>
 
         <Field label="Picture" stack info="The picture file this sprite is cut from. Images live in Graphics (import new ones there).">
-          <Select aria-label="Picture" value={image} placeholder="Choose a graphic…" options={graphics.map((g) => ({ value: g.id, label: `${g.id} (${g.width}×${g.height})` }))} onChange={setImage} />
+          <GraphicField aria-label="Picture" value={image} graphics={graphics} images={images} onChange={setImage} />
         </Field>
         {graphic && (
           <div className="flex items-center gap-3 rounded border border-border bg-card/30 p-2">

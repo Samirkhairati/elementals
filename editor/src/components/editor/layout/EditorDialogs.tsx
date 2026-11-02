@@ -1,6 +1,5 @@
 import React from 'react'
 import { ImportTilesetDialog } from '@/components/editor/dialogs/ImportTilesetDialog'
-import { CreateFolderDialog } from '@/components/editor/dialogs/CreateFolderDialog'
 import { RenameDialog } from '@/components/editor/dialogs/RenameDialog'
 import { ConfirmDialog } from '@/components/editor/dialogs/ConfirmDialog'
 import { CreateMapFolderDialog } from '@/components/editor/dialogs/CreateMapFolderDialog'
@@ -13,14 +12,8 @@ interface EditorDialogsProps {
   setNameInput: (v: string) => void
   handleConfirmImport: () => void
 
-  createFolderDialog: { open: boolean; parentPath?: string | null }
-  setCreateFolderDialog: React.Dispatch<React.SetStateAction<{ open: boolean; parentPath?: string | null }>>
-  createFolderName: string
-  setCreateFolderName: (v: string) => void
-  handleConfirmCreateFolder: () => void
-
-  renameDialog: { open: boolean; type: 'folder' | 'tileset' | 'map-folder' | 'map' | 'layer'; oldPath?: string; oldName?: string; targetFolder?: string | null }
-  setRenameDialog: React.Dispatch<React.SetStateAction<{ open: boolean; type: 'folder' | 'tileset' | 'map-folder' | 'map' | 'layer'; oldPath?: string; oldName?: string; targetFolder?: string | null }>>
+  renameDialog: { open: boolean; type: 'folder' | 'map-folder' | 'map' | 'layer'; oldPath?: string; oldName?: string; targetFolder?: string | null }
+  setRenameDialog: React.Dispatch<React.SetStateAction<{ open: boolean; type: 'folder' | 'map-folder' | 'map' | 'layer'; oldPath?: string; oldName?: string; targetFolder?: string | null }>>
   renameInput: string
   setRenameInput: (v: string) => void
   handleConfirmRename: () => void
@@ -47,11 +40,6 @@ export function EditorDialogs({
   nameInput,
   setNameInput,
   handleConfirmImport,
-  createFolderDialog,
-  setCreateFolderDialog,
-  createFolderName,
-  setCreateFolderName,
-  handleConfirmCreateFolder,
   renameDialog,
   setRenameDialog,
   renameInput,
@@ -78,13 +66,6 @@ export function EditorDialogs({
         setNameInput={setNameInput}
         onClose={() => setImportDialog({ open: false })}
         onConfirm={handleConfirmImport}
-      />
-      <CreateFolderDialog
-        open={createFolderDialog.open}
-        folderName={createFolderName}
-        setFolderName={setCreateFolderName}
-        onClose={() => setCreateFolderDialog({ open: false })}
-        onConfirm={handleConfirmCreateFolder}
       />
       <RenameDialog
         open={renameDialog.open}

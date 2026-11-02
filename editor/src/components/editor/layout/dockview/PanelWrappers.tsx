@@ -404,46 +404,26 @@ export function EmptyCanvasWrapper(_props: IDockviewPanelProps) {
 }
 
 const selectTilesets = (c: EditorContextValue) => ({
-  handleDrop: c.handleDrop,
   tilesets: c.tilesets,
   folders: c.folders,
   activeTileset: c.activeTileset,
   setActiveTileset: c.setActiveTileset,
   expandedFolders: c.expandedFolders,
-  selectedFolder: c.selectedFolder,
-  setSelectedFolder: c.setSelectedFolder,
   toggleFolder: c.toggleFolder,
-  handlePickFile: c.handlePickFile,
-  handleOpenCreateFolderDialog: c.handleOpenCreateFolderDialog,
-  setRenameInput: c.setRenameInput,
-  setRenameDialog: c.setRenameDialog,
-  handleDeleteFolder: c.handleDeleteFolder,
   activeLayerType: c.activeLayerType,
 });
 
 export function TilesetsWrapper(_props: IDockviewPanelProps) {
   const ctx = useEditorSelector(selectTilesets);
   return (
-    <div
-      className="flex-1 overflow-y-auto p-2 text-xs min-h-0 bg-sidebar-background h-full"
-      onDragOver={(e) => e.preventDefault()}
-      onDrop={(e) => ctx.handleDrop(e, null)}
-    >
+    <div className="flex-1 overflow-y-auto p-2 text-xs min-h-0 bg-sidebar-background h-full">
       <TilesetsPanel
         tilesets={ctx.tilesets}
         folders={ctx.folders}
         activeTileset={ctx.activeTileset}
         setActiveTileset={ctx.setActiveTileset}
         expandedFolders={ctx.expandedFolders}
-        selectedFolder={ctx.selectedFolder}
-        setSelectedFolder={ctx.setSelectedFolder}
         toggleFolder={ctx.toggleFolder}
-        handlePickFile={ctx.handlePickFile}
-        handleOpenCreateFolderDialog={ctx.handleOpenCreateFolderDialog}
-        setRenameInput={ctx.setRenameInput}
-        setRenameDialog={ctx.setRenameDialog}
-        handleDeleteFolder={ctx.handleDeleteFolder}
-        handleDrop={ctx.handleDrop}
         activeLayerType={ctx.activeLayerType}
       />
     </div>
