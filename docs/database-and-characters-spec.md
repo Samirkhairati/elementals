@@ -125,7 +125,7 @@ project/
     sprites/player/walk.png
     sprites/player/run.png
     props/flower.png
-  tilesets/…                   ← unchanged (Visual, read-only)
+  tilesets/…                   ← unchanged on disk; managed in the Database (Visual)
   database/
     characters/<id>.json       ← NEW home of Character records (replaces project/sprites/<id>/sprite.json)
     database.json              ← unchanged for now (switches/variables); may move here later
@@ -400,20 +400,20 @@ Adding Pokémon or Items later = add one entry; the shell, search, usage panel, 
 
 | Group | Table | Access | Phase 1 content |
 |---|---|---|---|
-| **Visual** (read-only) | Graphics | readonly | folder tree of `project/graphics`, viewer, Used by |
-| | Tilesets | readonly | list, image, tile size, columns×rows, tile count, Used by (maps) |
+| **Visual** | Graphics | **editable** | folder tree of `project/graphics` (new folder, drag to move, rename, delete), zoom viewer, Used by + Ends up in |
+| | Tilesets | **editable** | the same folder tree for `project/tilesets`, image with tile grid, tile size, columns×rows, tile count, Used by (maps) |
 | **Design** (editable) | Characters | **editable** | everything in §8 |
 | | Flags (switches, variables, stages, common events) | editable | whatever the event-graph work's Database panel exports (§0.1), hosted in the shell unchanged |
 | **World** | Maps | readonly listing | name, size, entity count, tilesets & characters used, **Open in Map Editor** |
 | **Text** | Dialogue / strings | planned | — |
 | **Game** | Pokémon, Items, Moves, Abilities, Types, Trainers… | planned | — (a Pokémon will *reference* Characters/Graphics by id) |
 
-**What "read-only" means for Visual tables**: you can look, zoom, search, see dimensions/size/format and *where each is
-used*; you cannot change content or properties. Import is the one allowed write (it adds a file); **Rename / Move / Delete** of a
-Graphic are disabled until the reference-rewrite flow (§11.4) lands, then enabled behind a confirm that lists every
-reference it will rewrite or break. Tileset properties continue to be edited where they are today (map editor tileset panel).
-The read-only state is visible: a lock badge on the table header with an info popover — *"Visual resources are shown exactly as
-stored. To use one, attach it to a character; to change it, edit the image file."*
+**Visual tables manage their library** (updated: they used to be read-only). Import, create folders, rename, move (by dialog or by
+dragging onto a folder) and delete happen here and nowhere else; the Map Editor's tileset panel only browses, picks and adds.
+Every change is planned first (`editor/src/lib/assetOps.ts`) and the dialog lists what it will rewrite: renaming or moving a
+graphic rewrites the character sheets and the map image layers that use it, renaming a tileset's file rewrites every tile painted from
+it (a tileset's id is its file name, so moving it between folders changes no map). Deleting is refused while anything still
+refers to it. The disk change goes first, then the rewrites; anything that could not be rewritten is named.
 
 ### 7.4 Shell layout
 
@@ -591,20 +591,25 @@ the game*. Initial copy (Appendix A has the full list):
 
 ---
 
-## 9. Visual tables (read-only)
+## 9. Visual tables
 
 ### 9.1 Graphics
 
-* Left: folder tree of `project/graphics` + search; right: **viewer** — zoom/pan, checkerboard, pixel grid toggle, dimensions,
-  file size, last modified, path with copy button.
-* **Overlay a grid**: pick a character's sheet to draw its cut over the image — a read-only way to check how it's used.
-* **Used by**: characters (and which sheet/clip), listed with *Open* links; `unused` badge otherwise.
-* Toolbar: *Import…*, *Reveal in Finder*. Rename/Move/Delete appear disabled with an info popover until §11.4 ships.
+* Left: search (top of the list), then the folder tree of `project/graphics` (list or tiles); right: **viewer** — the zoom pane
+  (slider, + / − in whole-number steps, Fit, 1:1, Ctrl/⌘-scroll or pinch around the pointer, drag to pan), checkerboard,
+  dimensions, file size, last modified, id with copy button.
+* **Pixel grid**: a thin line around every source pixel, drawn from 400% up (counting and aligning pixels).
+* **Sprite cut**: pick a character's sheet to lay its frames over the image, outlined and numbered like animations count them, with a
+  summary (columns × rows, frame size, margin, spacing), a warning when the frames do not fill the picture, and a link to edit the cut.
+* **Used by**: character sheets and map image layers that use the picture (with *Open* links), and **Ends up in**: the maps that show a
+  sprite cut from it. `unused` badge otherwise.
+* Toolbar: *Import…*, *New folder…*. Per picture: *Rename / move…*, *Delete*. Per folder (hover): new folder inside, rename / move, delete.
 
 ### 9.2 Tilesets
 
-* Cards/list with the image, tile size, columns × rows, tile count and a **Used by** list of maps (and which layers).
-* Opening one shows the image with the tile grid and index numbers. Editing stays in the map editor.
+* The same folder tree, with the image, tile size, columns × rows, tile count and a **Used by** list of maps (and which layers).
+* Opening one shows the image in the zoom pane with the tile grid. *Rename / move…* edits the name, the file name (the id maps use,
+  rewritten everywhere) and the folder.
 
 ### 9.3 Maps (World)
 

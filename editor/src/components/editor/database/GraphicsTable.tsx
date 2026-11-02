@@ -96,7 +96,7 @@ function ChangeFolder({ folder, actions, onDone, onClose }: { folder: string; ac
   const [parent, setParent] = useState(folderOfId(folder) || TOP)
   const next = joinId(toFolder(parent), name)
   const valid = FOLDER_NAME.test(name)
-  const plan = valid ? (actions.folders.includes(next) && next !== folder ? { ...actions.planFolder(folder, next), ok: false, problem: `A folder called “${next}” already exists.` } : actions.planFolder(folder, next)) : { ...actions.plan([]), ok: false, problem: 'Use letters, digits, “-” and “_” in the name.' }
+  const plan = next === folder ? { ...actions.plan([]), ok: false } : valid ? (actions.folders.includes(next) && next !== folder ? { ...actions.planFolder(folder, next), ok: false, problem: `A folder called “${next}” already exists.` } : actions.planFolder(folder, next)) : { ...actions.plan([]), ok: false, problem: 'Use letters, digits, “-” and “_” in the name.' }
   return (
     <ChangeDialog
       open
@@ -203,7 +203,8 @@ function ChangeGraphic({ id, data, actions, onDone, onClose }: { id: string; dat
   const [name, setName] = useState(leafOfId(id).replace(/\.png$/i, ''))
   const [folder, setFolder] = useState(folderOfId(id) || TOP)
   const next = joinId(toFolder(folder), `${name}.png`)
-  const plan = actions.plan([{ from: id, to: next }])
+  // Nothing typed yet: the button stays off without scolding.
+  const plan = next === id ? { ...actions.plan([]), ok: false } : actions.plan([{ from: id, to: next }])
   return (
     <ChangeDialog
       open

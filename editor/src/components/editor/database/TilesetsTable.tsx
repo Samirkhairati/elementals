@@ -89,13 +89,13 @@ function ChangeTilesetFolder({ folder, actions, onDone, onClose }: { folder: str
   const [name, setName] = useState(leafOfId(folder))
   const [parent, setParent] = useState(folderOfId(folder) || TOP)
   const next = joinId(toFolder(parent), name)
-  const problem = !FOLDER_NAME.test(name) ? 'Use letters, digits, “-” and “_” in the name.' : next === folder ? 'That is where it is already.' : actions.folders.includes(next) ? `A folder called “${next}” already exists.` : ''
+  const problem = !FOLDER_NAME.test(name) ? 'Use letters, digits, “-” and “_” in the name.' : next === folder ? '' : actions.folders.includes(next) ? `A folder called “${next}” already exists.` : ''
   return (
     <ChangeDialog
       open
       title={`Rename or move folder “${folder}”`}
       description="The tilesets inside keep their file names, so no map changes."
-      plan={{ ok: !problem, problem, changes: [], references: [], characters: [], maps: [] }}
+      plan={{ ok: !problem && next !== folder, problem, changes: [], references: [], characters: [], maps: [] }}
       confirmLabel="Rename"
       onConfirm={async () => { const r = await actions.changeFolder(folder, next); onDone(r); return r.error }}
       onClose={onClose}
@@ -169,9 +169,12 @@ export function TilesetDetail({ data, id, onSelect }: { data: DatabaseData; id: 
 }
 
 function EditTileset({ tileset, actions, onDone, onClose }: { tileset: DatabaseData['tilesets'][number]; actions: TilesetActions; onDone: (o: Outcome, newId: string) => void; onClose: () => void }) {
-  const [name, setName] = useState(tileset.name)
+  const [typedName, setTypedName] = useState<string | null>(null)
   const [stem, setStem] = useState(stemOf(tileset.fileName))
   const [folder, setFolder] = useState(folderOfTileset(tileset) || TOP)
+  // A tileset without a name of its own is shown by its file name, so its name follows the file name until edited.
+  const derived = tileset.name === stemOf(tileset.fileName)
+  const name = typedName ?? (derived && FILE_STEM.test(stem) ? stem : tileset.name)
   const edit = { name, stem, folder: toFolder(folder) }
   const plan = FILE_STEM.test(stem) ? actions.plan(tileset, edit) : { ok: false, problem: 'Use letters, digits, “-” and “_” in the file name.', changes: [], references: [], characters: [], maps: [] }
   return (
@@ -184,7 +187,7 @@ function EditTileset({ tileset, actions, onDone, onClose }: { tileset: DatabaseD
       onConfirm={async () => { const r = await actions.edit(tileset, edit); onDone(r, `${stem}.png`); return r.error }}
       onClose={onClose}
     >
-      <Field label="Name" stack info="The name shown in the editor."><input className="ed-input" aria-label="Tileset name" value={name} onChange={(e) => setName(e.target.value)} /></Field>
+      <Field label="Name" stack info="The name shown in the editor."><input className="ed-input" aria-label="Tileset name" value={name} onChange={(e) => setTypedName(e.target.value)} /></Field>
       <Field label="File name" stack info="The id maps use. Change it only if you want the file renamed; the maps are updated for you."><input className="ed-input" aria-label="Tileset file name" value={stem} onChange={(e) => setStem(e.target.value)} /></Field>
       <Field label="Folder" stack><Select aria-label="Folder" value={folder} options={folderOptions(actions.folders)} onChange={setFolder} /></Field>
     </ChangeDialog>

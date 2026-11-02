@@ -10,7 +10,7 @@ import { EdButton } from '../ui/controls'
 const labelsOf = (refs: readonly Reference[]): string[] => [...new Set(refs.map((r) => r.label))]
 
 function ReferencePreview({ references, extra }: { references: readonly Reference[]; extra?: string }) {
-  if (references.length === 0) return <p className="ed-hint">Nothing refers to it yet, so nothing else changes.</p>
+  if (references.length === 0) return <p className="ed-hint">Nothing else needs to change.</p>
   return (
     <div data-testid="change-preview" className="text-ed-label">
       <p>{summarizeReferences(references)} will be updated automatically{extra ? `; ${extra}` : ''}.</p>

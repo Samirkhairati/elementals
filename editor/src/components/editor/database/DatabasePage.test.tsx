@@ -345,7 +345,7 @@ describe('Tilesets', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Rename \/ move/ }))
     const dialog = await screen.findByRole('dialog')
     chooseOption(within(dialog).getByRole('combobox', { name: 'Folder' }), 'Outside')
-    expect(within(dialog).getByText(/Nothing refers to it yet/)).toBeInTheDocument()
+    expect(within(dialog).getByText(/Nothing else needs to change/)).toBeInTheDocument()
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save & update' }))
     await waitFor(() => expect(calls).toContainEqual(['moveTileset', 'grass.png', null, 'Outside']))
     expect(calls.some((c) => c[0] === 'saveMap')).toBe(false)
