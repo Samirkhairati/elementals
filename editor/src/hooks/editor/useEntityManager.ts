@@ -3,6 +3,7 @@ import { EntityData, ComponentType, MapData, EntityFolder } from '@/types/editor
 import { COMPONENT_REGISTRY } from '@/lib/componentRegistry'
 import { cloneEntity, createDefaultComponent } from '../../../../shared/engine/components'
 import { useSyncedState } from '@/hooks/useSyncedState'
+import { withCharacterDepth } from '@/lib/entityDepth'
 
 interface UseEntityManagerOptions {
   /** Read-only: used to (re)synchronise local state when the active map changes. */
@@ -367,14 +368,12 @@ export function useEntityManager(options: UseEntityManagerOptions) {
             if (key === 'y') nextY = Number(value) || 0
           }
 
+          const components = { ...e.components, [type]: updatedCompProps }
           return {
             ...e,
             x: nextX,
             y: nextY,
-            components: {
-              ...e.components,
-              [type]: updatedCompProps,
-            },
+            components: type === 'Sprite' && key === 'asset' ? withCharacterDepth(components, value) : components,
           }
         })
       )
@@ -398,10 +397,10 @@ export function useEntityManager(options: UseEntityManagerOptions) {
             ...e,
             x: nextX,
             y: nextY,
-            components: {
-              ...e.components,
-              [type]: { ...(e.components[type] || {}), ...props },
-            },
+            components: (() => {
+              const components = { ...e.components, [type]: { ...(e.components[type] || {}), ...props } }
+              return type === 'Sprite' && 'asset' in props ? withCharacterDepth(components, props.asset) : components
+            })(),
           }
         })
       )

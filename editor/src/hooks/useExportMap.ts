@@ -92,10 +92,18 @@ export async function exportMapToGame(
   layers: Layer[]
 ): Promise<GameExportOutcome> {
   if (!window.electronAPI) return { ok: false, error: 'The editor is not connected to the project files.' }
-  const built = await buildGameMapJson(mapToExportRaw, tilesets, activeMap, layers)
-  if (!built.ok) return built
+  // A window started before this feature existed has the old preload: say so instead of failing silently.
+  if (typeof window.electronAPI.exportMapToGame !== 'function') {
+    return { ok: false, error: 'This editor window is out of date. Restart the editor (npm run dev) and try again.' }
+  }
+  try {
+    const built = await buildGameMapJson(mapToExportRaw, tilesets, activeMap, layers)
+    if (!built.ok) return built
 
-  const res = await window.electronAPI.exportMapToGame(mapToExportRaw.fileName, built.json)
-  if (!res.success) return { ok: false, error: res.error }
-  return { ok: true, id: res.id, changed: res.changed }
+    const res = await window.electronAPI.exportMapToGame(mapToExportRaw.fileName, built.json)
+    if (!res.success) return { ok: false, error: res.error }
+    return { ok: true, id: res.id, changed: res.changed }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
+  }
 }
