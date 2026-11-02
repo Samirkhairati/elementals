@@ -31,6 +31,7 @@ export const MANIFEST_KEYS = {
   database: "manifest:database",
   common: "manifest:common",
   tilesets: "manifest:tilesets",
+  settings: "manifest:settings",
 } as const;
 
 export const MANIFEST_URLS = {
@@ -38,6 +39,7 @@ export const MANIFEST_URLS = {
   database: "data/database.json",
   common: "data/common.json",
   tilesets: "data/tilesets.json",
+  settings: "data/settings.json",
 } as const;
 
 /** Data loaded from the manifests, shared by the whole game (filled by the Preloader). */

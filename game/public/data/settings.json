@@ -1,0 +1,15 @@
+{
+  "display": {
+    "visibleTilesX": 32,
+    "integerScaling": false,
+    "pixelSnapping": false
+  },
+  "camera": {
+    "followLag": 0.08
+  },
+  "movement": {
+    "tileBased": true,
+    "playerSpeed": 200,
+    "turnDelayMs": 50
+  }
+}

@@ -1,5 +1,5 @@
 import { Direction, MovementType } from "@/utils/Direction";
-import { GAME_CONSTANTS } from "@/constants/game";
+import { settingsStore } from "@/core/SettingsStore";
 
 export interface GridMovementInit {
   speed?: number;
@@ -18,10 +18,10 @@ export class GridMovementComponent {
   public speed: number;
   public holdDuration: number = 0;
   public movementType: MovementType = MovementType.WALK;
-  public readonly moveThreshold: number = 50;
+  public readonly moveThreshold: number = settingsStore.movement.turnDelayMs;
 
   constructor(init?: GridMovementInit) {
-    this.speed = init?.speed ?? GAME_CONSTANTS.PLAYER_SPEED;
+    this.speed = init?.speed ?? settingsStore.movement.playerSpeed;
     this.direction = init?.direction ?? Direction.DOWN;
   }
 }

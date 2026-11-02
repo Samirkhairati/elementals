@@ -92,6 +92,9 @@ export class MovementSystem extends System {
       grid.progress += stepDist / GAME_CONSTANTS.TILE_SIZE;
 
       if (grid.progress >= 1) {
+        // How far this frame went past the tile edge (in tiles). A chained step starts with it, so a held key walks at
+        // an even pace instead of losing a little at every tile.
+        const carry = Math.min(grid.progress - 1, 0.99);
         grid.progress = 1;
         transform.x = grid.targetX;
         transform.y = grid.targetY;
@@ -105,6 +108,11 @@ export class MovementSystem extends System {
         if (grid.pendingDirection && !isLocked) {
           grid.direction = grid.pendingDirection;
           this.tryStartGridStep(entity, transform, grid, grid.direction, world);
+          if (grid.isMoving && carry > 0) {
+            grid.progress = carry;
+            transform.x = grid.startX + (grid.targetX - grid.startX) * carry;
+            transform.y = grid.startY + (grid.targetY - grid.startY) * carry;
+          }
         }
       } else {
         transform.x = grid.startX + (grid.targetX - grid.startX) * grid.progress;

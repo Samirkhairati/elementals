@@ -10,28 +10,28 @@ export const CONFIG = {
     return GAME_CONSTANTS.TILE_SIZE;
   },
   get visibleTilesX() {
-    return GAME_CONSTANTS.VISIBLE_TILES_X;
+    return settingsStore.view.tilesX;
   },
   get visibleTilesY() {
-    return GAME_CONSTANTS.VISIBLE_TILES_Y;
+    return settingsStore.view.tilesY;
   },
   get mapWidth() {
-    return GAME_CONSTANTS.VISIBLE_TILES_X;
+    return settingsStore.view.tilesX;
   },
   get mapHeight() {
-    return GAME_CONSTANTS.VISIBLE_TILES_Y;
+    return settingsStore.view.tilesY;
   },
   get width() {
-    return GAME_CONSTANTS.LOGICAL_WIDTH;
+    return settingsStore.view.width;
   },
   get height() {
-    return GAME_CONSTANTS.LOGICAL_HEIGHT;
+    return settingsStore.view.height;
   },
   get backgroundColor() {
     return GAME_CONSTANTS.DEFAULT_BG_COLOR;
   },
   get playerSpeed() {
-    return GAME_CONSTANTS.PLAYER_SPEED;
+    return settingsStore.movement.playerSpeed;
   },
   get playerDepth() {
     return GAME_CONSTANTS.PLAYER_DEPTH;

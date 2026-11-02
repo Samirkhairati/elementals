@@ -62,7 +62,8 @@ editor  --writes-->  project/maps/*.json (editor map format, tile index keyed)
   Keep it **free of enums, namespaces, parameter properties and DOM/Node imports**. If a doc and `shared/engine/types.ts` disagree, fix the types first.
 * Maps carry `schemaVersion` (current 4: events stored as graphs). Old data is migrated on load by pure, idempotent functions in `shared/engine/migrate.ts`
   (editor on load, exporter on export, game defensively); nothing is written back until the author edits. Existing user data is never "fixed".
-* Tilesets and sprites: PNGs under `project/`; `assets:sync` copies the ones in use to `game/public/graphics/` and writes manifests. The tileset/layer named `collision` is data, never drawn.
+* Tilesets and sprites: PNGs under `project/`; `assets:sync` copies the ones in use to `game/public/graphics/` and writes manifests. The tileset/layer named `collision` is data, never drawn. The editor runs this sync itself when you import a picture or tileset, save the game settings or Export to Game (`withAssetSync` in `editor/electron/ipc/projectApi.ts`; skipped for project copies and packaged editors).
+* **Game settings** (view size, camera, movement) are `shared/gameSettings.ts`: the schema is the one source (the editor's **Game Settings** page in the main sidebar builds its form from it, the sync and the game clean values with `normalizeGameSettings`). Stored in `project/game-settings.json`, synced to `game/public/data/settings.json`, loaded by Boot/Preloader into `settingsStore`. New setting = one schema row + read it from `settingsStore`.
 * Graphics (`project/graphics`) and tilesets (`project/tilesets`) are imported (several files at once, picked or dragged in from the OS; the folder clicked last is the destination), organised in folders, renamed, moved and deleted in **Database › Graphics / Tilesets** (`editor/src/lib/assetOps.ts` plans the change and rewrites
   sprites and maps); the Map Editor only browses and picks them. A tileset's id is its file name (folders do not matter to maps); a graphic's id is its path. Image-layer items point at a sprite (`assetId`) or a picture (`graphicId`).
 
@@ -81,6 +82,7 @@ editor  --writes-->  project/maps/*.json (editor map format, tile index keyed)
 * Scenes: `Boot` -> `Preloader` -> `Game` (+ `UIScene` for HUD). `ecs/` (World, systems by priority), `events/` (interpreter, triggers, routes), `sprites/`, `world/` (map + tilemap),
   `components/` (HUDs: dialogue, choices, debug), `core/` (GameState, settings, boot params). The `@/` alias is `game/src`.
 * URL params: `?map=<id>`, `?renderer=canvas|webgl|auto`, `?debug=1` (debug HUD + `window.__game`). Dialogue / choice HUDs are driven through the `EventBus`.
+* The view is **16:9, 32 x 18 tiles by default** (`settingsStore.view`, from the game settings), fitted to the window at any zoom (whole-number zoom is a setting). Movement and the camera are frame-rate independent and sub-pixel (pixel snapping is a setting): do not add `Math.round`/`floor` to positions or camera scroll. Smaller maps are centred on the screen.
 * Tile-layer depth comes from the layer's `z` property (Phaser depth). Layers are created in file order.
 * The game needs WebGL (or `?renderer=canvas`); some embedded browser panes cannot create the framebuffer and show a blank canvas.
 

@@ -1,5 +1,16 @@
-import { DEFAULT_CONTROLS } from "@/constants/game";
+import { DEFAULT_CONTROLS, GAME_CONSTANTS } from "@/constants/game";
 import { EventBus, Events } from "@/utils/EventBus";
+import {
+  defaultGameSettings,
+  normalizeGameSettings,
+  viewSizeForTiles,
+  type CameraSettings,
+  type DisplaySettings,
+  type GameSettings,
+  type MovementSettings,
+} from "@shared/gameSettings.ts";
+
+export type { CameraSettings, DisplaySettings, MovementSettings };
 
 export interface DebugSettings {
   enabled: boolean;
@@ -7,10 +18,6 @@ export interface DebugSettings {
   showCoords: boolean;
   showGrid: boolean;
   showFPS: boolean;
-}
-
-export interface CameraSettings {
-  smoothFollow: boolean;
 }
 
 export interface ControlSettings {
@@ -23,7 +30,10 @@ export interface GameSettingsState {
   tileBasedMovement: boolean;
   renderScale: number;
   debug: DebugSettings;
+  /** From the project's game settings (project/game-settings.json -> data/settings.json). */
+  display: DisplaySettings;
   camera: CameraSettings;
+  movement: MovementSettings;
   controls: ControlSettings;
 }
 
@@ -33,7 +43,7 @@ export class SettingsStore {
   private static instance: SettingsStore;
 
   private _state: GameSettingsState = {
-    tileBasedMovement: true,
+    tileBasedMovement: defaultGameSettings().movement.tileBased,
     renderScale: 1,
     debug: {
       enabled: false,
@@ -42,9 +52,9 @@ export class SettingsStore {
       showGrid: true,
       showFPS: true,
     },
-    camera: {
-      smoothFollow: true,
-    },
+    display: defaultGameSettings().display,
+    camera: defaultGameSettings().camera,
+    movement: defaultGameSettings().movement,
     controls: {
       run: DEFAULT_CONTROLS.RUN,
       action: DEFAULT_CONTROLS.ACTION,
@@ -104,8 +114,33 @@ export class SettingsStore {
     this.notify();
   }
 
+  public get display(): Readonly<DisplaySettings> {
+    return this._state.display;
+  }
+
   public get camera(): Readonly<CameraSettings> {
     return this._state.camera;
+  }
+
+  public get movement(): Readonly<MovementSettings> {
+    return this._state.movement;
+  }
+
+  /** The view in world pixels (16:9) for the current "tiles across" setting. */
+  public get view(): { width: number; height: number; tilesX: number; tilesY: number } {
+    const { width, height } = viewSizeForTiles(this._state.display.visibleTilesX, GAME_CONSTANTS.TILE_SIZE);
+    return { width, height, tilesX: width / GAME_CONSTANTS.TILE_SIZE, tilesY: height / GAME_CONSTANTS.TILE_SIZE };
+  }
+
+  /** Takes the project's game settings (cleaned: anything missing or out of range falls back). Called once, before the game scene starts. */
+  public applyGameSettings(raw: unknown): GameSettings {
+    const settings = normalizeGameSettings(raw);
+    this._state.display = settings.display;
+    this._state.camera = settings.camera;
+    this._state.movement = settings.movement;
+    this._state.tileBasedMovement = settings.movement.tileBased;
+    this.notify();
+    return settings;
   }
 
   public get controls(): Readonly<ControlSettings> {

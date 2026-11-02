@@ -96,3 +96,10 @@ Every sprite has a character (`SpriteRegistry` holds v2 `CharacterDef`s; the v1 
   `CharacterLoader` (`sprites/characterLoader.ts`) loads each character once and creates its animations after the files arrive.
 * **Modes**: `setMovementMode` {target, mode} sets `AnimatorComponent.mode`; the animator then prefers `<mode>.<activity>` bindings
   (`swim.walk`, ...) and falls back to the plain ones. A `changeSprite` between characters with different profiles logs a warning.
+
+## View, camera and smoothness
+
+* **View.** `settingsStore.view` is the world area on screen: `display.visibleTilesX` tiles across (default 32) at 16:9 (18 down), 32 px tiles. `Game.handleResize` fits it into the window with a camera viewport and zoom; any zoom works (`display.integerScaling` rounds it down to whole numbers, with black bars). The HUD scene is in screen space and ignores the view.
+* **Small maps** are centred: `MapSystem.updateWorldBounds` widens the camera bounds on an axis where the map is smaller than the view.
+* **Smooth motion.** Grid steps carry the distance walked past a tile edge into the next step (`MovementSystem`), so a held key walks at an even pace. The camera follows the player's body with `followLag` (seconds): `Game.updateCameraLag` sets the per-frame lerp to `1 - exp(-dt / lag)`, so 60 and 144 Hz behave alike, and 0 pins it. `display.pixelSnapping` (default off) is Phaser's camera `roundPixels`, which floors positions in *world* pixels (blocky when zoomed); leave it off unless thin lines show between tiles.
+* **Settings** come from `data/settings.json` (see CLAUDE.md, Game settings): `settingsStore.applyGameSettings` runs in the Preloader before any entity is created, so default speeds and the turn delay (`GridMovementComponent.moveThreshold`) read them at creation.

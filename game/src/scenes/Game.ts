@@ -163,23 +163,24 @@ export class Game extends Scene {
   }
 
   private handleResize(gameSize: { width: number; height: number }) {
-    const visibleWidth = GAME_CONSTANTS.LOGICAL_WIDTH;
-    const visibleHeight = GAME_CONSTANTS.LOGICAL_HEIGHT;
+    const { width: visibleWidth, height: visibleHeight } = settingsStore.view;
+    const { integerScaling, pixelSnapping } = settingsStore.display;
 
-    // Calculate integer scale factor to fit the visible area into the game size
-    const scaleX = Math.max(1, Math.floor(gameSize.width / visibleWidth));
-    const scaleY = Math.max(1, Math.floor(gameSize.height / visibleHeight));
-    const newScale = Math.min(scaleX, scaleY);
-    
-    const viewportWidth = visibleWidth * newScale;
-    const viewportHeight = visibleHeight * newScale;
+    // Fit the view into the window. Any zoom keeps movement smooth; whole-number zoom keeps every pixel the same size.
+    let zoom = Math.min(gameSize.width / visibleWidth, gameSize.height / visibleHeight);
+    if (integerScaling) zoom = Math.max(1, Math.floor(zoom));
+
+    const viewportWidth = Math.floor(visibleWidth * zoom);
+    const viewportHeight = Math.floor(visibleHeight * zoom);
     const viewportX = Math.floor((gameSize.width - viewportWidth) / 2);
     const viewportY = Math.floor((gameSize.height - viewportHeight) / 2);
 
-    this.cameras.main.setViewport(viewportX, viewportY, viewportWidth, viewportHeight);
-    this.cameras.main.setZoom(newScale);
+    const cam = this.cameras.main;
+    cam.setViewport(viewportX, viewportY, viewportWidth, viewportHeight);
+    cam.setZoom(zoom);
+    cam.setRoundPixels(pixelSnapping);
 
-    settingsStore.setRenderScale(newScale);
+    settingsStore.setRenderScale(zoom);
   }
 
   private cleanup() {
@@ -240,11 +241,8 @@ export class Game extends Scene {
 
     const playerSprite = this.renderBridgeSystem.getSprite(this.playerEntity);
     if (playerSprite) {
-      if (settingsStore.camera.smoothFollow) {
-        this.cameras.main.startFollow(playerSprite, false, 0.05, 0.05);
-      } else {
-        this.cameras.main.startFollow(playerSprite, true, 1, 1);
-      }
+      // The camera centres on the player's body (24 px above the feet); update() sets how fast it catches up
+      this.cameras.main.startFollow(playerSprite, settingsStore.display.pixelSnapping, 1, 1, 0, 24);
       // Warps jump the camera instead of gliding across the new map
       this.cameras.main.centerOn(spawned.x, spawned.y - 24);
     }
@@ -314,6 +312,16 @@ export class Game extends Scene {
     this.cameras.main.centerOn(x, y - 24);
   }
 
+  /**
+   * Camera follow: it covers the same share of the gap whatever the frame rate (so 60 and 144 Hz look alike).
+   * `followLag` is the time it takes to close most of the gap; 0 pins the camera to the player.
+   */
+  private updateCameraLag(delta: number) {
+    const lag = settingsStore.camera.followLag;
+    const k = lag <= 0 ? 1 : 1 - Math.exp(-(Math.min(delta, 100) / 1000) / lag);
+    this.cameras.main.setLerp(k, k);
+  }
+
   /** Footprints of event entities (yellow = solid, magenta = walkable trigger, grey = no active state). */
   private redrawDebugOverlay() {
     const g = this.debugGraphics;
@@ -352,6 +360,7 @@ export class Game extends Scene {
       this.inputSystem?.setSnapshot(input);
     }
     this.world?.update(delta);
+    this.updateCameraLag(delta);
     this.redrawDebugOverlay();
   }
 }

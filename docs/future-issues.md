@@ -13,3 +13,16 @@ Things that work today but will need attention later. Add an entry whenever you 
 
 - **What:** a sprite placed on an image layer shows the character's static frame, in the editor and in the game.
 - **Idea:** let an item pick an animation and play it in both places (the game side would use the sprite registry's animations).
+
+## The game canvas ignores the screen's pixel density
+
+- **What:** Phaser runs in `RESIZE` mode with a canvas of CSS pixels, so on a retina display the browser upscales it 2x. Sub-pixel smoothness is limited to CSS pixels.
+- **Fine now:** movement is steady and the picture is sharp enough at the default 32-tile view.
+- **Stops being fine:** if motion should be as fine as the screen allows or text looks soft.
+- **Idea:** size the canvas to `innerWidth * devicePixelRatio` and shrink it back with CSS (`Scale.zoom = 1 / dpr`), then include the ratio in the camera zoom in `Game.handleResize`.
+
+## A picture that no map uses is not copied to the game
+
+- **What:** `assets:sync` (and so the automatic sync after an import) copies only pictures that characters or image layers use, and removes copies nobody uses.
+- **Fine now:** the game only ever needs the used ones.
+- **Stops being fine:** if something should load a picture by id from an event (e.g. a "show picture" command): it would have to be added to the used set.

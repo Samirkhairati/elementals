@@ -110,8 +110,33 @@ describe('MovementSystem grid movement', () => {
     world.update(16);
     world.update(120); // finish first step and start second
     expect(grid.isMoving).toBe(true);
-    expect(t.y).toBe(py(6));
     expect(grid.targetY).toBe(py(7));
+    // the 6.4 px this frame went past the tile edge are walked into the next tile, not thrown away
+    expect(t.y).toBeCloseTo(py(6) + 6.4, 5);
+    expect(grid.progress).toBeCloseTo(0.2, 5);
+  });
+
+  it('holding a key walks at an even pace: tile edges do not cost any distance', () => {
+    const { world } = makeSystems();
+    const { grid, t } = addGridEntity(world, 5, 5, { speed: 200 });
+    grid.pendingDirection = Direction.DOWN;
+    grid.holdDuration = 100;
+    const frame = 1000 / 60;
+    world.update(frame);
+    const start = t.y;
+    for (let i = 0; i < 60; i++) world.update(frame); // one second
+    expect(t.y - start).toBeCloseTo(200, 3);
+  });
+
+  it('a very long frame never skips more than one tile', () => {
+    const { world } = makeSystems();
+    const { grid, t } = addGridEntity(world, 5, 5);
+    grid.pendingDirection = Direction.DOWN;
+    grid.holdDuration = 100;
+    world.update(16);
+    world.update(5000);
+    expect(t.y).toBeLessThan(py(6) + TS);
+    expect(grid.progress).toBeLessThan(1);
   });
 
   it('does not enter blocked tiles', () => {

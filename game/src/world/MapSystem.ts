@@ -58,11 +58,13 @@ export class MapSystem {
 
   private updateWorldBounds() {
     if (!this.currentMap) return;
-    this.scene.cameras.main.setBounds(
-        0, 0, 
-        this.currentMap.widthInPixels, 
-        this.currentMap.heightInPixels
-    );
+    // A map smaller than the screen sits in the middle of it (the camera cannot scroll on that axis)
+    const view = settingsStore.view;
+    const mapW = this.currentMap.widthInPixels;
+    const mapH = this.currentMap.heightInPixels;
+    const boundsW = Math.max(mapW, view.width);
+    const boundsH = Math.max(mapH, view.height);
+    this.scene.cameras.main.setBounds((mapW - boundsW) / 2, (mapH - boundsH) / 2, boundsW, boundsH);
   }
 
   private renderDebugGrid() {
