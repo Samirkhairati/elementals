@@ -5,7 +5,8 @@ import * as mapStore from './mapStore.js';
 import { toResult } from './result.js';
 import * as characterStore from './characterStore.js';
 import { TilesetCache } from './tilesetCache.js';
-import { syncGameAssets } from './gameAssets.js';
+import { syncGameAssets, type AssetSyncSummary } from './gameAssets.js';
+import * as gameSettingsStore from './gameSettingsStore.js';
 import * as tilesetStore from './tilesetStore.js';
 import * as graphicStore from './graphicStore.js';
 
@@ -53,6 +54,18 @@ export function createProjectChannels(
   const tilesetCache = new TilesetCache();
   const imageCache = new TilesetCache();
 
+  /**
+   * What the author adds to the project (a picture, a tileset, a setting) reaches the game right away: a successful
+   * result gets the asset sync (what `npm run assets:sync` does) and carries its summary as `assets`. A sync that cannot
+   * run (a project copy, a packaged editor) or finds problems never turns the result into a failure.
+   */
+  const withAssetSync = async <T extends { success: boolean }>(result: T): Promise<T | (T & { assets: AssetSyncSummary })> => {
+    if (!result.success) return result;
+    const assets = await syncGameAssets(root, gameMapsDir);
+    if (assets.skipped) console.warn(`[assets] ${assets.skipped}`);
+    return { ...result, assets };
+  };
+
   return {
     // ── tilesets ──
     'get-tilesets': () =>
@@ -61,8 +74,8 @@ export function createProjectChannels(
         for (const w of result.warnings) console.warn(`[tilesets] ${w.file}: ${w.error}`);
         return result;
       }),
-    'import-tileset': (sourcePath: string, name: string, folderPath: string | null = null, fileStem?: string) =>
-      toResult(() => tilesetStore.importTileset(tilesetsDir, tilesetCache, sourcePath, name, folderPath, fileStem)),
+    'import-tileset': async (sourcePath: string, name: string, folderPath: string | null = null, fileStem?: string) =>
+      withAssetSync(toResult(() => tilesetStore.importTileset(tilesetsDir, tilesetCache, sourcePath, name, folderPath, fileStem))),
     'create-folder': (parentPath: string | null, folderName: string) =>
       toResult(() => tilesetStore.createTilesetFolder(tilesetsDir, parentPath, folderName)),
     'rename-folder': (oldFolderPath: string, newFolderName: string) =>
@@ -93,12 +106,9 @@ export function createProjectChannels(
       toResult(() => mapStore.saveMap(mapsDir, folderPath, fileName, mapData)),
     'delete-map': (folderPath: string | null, fileName: string) =>
       toResult(() => mapStore.deleteMap(mapsDir, folderPath, fileName)),
-    'export-map-to-game': async (fileName: string, json: string) => {
-      const exported = toResult(() => mapStore.exportMapToGame(gameMapsDir, fileName, json));
-      if (!exported.success) return exported;
-      // The pictures, tilesets and sprites the map uses go to the game with it (what `npm run assets:sync` does).
-      return { ...exported, assets: await syncGameAssets(root, gameMapsDir) };
-    },
+    // The pictures, tilesets and sprites the map uses go to the game with it.
+    'export-map-to-game': async (fileName: string, json: string) =>
+      withAssetSync(toResult(() => mapStore.exportMapToGame(gameMapsDir, fileName, json))),
     'create-map-folder': (parentPath: string | null, folderName: string) =>
       toResult(() => mapStore.createMapFolder(mapsDir, parentPath, folderName)),
     'delete-map-folder': (folderPath: string) => toResult(() => mapStore.deleteMapFolder(mapsDir, folderPath)),
@@ -119,8 +129,8 @@ export function createProjectChannels(
     'save-character': (id: string, def: unknown) => toResult(() => characterStore.saveCharacter(roots, imageCache, id, def)),
     'rename-character': (id: string, newId: string) => toResult(() => characterStore.renameCharacter(roots, id, newId)),
     'delete-character': (id: string) => toResult(() => characterStore.deleteCharacter(roots, id)),
-    'import-graphic': (sourcePath: string, graphicId: string) =>
-      toResult(() => characterStore.importGraphic(graphicsDir, imageCache, sourcePath, graphicId)),
+    'import-graphic': async (sourcePath: string, graphicId: string) =>
+      withAssetSync(toResult(() => characterStore.importGraphic(graphicsDir, imageCache, sourcePath, graphicId))),
     'rename-graphic': (id: string, newId: string) => toResult(() => graphicStore.renameGraphic(graphicsDir, imageCache, id, newId)),
     'delete-graphic': (id: string) => toResult(() => graphicStore.deleteGraphic(graphicsDir, imageCache, id)),
     'create-graphic-folder': (parentId: string | null, name: string) => toResult(() => graphicStore.createGraphicFolder(graphicsDir, parentId ?? null, name)),
@@ -138,6 +148,10 @@ export function createProjectChannels(
     // ── database ──
     'get-database': () => toResult(() => databaseStore.getDatabase(root)),
     'save-database': (database: unknown) => toResult(() => databaseStore.saveDatabase(root, database)),
+
+    // ── game settings (project/game-settings.json; saving also writes game/public/data/settings.json) ──
+    'get-game-settings': () => toResult(() => gameSettingsStore.getGameSettings(root)),
+    'save-game-settings': async (settings: unknown) => withAssetSync(toResult(() => gameSettingsStore.saveGameSettings(root, settings))),
 
     // ── common events ──
     'get-common-events': () =>

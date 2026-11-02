@@ -115,6 +115,55 @@ describe('channels end to end (real temp project)', () => {
     });
   });
 
+  describe('importing and saving settings also syncs the game assets', () => {
+    const syncScript = `import fs from 'fs'; import path from 'path';
+      export function syncAssets({ publicDir }) {
+        fs.mkdirSync(publicDir, { recursive: true });
+        fs.writeFileSync(path.join(publicDir, 'synced.txt'), 'yes');
+        return { plan: { errors: [] }, applied: ['x'] };
+      }`;
+    const repoWithScript = () => {
+      const repo = tmp.create();
+      const project = path.join(repo, 'project');
+      fs.mkdirSync(path.join(repo, 'scripts', 'lib'), { recursive: true });
+      fs.writeFileSync(path.join(repo, 'scripts', 'lib', 'assets.mjs'), syncScript);
+      fs.mkdirSync(project, { recursive: true });
+      return { repo, project };
+    };
+
+    it('importing a picture or a tileset copies it to the game right away', async () => {
+      const { repo, project } = repoWithScript();
+      const channels = createProjectChannels(project);
+      const png = path.join(repo, 'pic.png');
+      fs.writeFileSync(png, makePng(8, 8));
+      const picture = (await channels['import-graphic'](png, 'pic.png')) as { success: boolean; assets: { written: number } };
+      expect(picture).toMatchObject({ success: true, assets: { written: 1 } });
+      fs.rmSync(path.join(repo, 'game', 'public', 'synced.txt'));
+      const tileset = (await channels['import-tileset'](png, 'Pic')) as { success: boolean; assets: { written: number } };
+      expect(tileset).toMatchObject({ success: true, assets: { written: 1 } });
+      expect(fs.existsSync(path.join(repo, 'game', 'public', 'synced.txt'))).toBe(true);
+    });
+
+    it('a failed import is not synced and stays a failure', async () => {
+      const { repo, project } = repoWithScript();
+      const res = (await createProjectChannels(project)['import-graphic'](path.join(repo, 'nope.png'), 'x.png')) as { success: boolean; assets?: unknown };
+      expect(res.success).toBe(false);
+      expect(res.assets).toBeUndefined();
+      expect(fs.existsSync(path.join(repo, 'game', 'public', 'synced.txt'))).toBe(false);
+    });
+
+    it('saving the game settings writes the project file and syncs', async () => {
+      const { repo, project } = repoWithScript();
+      const channels = createProjectChannels(project);
+      expect(await channels['get-game-settings']()).toEqual({ success: true, settings: null });
+      const settings = { display: { visibleTilesX: 40 } };
+      expect(await channels['save-game-settings'](settings)).toMatchObject({ success: true, settings, assets: { written: 1 } });
+      expect(await channels['get-game-settings']()).toEqual({ success: true, settings });
+      expect(fs.existsSync(path.join(repo, 'game', 'public', 'synced.txt'))).toBe(true);
+      expect(await channels['save-game-settings']('nope')).toMatchObject({ success: false });
+    });
+  });
+
   it('creates, saves and lists maps', async () => {
     const created = (await call('create-map', 'Town', 10, 8, null)) as { success: true; map: { fileName: string } };
     expect(created.success).toBe(true);

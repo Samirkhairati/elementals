@@ -4,6 +4,7 @@ import { IndexPage } from '@/routes/index'
 import { EditorPage } from '@/routes/editor'
 import { DatabasePage } from '@/components/editor/database/DatabasePage'
 import { SettingsPage } from '@/routes/settings'
+import { GameSettingsPage } from '@/routes/game-settings'
 
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -43,7 +44,13 @@ const settingsRoute = createRoute({
   component: SettingsPage,
 })
 
-const routeTree = rootRoute.addChildren([indexRoute, editorRoute, databaseRoute, assetsRoute, settingsRoute])
+const gameSettingsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/game-settings',
+  component: GameSettingsPage,
+})
+
+const routeTree = rootRoute.addChildren([indexRoute, editorRoute, databaseRoute, gameSettingsRoute, assetsRoute, settingsRoute])
 const hashHistory = createHashHistory()
 
 export const router = createRouter({

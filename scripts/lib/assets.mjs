@@ -7,6 +7,7 @@
 //   graphics/tilesets/<name>.png        project tilesets the game does not have yet (never overwritten, see --force)
 //   data/characters.json                CharacterManifest (shared/engine/graphics.ts): every character + web-relative sheet URLs
 //   data/database.json                  the global switches / variables
+//   data/settings.json                  the game settings (project/game-settings.json, cleaned; the defaults without one)
 //   data/common.json                    the common events (project/common/<id>.json), sorted by id
 //   data/tilesets.json                  every tileset PNG the game has (name = file stem)
 //
@@ -19,6 +20,7 @@ import path from 'node:path'
 import { parseArgs } from 'node:util'
 import { fileURLToPath } from 'node:url'
 import { readPngSize } from '../../shared/png.ts'
+import { normalizeGameSettings } from '../../shared/gameSettings.ts'
 import {
   buildCharacterManifest,
   buildCommonManifest,
@@ -246,6 +248,18 @@ export function planSync({ projectDir, publicDir, force = false }) {
     warnings.push('database.json not found in the project: generating an empty database')
   }
 
+  // game settings: project/game-settings.json cleaned by the shared schema (a project without one gets the defaults)
+  let settingsRaw = null
+  const settingsBytes = readIfExists(path.join(projectDir, 'game-settings.json'))
+  if (settingsBytes !== null) {
+    try {
+      settingsRaw = JSON.parse(settingsBytes.toString('utf8'))
+    } catch (e) {
+      errors.push(`game-settings.json: not valid JSON: ${e.message}`)
+    }
+  }
+  const settings = normalizeGameSettings(settingsRaw)
+
   // common events: one project/common/<id>.json each, bundled into data/common.json
   const commonRaw = []
   const commonDir = path.join(projectDir, 'common')
@@ -287,6 +301,7 @@ export function planSync({ projectDir, publicDir, force = false }) {
   // manifests
   add('data/characters.json', 'manifest', toJson(buildCharacterManifest(chars.characters)))
   add('data/database.json', 'manifest', toJson(database))
+  add('data/settings.json', 'manifest', toJson(settings))
   add('data/common.json', 'manifest', toJson(common))
   add(
     'data/tilesets.json',
@@ -382,6 +397,7 @@ Generates what the game loads from the authored project data:
   game/public/graphics/tilesets/*.png       project tilesets the game lacks (existing files are kept)
   game/public/data/characters.json          character manifest (ids, definitions, sheet URLs)
   game/public/data/database.json            global switches and variables
+  game/public/data/settings.json            game settings (project/game-settings.json)
   game/public/data/common.json              common events (project/common/<id>.json)
   game/public/data/tilesets.json            every tileset PNG the game has
 

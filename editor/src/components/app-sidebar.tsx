@@ -1,5 +1,5 @@
 import { Link, useLocation } from "@tanstack/react-router"
-import { Database, Home, Map, Settings } from "lucide-react"
+import { Database, Gamepad2, Home, Map, Settings } from "lucide-react"
 import {
   Sidebar,
   SidebarContent,
@@ -17,6 +17,7 @@ const mainItems = [
   { title: "Home", url: "/", icon: Home },
   { title: "Map Editor", url: "/editor", icon: Map },
   { title: "Database", url: "/database", icon: Database },
+  { title: "Game Settings", url: "/game-settings", icon: Gamepad2 },
 ]
 
 export function AppSidebar() {

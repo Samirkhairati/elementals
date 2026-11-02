@@ -229,6 +229,7 @@ describe('sync', () => {
         'data/characters.json',
         'data/common.json',
         'data/database.json',
+        'data/settings.json',
         'data/tilesets.json',
         'graphics/props/ball.png',
         'graphics/sprites/characters/hero/run.png',
@@ -242,6 +243,27 @@ describe('sync', () => {
     assert.deepEqual(sb.json('data/characters.json').characters.find((c) => c.id === 'objects/ball').files, { sheet: 'graphics/props/ball.png' })
   })
 
+  test('game settings: the defaults without a project file, otherwise the cleaned file', () => {
+    const sb = sandbox()
+    sb.sync()
+    assert.equal(sb.json('data/settings.json').display.visibleTilesX, 32)
+
+    writeJson(path.join(sb.projectDir, 'game-settings.json'), { display: { visibleTilesX: 40, junk: 1 }, camera: { followLag: 'slow' } })
+    sb.sync()
+    const settings = sb.json('data/settings.json')
+    assert.equal(settings.display.visibleTilesX, 40)
+    assert.equal(settings.camera.followLag, 0.08)
+    assert.equal(settings.display.junk, undefined)
+  })
+
+  test('a game-settings.json that is not JSON is an error and nothing is written', () => {
+    const sb = sandbox()
+    fs.writeFileSync(path.join(sb.projectDir, 'game-settings.json'), '{')
+    const { plan, applied } = sb.sync()
+    assert.match(plan.errors.join('\n'), /game-settings\.json: not valid JSON/)
+    assert.deepEqual(applied, [])
+  })
+
   test('is idempotent and deterministic', () => {
     const sb = sandbox()
     sb.sync()
@@ -253,7 +275,7 @@ describe('sync', () => {
     // a second sandbox with the same inputs gives byte-identical manifests
     const other = sandbox()
     other.sync()
-    for (const f of ['data/characters.json', 'data/database.json', 'data/tilesets.json', 'data/common.json']) {
+    for (const f of ['data/characters.json', 'data/database.json', 'data/settings.json', 'data/tilesets.json', 'data/common.json']) {
       assert.equal(fs.readFileSync(path.join(other.publicDir, f), 'utf8'), fs.readFileSync(path.join(sb.publicDir, f), 'utf8'))
     }
   })
@@ -261,7 +283,7 @@ describe('sync', () => {
   test('manifests end with a newline and carry no timestamps', () => {
     const sb = sandbox()
     sb.sync()
-    for (const f of ['data/characters.json', 'data/database.json', 'data/tilesets.json', 'data/common.json']) {
+    for (const f of ['data/characters.json', 'data/database.json', 'data/settings.json', 'data/tilesets.json', 'data/common.json']) {
       const text = fs.readFileSync(path.join(sb.publicDir, f), 'utf8')
       assert.ok(text.endsWith('}\n'), f)
       assert.doesNotMatch(text, /20\d\d-\d\d-\d\d/)

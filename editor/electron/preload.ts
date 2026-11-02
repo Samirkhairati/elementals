@@ -47,6 +47,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   deleteCharacterFolder: (folderId: string) => ipcRenderer.invoke('delete-character-folder', folderId),
   getDatabase: () => ipcRenderer.invoke('get-database'),
   saveDatabase: (database: unknown) => ipcRenderer.invoke('save-database', database),
+  getGameSettings: () => ipcRenderer.invoke('get-game-settings'),
+  saveGameSettings: (settings: unknown) => ipcRenderer.invoke('save-game-settings', settings),
   getCommonEvents: () => ipcRenderer.invoke('get-common-events'),
   saveCommonEvent: (event: unknown) => ipcRenderer.invoke('save-common-event', event),
   deleteCommonEvent: (id: string) => ipcRenderer.invoke('delete-common-event', id),

@@ -60,6 +60,8 @@ interface ElectronAPI {
   deleteCharacterFolder: (folderId: string) => Promise<({ success: true }) | IpcFailure>;
   getDatabase: () => Promise<({ success: true; database: GameDatabase }) | IpcFailure>;
   saveDatabase: (database: GameDatabase) => Promise<({ success: true; database: GameDatabase }) | IpcFailure>;
+  getGameSettings: () => Promise<({ success: true; settings: unknown | null }) | IpcFailure>;
+  saveGameSettings: (settings: unknown) => Promise<({ success: true; settings: unknown; assets?: { written: number; skipped?: string } }) | IpcFailure>;
   getCommonEvents: () => Promise<({ success: true; events: CommonEvent[]; warnings: { file: string; error: string }[] }) | IpcFailure>;
   saveCommonEvent: (event: CommonEvent) => Promise<({ success: true; event: CommonEvent }) | IpcFailure>;
   deleteCommonEvent: (id: string) => Promise<({ success: true }) | IpcFailure>;
