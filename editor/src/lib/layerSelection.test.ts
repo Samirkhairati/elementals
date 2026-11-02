@@ -70,6 +70,12 @@ describe('fitSelectionToLayer', () => {
     expect(fitSelectionToLayer('collision', plain)?.tiles).toEqual([COL])
   })
 
+  it('keeps an empty sampled area on a collision layer, so painting it erases instead of drawing a block', () => {
+    const empty: TileSelection = { width: 2, height: 2, tiles: [null, null, null, null] }
+    expect(fitSelectionToLayer('collision', empty)).toBe(empty)
+    expect(fitSelectionToLayer('tile', empty)).toBe(empty)
+  })
+
   it('never lets the collision marker onto a tile layer', () => {
     expect(fitSelectionToLayer('tile', marker)).toBeNull()
     const mixed: TileSelection = { width: 2, height: 1, tiles: [t(1), COL] }

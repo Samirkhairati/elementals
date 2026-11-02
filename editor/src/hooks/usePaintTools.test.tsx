@@ -59,6 +59,16 @@ describe('usePaintTools (StrictMode)', () => {
     expect(commitHistory).not.toHaveBeenCalled() // history is committed at stroke end
   })
 
+  it('painting an empty sampled area on a collision layer erases there instead of drawing a block', () => {
+    const marker = { tilesetId: '__collision__', x: 0, y: 0 }
+    const { result } = setup({
+      layer: { type: 'collision', data: { 5: marker, 6: marker, 15: marker } },
+      selection: { width: 2, height: 1, tiles: [null, null] },
+    })
+    act(() => result.current.tools.handlePaint(1, 1))
+    expect(result.current.layers[0].data).toEqual({ 15: marker })
+  })
+
   it('several paint calls in one tick compose', () => {
     const { result } = setup()
     act(() => {

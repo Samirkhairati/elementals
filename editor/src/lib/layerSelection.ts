@@ -77,13 +77,17 @@ const COLLISION_MARKER: CopiedTile = { tilesetId: COLLISION, x: 0, y: 0 }
 
 /**
  * The selection as a layer of that type can take it: a collision layer only holds the collision marker
- * (a selection without one paints the marker), every other layer never receives it. Returns the same
+ * (a selection of tileset tiles paints the marker; an all-empty sampled area is kept and so erases), every other layer never receives it. Returns the same
  * object when nothing has to change, and null when a collision-only selection meets a non-collision layer.
  */
 export function fitSelectionToLayer(layerType: Layer['type'], selection: TileSelection): TileSelection | null {
   const hasCollision = selection.tiles.some((t) => t?.tilesetId === COLLISION)
   if (layerType === 'collision') {
-    if (!hasCollision) return { width: 1, height: 1, tiles: [COLLISION_MARKER] }
+    if (!hasCollision) {
+      // A sampled empty area stays as it is, so stamping it erases (as on a tile layer); only real tileset tiles become the marker.
+      if (selection.tiles.every((t) => t === null)) return selection
+      return { width: 1, height: 1, tiles: [COLLISION_MARKER] }
+    }
     if (selection.tiles.every((t) => !t || t.tilesetId === COLLISION)) return selection
     return { ...selection, tiles: selection.tiles.map((t) => (t?.tilesetId === COLLISION ? t : null)) }
   }
