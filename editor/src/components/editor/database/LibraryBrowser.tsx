@@ -2,7 +2,7 @@
 // create in, rename and delete, and drag-and-drop to rearrange. It only reports what the user did; the table
 // decides what that means (and rewrites references).
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { ChevronDown, ChevronRight, FolderPlus, Pencil, Trash2 } from 'lucide-react'
 import { canMoveFolder } from '@/lib/assetOps'
 import { buildLibraryTree, type FolderNode, type LibraryItem } from '@/lib/libraryTree'
@@ -50,6 +50,10 @@ export function LibraryBrowser({ items, folders, query, mode, selected, onSelect
   const tree = useMemo(() => buildLibraryTree(items, folders, query), [items, folders, query])
   const searching = query.trim() !== ''
   const [closed, setClosed] = useState<Set<string>>(new Set())
+  // What is being dragged lives in a ref too: dragover must know it at once, and the browser forbids reading
+  // dataTransfer there. The state only drives the highlight, and is set after the drag has started (changing the DOM
+  // inside dragstart makes Chromium cancel the drag).
+  const dragRef = useRef<DragPayload | null>(null)
   const [dragging, setDragging] = useState<DragPayload | null>(null)
   const [dropTarget, setDropTarget] = useState<string | null>(null)
   const toggle = (path: string) => setClosed((s) => { const n = new Set(s); if (n.has(path)) n.delete(path); else n.add(path); return n })
@@ -59,9 +63,10 @@ export function LibraryBrowser({ items, folders, query, mode, selected, onSelect
   if (searching && tree.items.length === 0 && tree.folders.length === 0) return <p className="ed-hint p-3">Nothing matches “{query}”.</p>
 
   const accepts = (target: string): boolean => {
-    if (!dragging) return false
-    if (dragging.kind === 'item') return true
-    return canMoveFolder(dragging.key, target)
+    const d = dragRef.current
+    if (!d) return false
+    if (d.kind === 'item') return true
+    return canMoveFolder(d.key, target)
   }
   // Handlers stop at the innermost folder, so dropping into a nested folder does not also count for its parents.
   const dropProps = (target: string) => ({
@@ -75,10 +80,12 @@ export function LibraryBrowser({ items, folders, query, mode, selected, onSelect
     onDrop: (e: React.DragEvent) => {
       e.preventDefault()
       e.stopPropagation()
-      const drag = readDrag(e) ?? dragging
+      const drag = dragRef.current ?? readDrag(e)
+      const ok = !!drag && accepts(target)
+      dragRef.current = null
       setDropTarget(null)
       setDragging(null)
-      if (drag && accepts(target)) onMove(drag, target)
+      if (drag && ok) onMove(drag, target)
     },
   })
   const dragProps = (drag: DragPayload) => ({
@@ -87,9 +94,11 @@ export function LibraryBrowser({ items, folders, query, mode, selected, onSelect
       e.stopPropagation()
       e.dataTransfer.setData(DRAG_TYPE, JSON.stringify(drag))
       e.dataTransfer.effectAllowed = 'move'
-      setDragging(drag)
+      dragRef.current = drag
+      setTimeout(() => setDragging(drag), 0)
     },
     onDragEnd: () => {
+      dragRef.current = null
       setDragging(null)
       setDropTarget(null)
     },
@@ -175,13 +184,13 @@ export function LibraryBrowser({ items, folders, query, mode, selected, onSelect
   ]
 
   return (
-    <div className="flex flex-col gap-1" data-drop={dropTarget === '' ? 'true' : undefined} {...dropProps('')}>
-      {dragging && (
-        <div className="ed-row text-ed-label text-muted-foreground" data-drop={dropTarget === '' ? 'true' : undefined}>
-          Drop on a folder to move it there, or here for the top level
-        </div>
-      )}
+    <div
+      className="relative flex min-h-[50vh] flex-col gap-1 rounded-md data-[drop=true]:ring-1 data-[drop=true]:ring-primary/60"
+      data-drop={dropTarget === '' ? 'true' : undefined}
+      {...dropProps('')}
+    >
       {mode === 'tiles' ? <div className="flex flex-col gap-3">{renderTiles(tree)}</div> : renderList(tree, true)}
+      {dragging && <p className="ed-hint pointer-events-none absolute inset-x-0 bottom-1 text-center">Drop on a folder, or on empty space for the top level</p>}
     </div>
   )
 }
