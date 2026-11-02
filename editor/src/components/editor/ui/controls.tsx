@@ -245,7 +245,7 @@ export function NumberField({
   disabled,
   id,
   className,
-  align = 'right',
+  align = 'left',
   size,
   ...rest
 }: NumberFieldProps) {

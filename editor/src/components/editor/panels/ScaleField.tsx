@@ -43,7 +43,6 @@ export function ScaleField({ scale, source, disabled, onApply, onDraft }: Props)
             type="text"
             inputMode="decimal"
             className="ed-input"
-            data-align="right"
             data-unit="true"
             style={{ paddingRight: 22 }}
             aria-label="Image scale"
