@@ -118,6 +118,59 @@ describe('ImagesPanel', () => {
     expect(f.updateImage).toHaveBeenCalledWith('i1', 'b', { crop: undefined })
   })
 
+  describe('scale', () => {
+    const open = () => {
+      const f = setup(items, { selectedImageId: 'a' })
+      return { f, input: screen.getByLabelText('Image scale') as HTMLInputElement }
+    }
+
+    it('shows the size before and after while typing, and applies nothing until Enter', () => {
+      const { f, input } = open()
+      expect(screen.getByTestId('scale-sizes').textContent).toBe('64×32 px')
+      fireEvent.change(input, { target: { value: '2' } })
+      expect(screen.getByTestId('scale-sizes').textContent).toContain('64×32 px → 128×64 px')
+      expect(screen.getByTestId('scale-sizes').textContent).toContain('Enter to apply')
+      expect(f.updateImage).not.toHaveBeenCalled()
+    })
+
+    it('Enter applies it once; Esc puts the old value back', () => {
+      const { f, input } = open()
+      fireEvent.change(input, { target: { value: '3' } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+      expect(f.updateImage).toHaveBeenCalledTimes(1)
+      expect(f.updateImage).toHaveBeenCalledWith('i1', 'a', { scale: 3 })
+
+      f.updateImage.mockClear()
+      fireEvent.change(input, { target: { value: '5' } })
+      fireEvent.keyDown(input, { key: 'Escape' })
+      expect(f.updateImage).not.toHaveBeenCalled()
+      expect(input.value).toBe('1')
+      expect(screen.getByTestId('scale-sizes').textContent).toBe('64×32 px')
+    })
+
+    it('does not apply nonsense, and says what is accepted', () => {
+      const { f, input } = open()
+      fireEvent.change(input, { target: { value: 'big' } })
+      expect(screen.getByTestId('scale-sizes').textContent).toMatch(/Type a number/)
+      fireEvent.keyDown(input, { key: 'Enter' })
+      expect(f.updateImage).not.toHaveBeenCalled()
+    })
+
+    it('the preset buttons apply straight away, and the preview has the size it will get', () => {
+      const { f } = open()
+      fireEvent.click(screen.getByRole('button', { name: 'Scale 2×' }))
+      expect(f.updateImage).toHaveBeenCalledWith('i1', 'a', { scale: 2 })
+      fireEvent.change(screen.getByLabelText('Image scale'), { target: { value: '4' } })
+      const canvas = screen.getByTestId('image-preview').querySelector('canvas') as HTMLCanvasElement
+      expect(parseInt(canvas.style.width, 10) % 256).toBe(0) // 64 px * 4 at a whole-number zoom
+    })
+
+    it('is disabled on a locked layer', () => {
+      setup(items, { selectedImageId: 'a' }, { locked: true })
+      expect(screen.getByLabelText('Image scale')).toBeDisabled()
+    })
+  })
+
   it('cannot crop a sprite item (it has its own frames)', () => {
     setup([{ id: 's', assetId: 'objects/chest', x: 0, y: 0 }, items[1]], { selectedImageId: 's' })
     expect(screen.getByRole('button', { name: 'Crop image' })).toBeDisabled()

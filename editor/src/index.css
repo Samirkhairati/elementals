@@ -302,6 +302,9 @@
     @apply px-2;
     font-size: var(--text-label);
   }
+  .ed-btn[data-active='true'] {
+    @apply border-primary/60 bg-primary/15 text-foreground;
+  }
   .ed-btn[data-variant='primary'] {
     @apply border-transparent bg-primary text-primary-foreground;
   }

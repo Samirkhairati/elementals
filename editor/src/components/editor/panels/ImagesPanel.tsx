@@ -11,6 +11,8 @@ import { sortedImages } from '@/lib/layerOrder'
 import { Badge, EdButton, Field, IconButton, NumberField, TextField, Toggle } from '../ui/controls'
 import { ZoomPane } from '../ui/ZoomPane'
 import { ImageItemView } from '../sprites/ImageItemView'
+import { ScaleField } from './ScaleField'
+import { scaledSize } from '@/lib/imageScale'
 import { PicturePicker } from '../dialogs/PicturePicker'
 import { CropImageDialog } from '../dialogs/CropImageDialog'
 import { useEditorSelector, type EditorContextValue } from '../layout/EditorContext'
@@ -43,6 +45,8 @@ export function ImagesPanel() {
   const [pickerOpen, setPickerOpen] = useState(false)
   const [cropOpen, setCropOpen] = useState(false)
   const [renaming, setRenaming] = useState<string | null>(null)
+  // The scale being typed, shown in the preview before Enter applies it (belongs to one item).
+  const [scaleDraft, setScaleDraft] = useState<{ id: string; scale: number } | null>(null)
   const assets = ctx.spriteAssets ?? NO_ASSETS
 
   const images = layer?.images ?? []
@@ -56,6 +60,8 @@ export function ImagesPanel() {
   const pendingLabel = ctx.pendingImage ? imagePickLabel(ctx.pendingImage) : ''
   const graphic = selected?.graphicId ? ctx.graphics.find((g) => g.id === selected.graphicId) : undefined
   const sourceSize = selected ? itemSourceSize(selected, assets) : null
+  const previewScale = selected && scaleDraft?.id === selected.id ? scaleDraft.scale : (selected?.scale ?? 1)
+  const previewSize = sourceSize && scaledSize(sourceSize, previewScale)
 
   return (
     <div className="flex w-full flex-col gap-3 text-left" data-testid="images-panel">
@@ -173,10 +179,10 @@ export function ImagesPanel() {
             </IconButton>
           </div>
           <div className="ed-card-body">
-            {sourceSize && (
+            {previewSize && (
               <div className="flex h-60 min-h-0 flex-col" data-testid="image-preview">
-                <ZoomPane key={`${selected.id}`} width={sourceSize.w} height={sourceSize.h} maxFit={8} hint={false} compact>
-                  {(zoom) => <ImageItemView item={selected} assets={assets} zoom={zoom} />}
+                <ZoomPane key={`${selected.id}`} width={previewSize.w} height={previewSize.h} maxFit={8} hint={false} compact>
+                  {(zoom) => <ImageItemView item={selected} assets={assets} zoom={zoom} itemScale={previewScale} />}
                 </ZoomPane>
               </div>
             )}
@@ -204,8 +210,15 @@ export function ImagesPanel() {
             <Field label="Z-index" hint="Draw order inside this layer; higher draws on top.">
               <NumberField value={selected.z ?? 0} integer aria-label="Image z-index" disabled={locked} onCommit={(z) => ctx.updateImage(layer.id, selected.id, { z })} />
             </Field>
-            <Field label="Scale">
-              <NumberField value={selected.scale ?? 1} min={0.1} max={16} step={0.25} aria-label="Image scale" disabled={locked} onCommit={(scale) => ctx.updateImage(layer.id, selected.id, { scale })} />
+            <Field label="Scale" stack hint="How big the picture is drawn on the map. Whole pixels, nearest neighbour.">
+              <ScaleField
+                key={selected.id}
+                scale={selected.scale ?? 1}
+                source={sourceSize}
+                disabled={locked}
+                onApply={(scale) => ctx.updateImage(layer.id, selected.id, { scale })}
+                onDraft={(scale) => setScaleDraft(scale === null ? null : { id: selected.id, scale })}
+              />
             </Field>
             <Field label="Opacity">
               <NumberField value={selected.opacity ?? 1} min={0} max={1} step={0.05} aria-label="Image opacity" disabled={locked} onCommit={(opacity) => ctx.updateImage(layer.id, selected.id, { opacity })} />

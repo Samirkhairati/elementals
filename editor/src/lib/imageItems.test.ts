@@ -20,6 +20,14 @@ describe('imageItems', () => {
     expect(itemBounds(part, assets)).toEqual({ x: -16, y: -16, w: 32, h: 16 })
   })
 
+  it('a scaled item is a whole number of pixels, so the size announced is the size drawn', () => {
+    const part = { graphicId: 'sky/sheet.png', crop: { x: 0, y: 0, w: 15, h: 15 }, scale: 1.5 }
+    const b = itemBounds(part, assets)
+    expect([b.w, b.h]).toEqual([23, 23])
+    expect(Number.isInteger(b.y)).toBe(true)
+    expect(itemBounds({ graphicId: 'sky/sheet.png', scale: 0.5 }, assets)).toMatchObject({ w: 32, h: 16 })
+  })
+
   it('every crop of a picture uses the one asset, so nothing is copied per crop', () => {
     const a = itemBounds({ graphicId: 'sky/sheet.png', crop: { x: 0, y: 0, w: 8, h: 8 } }, assets)
     const b = itemBounds({ graphicId: 'sky/sheet.png', crop: { x: 8, y: 8, w: 8, h: 8 } }, assets)

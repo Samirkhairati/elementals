@@ -135,5 +135,37 @@ describe('useHistory (StrictMode)', () => {
       expect(result.current.layers.layers).toHaveLength(2)
       expect(result.current.entities.entities.map(e => e.name)).toEqual(['Hero'])
     })
+
+    it('scaling an image is one undo step: undo brings the old scale back, redo the new one', () => {
+      const { result } = setup()
+      const image = { id: 'img1', graphicId: 'a.png', x: 16, y: 32 }
+      const start = [makeLayer('I1', { type: 'image', images: [image] })]
+      act(() => {
+        result.current.layers.setLayers(start)
+        result.current.history.resetHistory({ layers: start, entities: [] })
+      })
+      const scaleOf = () => result.current.layers.layers[0].images![0].scale
+      const apply = (s: HistorySnapshot) => result.current.layers.setLayers(s.layers)
+
+      act(() => result.current.layers.updateImage('I1', 'img1', { scale: 2 }))
+      act(() => result.current.layers.updateImage('I1', 'img1', { scale: 2 })) // unchanged: nothing recorded
+      act(() => result.current.layers.updateImage('I1', 'img1', { scale: 4 }))
+      expect(scaleOf()).toBe(4)
+      expect(result.current.history.historyIndex).toBe(2)
+
+      act(() => {
+        result.current.history.handleUndo(apply)
+      })
+      expect(scaleOf()).toBe(2)
+      act(() => {
+        result.current.history.handleUndo(apply)
+      })
+      expect(scaleOf()).toBeUndefined()
+      act(() => {
+        result.current.history.handleRedo(apply)
+        result.current.history.handleRedo(apply)
+      })
+      expect(scaleOf()).toBe(4)
+    })
   })
 })
