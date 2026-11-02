@@ -7,7 +7,6 @@ import type { ImageItem } from '@/types/editor'
 import { imagePickKey } from './graphicAssets'
 import { effectiveCrop } from './cropRect'
 import type { Rect } from './entityVisuals'
-import { wholePixelDest } from './imageScale'
 import { getSpriteImage, resolveSprite, spriteBoundsFromMeta, type ResolvedSprite } from './spriteImages'
 
 type ItemLike = Pick<ImageItem, 'assetId' | 'graphicId' | 'crop' | 'scale'>
@@ -31,9 +30,11 @@ export function itemBounds(item: ItemLike, assets: Record<string, SpriteAssetInf
   if (!asset) return FALLBACK
   const scale = item.scale ?? 1
   if (croppedPicture(item)) {
-    return wholePixelDest({ x: (-item.crop!.w * scale) / 2, y: -item.crop!.h * scale, w: item.crop!.w * scale, h: item.crop!.h * scale }, scale)
+    const w = item.crop!.w * scale
+    const h = item.crop!.h * scale
+    return { x: -w / 2, y: -h, w, h }
   }
-  return wholePixelDest(spriteBoundsFromMeta(asset.meta, { scale }), scale)
+  return spriteBoundsFromMeta(asset.meta, { scale })
 }
 
 /** What to draw for an item right now, or null while its picture loads. */
@@ -41,15 +42,11 @@ export function resolveImageItem(item: ItemLike, assets: Record<string, SpriteAs
   const asset = assets[imagePickKey(item)]
   if (!asset) return null
   const scale = item.scale ?? 1
-  if (!croppedPicture(item)) {
-    const sprite = resolveSprite(asset, { scale })
-    return sprite && { ...sprite, dest: wholePixelDest(sprite.dest, scale) }
-  }
+  if (!croppedPicture(item)) return resolveSprite(asset, { scale })
   const img = getSpriteImage(Object.values(asset.sheets)[0])
   if (!img) return null
   const src = effectiveCrop(item.crop, { width: img.naturalWidth || img.width, height: img.naturalHeight || img.height })
-  const dest = { x: (-src.w * scale) / 2, y: -src.h * scale, w: src.w * scale, h: src.h * scale }
-  return { img, src, dest: wholePixelDest(dest, scale), flipX: false }
+  return { img, src, dest: { x: (-src.w * scale) / 2, y: -src.h * scale, w: src.w * scale, h: src.h * scale }, flipX: false }
 }
 
 /** "Tree", "Tree 2", "Tree 3"...: the first of these not in `taken`, starting from `base` itself. */

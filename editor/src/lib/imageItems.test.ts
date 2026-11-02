@@ -20,11 +20,10 @@ describe('imageItems', () => {
     expect(itemBounds(part, assets)).toEqual({ x: -16, y: -16, w: 32, h: 16 })
   })
 
-  it('a scaled item is a whole number of pixels, so the size announced is the size drawn', () => {
+  it('a scaled item keeps its exact size in the editor (the game rounds)', () => {
     const part = { graphicId: 'sky/sheet.png', crop: { x: 0, y: 0, w: 15, h: 15 }, scale: 1.5 }
     const b = itemBounds(part, assets)
-    expect([b.w, b.h]).toEqual([23, 23])
-    expect(Number.isInteger(b.y)).toBe(true)
+    expect(b).toEqual({ x: -11.25, y: -22.5, w: 22.5, h: 22.5 })
     expect(itemBounds({ graphicId: 'sky/sheet.png', scale: 0.5 }, assets)).toMatchObject({ w: 32, h: 16 })
   })
 

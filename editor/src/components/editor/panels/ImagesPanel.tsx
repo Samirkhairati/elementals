@@ -210,7 +210,7 @@ export function ImagesPanel() {
             <Field label="Z-index" hint="Draw order inside this layer; higher draws on top.">
               <NumberField value={selected.z ?? 0} integer aria-label="Image z-index" disabled={locked} onCommit={(z) => ctx.updateImage(layer.id, selected.id, { z })} />
             </Field>
-            <Field label="Scale" stack hint="How big the picture is drawn on the map. Whole pixels, nearest neighbour.">
+            <Field label="Scale" stack hint="How big the picture is drawn on the map. Nearest neighbour; the game rounds to whole pixels.">
               <ScaleField
                 key={selected.id}
                 scale={selected.scale ?? 1}

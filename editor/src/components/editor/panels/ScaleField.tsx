@@ -1,5 +1,5 @@
 // The scale of an image item: type a number, see the size it would get right away (and in the preview above), press
-// Enter to apply. Esc puts the old value back. One apply = one undo step. Pixels are scaled nearest neighbour.
+// Enter to apply. Esc puts the old value back. One apply = one undo step. Drawn nearest neighbour at the exact size; the game rounds to whole pixels.
 
 import React, { useState } from 'react'
 import { MAX_SCALE, MIN_SCALE, parseScale, scaledSize } from '@/lib/imageScale'
@@ -99,7 +99,7 @@ export function ScaleField({ scale, source, disabled, onApply, onDraft }: Props)
           )}
         </p>
       )}
-      <p className="ed-hint">Pixels stay sharp: each picture pixel becomes a block, nothing is blended.</p>
+      <p className="ed-hint">Pixels stay sharp (nearest neighbour, nothing is blended). The game rounds the size to whole pixels.</p>
     </div>
   )
 }

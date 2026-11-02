@@ -1,8 +1,5 @@
-// Scaling an image item. The canvas draws with smoothing off (nearest neighbour: every picture pixel becomes a block
-// of whole screen pixels, never blended), and the size an item ends up with is a whole number of pixels, so the
-// "after" size the panel announces is exactly what appears on the map.
-
-import type { Rect } from './entityVisuals'
+// Scaling an image item. The canvas draws with smoothing off (nearest neighbour: picture pixels are never blended).
+// The editor uses the exact size (w * scale); only the game rounds to whole pixels when it draws.
 
 export const MIN_SCALE = 0.1
 export const MAX_SCALE = 16
@@ -15,15 +12,8 @@ export function parseScale(text: string): number | null {
   return Math.round(Math.min(MAX_SCALE, Math.max(MIN_SCALE, n)) * 1000) / 1000
 }
 
-/** Size in whole pixels of a `w` x `h` picture drawn at `scale` (never smaller than 1 px). */
+/** Size of a `w` x `h` picture drawn at `scale`, exact (to 2 decimals): the editor does not snap it to whole pixels. */
 export function scaledSize(size: { w: number; h: number }, scale: number): { w: number; h: number } {
-  return { w: Math.max(1, Math.round(size.w * scale)), h: Math.max(1, Math.round(size.h * scale)) }
-}
-
-/** `dest` (already multiplied by `scale`) with its width and height rounded to whole pixels, same pivot ratio. */
-export function wholePixelDest(dest: Rect, scale: number): Rect {
-  if (scale === 1 || dest.w <= 0 || dest.h <= 0) return dest
-  const w = Math.max(1, Math.round(dest.w))
-  const h = Math.max(1, Math.round(dest.h))
-  return { x: (dest.x * w) / dest.w, y: (dest.y * h) / dest.h, w, h }
+  const exact = (n: number) => Math.round(n * scale * 100) / 100
+  return { w: exact(size.w), h: exact(size.h) }
 }

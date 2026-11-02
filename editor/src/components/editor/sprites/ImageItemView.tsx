@@ -12,7 +12,7 @@ interface Props {
   size?: number
   /** ...or draw at exactly this zoom (1 = actual pixels). */
   zoom?: number
-  /** The item's scale: the view then has the size the item gets on the map (whole pixels, nearest neighbour). */
+  /** The item's scale: the view then has the size the item gets on the map (exact size, nearest neighbour). */
   itemScale?: number
   className?: string
 }
