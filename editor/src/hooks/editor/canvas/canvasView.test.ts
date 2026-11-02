@@ -19,9 +19,11 @@ afterEach(() => {
 })
 
 describe('canvas view settings', () => {
-  it('defaults to everything visible', () => {
+  it('defaults to everything visible, and not clipped to the map', () => {
     expect(getCanvasView()).toEqual(DEFAULT_CANVAS_VIEW)
-    expect(Object.values(DEFAULT_CANVAS_VIEW).every(Boolean)).toBe(true)
+    const { clip, ...shown } = DEFAULT_CANVAS_VIEW
+    expect(clip).toBe(false)
+    expect(Object.values(shown).every(Boolean)).toBe(true)
   })
 
   it('toggles one flag and notifies subscribers', () => {

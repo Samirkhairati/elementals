@@ -85,10 +85,22 @@ function ToolButton({ title, active, disabled, onClick, children, label, tone }:
   )
 }
 
+/** A dashed square (the map's edge) with a small eye in its corner: show only what is inside the map. */
+function ClipToMapIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="3" width="15" height="15" strokeDasharray="3 3" />
+      <path d="M11 17.5s2.2-3.5 6-3.5 6 3.5 6 3.5-2.2 3.5-6 3.5-6-3.5-6-3.5z" fill="var(--background, #111)" />
+      <circle cx="17" cy="17.5" r="1.3" />
+    </svg>
+  )
+}
+
 const VIEW_TOGGLES: { key: CanvasViewToggle; title: string; icon: React.ReactNode }[] = [
   { key: 'sprites', title: 'Sprites: draw real graphics (off: placeholder tiles)', icon: <ImageIcon /> },
   { key: 'labels', title: 'Labels: names of all entities when zoomed in', icon: <Type /> },
   { key: 'badges', title: 'Event badges: lightning on entities with an Event', icon: <Zap /> },
+  { key: 'clip', title: 'Clip to map: hide everything drawn outside the map (view only, nothing is changed)', icon: <ClipToMapIcon /> },
 ]
 
 function MapToolbar() {

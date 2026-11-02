@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useRef } from 'react'
 import type { ImagePick } from '@/lib/graphicAssets'
-import { Stage, Layer as KonvaLayer, Rect } from 'react-konva'
+import { Stage, Layer as KonvaLayer, Rect, Group } from 'react-konva'
 import {
   Layer,
   TilesetData,
@@ -268,7 +268,14 @@ export function MapCanvas({
                 listening={false}
               />
 
-              {/* Layers below the Entities row, the entities, then the layers above them: the layer list's order */}
+              {/* Layers below the Entities row, the entities, then the layers above them: the layer list's order.
+                  "Clip to map" (top toolbar) only hides what is drawn past the map's edge; handles and overlays stay. */}
+              <Group
+                clipX={view.clip ? 0 : undefined}
+                clipY={view.clip ? 0 : undefined}
+                clipWidth={view.clip ? mapWidthPx : undefined}
+                clipHeight={view.clip ? mapHeightPx : undefined}
+              >
               <KonvaTilemapLayer
                 layers={layersBelowEntities}
                 images={images}
@@ -302,6 +309,7 @@ export function MapCanvas({
                 spriteAssets={spriteAssets}
                 dragRef={imageDrag}
               />
+              </Group>
 
               {/* Grid and tool previews */}
               <KonvaOverlays

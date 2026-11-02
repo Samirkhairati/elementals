@@ -37,10 +37,10 @@ describe('EditorTopToolbar', () => {
     expect(screen.getByRole('button', { name: /Brush Tool/ })).toHaveAttribute('aria-pressed', 'false')
   })
 
-  it('has a View group that toggles sprites / labels / event badges', () => {
+  it('has a View group that toggles sprites / labels / event badges (and Clip to map)', () => {
     renderWithEditor(<EditorTopToolbar />, base() as any)
     const group = screen.getByRole('group', { name: 'View' })
-    expect(group.querySelectorAll('button')).toHaveLength(3)
+    expect(group.querySelectorAll('button')).toHaveLength(4)
     for (const key of ['sprites', 'labels', 'badges'] as const) {
       const btn = screen.getByRole('button', { name: `View ${key}` })
       expect(btn).toHaveAttribute('aria-pressed', 'true')
@@ -48,6 +48,18 @@ describe('EditorTopToolbar', () => {
       expect(getCanvasView()[key]).toBe(false)
       expect(btn).toHaveAttribute('aria-pressed', 'false')
     }
+  })
+
+  it('Clip to map starts off, turns on and off, and is remembered in the view settings', () => {
+    renderWithEditor(<EditorTopToolbar />, base() as any)
+    const btn = screen.getByRole('button', { name: 'View clip' })
+    expect(btn).toHaveAttribute('aria-pressed', 'false')
+    expect(getCanvasView().clip).toBe(false)
+    fireEvent.click(btn)
+    expect(getCanvasView().clip).toBe(true)
+    expect(btn).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(btn)
+    expect(getCanvasView().clip).toBe(false)
   })
 
   it('disables map tools without a map but keeps the View toggles usable', () => {
