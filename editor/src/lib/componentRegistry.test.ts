@@ -15,7 +15,7 @@ describe('COMPONENT_REGISTRY (adapter over shared schemas)', () => {
       expect(entry.icon).toBe(schema.icon)
     }
     expect(COMPONENT_REGISTRY.Collider.defaultProps).toEqual({ width: 32, height: 32, offsetX: 0, offsetY: 0, isSolid: true })
-    expect(COMPONENT_REGISTRY.Transform.defaultProps).toEqual({ x: 0, y: 0, depth: 10 })
+    expect(COMPONENT_REGISTRY.Transform.defaultProps).toEqual({ x: 0, y: 0, depth: 20 })
     expect(COMPONENT_REGISTRY.Event.defaultProps.states).toHaveLength(1)
   })
 

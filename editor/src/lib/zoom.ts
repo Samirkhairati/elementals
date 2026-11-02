@@ -23,8 +23,8 @@ export function fitScale(boxW: number, boxH: number, width: number, height: numb
 }
 
 /** Slider position (log2 of the zoom) and back. */
-export const zoomToSlider = (zoom: number): number => Math.log2(clampZoom(zoom))
-export const sliderToZoom = (v: number): number => clampZoom(2 ** v)
+export const zoomToSlider = (zoom: number, min = MIN_ZOOM, max = MAX_ZOOM): number => Math.log2(clampZoom(zoom, min, max))
+export const sliderToZoom = (v: number, min = MIN_ZOOM, max = MAX_ZOOM): number => clampZoom(2 ** v, min, max)
 
 /** Percent label: 100% , 250% , 12.5% */
 export const zoomLabel = (zoom: number): string => `${Math.round(zoom * 1000) / 10}%`

@@ -108,6 +108,8 @@ editor  --writes-->  project/maps/*.json (editor map format, tile index keyed)
   entity areas/labels/selection always draw on top. Editor-only, not exported.
 * **Image layers** hold freely placed sprite assets (`images[]`: anchor `x/y`, `z`, `scale`, `flipX/flipY`, `opacity`); they never take tile paint. Placement and dragging snap to the
   tile anchor when the top-toolbar magnet (`snapToGrid`) is on, and are free otherwise. Exported as a Tiled `objectgroup` with property `kind=image`; **the game does not draw these yet**.
+* **Navigation**: the top-right of the canvas has the zoom bar (slider 10%-800%, +/-, 1:1, **reset** = fit the whole map) and a minimap (one pixel per tile, frame = visible area; click or drag to move the view, collapsible).
+  The stage is driven imperatively; `useCanvasViewport` exposes its scale/position through a small external store (`viewStore`) so only the navigator re-renders while panning. Maths in `hooks/editor/canvas/viewMath.ts`.
 * **Pin** (Active Selection panel): Ctrl/Cmd+click layers, then right-drag samples all of them; painting writes each part back to its own layer (`lib/layerSelection.ts`, `usePaintTools`).
 * Collision layers paint a `__collision__` marker tile; `fitSelectionToLayer` keeps that marker off tile layers and tile selections off collision layers.
 

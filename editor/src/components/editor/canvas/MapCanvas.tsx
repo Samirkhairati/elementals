@@ -24,6 +24,7 @@ import { KonvaGhostEntity } from './konva/KonvaGhostEntity'
 import { KonvaGhostImage, KonvaImageItems } from './konva/KonvaImageItems'
 import { CanvasContextMenu } from './CanvasContextMenu'
 import { DebugStatusBadge } from './DebugStatusBadge'
+import { CanvasNavigator, type ViewportHandle } from './CanvasNavigator'
 import { PendingEntityPlacement } from '@/hooks/editor/useEntityPlacement'
 import { useCanvasView } from '@/hooks/editor/canvas/canvasView'
 import { clampEntitiesIndex } from '@/lib/layerOrder'
@@ -145,7 +146,16 @@ export function MapCanvas({
     movePan,
     endPan,
     getTileCoordsFromPointer,
+    centerMap,
+    viewStore,
+    zoomTo,
+    zoomBy,
+    panToWorld,
   } = useCanvasViewport({ activeMap })
+  const viewportHandle = useMemo<ViewportHandle>(
+    () => ({ viewStore, zoomTo, zoomBy, panToWorld, reset: centerMap }),
+    [viewStore, zoomTo, zoomBy, panToWorld, centerMap]
+  )
 
   // Tools, painting, eraser, bucket, rectangle fill, copy/sampler, placement, context menu
   const {
@@ -354,6 +364,18 @@ export function MapCanvas({
           <div className="h-full w-full flex items-center justify-center text-muted-foreground font-mono text-xs tracking-wider opacity-50">
             Select or create a map to start editing
           </div>
+        )}
+
+        {activeMap && (
+          <CanvasNavigator
+            viewport={viewportHandle}
+            dimensions={dimensions}
+            mapWidth={activeMap.width}
+            mapHeight={activeMap.height}
+            layers={layers}
+            entities={entities}
+            images={images}
+          />
         )}
 
         {/* Floating debug status overlay */}

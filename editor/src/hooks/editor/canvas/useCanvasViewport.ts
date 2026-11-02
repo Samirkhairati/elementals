@@ -1,6 +1,14 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import Konva from 'konva'
 import { MapData } from '@/types/editor'
+import {
+  MAX_CANVAS_ZOOM,
+  MIN_CANVAS_ZOOM,
+  centerOnWorld,
+  fitView,
+  zoomAbout,
+  type CanvasView,
+} from './viewMath'
 
 export interface TileCoords {
   x: number
@@ -24,25 +32,80 @@ export function useCanvasViewport({ activeMap }: UseCanvasViewportOptions) {
   const activeMapRef = useRef(activeMap)
   useEffect(() => { activeMapRef.current = activeMap }, [activeMap])
 
-  // ── Auto-center Map Calculations ─────────────────────────────────────────
-  const centerMap = useCallback(() => {
+  // ── View store ───────────────────────────────────────────────────────────
+  // The stage is driven imperatively (no React state per pan/zoom frame). The zoom bar and the minimap read its
+  // scale/position through this tiny external store, so only they re-render while the view moves.
+  const viewRef = useRef<CanvasView>({ scale: 1, x: 0, y: 0 })
+  const listenersRef = useRef(new Set<() => void>())
+  const viewStore = useRef({
+    subscribe: (l: () => void) => {
+      listenersRef.current.add(l)
+      return () => {
+        listenersRef.current.delete(l)
+      }
+    },
+    getSnapshot: () => viewRef.current,
+  }).current
+
+  const syncView = useCallback(() => {
     const stage = stageRef.current
-    const map = activeMapRef.current
-    if (!stage || !map || dimensions.width <= 0 || dimensions.height <= 0) return
+    if (!stage) return
+    const next: CanvasView = { scale: stage.scaleX(), x: stage.x(), y: stage.y() }
+    const cur = viewRef.current
+    if (next.scale === cur.scale && next.x === cur.x && next.y === cur.y) return
+    viewRef.current = next
+    listenersRef.current.forEach(l => l())
+  }, [])
 
-    const mapW = map.width * 32
-    const mapH = map.height * 32
-    const initialScale = Math.min(
-      1,
-      Math.max(0.2, Math.min((dimensions.width * 0.8) / mapW, (dimensions.height * 0.8) / mapH))
-    )
-    const posX = Math.round((dimensions.width - mapW * initialScale) / 2)
-    const posY = Math.round((dimensions.height - mapH * initialScale) / 2)
+  const hasStage = !!activeMap
+  useEffect(() => {
+    const stage = stageRef.current
+    if (!stage) return
+    const events = 'xChange.viewStore yChange.viewStore scaleXChange.viewStore scaleYChange.viewStore'
+    stage.on(events, syncView)
+    syncView()
+    return () => {
+      stage.off(events)
+    }
+  }, [hasStage, syncView])
 
-    stage.scale({ x: initialScale, y: initialScale })
-    stage.position({ x: posX, y: posY })
+  const applyView = useCallback((view: CanvasView) => {
+    const stage = stageRef.current
+    if (!stage) return
+    stage.scale({ x: view.scale, y: view.scale })
+    stage.position({ x: view.x, y: view.y })
     stage.batchDraw()
-  }, [dimensions])
+    syncView()
+  }, [syncView])
+
+  const currentView = useCallback((): CanvasView => {
+    const stage = stageRef.current
+    return stage ? { scale: stage.scaleX(), x: stage.x(), y: stage.y() } : viewRef.current
+  }, [])
+
+  // ── Auto-center Map Calculations ─────────────────────────────────────────
+  /** Reset: the whole map, centred. */
+  const centerMap = useCallback(() => {
+    const map = activeMapRef.current
+    if (!stageRef.current || !map || dimensions.width <= 0 || dimensions.height <= 0) return
+    applyView(fitView(dimensions, map.width, map.height))
+  }, [dimensions, applyView])
+
+  /** Zoom to an absolute scale around the middle of the viewport. */
+  const zoomTo = useCallback((scale: number) => {
+    if (dimensions.width <= 0) return
+    applyView(zoomAbout(currentView(), scale, dimensions.width / 2, dimensions.height / 2))
+  }, [dimensions, applyView, currentView])
+
+  const zoomBy = useCallback((factor: number) => {
+    zoomTo(currentView().scale * factor)
+  }, [zoomTo, currentView])
+
+  /** Scroll so that world point (wx, wy) is in the middle of the viewport. */
+  const panToWorld = useCallback((wx: number, wy: number) => {
+    if (dimensions.width <= 0) return
+    applyView(centerOnWorld(currentView(), dimensions, wx, wy))
+  }, [dimensions, applyView, currentView])
 
   // ── Resize Observer for Stage Dimensions ─────────────────────────────────
   useEffect(() => {
@@ -99,7 +162,7 @@ export function useCanvasViewport({ activeMap }: UseCanvasViewportOptions) {
       const clampedDelta = Math.max(-120, Math.min(120, e.evt.deltaY))
       const sensitivity = 0.003
       const factor = Math.exp(-clampedDelta * sensitivity)
-      const newScale = Math.min(Math.max(0.15, oldScale * factor), 5)
+      const newScale = Math.min(Math.max(MIN_CANVAS_ZOOM, oldScale * factor), MAX_CANVAS_ZOOM)
 
       const mousePointToX = (pointer.x - stage.x()) / oldScale
       const mousePointToY = (pointer.y - stage.y()) / oldScale
@@ -183,5 +246,9 @@ export function useCanvasViewport({ activeMap }: UseCanvasViewportOptions) {
     endPan,
     getTileCoordsFromPointer,
     centerMap,
+    viewStore,
+    zoomTo,
+    zoomBy,
+    panToWorld,
   }
 }

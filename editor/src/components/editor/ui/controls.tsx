@@ -128,9 +128,14 @@ interface ZoomControlsProps {
   onZoomTo?: (zoom: number) => void
   /** Adds a "100%" button. */
   onActualSize?: () => void
+  /** Range of the slider (defaults to the image viewers' 25% - 3200%). */
+  minZoom?: number
+  maxZoom?: number
+  /** Tooltip of the fit button. */
+  fitLabel?: string
 }
 
-export function ZoomControls({ zoom, onZoomIn, onZoomOut, onFit, fitted, className, onZoomTo, onActualSize }: ZoomControlsProps) {
+export function ZoomControls({ zoom, onZoomIn, onZoomOut, onFit, fitted, className, onZoomTo, onActualSize, minZoom = MIN_ZOOM, maxZoom = MAX_ZOOM, fitLabel = 'Reset the view to fit' }: ZoomControlsProps) {
   const readout = (
     <span className="ed-mono w-14 text-center text-ed-label text-muted-foreground" data-testid="zoom-readout">
       {zoomLabel(zoom)}
@@ -143,7 +148,7 @@ export function ZoomControls({ zoom, onZoomIn, onZoomOut, onFit, fitted, classNa
       </IconButton>
       {onZoomTo ? (
         <>
-          <Slider aria-label="Zoom" className="w-28 flex-none" min={Math.log2(MIN_ZOOM)} max={Math.log2(MAX_ZOOM)} step={0.01} value={zoomToSlider(zoom)} onChange={(v) => onZoomTo(sliderToZoom(v))} />
+          <Slider aria-label="Zoom" className="w-28 flex-none" min={Math.log2(minZoom)} max={Math.log2(maxZoom)} step={0.01} value={zoomToSlider(zoom, minZoom, maxZoom)} onChange={(v) => onZoomTo(sliderToZoom(v, minZoom, maxZoom))} />
           <IconButton title="Zoom in" aria-label="Zoom in" onClick={onZoomIn}>
             <Plus />
           </IconButton>
@@ -162,7 +167,7 @@ export function ZoomControls({ zoom, onZoomIn, onZoomOut, onFit, fitted, classNa
           <span className="text-[10px] font-medium leading-none">1:1</span>
         </IconButton>
       )}
-      <IconButton title="Reset the view to fit" aria-label="Fit view" active={fitted} onClick={onFit}>
+      <IconButton title={fitLabel} aria-label="Fit view" active={fitted} onClick={onFit}>
         <Maximize />
       </IconButton>
     </div>

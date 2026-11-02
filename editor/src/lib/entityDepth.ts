@@ -6,8 +6,9 @@ export const CHARACTER_DEPTH = 20
 
 /**
  * Characters (`characters/...`) draw in the same layer as the player (20), so whoever stands lower on the map covers the
- * other one's feet. A new entity starts at the objects layer (10): picking a character sprite on such an entity moves it
- * to the characters layer. A depth the author already changed is left alone.
+ * other one's feet. New entities now start at 20 already; an entity still on the objects layer (10, e.g. made before that
+ * or from an object prefab) moves to the characters layer when a character sprite is picked. Any other depth the author
+ * chose is left alone.
  */
 export function withCharacterDepth(components: EntityData['components'], spriteAsset: unknown): EntityData['components'] {
   if (typeof spriteAsset !== 'string' || !spriteAsset.startsWith('characters/')) return components
