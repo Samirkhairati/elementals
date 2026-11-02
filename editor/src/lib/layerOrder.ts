@@ -20,6 +20,26 @@ export function sortedImages<T extends { z?: number }>(images: T[] | undefined):
     .map((entry) => entry.item)
 }
 
+/**
+ * `images` with `id` dropped just in front of (`top`) or behind (`bottom`) `targetId` in the draw order, as one change.
+ * It uses the same one-step moves as the arrow buttons (so `z` is traded exactly the same way) until the item is there.
+ */
+export function moveInDrawOrderTo<T extends { id: string; z?: number }>(images: T[], id: string, targetId: string, position: 'top' | 'bottom'): T[] {
+  const sorted = sortedImages(images)
+  const from = sorted.findIndex((img) => img.id === id)
+  const to = sorted.findIndex((img) => img.id === targetId)
+  if (from === -1 || to === -1 || from === to) return images
+  const front = position === 'top'
+  const dest = from < to ? (front ? to : to - 1) : front ? to + 1 : to
+  let out = images
+  for (let at = from; at !== dest; ) {
+    const dir = dest > at ? 1 : -1
+    out = moveInDrawOrder(out, id, dir)
+    at += dir
+  }
+  return out
+}
+
 /** `entitiesIndex` as a usable position: how many layers are above the Entities row (0 = on top), within the list. */
 export function clampEntitiesIndex(index: number | undefined, layerCount: number): number {
   if (typeof index !== 'number' || !Number.isFinite(index)) return 0

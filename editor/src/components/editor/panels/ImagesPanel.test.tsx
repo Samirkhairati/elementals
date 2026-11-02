@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- tests build partial editor contexts */
 import { describe, expect, it, vi } from 'vitest'
-import { fireEvent, screen, within } from '@testing-library/react'
+import { createEvent, fireEvent, screen, within } from '@testing-library/react'
 import { renderWithEditor } from '@/test/editorContext'
 import { ImagesPanel } from './ImagesPanel'
 
@@ -20,6 +20,7 @@ function setup(images: any[], extra: Record<string, unknown> = {}, layerOver: Re
     deleteImage: vi.fn(),
     duplicateImage: vi.fn(),
     reorderImage: vi.fn(),
+    moveImageTo: vi.fn(),
   }
   const layer = { id: 'i1', name: 'Sky', type: 'image', visible: true, locked: false, images, ...layerOver }
   renderWithEditor(<ImagesPanel />, {
@@ -78,6 +79,22 @@ describe('ImagesPanel', () => {
     const front = within(screen.getByTestId('image-list')).getByText('sky/sheet.png').closest('.ed-row') as HTMLElement
     expect(within(front).getByRole('button', { name: 'Bring forward' })).toBeDisabled()
     expect(within(row).getByRole('button', { name: 'Send backward' })).toBeDisabled()
+  })
+
+  it('dragging a row onto another reorders the draw order in one move', () => {
+    const f = setup(items)
+    const rows = Array.from(screen.getByTestId('image-list').children) as HTMLElement[]
+    // front first: [sky/sheet.png (b), Cloud (a)]. Drag Cloud onto the front one's top half.
+    const [front, back] = rows
+    const data: Record<string, string> = {}
+    const dt = { setData: (k: string, v: string) => { data[k] = v }, getData: (k: string) => data[k], effectAllowed: '', dropEffect: '' }
+    fireEvent.dragStart(back, { dataTransfer: dt })
+    front.getBoundingClientRect = () => ({ top: 0, height: 20, bottom: 20, left: 0, right: 10, width: 10, x: 0, y: 0, toJSON: () => ({}) })
+    const over = createEvent.dragOver(front, { dataTransfer: dt })
+    Object.defineProperty(over, 'clientY', { value: 2 }) // jsdom has no DragEvent, so the pointer position is set by hand
+    fireEvent(front, over)
+    fireEvent.drop(front, { dataTransfer: dt })
+    expect(f.moveImageTo).toHaveBeenCalledWith('i1', 'a', 'b', 'top')
   })
 
   it('renames from the row: Enter keeps the new name, Esc keeps the old one', () => {

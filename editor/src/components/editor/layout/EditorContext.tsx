@@ -84,6 +84,7 @@ export interface EditorBaseContextValue
       | 'deleteImage'
       | 'duplicateImage'
       | 'reorderImage'
+      | 'moveImageTo'
       | 'isPainting'
       | 'setIsPainting'
       | 'paintStartPos'

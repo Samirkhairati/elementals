@@ -3,8 +3,9 @@ import { imagePickLabel, type ImagePick } from '@/lib/graphicAssets'
 import { nextImageName } from '@/lib/imageItems'
 import { Layer, LayerType, ImageItem, TileSelection, ActiveTool, PaintMode, DebugInfo, MapData } from '@/types/editor'
 import { useSyncedState } from '@/hooks/useSyncedState'
+import { ARROW_DELTAS, nudgeStep } from '@/lib/imageNudge'
 import { setFolderFlag } from '@/lib/layerFolders'
-import { clampEntitiesIndex, entitiesIndexAfterInsert, entitiesIndexAfterRemove, moveInDrawOrder } from '@/lib/layerOrder'
+import { clampEntitiesIndex, entitiesIndexAfterInsert, entitiesIndexAfterRemove, moveInDrawOrder, moveInDrawOrderTo } from '@/lib/layerOrder'
 
 interface UseLayerManagerOptions {
   /** Functional updates only: the manager never closes over the current map. */
@@ -413,6 +414,50 @@ export function useLayerManager(options: UseLayerManagerOptions) {
     [commitNewLayers]
   )
 
+  /** Dropped in front of (`top`) or behind (`bottom`) another image: the whole move is one undo step. */
+  const moveImageTo = useCallback(
+    (layerId: string, imageId: string, targetId: string, position: 'top' | 'bottom') => {
+      commitNewLayers(prev => {
+        const index = prev.findIndex(l => l.id === layerId && l.type === 'image')
+        if (index === -1) return prev
+        const images = prev[index].images || []
+        const moved = moveInDrawOrderTo(images, imageId, targetId, position)
+        if (moved === images) return prev
+        const next = [...prev]
+        next[index] = { ...prev[index], images: moved }
+        return next
+      })
+    },
+    [commitNewLayers]
+  )
+
+  // Arrow keys move the picked image (see lib/imageNudge). Not while typing, in a dialog, or while placing a new image.
+  const repeatsRef = useRef(0)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const delta = ARROW_DELTAS[e.key]
+      if (!delta || e.ctrlKey || e.metaKey || e.altKey || pendingImage || !selectedImageId) return
+      const target = e.target as HTMLElement | null
+      if (target instanceof Element && target.closest('input, textarea, select, [contenteditable="true"], [role="dialog"], [role="slider"]')) return
+      const layer = layersRef.current.find(l => l.id === activeLayerId)
+      const item = layer?.type === 'image' && !layer.locked ? layer.images?.find(i => i.id === selectedImageId) : undefined
+      if (!layer || !item) return
+      e.preventDefault()
+      repeatsRef.current = e.repeat ? repeatsRef.current + 1 : 0
+      const step = nudgeStep(e.shiftKey, repeatsRef.current)
+      updateImage(layer.id, item.id, { x: item.x + delta.dx * step, y: item.y + delta.dy * step })
+    }
+    const onUp = () => {
+      repeatsRef.current = 0
+    }
+    window.addEventListener('keydown', onKey)
+    window.addEventListener('keyup', onUp)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('keyup', onUp)
+    }
+  }, [activeLayerId, selectedImageId, pendingImage, layersRef, updateImage])
+
   /** One step toward the front (+1) or back (-1) in the layer's draw order. */
   const reorderImage = useCallback(
     (layerId: string, imageId: string, direction: 1 | -1) => {
@@ -473,6 +518,7 @@ export function useLayerManager(options: UseLayerManagerOptions) {
     deleteImage,
     duplicateImage,
     reorderImage,
+    moveImageTo,
     tileSelection,
     setTileSelection,
     activeTool,

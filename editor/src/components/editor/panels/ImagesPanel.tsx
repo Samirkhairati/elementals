@@ -34,6 +34,7 @@ const selectImages = (c: EditorContextValue) => ({
   deleteImage: c.deleteImage,
   duplicateImage: c.duplicateImage,
   reorderImage: c.reorderImage,
+  moveImageTo: c.moveImageTo,
 })
 
 const NO_ASSETS = {}
@@ -45,6 +46,9 @@ export function ImagesPanel() {
   const [pickerOpen, setPickerOpen] = useState(false)
   const [cropOpen, setCropOpen] = useState(false)
   const [renaming, setRenaming] = useState<string | null>(null)
+  // Dragging a row changes the draw order: the row being dragged and where it would land.
+  const [dragId, setDragId] = useState<string | null>(null)
+  const [dropAt, setDropAt] = useState<{ id: string; position: 'top' | 'bottom' } | null>(null)
   // The scale being typed, shown in the preview before Enter applies it (belongs to one item).
   const [scaleDraft, setScaleDraft] = useState<{ id: string; scale: number } | null>(null)
   const assets = ctx.spriteAssets ?? NO_ASSETS
@@ -98,7 +102,36 @@ export function ImagesPanel() {
           ) : (
             <div className="flex flex-col gap-0.5" data-testid="image-list">
               {rows.map((img, i) => (
-                <div key={img.id} className="ed-row group" data-selected={img.id === ctx.selectedImageId ? 'true' : undefined} onClick={() => ctx.setSelectedImageId(img.id)}>
+                <div
+                  key={img.id}
+                  className="ed-row group"
+                  data-selected={img.id === ctx.selectedImageId ? 'true' : undefined}
+                  data-dim={dragId === img.id ? 'true' : undefined}
+                  draggable={!locked && renaming !== img.id}
+                  onClick={() => ctx.setSelectedImageId(img.id)}
+                  onDragStart={(e) => {
+                    setDragId(img.id)
+                    e.dataTransfer.effectAllowed = 'move'
+                    e.dataTransfer.setData('text/plain', img.id)
+                  }}
+                  onDragOver={(e) => {
+                    if (!dragId) return
+                    e.preventDefault()
+                    e.dataTransfer.dropEffect = 'move'
+                    const r = e.currentTarget.getBoundingClientRect()
+                    setDropAt(dragId === img.id ? null : { id: img.id, position: e.clientY - r.top < r.height / 2 ? 'top' : 'bottom' })
+                  }}
+                  onDragEnd={() => { setDragId(null); setDropAt(null) }}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    if (dragId && dropAt && dropAt.id === img.id) ctx.moveImageTo(layer.id, dragId, img.id, dropAt.position)
+                    setDragId(null)
+                    setDropAt(null)
+                  }}
+                >
+                  {dropAt?.id === img.id && dragId !== img.id && (
+                    <div className={`pointer-events-none absolute left-0 right-0 z-30 h-[2px] rounded-full bg-primary ${dropAt.position === 'top' ? '-top-[2px]' : '-bottom-[2px]'}`} />
+                  )}
                   <div className="ed-checker flex h-6 w-6 shrink-0 items-center justify-center rounded-sm">
                     <ImageItemView item={img} assets={assets} size={24} />
                   </div>

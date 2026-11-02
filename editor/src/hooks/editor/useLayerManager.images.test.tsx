@@ -226,4 +226,67 @@ describe('useLayerManager: Entities row position', () => {
     act(() => result.current.manager.reorderImage('I1', a, 1)) // already in front: no change
     expect(sortedImages(result.current.manager.layers[0].images).map((i) => i.id)).toEqual([b, a])
   })
+
+  describe('arrow keys', () => {
+    const press = (key: string, init: KeyboardEventInit = {}) => window.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...init }))
+    const picked = () => {
+      const r = withImageLayer()
+      let id = ''
+      act(() => {
+        id = r.result.current.manager.addImage('I1', { graphicId: 'p.png', x: 100, y: 100 }) ?? ''
+        r.result.current.manager.setActiveLayerId('I1')
+        r.result.current.manager.setSelectedImageId(id)
+      })
+      const pos = () => {
+        const it = r.result.current.manager.layers[0].images![0]
+        return [it.x, it.y]
+      }
+      return { ...r, id, pos }
+    }
+
+    it('move the picked image one pixel, and with Shift 8 px doubling for every repeat while held', () => {
+      const { pos } = picked()
+      act(() => { press('ArrowRight') })
+      expect(pos()).toEqual([101, 100])
+      act(() => { press('ArrowUp') })
+      expect(pos()).toEqual([101, 99])
+      act(() => { press('ArrowLeft', { shiftKey: true }) })
+      expect(pos()).toEqual([93, 99])
+      act(() => { press('ArrowLeft', { shiftKey: true, repeat: true }) })
+      expect(pos()).toEqual([77, 99]) // 16 more
+      act(() => { press('ArrowLeft', { shiftKey: true, repeat: true }) })
+      expect(pos()).toEqual([45, 99]) // 32 more
+      act(() => { window.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowLeft' })) })
+      act(() => { press('ArrowLeft', { shiftKey: true }) })
+      expect(pos()).toEqual([37, 99]) // released: back to 8
+    })
+
+    it('do nothing on a locked layer, while typing in a field, or while placing a picture', () => {
+      const { pos, result } = picked()
+      const input = document.createElement('input')
+      document.body.appendChild(input)
+      act(() => { input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })) })
+      expect(pos()).toEqual([100, 100])
+      input.remove()
+      act(() => result.current.manager.startImagePlacement({ graphicId: 'q.png' }))
+      act(() => { press('ArrowRight') })
+      expect(pos()).toEqual([100, 100])
+      act(() => result.current.manager.cancelImagePlacement())
+      act(() => result.current.manager.toggleLayerLock('I1'))
+      act(() => { press('ArrowRight') })
+      expect(pos()).toEqual([100, 100])
+    })
+  })
+
+  it('moveImageTo drops an image in front of / behind another as one undo step', () => {
+    const { result, onCommitHistory } = withImageLayer()
+    const ids: string[] = []
+    act(() => {
+      for (const g of ['a.png', 'b.png', 'c.png']) ids.push(result.current.manager.addImage('I1', { graphicId: g, x: 0, y: 0 }) ?? '')
+    })
+    onCommitHistory.mockClear()
+    act(() => result.current.manager.moveImageTo('I1', ids[0], ids[2], 'top'))
+    expect(sortedImages(result.current.manager.layers[0].images).map((i) => i.id)).toEqual([ids[1], ids[2], ids[0]])
+    expect(onCommitHistory).toHaveBeenCalledTimes(1)
+  })
 })
