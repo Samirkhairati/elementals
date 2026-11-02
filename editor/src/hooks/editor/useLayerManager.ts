@@ -3,6 +3,7 @@ import { imagePickLabel, type ImagePick } from '@/lib/graphicAssets'
 import { nextImageName } from '@/lib/imageItems'
 import { Layer, LayerType, ImageItem, TileSelection, ActiveTool, PaintMode, DebugInfo, MapData } from '@/types/editor'
 import { useSyncedState } from '@/hooks/useSyncedState'
+import { setFolderFlag } from '@/lib/layerFolders'
 import { clampEntitiesIndex, entitiesIndexAfterInsert, entitiesIndexAfterRemove, moveInDrawOrder } from '@/lib/layerOrder'
 
 interface UseLayerManagerOptions {
@@ -139,16 +140,36 @@ export function useLayerManager(options: UseLayerManagerOptions) {
 
   const toggleLayerVisibility = useCallback(
     (id: string) => {
-      commitNewLayers(prev => prev.map(l => (l.id === id ? { ...l, visible: !l.visible } : l)))
+      commitNewLayers(prev => {
+        const layer = prev.find(l => l.id === id)
+        // A folder's eye sets the eye of the layers it holds too.
+        if (layer?.type === 'folder') return setFolderFlag(prev, id, 'visible', !layer.visible)
+        return prev.map(l => (l.id === id ? { ...l, visible: !l.visible } : l))
+      })
     },
     [commitNewLayers]
   )
 
   const toggleLayerLock = useCallback(
     (id: string) => {
-      commitNewLayers(prev => prev.map(l => (l.id === id ? { ...l, locked: !l.locked } : l)))
+      commitNewLayers(prev => {
+        const layer = prev.find(l => l.id === id)
+        if (layer?.type === 'folder') return setFolderFlag(prev, id, 'locked', !layer.locked)
+        return prev.map(l => (l.id === id ? { ...l, locked: !l.locked } : l))
+      })
     },
     [commitNewLayers]
+  )
+
+  /** Opening or closing a folder in the list is a view change: it is saved with the map but is not an undo step. */
+  const toggleFolderCollapsed = useCallback(
+    (id: string) => {
+      const prev = layersRef.current
+      const next = prev.map(l => (l.id === id && l.type === 'folder' ? { ...l, collapsed: !l.collapsed } : l))
+      setLayers(next)
+      setActiveMap(m => (m ? { ...m, layers: next } : m))
+    },
+    [layersRef, setLayers, setActiveMap]
   )
 
   const handleCreateLayerOfType = useCallback(
@@ -182,6 +203,12 @@ export function useLayerManager(options: UseLayerManagerOptions) {
               counter++
             }
             name = counter === 1 ? 'Images' : `Images ${counter}`
+          } else if (type === 'folder') {
+            let counter = 1
+            while (prev.some(l => l.name === (counter === 1 ? 'Folder' : `Folder ${counter}`))) {
+              counter++
+            }
+            name = counter === 1 ? 'Folder' : `Folder ${counter}`
           } else if (type === 'objects') {
             let counter = 1
             while (prev.some(l => l.name === (counter === 1 ? 'Objects' : `Objects ${counter}`))) {
@@ -279,7 +306,14 @@ export function useLayerManager(options: UseLayerManagerOptions) {
         prev => {
           removedAt = prev.findIndex(l => l.id === id)
           countBefore = prev.length
-          return prev.filter(l => l.id !== id)
+          // Deleting a folder keeps the layers it held: they just leave it.
+          return prev
+            .filter(l => l.id !== id)
+            .map(l => {
+              if (l.folderId !== id) return l
+              const { folderId: _gone, ...rest } = l
+              return rest
+            })
         },
         next => {
           if (removedAt >= 0) shiftEntitiesIndex(k => entitiesIndexAfterRemove(k, removedAt, countBefore))
@@ -456,6 +490,7 @@ export function useLayerManager(options: UseLayerManagerOptions) {
     setEntitiesIndex,
     toggleLayerVisibility,
     toggleLayerLock,
+    toggleFolderCollapsed,
     handleCreateLayer,
     handleCreateLayerOfType,
     handleRenameLayer,

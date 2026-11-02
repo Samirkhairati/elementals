@@ -20,6 +20,7 @@ import { KonvaTilemapLayer } from './konva/KonvaTilemapLayer'
 import { KonvaOverlays } from './konva/KonvaOverlays'
 import { KonvaEntities, type Visuals } from './konva/KonvaEntities'
 import { KonvaGhostEntity } from './konva/KonvaGhostEntity'
+import { withoutFolders } from '@/lib/layerFolders'
 import { KonvaGhostImage, KonvaImageItems } from './konva/KonvaImageItems'
 import { CanvasContextMenu } from './CanvasContextMenu'
 import { CanvasNavigator, type ViewportHandle } from './CanvasNavigator'
@@ -208,8 +209,9 @@ export function MapCanvas({
 
   // Where the Entities row sits among the layers: the layers above it draw over the entities, the ones below under them.
   const entitiesAt = clampEntitiesIndex(activeMap?.entitiesIndex, layers.length)
-  const layersAboveEntities = useMemo(() => layers.slice(0, entitiesAt), [layers, entitiesAt])
-  const layersBelowEntities = useMemo(() => layers.slice(entitiesAt), [layers, entitiesAt])
+  // Folder rows only group layers in the list; they draw nothing.
+  const layersAboveEntities = useMemo(() => withoutFolders(layers.slice(0, entitiesAt)), [layers, entitiesAt])
+  const layersBelowEntities = useMemo(() => withoutFolders(layers.slice(entitiesAt)), [layers, entitiesAt])
   const entityVisuals = useRef<Visuals>({ hoverId: null, dragId: null, dragX: 0, dragY: 0 })
   // The image being dragged, drawn at the mouse by the image layer itself (see KonvaImageItems).
   const imageDrag = useRef<{ id: string; x: number; y: number } | null>(null)

@@ -3,7 +3,7 @@
 
 import type { EngineEntity } from './engine/types.ts'
 
-export type EditorLayerType = 'tile' | 'collision' | 'terrain' | 'objects' | 'encounters' | 'image'
+export type EditorLayerType = 'tile' | 'collision' | 'terrain' | 'objects' | 'encounters' | 'image' | 'folder'
 
 export interface EditorTile {
   tilesetId: string
@@ -56,6 +56,10 @@ export interface EditorLayer {
   data?: Record<number | string, EditorTile>
   /** `image` layers only. */
   images?: EditorImageItem[]
+  /** Tile and image layers only: the `folder` layer that holds this one in the layer list (editor view only, not exported). */
+  folderId?: string
+  /** `folder` layers only: the folder is shown closed in the list. */
+  collapsed?: boolean
 }
 
 export interface EditorEntity {

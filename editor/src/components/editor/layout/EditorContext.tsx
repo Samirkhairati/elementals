@@ -157,6 +157,7 @@ export interface EditorBaseContextValue
   selectLayer: (layerId: string, additive?: boolean) => void
   handleCreateLayerOfType: (type: LayerType) => void
   handleDuplicateLayer: (id: string) => void
+  toggleFolderCollapsed: (id: string) => void
 
   // Entities
   setSelectedEntityId: (entityId: string | null) => void

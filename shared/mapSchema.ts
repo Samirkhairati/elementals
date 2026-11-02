@@ -9,7 +9,7 @@ import type { EntityLike } from './engine/migrate.ts'
 import { validateEntity } from './engine/validate.ts'
 
 /** Mirrors `LayerType` in editor/src/types/editor.ts (checked at compile time by the editor tests). */
-export const LAYER_TYPES = ['tile', 'collision', 'terrain', 'objects', 'encounters', 'image'] as const
+export const LAYER_TYPES = ['tile', 'collision', 'terrain', 'objects', 'encounters', 'image', 'folder'] as const
 
 /**
  * Canonical component names (mirrors `ComponentType` in editor/src/types/editor.ts, checked at compile
@@ -154,9 +154,15 @@ export function validateEditorMap(data: unknown, options: ValidateEditorMapOptio
       if (layer.locked !== undefined && typeof layer.locked !== 'boolean') errors.push(`${label}: locked must be a boolean`)
       if (layer.z !== undefined && !isFiniteNumber(layer.z)) errors.push(`${label}: z must be a finite number`)
 
-      if (typeof layer.name === 'string') {
+      if (typeof layer.name === 'string' && layer.type !== 'folder') {
         const exported = layer.type === 'collision' ? 'collision' : layer.name
         exportedNames.set(exported, (exportedNames.get(exported) ?? 0) + 1)
+      }
+
+      if (layer.folderId !== undefined) {
+        const holder = (data.layers as unknown[]).find((l) => isRecord(l) && l.id === layer.folderId)
+        if (layer.type !== 'tile' && layer.type !== 'image') warnings.push(`${label}: only tile and image layers can sit in a folder`)
+        else if (!isRecord(holder) || holder.type !== 'folder') warnings.push(`${label}: folderId ${JSON.stringify(layer.folderId)} is not a folder layer; it is ignored`)
       }
 
       if (layer.images !== undefined) {

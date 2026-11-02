@@ -1,6 +1,6 @@
 import type { ComponentSchema, ComponentType as EngineComponentType, FieldKind } from '../../../shared/engine/types'
 
-export type LayerType = 'tile' | 'collision' | 'terrain' | 'objects' | 'encounters' | 'image'
+export type LayerType = 'tile' | 'collision' | 'terrain' | 'objects' | 'encounters' | 'image' | 'folder'
 
 /** A rectangle of a picture in its own pixels. */
 export interface ImageCrop {
@@ -44,6 +44,10 @@ export interface Layer {
   data?: Record<number, { tilesetId: string; x: number; y: number }>
   /** `image` layers only. */
   images?: ImageItem[]
+  /** Tile and image layers only: the `folder` layer that holds this one in the list. */
+  folderId?: string
+  /** `folder` layers only: shown closed in the list. */
+  collapsed?: boolean
 }
 
 export interface CopiedTile {

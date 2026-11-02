@@ -97,6 +97,7 @@ editor  --writes-->  project/maps/*.json (editor map format, tile index keyed)
   Adding editor state means: manager hook -> `EditorContext` type -> the `contextValue` object **and its deps array** in `editor.tsx` -> a wrapper selector.
 * Pure logic lives in `src/lib/` (`paintOps`, `layerOrder`, `layerSelection`, `history`, ...) and is unit-tested; hooks are thin wrappers around it. Alias `@/` = `editor/src`.
 * **Dialogs**: Esc closes (Radix). Enter presses the button marked `data-dialog-confirm` (handled once in `components/ui/dialog.tsx`; fields inside a `<form>`, buttons and text areas keep their own Enter). Confirm dialogs use `ConfirmFooter`/`DangerHeader` (`dialogs/ConfirmParts.tsx`): the Delete button takes focus and shows its key. Inline "Delete anyway / Cancel" boxes mount `<ConfirmKeys>` (`ui/ConfirmKeys.tsx`). New dialogs: mark the confirm button.
+* **Help text goes in an info icon**: explanations, how-it-works notes and tips are an `InfoTip` (`ui/controls.tsx`, the little "i" that opens on click, or `info=` on `Field`/`Section`) next to the label or title they explain, never a standing paragraph (`ed-hint`) in the layout. Only state ("No images yet", errors, live readouts) stays as visible text.
 * UI conventions: `ed-*` classes in `src/index.css` (rows, badges, buttons), controls in `components/editor/ui/controls.tsx`, native `title` attributes as tooltips,
   lucide icons. Canvas is react-konva (`components/editor/canvas/konva/`).
 
@@ -104,6 +105,7 @@ editor  --writes-->  project/maps/*.json (editor map format, tile index keyed)
 
 * The layer list is **top first** and the canvas draws it **bottom-up in list order**: what the list shows is what you see. Reordering only changes order.
 * A layer's `z` is a separate property (shown as a badge, exported as a Tiled property, used by the **game** as depth). The editor does not sort by it. Dragging layers never edits `z`.
+* **Folders** are layers of type `folder` in the same list (`lib/layerFolders.ts`): the tile and image layers they hold sit directly below them and carry `folderId`; only tile and image layers can be held. Drag a layer onto a folder (below its row) or use *Move to folder*; a folder drags with its layers; clicking its row opens/closes it (`collapsed`, not an undo step); its eye and lock set the layers inside. Editor-only: the canvas skips folder rows and the exporter drops them.
 * Types: `tile`, `image`, and the gameplay layers `collision`, `terrain`, `encounters`, `objects`. Collision/terrain/encounters are singletons per map.
 * The **Entities row** is part of the stack: its position is the map field `entitiesIndex` (how many layers are above it; missing = on top). Entity sprites draw there,
   entity areas/labels/selection always draw on top. Editor-only, not exported.

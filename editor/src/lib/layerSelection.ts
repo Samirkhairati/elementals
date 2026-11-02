@@ -1,7 +1,7 @@
 import type { CopiedTile, Layer, SelectionLayerPart, TileSelection } from '@/types/editor'
 
 /** Layers that hold tile cells and so can be sampled into / painted from a selection (image layers cannot). */
-export const isSampleableLayer = (layer: Pick<Layer, 'type'>) => layer.type !== 'image' && layer.type !== 'objects'
+export const isSampleableLayer = (layer: Pick<Layer, 'type'>) => layer.type !== 'image' && layer.type !== 'objects' && layer.type !== 'folder'
 
 /**
  * The layers a pinned right-drag samples: the active layer plus every multi-selected one, in list order

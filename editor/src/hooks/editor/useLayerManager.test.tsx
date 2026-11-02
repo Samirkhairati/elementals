@@ -121,4 +121,47 @@ describe('useLayerManager (StrictMode)', () => {
     act(() => result.current.manager.setActiveLayerId('T'))
     expect(result.current.manager.tileSelection).toEqual(sel)
   })
+
+  describe('folders', () => {
+    const held = () => [
+      makeLayer('F', { type: 'folder', name: 'Scenery' }),
+      makeLayer('a', { name: 'Ground', folderId: 'F' }),
+      makeLayer('b', { name: 'Deco', folderId: 'F' }),
+      makeLayer('c', { name: 'Loose' }),
+    ]
+
+    it('creates a folder named Folder, Folder 2 on top of the list', () => {
+      const { result } = setup()
+      act(() => result.current.manager.handleCreateLayerOfType('folder'))
+      act(() => result.current.manager.handleCreateLayerOfType('folder'))
+      expect(result.current.manager.layers.filter(l => l.type === 'folder').map(l => l.name).sort()).toEqual(['Folder', 'Folder 2'])
+    })
+
+    it('the folder eye and lock set the layers it holds, in one undo step each', () => {
+      const { result, onCommitHistory } = setup(held())
+      act(() => result.current.manager.toggleLayerVisibility('F'))
+      expect(result.current.manager.layers.map(l => l.visible)).toEqual([false, false, false, true])
+      expect(onCommitHistory).toHaveBeenCalledTimes(1)
+      act(() => result.current.manager.toggleLayerLock('F'))
+      expect(result.current.manager.layers.map(l => l.locked)).toEqual([true, true, true, false])
+    })
+
+    it('deleting a folder keeps its layers, now outside it', () => {
+      const { result } = setup(held())
+      act(() => result.current.manager.handleDeleteLayer('F'))
+      expect(result.current.manager.layers.map(l => l.id)).toEqual(['a', 'b', 'c'])
+      expect(result.current.manager.layers.every(l => l.folderId === undefined)).toBe(true)
+    })
+
+    it('opening or closing a folder is saved but is not an undo step', () => {
+      const { result, onCommitHistory, activeMap } = (() => {
+        const r = setup(held())
+        return { ...r, activeMap: () => r.result.current.activeMap }
+      })()
+      act(() => result.current.manager.toggleFolderCollapsed('F'))
+      expect(result.current.manager.layers[0].collapsed).toBe(true)
+      expect(activeMap()!.layers[0].collapsed).toBe(true)
+      expect(onCommitHistory).not.toHaveBeenCalled()
+    })
+  })
 })

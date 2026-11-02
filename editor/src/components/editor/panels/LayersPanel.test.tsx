@@ -140,4 +140,39 @@ describe('LayersPanel', () => {
     fireEvent.click(rowOf('Trees'))
     expect(props.setActiveLayerId).toHaveBeenCalledWith('img')
   })
+
+  describe('folders', () => {
+    const folderLayers = (collapsed = false) => [
+      makeLayer('F', { type: 'folder', name: 'Scenery', collapsed }),
+      makeLayer('a', { name: 'Ground', folderId: 'F' }),
+      makeLayer('b', { type: 'image', name: 'Trees', folderId: 'F' }),
+      makeLayer('c', { name: 'Loose' }),
+    ]
+
+    it('shows the folder with its layers under it, and a count instead of a z badge', () => {
+      renderPanel({ layers: folderLayers() })
+      const row = screen.getByTestId('folder-row')
+      expect(within(row).getByTestId('folder-count').textContent).toBe('2')
+      expect(within(row).queryByTestId('layer-z')).toBeNull()
+      expect(screen.getByText('Ground')).toBeInTheDocument()
+    })
+
+    it('a closed folder hides its layers; clicking the row opens/closes it without selecting a layer', () => {
+      const { props } = renderPanel({ layers: folderLayers(true), toggleFolderCollapsed: vi.fn() })
+      expect(screen.queryByText('Ground')).toBeNull()
+      expect(screen.getByText('Loose')).toBeInTheDocument()
+      fireEvent.click(screen.getByTestId('folder-row'))
+      expect(props.toggleFolderCollapsed).toHaveBeenCalledWith('F')
+      expect(props.selectLayer).not.toHaveBeenCalled()
+    })
+
+    it('a loose tile layer can be moved into a folder from its menu', async () => {
+      const { props } = renderPanel({ layers: folderLayers() })
+      fireEvent.contextMenu(screen.getByText('Loose'))
+      fireEvent.click(await screen.findByText('Move to folder'))
+      fireEvent.click((await screen.findAllByText('Scenery')).pop()!)
+      expect(props.reorderLayers).toHaveBeenCalledTimes(1)
+      expect(vi.mocked(props.reorderLayers).mock.calls[0][0].find((l) => l.id === 'c')?.folderId).toBe('F')
+    })
+  })
 })

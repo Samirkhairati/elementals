@@ -26,6 +26,10 @@ The editor imports it from `src/hooks/useExportMap.ts` (relative path, no extens
 paths (type stripping). Keep the files free of enums, namespaces, parameter properties and DOM/Node imports.
 **Export to Game** (Maps panel context menu) validates the editor map and the converted map, then writes `game/public/data/maps/<id>.json` atomically with no dialog (`export-map-to-game` channel, `mapStore.exportMapToGame`; the id is the editor file name slugified, see below). It refuses to write (notice with the first errors) when either is invalid. **Export as File…** is the old save dialog. Run against a project copy (`ELEMENTALS_PROJECT_DIR`), the game folder is the one *beside that copy*, so the real game is never touched. A map that uses a tileset the game does not have yet still needs `npm run assets:sync`.
 
+## Layer folders
+
+A layer of type `folder` groups tile and image layers in the editor's layer list: the layers it holds follow it in `layers[]` and carry `folderId`; the folder has `collapsed` for its open/closed state. Folders are editor-only: `convertEditorMapToTiled` leaves them out (the held layers export as normal layers, in list order) and `validateEditorMap` only warns about a `folderId` that points at no folder or sits on a layer kind that cannot be held. Logic and drag rules: `editor/src/lib/layerFolders.ts`.
+
 ## Image layers
 
 An editor layer of type `image` holds freely placed pictures (`images[]`: `assetId` for a sprite or `graphicId` for a picture from the graphics library, never both; pixel `x`/`y` = the sprite anchor, optional `z`, `scale`, `flipX`, `opacity`)

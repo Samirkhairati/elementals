@@ -69,7 +69,8 @@ export function convertEditorMapToTiled(map: EditorMap, tilesets: TilesetInfo[])
   // Legacy entities (SpriteView, Interactable, ...) are converted so the game only ever sees the
   // canonical components; the exported map is always stamped with the schema version.
   const migrated = migrateMap(map).value
-  const layers = map.layers || []
+  // Folders only group layers in the editor's list; the game gets the layers themselves.
+  const layers = (map.layers || []).filter((l) => l.type !== 'folder')
   const hasCollisionLayer = layers.some((l) => l.type === 'collision')
 
   const exportTilesets: TiledTileset[] = []

@@ -96,6 +96,7 @@ const selectLayers = (c: EditorContextValue) => ({
   handleCreateLayerOfType: c.handleCreateLayerOfType,
   handleRenameLayer: c.handleRenameLayer,
   handleDuplicateLayer: c.handleDuplicateLayer,
+  toggleFolderCollapsed: c.toggleFolderCollapsed,
   setConfirmDialog: c.setConfirmDialog,
 });
 
@@ -125,6 +126,7 @@ export function LayersWrapper(_props: IDockviewPanelProps) {
         createLayerOfType={ctx.handleCreateLayerOfType}
         renameLayer={ctx.handleRenameLayer}
         duplicateLayer={ctx.handleDuplicateLayer}
+        toggleFolderCollapsed={ctx.toggleFolderCollapsed}
         setConfirmDialog={ctx.setConfirmDialog}
       />
     </div>

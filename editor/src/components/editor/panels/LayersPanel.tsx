@@ -15,9 +15,14 @@ import {
   Plus,
   Image as ImageIcon,
   Users,
+  Folder as FolderIcon,
+  FolderOpen,
+  ChevronRight,
+  ChevronDown,
 } from 'lucide-react'
 import { Layer, LayerType } from '@/types/editor'
-import { ENTITIES_ID, moveInStack, stackIds } from '@/lib/layerOrder'
+import { ENTITIES_ID } from '@/lib/layerOrder'
+import { canHoldInFolder, moveInList, setLayerFolder, visibleStack } from '@/lib/layerFolders'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -43,6 +48,8 @@ function getLayerIcon(type: LayerType) {
       return <Leaf className="text-green-400" />
     case 'image':
       return <ImageIcon className="text-violet-400" />
+    case 'folder':
+      return <FolderIcon className="text-yellow-400" />
     default:
       return <LayersIcon className="text-gray-400" />
   }
@@ -68,6 +75,7 @@ function NewLayerSubmenu({
       <ContextMenuSubContent className="w-44">
         <ContextMenuItem onClick={() => createLayerOfType('tile')}>Tile Layer</ContextMenuItem>
         <ContextMenuItem onClick={() => createLayerOfType('image')}>Image Layer</ContextMenuItem>
+        <ContextMenuItem onClick={() => createLayerOfType('folder')}>Folder</ContextMenuItem>
         <ContextMenuItem disabled={hasCollision} onClick={() => createLayerOfType('collision')}>
           Collision Layer
         </ContextMenuItem>
@@ -155,6 +163,8 @@ interface LayersPanelProps {
   createLayerOfType: (type: LayerType) => void
   renameLayer: (id: string, newName: string) => void
   duplicateLayer: (id: string) => void
+  /** Opens or closes a folder row (a view change, not an undo step). */
+  toggleFolderCollapsed?: (id: string) => void
   setConfirmDialog: (config: {
     open: boolean
     title: string
@@ -182,6 +192,7 @@ export function LayersPanel({
   createLayerOfType,
   renameLayer,
   duplicateLayer,
+  toggleFolderCollapsed,
   setConfirmDialog,
 }: LayersPanelProps) {
   const [draggedLayerId, setDraggedLayerId] = useState<string | null>(null)
@@ -243,26 +254,36 @@ export function LayersPanel({
       return
     }
 
-    // Layers and the Entities row are one stack; only the order changes (no z, no other property).
-    const moved = moveInStack(layers, entitiesIndex, draggedLayerId, targetId, dragOverTarget?.position === 'bottom' ? 'bottom' : 'top')
+    // Layers and the Entities row are one stack; only the order (and which folder holds a layer) changes (no z, no other property).
+    const moved = moveInList(layers, entitiesIndex, draggedLayerId, targetId, dragOverTarget?.position === 'bottom' ? 'bottom' : 'top')
     if (moved.layers !== layers) reorderLayers(moved.layers)
     if (moved.entitiesIndex !== Math.min(entitiesIndex, layers.length)) setEntitiesIndex?.(moved.entitiesIndex)
     setDraggedLayerId(null)
     setDragOverTarget(null)
   }
 
+  const putInFolder = (layerId: string, folderId: string | null) => {
+    const moved = setLayerFolder(layers, entitiesIndex, layerId, folderId)
+    if (moved.layers !== layers) reorderLayers(moved.layers)
+    if (moved.entitiesIndex !== Math.min(entitiesIndex, layers.length)) setEntitiesIndex?.(moved.entitiesIndex)
+  }
+
   const confirmDeleteLayer = (layer: Layer) => {
     setTimeout(() => {
       setConfirmDialog({
         open: true,
-        title: 'Delete Layer',
-        description: `Are you sure you want to delete layer "${layer.name}"?`,
+        title: layer.type === 'folder' ? 'Delete Folder' : 'Delete Layer',
+        description:
+          layer.type === 'folder'
+            ? `Delete the folder "${layer.name}"? The layers inside it are kept.`
+            : `Are you sure you want to delete layer "${layer.name}"?`,
         action: () => deleteLayer(layer.id),
       })
     }, 0)
   }
 
-  const stack = stackIds(layers, entitiesIndex)
+  const stack = visibleStack(layers, entitiesIndex)
+  const folders = layers.filter((l) => l.type === 'folder')
 
   const hasCollision = layers.some((l) => l.type === 'collision')
   const hasTerrain = layers.some((l) => l.type === 'terrain')
@@ -324,6 +345,8 @@ export function LayersPanel({
             const isSelected = activeLayerId === layer.id
             const isMulti = !isSelected && selectedLayerIds.includes(layer.id)
             const isDropTarget = dragOverTarget?.id === layer.id && draggedLayerId !== layer.id
+            const isFolderRow = layer.type === 'folder'
+            const held = layer.folderId !== undefined
 
             return (
               <ContextMenu key={layer.id}>
@@ -335,6 +358,10 @@ export function LayersPanel({
                     onDragEnd={handleDragEnd}
                     onDrop={(e) => handleDrop(e, layer.id)}
                     onClick={(e) => {
+                      if (isFolderRow) {
+                        toggleFolderCollapsed?.(layer.id)
+                        return
+                      }
                       const additive = e.metaKey || e.ctrlKey
                       if (selectLayer) selectLayer(layer.id, additive)
                       else setActiveLayerId(layer.id)
@@ -344,6 +371,9 @@ export function LayersPanel({
                       if (!layer.locked) startEditing(layer)
                     }}
                     className="ed-row"
+                    style={held ? { marginLeft: 16 } : undefined}
+                    data-testid={isFolderRow ? 'folder-row' : undefined}
+                    data-dim={layer.visible ? undefined : 'true'}
                     data-selected={isSelected ? 'true' : undefined}
                     data-multi={isMulti ? 'true' : undefined}
                   >
@@ -356,7 +386,9 @@ export function LayersPanel({
                       />
                     )}
 
-                    {getLayerIcon(layer.type)}
+                    {isFolderRow &&
+                      (layer.collapsed ? <ChevronRight className="text-gray-400" /> : <ChevronDown className="text-gray-400" />)}
+                    {isFolderRow ? (layer.collapsed ? <FolderIcon className="text-yellow-400" /> : <FolderOpen className="text-yellow-400" />) : getLayerIcon(layer.type)}
 
                     {isEditing ? (
                       <input
@@ -376,9 +408,15 @@ export function LayersPanel({
                       <span className="ed-row-label" title={layer.name}>{layer.name}</span>
                     )}
 
-                    <span className="ed-badge" title="Z-index: draw order, higher draws on top" data-testid="layer-z">
-                      z {layer.z ?? 0}
-                    </span>
+                    {isFolderRow ? (
+                      <span className="ed-badge" title="Layers in this folder" data-testid="folder-count">
+                        {layers.filter((l) => l.folderId === layer.id).length}
+                      </span>
+                    ) : (
+                      <span className="ed-badge" title="Z-index: draw order, higher draws on top" data-testid="layer-z">
+                        z {layer.z ?? 0}
+                      </span>
+                    )}
 
                     {/* Compact status & inline visibility toggle */}
                     <div
@@ -413,10 +451,33 @@ export function LayersPanel({
                     <Edit2 className="w-3.5 h-3.5 mr-2" />
                     Rename
                   </ContextMenuItem>
-                  <ContextMenuItem onClick={() => duplicateLayer(layer.id)}>
-                    <Copy className="w-3.5 h-3.5 mr-2" />
-                    Duplicate
-                  </ContextMenuItem>
+                  {!isFolderRow && (
+                    <ContextMenuItem onClick={() => duplicateLayer(layer.id)}>
+                      <Copy className="w-3.5 h-3.5 mr-2" />
+                      Duplicate
+                    </ContextMenuItem>
+                  )}
+                  {canHoldInFolder(layer) && (folders.length > 0 || held) && (
+                    <ContextMenuSub>
+                      <ContextMenuSubTrigger>
+                        <FolderIcon className="w-3.5 h-3.5 mr-2" />
+                        Move to folder
+                      </ContextMenuSubTrigger>
+                      <ContextMenuSubContent className="w-44">
+                        {folders.map((f) => (
+                          <ContextMenuItem key={f.id} disabled={layer.folderId === f.id} onClick={() => putInFolder(layer.id, f.id)}>
+                            {f.name}
+                          </ContextMenuItem>
+                        ))}
+                        {held && (
+                          <>
+                            <ContextMenuSeparator />
+                            <ContextMenuItem onClick={() => putInFolder(layer.id, null)}>Remove from folder</ContextMenuItem>
+                          </>
+                        )}
+                      </ContextMenuSubContent>
+                    </ContextMenuSub>
+                  )}
                   <ContextMenuSeparator />
                   <ContextMenuItem onClick={() => toggleLayerVisibility(layer.id)}>
                     {layer.visible ? (
@@ -450,7 +511,7 @@ export function LayersPanel({
                     className="text-red-400 focus:text-red-400 focus:bg-red-500/10"
                   >
                     <Trash2 className="w-3.5 h-3.5 mr-2" />
-                    Delete Layer
+                    {isFolderRow ? 'Delete Folder' : 'Delete Layer'}
                   </ContextMenuItem>
                 </ContextMenuContent>
               </ContextMenu>
