@@ -144,6 +144,7 @@ function ResizeBody({ map, tilesets, onClose, onConfirm }: Props & { map: Resiza
           type="submit"
           className="ed-btn"
           data-variant={lossy ? 'danger' : 'primary'}
+          data-dialog-confirm
           disabled={Boolean(problem) || unchanged}
         >
           {lossy ? 'Resize and remove content' : 'Resize'}

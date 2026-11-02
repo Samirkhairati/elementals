@@ -30,10 +30,26 @@ const DialogOverlay = React.forwardRef<
 ))
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
+// Esc closes a dialog (Radix); Enter presses its confirm button, the one marked data-dialog-confirm. Fields inside a
+// <form> and buttons keep their own Enter (submit / click), and so do text areas, selects and anything that opens a list.
+const OWN_ENTER = 'button, a, textarea, select, [role="combobox"], [role="listbox"], [role="option"], [role="menuitem"], [contenteditable="true"]'
+function confirmOnEnter(e: React.KeyboardEvent<HTMLElement>) {
+  if (e.defaultPrevented || e.key !== 'Enter' || e.altKey || e.shiftKey || e.nativeEvent.isComposing) return
+  const target = e.target as HTMLElement
+  if (target.closest(OWN_ENTER)) return
+  if (target instanceof HTMLInputElement && target.form) return
+  const buttons = e.currentTarget.querySelectorAll<HTMLButtonElement>("button[data-dialog-confirm]:not(:disabled)")
+  const confirm = buttons[buttons.length - 1]
+  if (!confirm) return
+  e.preventDefault()
+  // One tick later: a field that commits on Enter (TextField) has then updated what the button acts on.
+  setTimeout(() => { if (confirm.isConnected && !confirm.disabled) confirm.click() }, 0)
+}
+
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, onCloseAutoFocus, ...props }, ref) => {
+>(({ className, children, onCloseAutoFocus, onKeyDown, ...props }, ref) => {
   // Floating panels inside the dialog (dropdown lists ...) render into this node, not the page.
   const [node, setNode] = React.useState<HTMLElement | null>(null)
   const setRefs = React.useCallback(
@@ -52,6 +68,10 @@ const DialogContent = React.forwardRef<
       onCloseAutoFocus={(e) => {
         document.body.style.pointerEvents = ""
         onCloseAutoFocus?.(e)
+      }}
+      onKeyDown={(e) => {
+        onKeyDown?.(e)
+        confirmOnEnter(e)
       }}
       className={cn(
         "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-3 border bg-background p-4 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",

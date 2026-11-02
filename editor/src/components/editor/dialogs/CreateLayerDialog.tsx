@@ -43,7 +43,7 @@ export function CreateLayerDialog({ open, name, type, setName, setType, onClose,
           </div>
           <DialogFooter className="gap-2 sm:space-x-0">
             <button type="button" onClick={() => onClose(false)} className="ed-btn">Cancel</button>
-            <button type="submit" className="ed-btn" data-variant="primary">Create</button>
+            <button type="submit" className="ed-btn" data-variant="primary" data-dialog-confirm>Create</button>
           </DialogFooter>
         </form>
       </DialogContent>

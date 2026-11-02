@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import type { Reference } from '../../../../../shared/engine/references'
 import { summarizeReferences, type AssetPlan } from '@/lib/assetOps'
 import { EdButton } from '../ui/controls'
+import { ConfirmFooter, DangerHeader } from '../dialogs/ConfirmParts'
 
 /** The reference labels of a plan, once each. */
 const labelsOf = (refs: readonly Reference[]): string[] => [...new Set(refs.map((r) => r.label))]
@@ -61,7 +62,7 @@ export function NameDialog({ open, title, description, label, initial = '', conf
           {error && <p role="alert" className="text-destructive">{error}</p>}
           <div className="flex justify-end gap-2">
             <EdButton type="button" onClick={onClose}>Cancel</EdButton>
-            <EdButton type="submit" variant="primary" disabled={!!problem || busy}>{confirmLabel}</EdButton>
+            <EdButton type="submit" variant="primary" data-dialog-confirm disabled={!!problem || busy}>{confirmLabel}</EdButton>
           </div>
         </form>
       </DialogContent>
@@ -107,10 +108,7 @@ export function ChangeDialog({ open, title, description, children, plan, confirm
         {plan?.ok && <ReferencePreview references={plan.references} extra={plan.characters.length + plan.maps.length > 0 ? `${plan.characters.length + plan.maps.length} file${plan.characters.length + plan.maps.length === 1 ? '' : 's'} will be rewritten` : undefined} />}
         {note && <p className="ed-hint">{note}</p>}
         {error && <p role="alert" className="text-destructive">{error}</p>}
-        <div className="flex justify-end gap-2">
-          <EdButton onClick={onClose}>Cancel</EdButton>
-          <EdButton variant="primary" disabled={!plan?.ok || busy} onClick={() => void confirm()}>{confirmLabel}</EdButton>
-        </div>
+        <ConfirmFooter tone="primary" onCancel={onClose} onConfirm={() => void confirm()} confirmLabel={confirmLabel} disabled={!plan?.ok || busy} />
       </DialogContent>
     </Dialog>
   )
@@ -119,7 +117,9 @@ export function ChangeDialog({ open, title, description, children, plan, confirm
 interface DeleteProps {
   open: boolean
   title: string
-  /** What goes, e.g. "the picture and its file". */
+  /** What goes (a path, a name): shown on its own line. */
+  subject?: string
+  /** What happens to it, e.g. "the picture and its file". */
   description: string
   guard: { allowed: boolean; references: readonly Reference[] }
   /** Shown when blocked: what to do about it. */
@@ -128,7 +128,7 @@ interface DeleteProps {
   onClose: () => void
 }
 
-export function DeleteDialog({ open, title, description, guard, blockedHint, onConfirm, onClose }: DeleteProps) {
+export function DeleteDialog({ open, title, subject, description, guard, blockedHint, onConfirm, onClose }: DeleteProps) {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const confirm = async () => {
@@ -140,11 +140,8 @@ export function DeleteDialog({ open, title, description, guard, blockedHint, onC
   }
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-lg" aria-describedby="delete-dialog-desc">
-        <DialogHeader className="text-left">
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription id="delete-dialog-desc" className="ed-hint">{guard.allowed ? description : 'Something still uses it, so it cannot be deleted.'}</DialogDescription>
-        </DialogHeader>
+      <DialogContent className="max-w-md" aria-describedby="delete-dialog-desc">
+        <DangerHeader title={title} subject={subject} descriptionId="delete-dialog-desc" description={guard.allowed ? description : 'Something still uses it, so it cannot be deleted.'} />
         {!guard.allowed && (
           <div data-testid="delete-blocked" className="text-ed-label">
             <p>{summarizeReferences(guard.references)}:</p>
@@ -153,10 +150,7 @@ export function DeleteDialog({ open, title, description, guard, blockedHint, onC
           </div>
         )}
         {error && <p role="alert" className="text-destructive">{error}</p>}
-        <div className="flex justify-end gap-2">
-          <EdButton onClick={onClose}>Cancel</EdButton>
-          <EdButton variant="danger" disabled={!guard.allowed || busy} onClick={() => void confirm()}>Delete</EdButton>
-        </div>
+        <ConfirmFooter onCancel={onClose} onConfirm={() => void confirm()} confirmLabel="Delete" disabled={!guard.allowed || busy} />
       </DialogContent>
     </Dialog>
   )

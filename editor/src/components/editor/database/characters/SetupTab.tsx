@@ -5,6 +5,7 @@ import type { FacingMode } from '../../../../../../shared/engine/characters'
 import { facingChangeImpact, setBinding, setFacingMode, setPivot, setTags } from '@/lib/characterEdit'
 import { Select } from '../../ui/fields'
 import { EdButton, Field, FieldRow, InfoTip, NumberField, Segmented, TextField } from '../../ui/controls'
+import { ConfirmKeys } from '../../ui/ConfirmKeys'
 import { PivotPicker } from './PivotPicker'
 
 interface Props {
@@ -39,7 +40,8 @@ export function SetupTab({ id, def, onChange }: Props) {
       {pendingFacing && impact && (
         <div role="alert" className="rounded border border-border p-2 text-ed-label">
           {impact.invalid.length} directional animation{impact.invalid.length === 1 ? '' : 's'} will become plain ones that show their “down” frames ({impact.invalid.join(', ')}).
-          <FieldRow className="mt-1"><EdButton size="sm" variant="primary" onClick={() => { onChange(setFacingMode(def, pendingFacing)); setPendingFacing(null) }}>Change facing</EdButton><EdButton size="sm" onClick={() => setPendingFacing(null)}>Cancel</EdButton></FieldRow>
+          <ConfirmKeys onConfirm={() => { onChange(setFacingMode(def, pendingFacing)); setPendingFacing(null) }} onCancel={() => setPendingFacing(null)} />
+          <FieldRow className="mt-1"><EdButton size="sm" variant="primary" autoFocus onClick={() => { onChange(setFacingMode(def, pendingFacing)); setPendingFacing(null) }}>Change facing</EdButton><EdButton size="sm" onClick={() => setPendingFacing(null)}>Cancel</EdButton></FieldRow>
         </div>
       )}
       <Field label="Pivot" info="The point of the frame that stands on the spot where the entity is placed. Bottom-centre suits sprites; centre suits things that float.">

@@ -28,7 +28,7 @@ export function RenameDialog({ open, type, renameInput, setRenameInput, onClose,
           </div>
           <DialogFooter className="gap-2 sm:space-x-0">
             <button type="button" onClick={onClose} className="ed-btn">Cancel</button>
-            <button type="submit" className="ed-btn" data-variant="primary">Save</button>
+            <button type="submit" className="ed-btn" data-variant="primary" data-dialog-confirm>Save</button>
           </DialogFooter>
         </form>
       </DialogContent>

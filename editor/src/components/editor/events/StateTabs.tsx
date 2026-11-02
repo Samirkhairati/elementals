@@ -6,6 +6,7 @@ import type { EventState } from '../../../../../shared/engine/types'
 import { TRIGGER_LABELS } from '../../../../../shared/engine/constants'
 import { commandNodes } from '../../../../../shared/engine/graph'
 import { cn } from '@/lib/utils'
+import { ConfirmKeys } from '../ui/ConfirmKeys'
 import { DraftText, IconButton, SectionTitle, SmallButton } from './primitives'
 import { stateLabel, type Problem } from './eventModel'
 
@@ -154,9 +155,10 @@ export function StateTabs({ states, selectedId, startIndex, problems, onSelect, 
         </div>
         {confirmDelete && selected && confirmDelete === selected.id && (
           <div role="alert" className="mt-1.5 rounded border border-amber-500/40 bg-amber-500/10 p-1.5 text-[11px]">
+            <ConfirmKeys onConfirm={requestDelete} onCancel={() => setConfirmDelete(null)} />
             <p className="text-amber-300">Delete “{stateLabel(selected, selectedIndex)}” and its {commandNodes(selected.graph).length} nodes? You can undo this.</p>
             <div className="mt-1 flex gap-1">
-              <SmallButton variant="danger" onClick={requestDelete}>
+              <SmallButton variant="danger" autoFocus onClick={requestDelete}>
                 Delete state
               </SmallButton>
               <SmallButton onClick={() => setConfirmDelete(null)}>Cancel</SmallButton>

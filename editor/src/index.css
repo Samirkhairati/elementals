@@ -315,6 +315,24 @@
   .ed-btn[data-variant='danger']:hover:not(:disabled) {
     background: hsl(var(--solid) / 0.14);
   }
+  /* The button that actually deletes: solid, where 'danger' is an outline. */
+  .ed-btn[data-variant='destructive'] {
+    @apply border-transparent text-white;
+    background: hsl(var(--solid));
+  }
+  .ed-btn[data-variant='destructive']:hover:not(:disabled) {
+    background: hsl(var(--solid) / 0.88);
+  }
+  /* A key hint inside a button or label */
+  .ed-kbd {
+    @apply inline-flex select-none items-center justify-center rounded border px-1 leading-none;
+    height: 1.125rem;
+    min-width: 1.125rem;
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    border-color: color-mix(in srgb, currentColor 35%, transparent);
+    opacity: 0.75;
+  }
   .ed-btn[data-variant='dashed'] {
     @apply border-dashed text-muted-foreground;
   }

@@ -107,7 +107,8 @@ function DeleteTilesetFolder({ folder, actions, onDone, onClose }: { folder: str
   return (
     <DeleteDialog
       open
-      title={`Delete folder “${folder}”?`}
+      title="Delete folder?"
+      subject={folder}
       description={inside.length ? `The folder and the ${inside.length} unused tileset${inside.length === 1 ? '' : 's'} in it are removed from the project.` : 'The empty folder is removed.'}
       guard={actions.deleteGuard(inside.map((t) => t.fileName))}
       blockedHint="Repaint those maps first, or move the tilesets that are in use somewhere else."
@@ -152,7 +153,8 @@ export function TilesetDetail({ data, id, onSelect }: { data: DatabaseData; id: 
       {dialog === 'delete' && (
         <DeleteDialog
           open
-          title={`Delete “${tileset.name}”?`}
+          title="Delete tileset?"
+          subject={tileset.name}
           description="The tileset image is removed from the project. This cannot be undone."
           guard={actions.deleteGuard([tileset.fileName])}
           blockedHint="Repaint those layers first, or rename the tileset instead."

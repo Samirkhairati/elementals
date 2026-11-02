@@ -102,7 +102,7 @@ function ImportBody({ candidates, importer, folder: startFolder, onClose, onImpo
 
       <div className="flex justify-end gap-2">
         <EdButton type="button" onClick={onClose}>Cancel</EdButton>
-        <EdButton type="submit" variant="primary" disabled={blocked}>{busy ? 'Importing…' : `Import ${rows.length} ${plural}`}</EdButton>
+        <EdButton type="submit" variant="primary" data-dialog-confirm disabled={blocked}>{busy ? 'Importing…' : `Import ${rows.length} ${plural}`}</EdButton>
       </div>
     </form>
   )

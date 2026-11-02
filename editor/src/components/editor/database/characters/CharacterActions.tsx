@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { applyCharacterRename, deleteGuard, planCharacterRename } from '@/lib/renameFlow'
 import { groupReferences } from '@/lib/referenceIndex'
-import { EdButton, TextField } from '../../ui/controls'
+import { TextField } from '../../ui/controls'
+import { ConfirmFooter, DangerHeader } from '../../dialogs/ConfirmParts'
 import type { DatabaseData } from '../useDatabaseData'
 
 const summarize = (refs: { source: { table: string; mapName?: string } }[]): string => {
@@ -65,14 +66,11 @@ export function CharacterActions({ data, id, mode, onClose, onDone }: Props) {
               </div>
             )}
             {error && <p role="alert" className="text-destructive">{error}</p>}
-            <div className="flex justify-end gap-2"><EdButton onClick={onClose}>Cancel</EdButton><EdButton variant="primary" disabled={!plan.ok} onClick={() => void rename()}>Rewrite &amp; rename</EdButton></div>
+            <ConfirmFooter tone="primary" onCancel={onClose} onConfirm={() => void rename()} confirmLabel="Rewrite & rename" disabled={!plan.ok} />
           </>
         ) : (
           <>
-            <DialogHeader className="text-left">
-              <DialogTitle>Delete “{id}”?</DialogTitle>
-              <DialogDescription id="character-action-desc">{guard.allowed ? 'Nothing uses this sprite. The record is removed; its graphics stay in the library.' : 'Something still uses this sprite, so it cannot be deleted.'}</DialogDescription>
-            </DialogHeader>
+            <DangerHeader title="Delete sprite?" subject={id} descriptionId="character-action-desc" description={guard.allowed ? 'Nothing uses this sprite. The record is removed; its graphics stay in the library.' : 'Something still uses this sprite, so it cannot be deleted.'} />
             {!guard.allowed && (
               <div data-testid="delete-blocked" className="text-ed-label">
                 <p>{summarize(guard.references)}:</p>
@@ -81,7 +79,7 @@ export function CharacterActions({ data, id, mode, onClose, onDone }: Props) {
               </div>
             )}
             {error && <p role="alert" className="text-destructive">{error}</p>}
-            <div className="flex justify-end gap-2"><EdButton onClick={onClose}>Cancel</EdButton><EdButton variant="danger" disabled={!guard.allowed} onClick={() => void remove()}>Delete</EdButton></div>
+            <ConfirmFooter onCancel={onClose} onConfirm={() => void remove()} confirmLabel="Delete" disabled={!guard.allowed} />
           </>
         )}
       </DialogContent>

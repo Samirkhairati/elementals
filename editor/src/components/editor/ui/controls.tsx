@@ -425,7 +425,7 @@ export function Toggle({ checked, onChange, disabled, id, ...rest }: ToggleProps
 // ── Buttons ─────────────────────────────────────────────────────────────────────────────────────
 
 interface EdButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'default' | 'primary' | 'danger' | 'dashed'
+  variant?: 'default' | 'primary' | 'danger' | 'destructive' | 'dashed'
   size?: 'default' | 'sm'
 }
 

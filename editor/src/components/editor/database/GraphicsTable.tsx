@@ -114,7 +114,8 @@ function DeleteFolder({ folder, data, actions, onDone, onClose }: { folder: stri
   return (
     <DeleteDialog
       open
-      title={`Delete folder “${folder}”?`}
+      title="Delete folder?"
+      subject={folder}
       description={inside.length ? `The folder and the ${inside.length} unused picture${inside.length === 1 ? '' : 's'} in it are removed from the project.` : 'The empty folder is removed.'}
       guard={guard}
       blockedHint="Change those first, or move the pictures that are in use somewhere else."
@@ -181,7 +182,8 @@ export function GraphicDetail({ data, id, onSelect }: { data: DatabaseData; id: 
       {dialog === 'delete' && (
         <DeleteDialog
           open
-          title={`Delete “${id}”?`}
+          title="Delete picture?"
+          subject={id}
           description="The picture file is removed from the project. This cannot be undone."
           guard={actions.deleteGuard([id])}
           blockedHint="Change those first, or rename it instead."

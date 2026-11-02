@@ -25,7 +25,7 @@ export function CreateMapFolderDialog({ open, folderName, setFolderName, onClose
           </div>
           <DialogFooter className="gap-2 sm:space-x-0">
             <button type="button" onClick={onClose} className="ed-btn">Cancel</button>
-            <button type="submit" className="ed-btn" data-variant="primary">Create</button>
+            <button type="submit" className="ed-btn" data-variant="primary" data-dialog-confirm>Create</button>
           </DialogFooter>
         </form>
       </DialogContent>

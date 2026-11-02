@@ -3,7 +3,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { PRESET_FOLDERS, PRESET_LABELS, newCharacter, slugify, suggestGrid, type Preset } from '@/lib/characterEdit'
 import { isValidCharacterId } from '../../../../../../shared/engine/graphics'
 import { GraphicField } from './GraphicField'
-import { EdButton, Field, Segmented, TextField } from '../../ui/controls'
+import { Field, Segmented, TextField } from '../../ui/controls'
+import { ConfirmFooter } from '../../dialogs/ConfirmParts'
 import type { DatabaseData } from '../useDatabaseData'
 
 const PRESET_HELP: Record<Preset, string> = {
@@ -82,13 +83,7 @@ export function NewCharacterWizard({ data, open, onOpenChange, onCreated }: Prop
         {idError && <p role="alert" className="-mt-2 text-destructive">{idError}</p>}
         {error && <p role="alert" className="text-destructive">{error}</p>}
 
-        <div className="flex items-center gap-2 border-t border-border pt-3">
-          <span className="ed-hint">Nothing is saved until you press Create.</span>
-          <div className="ml-auto flex gap-2">
-            <EdButton onClick={() => onOpenChange(false)}>Cancel</EdButton>
-            <EdButton variant="primary" disabled={!graphic || !!idError} onClick={() => void create()}>Create</EdButton>
-          </div>
-        </div>
+        <ConfirmFooter tone="primary" note="Nothing is saved until you press Create." onCancel={() => onOpenChange(false)} onConfirm={() => void create()} confirmLabel="Create" disabled={!graphic || !!idError} />
       </DialogContent>
     </Dialog>
   )
