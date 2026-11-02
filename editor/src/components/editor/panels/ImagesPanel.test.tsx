@@ -114,6 +114,18 @@ describe('ImagesPanel', () => {
     expect(f.updateImage).not.toHaveBeenCalled()
   })
 
+  it('previews a cropped picture as the whole picture with the cropped part outlined', () => {
+    setup(items, { selectedImageId: 'b' })
+    const outline = screen.getByTestId('crop-outline')
+    expect(outline).toHaveClass('border-dashed')
+    expect(outline.title).toMatch(/16×16 px from 32, 0/)
+  })
+
+  it('an uncropped item has no outline in its preview', () => {
+    setup(items, { selectedImageId: 'a' })
+    expect(screen.queryByTestId('crop-outline')).toBeNull()
+  })
+
   it('shows the picked item with a preview, and Crop… stores the chosen part on that item only', () => {
     const f = setup(items, { selectedImageId: 'a' })
     expect(screen.getByTestId('image-preview')).toBeInTheDocument()

@@ -63,8 +63,10 @@ export function ImagesPanel() {
   const locked = layer.locked
   const pendingLabel = ctx.pendingImage ? imagePickLabel(ctx.pendingImage) : ''
   const graphic = selected?.graphicId ? ctx.graphics.find((g) => g.id === selected.graphicId) : undefined
-  const sourceSize = selected ? itemSourceSize(selected, assets) : null
   const previewScale = selected && scaleDraft?.id === selected.id ? scaleDraft.scale : (selected?.scale ?? 1)
+  // A cropped picture previews as the whole picture with the part the item shows outlined; anything else as the item itself.
+  const whole = selected?.graphicId && selected.crop ? { graphicId: selected.graphicId } : null
+  const sourceSize = selected ? itemSourceSize(whole ?? selected, assets) : null
   const previewSize = sourceSize && scaledSize(sourceSize, previewScale)
 
   return (
@@ -214,7 +216,25 @@ export function ImagesPanel() {
             {previewSize && (
               <div className="flex h-60 min-h-0 flex-col" data-testid="image-preview">
                 <ZoomPane key={`${selected.id}`} width={previewSize.w} height={previewSize.h} maxFit={8} hint={false} compact>
-                  {(zoom) => <ImageItemView item={selected} assets={assets} zoom={zoom} itemScale={previewScale} />}
+                  {(zoom) => (
+                    <div className="relative" style={{ width: Math.round(previewSize.w * zoom), height: Math.round(previewSize.h * zoom) }}>
+                      <ImageItemView item={whole ?? selected} assets={assets} zoom={zoom} itemScale={previewScale} />
+                      {whole && selected.crop && (
+                        <div
+                          data-testid="crop-outline"
+                          title={`The part this item shows: ${selected.crop.w}×${selected.crop.h} px from ${selected.crop.x}, ${selected.crop.y}`}
+                          className="pointer-events-none absolute border border-dashed border-yellow-400"
+                          style={{
+                            left: selected.crop.x * previewScale * zoom,
+                            top: selected.crop.y * previewScale * zoom,
+                            width: selected.crop.w * previewScale * zoom,
+                            height: selected.crop.h * previewScale * zoom,
+                            boxShadow: '0 0 0 1px rgba(0,0,0,0.6)',
+                          }}
+                        />
+                      )}
+                    </div>
+                  )}
                 </ZoomPane>
               </div>
             )}
