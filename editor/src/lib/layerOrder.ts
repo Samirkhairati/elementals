@@ -75,3 +75,23 @@ export function entitiesIndexAfterRemove(entitiesIndex: number | undefined, at: 
   const k = clampEntitiesIndex(entitiesIndex, layerCountBefore)
   return at < k ? k - 1 : k
 }
+
+/**
+ * `images` with `id` moved one step toward the front (+1, drawn later) or the back (-1) of the draw order. Neighbours
+ * with different `z` trade their `z`; neighbours with the same `z` trade places in the array (that is what breaks the tie).
+ */
+export function moveInDrawOrder<T extends { id: string; z?: number }>(images: T[], id: string, direction: 1 | -1): T[] {
+  const sorted = sortedImages(images)
+  const from = sorted.findIndex((img) => img.id === id)
+  const to = from + direction
+  if (from === -1 || to < 0 || to >= sorted.length) return images
+  const a = sorted[from]
+  const b = sorted[to]
+  if ((a.z ?? 0) !== (b.z ?? 0)) return images.map((img) => (img.id === a.id ? { ...img, z: b.z ?? 0 } : img.id === b.id ? { ...img, z: a.z ?? 0 } : img))
+  const ia = images.indexOf(a)
+  const ib = images.indexOf(b)
+  const next = [...images]
+  next[ia] = b
+  next[ib] = a
+  return next
+}

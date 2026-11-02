@@ -346,6 +346,15 @@ export function MapCanvas({
                 view={view}
               />
 
+              {/* The image waiting to be placed follows the mouse, snapped (or not) exactly like the placement */}
+              <KonvaGhostImage
+                pending={pendingImage && isImageLayerActive ? pendingImage : null}
+                pointerPos={stagePointerPos}
+                snapToGrid={snapToGrid}
+                snapEntityPos={snapEntityPos}
+                spriteAssets={spriteAssets}
+              />
+
               {/* Ghost entity preview during placement mode */}
               <KonvaGhostEntity
                 pendingPlacement={pendingPlacement}

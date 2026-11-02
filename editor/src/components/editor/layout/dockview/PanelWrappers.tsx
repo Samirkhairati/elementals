@@ -7,6 +7,7 @@ import { MapsPanel } from '@/components/editor/panels/MapsPanel';
 import { LayersPanel } from '@/components/editor/panels/LayersPanel';
 import { EntitiesPanel } from '@/components/editor/panels/EntitiesPanel';
 import { PropertiesPanel } from '@/components/editor/panels/PropertiesPanel';
+import { ImagesPanel } from '@/components/editor/panels/ImagesPanel';
 import { TilesetsPanel } from '@/components/editor/panels/TilesetsPanel';
 import { TilesetPreview } from '@/components/editor/panels/TilesetPreview';
 import { ActiveSelectionPanel } from '@/components/editor/panels/ActiveSelectionPanel';
@@ -239,6 +240,15 @@ export function PropertiesWrapper(_props: IDockviewPanelProps) {
 
 export function InspectorWrapper(_props: IDockviewPanelProps) {
   return <PropertiesBody entityMode />;
+}
+
+/** The right sidebar while an image layer is active (see useDockviewLayout). */
+export function ImagesWrapper(_props: IDockviewPanelProps) {
+  return (
+    <div className="h-full min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain bg-card/40 p-2 text-xs text-muted-foreground" data-testid="images-scroll">
+      <ImagesPanel />
+    </div>
+  );
 }
 
 const selectCanvas = (c: EditorContextValue) => ({
@@ -559,6 +569,7 @@ export const dockviewComponents = {
   entities: EntitiesWrapper,
   properties: PropertiesWrapper,
   inspector: InspectorWrapper,
+  images: ImagesWrapper,
   canvas: CanvasWrapper,
   emptyCanvas: EmptyCanvasWrapper,
   tilesets: TilesetsWrapper,

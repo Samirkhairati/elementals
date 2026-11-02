@@ -11,6 +11,14 @@ export interface EditorTile {
   y: number
 }
 
+/** A rectangle of a picture in its own pixels (whole numbers, inside the picture). */
+export interface EditorImageCrop {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
 /**
  * One freely placed image of an `image` layer, drawn at a pixel position (its anchor: bottom-centre of the picture).
  * It is either a sprite asset (`assetId`) or a plain picture from the graphics library (`graphicId`), never both.
@@ -21,6 +29,13 @@ export interface EditorImageItem {
   assetId?: string
   /** Graphic id (a picture under project/graphics), e.g. `scenery/clouds.png`. */
   graphicId?: string
+  /** Shown name in the editor's list (the picture's id when absent). */
+  name?: string
+  /**
+   * Only part of the picture (`graphicId` items only). Several items can show different parts of one picture: they
+   * all point at that one file, nothing is cut out or copied. Absent = the whole picture.
+   */
+  crop?: EditorImageCrop
   x: number
   y: number
   /** Draw order inside the layer (ties keep array order). */

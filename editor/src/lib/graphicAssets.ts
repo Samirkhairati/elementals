@@ -10,11 +10,13 @@ import { newCharacter } from './characterEdit'
 export interface ImagePick {
   assetId?: string
   graphicId?: string
+  /** Only this part of the picture (see EditorImageItem.crop). */
+  crop?: { x: number; y: number; w: number; h: number }
 }
 
 export const graphicAssetKey = (graphicId: string): string => `graphic:${graphicId}`
 
-/** Key of the item's picture in the canvas' asset map ('' when it points at nothing). */
+/** Key of the item's picture in the canvas' asset map ('' when it points at nothing). Crops of one picture share its key. */
 export const imagePickKey = (pick: ImagePick): string => (pick.graphicId ? graphicAssetKey(pick.graphicId) : pick.assetId ?? '')
 
 /** Readable name of what an item shows (the sprite id or the graphic id). */

@@ -2,6 +2,14 @@ import type { ComponentSchema, ComponentType as EngineComponentType, FieldKind }
 
 export type LayerType = 'tile' | 'collision' | 'terrain' | 'objects' | 'encounters' | 'image'
 
+/** A rectangle of a picture in its own pixels. */
+export interface ImageCrop {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
 /**
  * One freely placed image of an `image` layer, drawn at a pixel position (its anchor: bottom-centre of the picture).
  * It is either a sprite asset (`assetId`) or a plain picture from the graphics library (`graphicId`), never both.
@@ -12,6 +20,10 @@ export interface ImageItem {
   assetId?: string
   /** Graphic id (a picture under project/graphics), e.g. `scenery/clouds.png`. */
   graphicId?: string
+  /** Shown name in the list (the picture's id when absent). */
+  name?: string
+  /** Only this part of the picture (graphic items): the same file is shared, nothing is copied. Absent = whole picture. */
+  crop?: ImageCrop
   x: number
   y: number
   /** Draw order inside the layer (ties keep array order). */

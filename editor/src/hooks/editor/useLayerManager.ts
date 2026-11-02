@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import type { ImagePick } from '@/lib/graphicAssets'
+import { imagePickLabel, type ImagePick } from '@/lib/graphicAssets'
+import { nextImageName } from '@/lib/imageItems'
 import { Layer, LayerType, ImageItem, TileSelection, ActiveTool, PaintMode, DebugInfo, MapData } from '@/types/editor'
 import { useSyncedState } from '@/hooks/useSyncedState'
-import { clampEntitiesIndex, entitiesIndexAfterInsert, entitiesIndexAfterRemove } from '@/lib/layerOrder'
+import { clampEntitiesIndex, entitiesIndexAfterInsert, entitiesIndexAfterRemove, moveInDrawOrder } from '@/lib/layerOrder'
 
 interface UseLayerManagerOptions {
   /** Functional updates only: the manager never closes over the current map. */
@@ -350,6 +351,51 @@ export function useLayerManager(options: UseLayerManagerOptions) {
     [commitNewLayers]
   )
 
+  /** A copy of an image (same picture and crop), a tile down-right of the original and picked, named like its neighbours. */
+  const duplicateImage = useCallback(
+    (layerId: string, imageId: string): string | null => {
+      let createdId: string | null = null
+      commitNewLayers(
+        prev => {
+          const index = prev.findIndex(l => l.id === layerId && l.type === 'image')
+          if (index === -1) return prev
+          const images = prev[index].images || []
+          const at = images.findIndex(img => img.id === imageId)
+          if (at === -1) return prev
+          const source = images[at]
+          const name = nextImageName(source.name || imagePickLabel(source), images.map(img => img.name || imagePickLabel(img)))
+          const copy: ImageItem = { ...source, id: crypto.randomUUID(), name, x: source.x + 32, y: source.y + 32 }
+          createdId = copy.id
+          const next = [...prev]
+          next[index] = { ...prev[index], images: [...images.slice(0, at + 1), copy, ...images.slice(at + 1)] }
+          return next
+        },
+        () => {
+          if (createdId) setSelectedImageId(createdId)
+        }
+      )
+      return createdId
+    },
+    [commitNewLayers]
+  )
+
+  /** One step toward the front (+1) or back (-1) in the layer's draw order. */
+  const reorderImage = useCallback(
+    (layerId: string, imageId: string, direction: 1 | -1) => {
+      commitNewLayers(prev => {
+        const index = prev.findIndex(l => l.id === layerId && l.type === 'image')
+        if (index === -1) return prev
+        const images = prev[index].images || []
+        const moved = moveInDrawOrder(images, imageId, direction)
+        if (moved === images) return prev
+        const next = [...prev]
+        next[index] = { ...prev[index], images: moved }
+        return next
+      })
+    },
+    [commitNewLayers]
+  )
+
   const deleteImage = useCallback(
     (layerId: string, imageId: string) => {
       commitNewLayers(
@@ -391,6 +437,8 @@ export function useLayerManager(options: UseLayerManagerOptions) {
     addImage,
     updateImage,
     deleteImage,
+    duplicateImage,
+    reorderImage,
     tileSelection,
     setTileSelection,
     activeTool,

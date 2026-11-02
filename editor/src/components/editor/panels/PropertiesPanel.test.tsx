@@ -128,22 +128,10 @@ describe('PropertiesPanel entity inspector', () => {
 })
 
 describe('PropertiesPanel image layer', () => {
-  it('Add opens the picture browser (sprites and pictures) and starts placing the pick', () => {
-    const startImagePlacement = vi.fn()
-    const layer = { id: 'i1', name: 'Sky', type: 'image', visible: true, locked: false, images: [] }
-    renderWithEditor(
-      <PropertiesPanel layers={[layer] as any} activeLayerId="i1" updateLayers={vi.fn()} />,
-      { startImagePlacement, graphics: [{ id: 'sky/cloud.png', width: 32, height: 16, bytes: 1, mtimeMs: 0 }], graphicImages: {}, spriteList: [], images: [] } as any,
-    )
-    fireEvent.click(screen.getByRole('button', { name: 'Add image' }))
-    fireEvent.click(screen.getByRole('radio', { name: /Pictures/ }))
-    fireEvent.click(screen.getByTitle('sky/cloud.png'))
-    expect(startImagePlacement).toHaveBeenCalledWith({ graphicId: 'sky/cloud.png' })
-  })
-
-  it('lists a picture item by its graphic id', () => {
+  it('keeps only the layer fields: the pictures live in the Images panel on the right', () => {
     const layer = { id: 'i1', name: 'Sky', type: 'image', visible: true, locked: false, images: [{ id: 'a', graphicId: 'sky/cloud.png', x: 4, y: 5 }] }
-    renderWithEditor(<PropertiesPanel layers={[layer] as any} activeLayerId="i1" updateLayers={vi.fn()} />, { graphics: [], graphicImages: {} } as any)
-    expect(within(screen.getByTestId('image-list')).getByText('sky/cloud.png')).toBeInTheDocument()
+    renderWithEditor(<PropertiesPanel layers={[layer] as any} activeLayerId="i1" updateLayers={vi.fn()} />, {} as any)
+    expect(screen.getByLabelText('Layer name')).toHaveValue('Sky')
+    expect(screen.queryByTestId('image-list')).toBeNull()
   })
 })

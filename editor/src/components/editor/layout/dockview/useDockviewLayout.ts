@@ -10,15 +10,22 @@ interface UseDockviewLayoutOptions {
   onClearActiveMap?: () => void;
   /** An entity is selected: the inspector replaces the tileset panels of the right sidebar. */
   entityFocus?: boolean;
+  /** An image layer is active (and no entity selected): the images panel replaces the tileset panels instead. */
+  imageFocus?: boolean;
 }
 
-export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
-  const { maps = [], activeMap = null, onSelectMap, onClearActiveMap, entityFocus = false } = options;
+type RightFocus = 'tiles' | 'inspector' | 'images';
+const TILE_PANELS = ['tilesets', 'preview', 'activeSelection'];
+const FOCUS_PANELS = ['inspector', 'images'];
 
-  const optionsRef = useRef({ maps, activeMap, onSelectMap, onClearActiveMap, entityFocus });
+export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
+  const { maps = [], activeMap = null, onSelectMap, onClearActiveMap, entityFocus = false, imageFocus = false } = options;
+
+  const rightFocus: RightFocus = entityFocus ? 'inspector' : imageFocus ? 'images' : 'tiles';
+  const optionsRef = useRef({ maps, activeMap, onSelectMap, onClearActiveMap, rightFocus });
   useEffect(() => {
-    optionsRef.current = { maps, activeMap, onSelectMap, onClearActiveMap, entityFocus };
-  }, [maps, activeMap, onSelectMap, onClearActiveMap, entityFocus]);
+    optionsRef.current = { maps, activeMap, onSelectMap, onClearActiveMap, rightFocus };
+  }, [maps, activeMap, onSelectMap, onClearActiveMap, rightFocus]);
 
   const apiRef = useRef<DockviewApi | null>(null);
   const [openPanels, setOpenPanels] = useState<string[]>([
@@ -34,15 +41,16 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
     );
   }, []);
 
-  const applyEntityFocus = useCallback((api: DockviewApi, focus: boolean) => {
-    const inspector = api.getPanel('inspector');
-    if (!inspector) return;
-    for (const id of ['tilesets', 'preview', 'activeSelection']) {
+  // The right sidebar shows either the tileset panels, the entity inspector or the images panel: the others are hidden.
+  const applyRightFocus = useCallback((api: DockviewApi, focus: RightFocus) => {
+    if (!api.getPanel('inspector')) return;
+    const focusGroups = FOCUS_PANELS.map((id) => api.getPanel(id)?.group);
+    for (const id of TILE_PANELS) {
       const panel = api.getPanel(id);
-      if (panel && panel.group !== inspector.group) panel.group.api.setVisible(!focus);
+      if (panel && !focusGroups.includes(panel.group)) panel.group.api.setVisible(focus === 'tiles');
     }
-    inspector.group.api.setVisible(focus);
-    if (!focus) {
+    for (const id of FOCUS_PANELS) api.getPanel(id)?.group.api.setVisible(id === focus);
+    if (focus === 'tiles') {
       // Showing the groups again leaves the first two squeezed: split the column 40 / 40 / 20.
       const resize = () => {
         const total = api.height;
@@ -125,6 +133,14 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
       position: { referencePanel: tilesetsPanel, direction: 'above' },
     });
 
+    // Images panel: the same spot, shown while an image layer is active.
+    const imagesPanel = api.addPanel({
+      id: 'images',
+      component: 'images',
+      title: 'IMAGES',
+      position: { referencePanel: tilesetsPanel, direction: 'above' },
+    });
+
     const previewPanel = api.addPanel({
       id: 'preview',
       component: 'preview',
@@ -148,14 +164,15 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
     layersPanel.api.setSize({ width: sideWidth });
     propsPanel.api.setSize({ width: sideWidth });
     inspectorPanel.api.setSize({ width: sideWidth });
+    imagesPanel.api.setSize({ width: sideWidth });
     tilesetsPanel.api.setSize({ width: sideWidth });
     previewPanel.api.setSize({ width: sideWidth });
     selectionPanel.api.setSize({ width: sideWidth });
     centerPanel.api.setSize({ width: centerWidth });
 
     api.layout(api.width, api.height);
-    applyEntityFocus(api, optionsRef.current.entityFocus);
-  }, [applyEntityFocus]);
+    applyRightFocus(api, optionsRef.current.rightFocus);
+  }, [applyRightFocus]);
 
   const applyDefaultSizes = useCallback((api: DockviewApi) => {
     const totalWidth = api.width > 0 ? api.width : (typeof window !== 'undefined' ? window.innerWidth : 1200);
@@ -177,6 +194,7 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
     if (layers) layers.api.setSize({ width: sideWidth });
     if (props) props.api.setSize({ width: sideWidth });
     if (inspector) inspector.api.setSize({ width: sideWidth });
+    api.getPanel('images')?.api.setSize({ width: sideWidth });
 
     if (tilesets) tilesets.api.setSize({ width: sideWidth });
     if (preview) preview.api.setSize({ width: sideWidth });
@@ -401,11 +419,11 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
     }
   }, [maps]);
 
-  // Entity selected: the inspector replaces the right sidebar (tileset browser, tileset, active selection); with no
-  // entity the inspector is hidden and the tileset panels are back. Also re-applied after a layout reset.
+  // Entity selected: the inspector replaces the right sidebar (tileset browser, tileset, active selection); on an image
+  // layer the images panel does; otherwise the tileset panels are back. Also re-applied after a layout reset.
   useEffect(() => {
-    if (apiRef.current) applyEntityFocus(apiRef.current, entityFocus);
-  }, [entityFocus, openPanels]);
+    if (apiRef.current) applyRightFocus(apiRef.current, rightFocus);
+  }, [rightFocus, openPanels, applyRightFocus]);
 
   const openPanel = useCallback((id: PanelId | string) => {
     if (!apiRef.current) return;

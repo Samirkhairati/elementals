@@ -31,7 +31,12 @@ paths (type stripping). Keep the files free of enums, namespaces, parameter prop
 An editor layer of type `image` holds freely placed pictures (`images[]`: `assetId` for a sprite or `graphicId` for a picture from the graphics library, never both; pixel `x`/`y` = the sprite anchor, optional `z`, `scale`, `flipX`, `opacity`)
 instead of tile cells. In the editor they are drawn in layer `z` order (equal `z` keeps the list order) and placed with or without grid snapping.
 The converter writes them as a Tiled `objectgroup` with the layer property `kind = image` (and `z` when set); each image is an object with type `image`,
-`x`/`y` and the property `sprite` (asset id) or `graphic` (graphic id) plus `z`, `scale`, `flipX`, `opacity` when set, sorted by draw order.
+`x`/`y` and the property `sprite` (asset id) or `graphic` (graphic id) plus `cropX`/`cropY`/`cropW`/`cropH`, `z`, `scale`, `flipX`, `opacity` when set, sorted by draw order. The object's `name` is the item's `name` (its picture id when it has none).
+**Crops.** A picture item may carry `crop` (`x, y, w, h` in the picture's pixels, whole numbers inside the picture; pictures only, sprites have their own frames).
+Several items can show different parts of one picture: they all point at the same file, so nothing is cut out, copied or re-saved. The editor decodes each picture once and draws a sub-rectangle of it;
+the game should do the same (one texture per picture, one frame per distinct crop, e.g. Phaser `texture.add(name, 0, x, y, w, h)`), and `assets:sync` copies the picture once however many crops use it.
+While an image layer is active, the **Images panel** replaces the tileset panels on the right: the item list (bring forward/send backward = draw order, duplicate, rename, delete), a zoomable preview of the picked item with **Crop…** (a dialog with a draggable box), and its properties. The layer's own name and z stay in Properties on the left.
+A picture waiting to be placed follows the mouse as a translucent ghost (snapped like the placement itself).
 **The game does not draw these layers yet**: `PhaserTilemapAdapter` still only logs object groups.
 
 ## Checking and exporting

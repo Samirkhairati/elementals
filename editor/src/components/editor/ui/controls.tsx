@@ -133,11 +133,13 @@ interface ZoomControlsProps {
   maxZoom?: number
   /** Tooltip of the fit button. */
   fitLabel?: string
+  /** Narrower slider and read-out, for side panels. */
+  compact?: boolean
 }
 
-export function ZoomControls({ zoom, onZoomIn, onZoomOut, onFit, fitted, className, onZoomTo, onActualSize, minZoom = MIN_ZOOM, maxZoom = MAX_ZOOM, fitLabel = 'Reset the view to fit' }: ZoomControlsProps) {
+export function ZoomControls({ zoom, onZoomIn, onZoomOut, onFit, fitted, className, onZoomTo, onActualSize, minZoom = MIN_ZOOM, maxZoom = MAX_ZOOM, fitLabel = 'Reset the view to fit', compact = false }: ZoomControlsProps) {
   const readout = (
-    <span className="ed-mono w-14 text-center text-ed-label text-muted-foreground" data-testid="zoom-readout">
+    <span className={cn('ed-mono text-center text-ed-label text-muted-foreground', compact ? 'w-11' : 'w-14')} data-testid="zoom-readout">
       {zoomLabel(zoom)}
     </span>
   )
@@ -148,7 +150,7 @@ export function ZoomControls({ zoom, onZoomIn, onZoomOut, onFit, fitted, classNa
       </IconButton>
       {onZoomTo ? (
         <>
-          <Slider aria-label="Zoom" className="w-28 flex-none" min={Math.log2(minZoom)} max={Math.log2(maxZoom)} step={0.01} value={zoomToSlider(zoom, minZoom, maxZoom)} onChange={(v) => onZoomTo(sliderToZoom(v, minZoom, maxZoom))} />
+          <Slider aria-label="Zoom" className={cn('flex-none', compact ? 'w-14' : 'w-28')} min={Math.log2(minZoom)} max={Math.log2(maxZoom)} step={0.01} value={zoomToSlider(zoom, minZoom, maxZoom)} onChange={(v) => onZoomTo(sliderToZoom(v, minZoom, maxZoom))} />
           <IconButton title="Zoom in" aria-label="Zoom in" onClick={onZoomIn}>
             <Plus />
           </IconButton>

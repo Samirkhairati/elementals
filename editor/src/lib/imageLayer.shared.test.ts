@@ -90,4 +90,28 @@ describe('image layers: export', () => {
   it('a map without image layers keeps nextobjectid 1', () => {
     expect(convertEditorMapToTiled(map([]), []).nextobjectid).toBe(1)
   })
+
+  it('writes a crop as four int properties, and names the object after the item', () => {
+    const out = convertEditorMapToTiled(map([{ ...imageLayer, images: [{ id: 'p', graphicId: 'sheet.png', name: 'Cloud', crop: { x: 32, y: 8, w: 16, h: 24 }, x: 8, y: 9, z: 1 }] }]), [])
+    const object = out.layers[0].objects![0]
+    expect(object.name).toBe('Cloud')
+    expect(object.properties).toEqual([
+      { name: 'graphic', type: 'string', value: 'sheet.png' },
+      { name: 'cropX', type: 'int', value: 32 },
+      { name: 'cropY', type: 'int', value: 8 },
+      { name: 'cropW', type: 'int', value: 16 },
+      { name: 'cropH', type: 'int', value: 24 },
+      { name: 'z', type: 'int', value: 1 },
+    ])
+  })
+
+  it('accepts a crop on a picture, rejects a bad one and a crop on a sprite', () => {
+    const check = (item: Record<string, unknown>) =>
+      validateEditorMap({ name: 'm', width: 2, height: 2, layers: [{ id: 'i', name: 'I', type: 'image', visible: true, images: [{ id: 'a', x: 0, y: 0, ...item }] }] }).errors
+    expect(check({ graphicId: 's.png', crop: { x: 0, y: 0, w: 4, h: 4 } })).toEqual([])
+    expect(check({ graphicId: 's.png', crop: { x: -1, y: 0, w: 4, h: 4 } })[0]).toMatch(/crop must be whole numbers/)
+    expect(check({ graphicId: 's.png', crop: { x: 0, y: 0, w: 0, h: 4 } })[0]).toMatch(/crop must be whole numbers/)
+    expect(check({ graphicId: 's.png', crop: { x: 0.5, y: 0, w: 4, h: 4 } })[0]).toMatch(/crop must be whole numbers/)
+    expect(check({ assetId: 'objects/chest', crop: { x: 0, y: 0, w: 4, h: 4 } })[0]).toMatch(/only a picture/)
+  })
 })

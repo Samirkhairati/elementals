@@ -34,6 +34,11 @@ function imageObjects(layer: EditorLayer, nextId: () => number): TiledObject[] {
   items.sort((a, b) => (a.item.z ?? 0) - (b.item.z ?? 0) || a.index - b.index)
   return items.map(({ item }) => {
     const properties: TiledProperty[] = [item.graphicId ? { name: 'graphic', type: 'string', value: item.graphicId } : { name: 'sprite', type: 'string', value: item.assetId ?? '' }]
+    if (item.graphicId && item.crop) {
+      // One region of the picture's file; the game draws that sub-rectangle of the one texture.
+      properties.push({ name: 'cropX', type: 'int', value: item.crop.x }, { name: 'cropY', type: 'int', value: item.crop.y })
+      properties.push({ name: 'cropW', type: 'int', value: item.crop.w }, { name: 'cropH', type: 'int', value: item.crop.h })
+    }
     if (item.z !== undefined) properties.push({ name: 'z', type: 'int', value: Math.round(item.z) })
     if (item.scale !== undefined && item.scale !== 1) properties.push({ name: 'scale', type: 'float', value: item.scale })
     if (item.flipX) properties.push({ name: 'flipX', type: 'bool', value: true })
@@ -41,7 +46,7 @@ function imageObjects(layer: EditorLayer, nextId: () => number): TiledObject[] {
     if (item.opacity !== undefined && item.opacity !== 1) properties.push({ name: 'opacity', type: 'float', value: item.opacity })
     return {
       id: nextId(),
-      name: item.graphicId || item.assetId || '',
+      name: item.name || item.graphicId || item.assetId || '',
       type: 'image',
       x: item.x,
       y: item.y,

@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import type { Layer, MapData } from '@/types/editor'
 import { makeLayer, makeMap } from '@/test/helpers'
+import { sortedImages } from '@/lib/layerOrder'
 import { useLayerManager } from './useLayerManager'
 
 const wrapper = ({ children }: { children: ReactNode }) => <StrictMode>{children}</StrictMode>
@@ -192,5 +193,37 @@ describe('useLayerManager: Entities row position', () => {
     const { result } = withMap(2) // under B
     act(() => result.current.manager.handleDeleteLayer('A'))
     expect(result.current.activeMap?.entitiesIndex).toBe(1)
+  })
+
+  it('duplicates an image next to the original (same picture and crop, a tile away, named like its neighbours) and picks the copy', () => {
+    const { result } = withImageLayer()
+    let id = ''
+    act(() => {
+      id = result.current.manager.addImage('I1', { graphicId: 'sky/sheet.png', crop: { x: 1, y: 2, w: 3, h: 4 }, x: 64, y: 96 }) ?? ''
+    })
+    let copyId: string | null = null
+    act(() => {
+      copyId = result.current.manager.duplicateImage('I1', id)
+    })
+    const images = result.current.manager.layers[0].images!
+    expect(images).toHaveLength(2)
+    expect(images[1]).toMatchObject({ graphicId: 'sky/sheet.png', crop: { x: 1, y: 2, w: 3, h: 4 }, x: 96, y: 128, name: 'sky/sheet.png 2' })
+    expect(copyId).toBe(images[1].id)
+    expect(images[1].id).not.toBe(id)
+    expect(result.current.manager.selectedImageId).toBe(copyId)
+  })
+
+  it('moves an image forward and back in the draw order', () => {
+    const { result } = withImageLayer()
+    let a = ''
+    let b = ''
+    act(() => {
+      a = result.current.manager.addImage('I1', { graphicId: 'p.png', x: 0, y: 0 }) ?? ''
+      b = result.current.manager.addImage('I1', { graphicId: 'q.png', x: 0, y: 0 }) ?? ''
+    })
+    act(() => result.current.manager.reorderImage('I1', a, 1))
+    expect(sortedImages(result.current.manager.layers[0].images).map((i) => i.id)).toEqual([b, a])
+    act(() => result.current.manager.reorderImage('I1', a, 1)) // already in front: no change
+    expect(sortedImages(result.current.manager.layers[0].images).map((i) => i.id)).toEqual([b, a])
   })
 })

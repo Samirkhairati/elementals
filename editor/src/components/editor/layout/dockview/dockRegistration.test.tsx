@@ -48,16 +48,16 @@ function createFakeApi() {
   return { api: api as unknown as DockviewApi, addPanel, panels }
 }
 
-function mountLayout(options: { entityFocus?: boolean } = {}) {
+function mountLayout(options: { entityFocus?: boolean; imageFocus?: boolean } = {}) {
   const fake = createFakeApi()
-  const hook = renderHook((props: { entityFocus?: boolean }) => useDockviewLayout(props), { initialProps: options })
+  const hook = renderHook((props: { entityFocus?: boolean; imageFocus?: boolean }) => useDockviewLayout(props), { initialProps: options })
   act(() => {
     hook.result.current.onReady({ api: fake.api } as unknown as DockviewReadyEvent)
   })
   return { ...fake, hook }
 }
 
-const DEFAULT_OPEN = ['empty_canvas', 'maps', 'layers', 'entities', 'properties', 'tilesets', 'inspector', 'preview', 'activeSelection']
+const DEFAULT_OPEN = ['empty_canvas', 'maps', 'layers', 'entities', 'properties', 'tilesets', 'inspector', 'images', 'preview', 'activeSelection']
 
 describe('panel registry', () => {
   it('lists the Database in the right column with its shortcut', () => {
@@ -124,6 +124,29 @@ describe('entity focus', () => {
     hook.rerender({ entityFocus: false })
     expect(visible(panels, 'inspector')).toBe(false)
     expect(visible(panels, 'tilesets')).toBe(true)
+  })
+})
+
+describe('image layer focus', () => {
+  const visible = (panels: Map<string, FakePanel>, id: string) => panels.get(id)!.group.api.setVisible.mock.calls.at(-1)?.[0]
+
+  it('shows the images panel instead of the tileset panels on an image layer, and back again', () => {
+    const { hook, panels } = mountLayout({ imageFocus: false })
+    expect(visible(panels, 'images')).toBe(false)
+    hook.rerender({ imageFocus: true })
+    expect(visible(panels, 'images')).toBe(true)
+    expect(visible(panels, 'inspector')).toBe(false)
+    for (const id of ['tilesets', 'preview', 'activeSelection']) expect(visible(panels, id)).toBe(false)
+    hook.rerender({ imageFocus: false })
+    expect(visible(panels, 'images')).toBe(false)
+    expect(visible(panels, 'tilesets')).toBe(true)
+  })
+
+  it('a selected entity wins: the inspector shows, not the images panel', () => {
+    const { hook, panels } = mountLayout({ imageFocus: true })
+    hook.rerender({ imageFocus: true, entityFocus: true })
+    expect(visible(panels, 'inspector')).toBe(true)
+    expect(visible(panels, 'images')).toBe(false)
   })
 })
 

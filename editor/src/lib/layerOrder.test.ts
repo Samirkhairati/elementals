@@ -5,6 +5,7 @@ import {
   clampEntitiesIndex,
   entitiesIndexAfterInsert,
   entitiesIndexAfterRemove,
+  moveInDrawOrder,
   moveInStack,
   renderOrder,
   sortedImages,
@@ -79,5 +80,31 @@ describe('the stack with the Entities row', () => {
     expect(entitiesIndexAfterInsert(0, 0, 3)).toBe(0) // row on top: new layers appear under it
     expect(entitiesIndexAfterRemove(2, 0, 3)).toBe(1)
     expect(entitiesIndexAfterRemove(2, 2, 3)).toBe(2)
+  })
+})
+
+describe('moveInDrawOrder', () => {
+  const ids = (images: { id: string }[]) => images.map((i) => i.id)
+  const drawn = (images: { id: string; z?: number }[]) => ids(sortedImages(images))
+
+  it('swaps places with a neighbour that has the same z (array order breaks the tie)', () => {
+    const images = [{ id: 'a' }, { id: 'b' }, { id: 'c' }]
+    expect(drawn(moveInDrawOrder(images, 'a', 1))).toEqual(['b', 'a', 'c'])
+    expect(drawn(moveInDrawOrder(images, 'c', -1))).toEqual(['a', 'c', 'b'])
+  })
+
+  it('trades z with a neighbour that has a different one, leaving the others alone', () => {
+    const images = [{ id: 'a', z: 5 }, { id: 'b', z: 1 }, { id: 'c', z: 3 }]
+    // draw order b(1) c(3) a(5): bring b forward past c
+    const moved = moveInDrawOrder(images, 'b', 1)
+    expect(drawn(moved)).toEqual(['c', 'b', 'a'])
+    expect(moved.find((i) => i.id === 'a')!.z).toBe(5)
+  })
+
+  it('does nothing at either end or for an unknown id', () => {
+    const images = [{ id: 'a' }, { id: 'b' }]
+    expect(moveInDrawOrder(images, 'b', 1)).toBe(images)
+    expect(moveInDrawOrder(images, 'a', -1)).toBe(images)
+    expect(moveInDrawOrder(images, 'zzz', 1)).toBe(images)
   })
 })

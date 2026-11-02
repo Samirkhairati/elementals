@@ -90,6 +90,14 @@ function validateImages(images: unknown, label: string, errors: string[], warnin
     if (hasAsset === hasGraphic) errors.push(`${ip}: needs exactly one of assetId (a sprite) and graphicId (a picture)`)
     else if ((hasAsset && typeof item.assetId !== 'string') || (hasGraphic && typeof item.graphicId !== 'string')) errors.push(`${ip}: assetId / graphicId must be a string`)
     if (!isFiniteNumber(item.x) || !isFiniteNumber(item.y)) errors.push(`${ip}: x/y must be finite numbers`)
+    if (item.name !== undefined && typeof item.name !== 'string') errors.push(`${ip}: name must be a string`)
+    if (item.crop !== undefined) {
+      const c = item.crop
+      if (!hasGraphic) errors.push(`${ip}: only a picture (graphicId) can be cropped`)
+      else if (!isRecord(c) || !Number.isInteger(c.x) || !Number.isInteger(c.y) || !Number.isInteger(c.w) || !Number.isInteger(c.h) || (c.x as number) < 0 || (c.y as number) < 0 || (c.w as number) < 1 || (c.h as number) < 1) {
+        errors.push(`${ip}: crop must be whole numbers x, y >= 0 and w, h >= 1`)
+      }
+    }
     if (item.z !== undefined && !isFiniteNumber(item.z)) errors.push(`${ip}: z must be a finite number`)
     if (item.scale !== undefined && (!isFiniteNumber(item.scale) || item.scale <= 0)) errors.push(`${ip}: scale must be a positive number`)
     if (item.opacity !== undefined && (!isFiniteNumber(item.opacity) || item.opacity < 0 || item.opacity > 1)) {

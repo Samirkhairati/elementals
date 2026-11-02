@@ -13,6 +13,10 @@ interface ZoomPaneProps {
   toolbar?: React.ReactNode | ((zoom: number) => React.ReactNode)
   /** Largest scale "fit" will pick for a small picture. */
   maxFit?: number
+  /** Replaces the line under the picture; `false` leaves it out. */
+  hint?: React.ReactNode | false
+  /** Narrow controls, for side panels. */
+  compact?: boolean
   className?: string
 }
 
@@ -21,7 +25,7 @@ interface ZoomPaneProps {
  * Fit and 1:1; Ctrl/Cmd + scroll (or a trackpad pinch) zooms around the pointer; drag to pan; plain scroll scrolls.
  * It starts fitted and follows the pane while it is. Give it a `key` to reset the view for another picture.
  */
-export function ZoomPane({ width, height, children, toolbar, maxFit = 8, className }: ZoomPaneProps) {
+export function ZoomPane({ width, height, children, toolbar, maxFit = 8, hint, compact, className }: ZoomPaneProps) {
   const scroller = useRef<HTMLDivElement>(null)
   const [box, setBox] = useState({ w: 0, h: 0 })
   const [userZoom, setUserZoom] = useState<number | null>(null) // null = fitted
@@ -108,6 +112,7 @@ export function ZoomPane({ width, height, children, toolbar, maxFit = 8, classNa
         {typeof toolbar === 'function' ? toolbar(zoom) : toolbar}
         <ZoomControls
           className="ml-auto"
+          compact={compact}
           zoom={zoom}
           fitted={userZoom === null}
           onZoomIn={() => zoomAround(stepZoom(zoom, 1))}
@@ -132,7 +137,7 @@ export function ZoomPane({ width, height, children, toolbar, maxFit = 8, classNa
           </div>
         </div>
       </div>
-      <p className="ed-hint">Ctrl/⌘ + scroll or pinch to zoom, drag to move around.</p>
+      {hint !== false && <p className="ed-hint">{hint ?? 'Ctrl/⌘ + scroll or pinch to zoom, drag to move around.'}</p>}
     </div>
   )
 }

@@ -2,9 +2,10 @@ import React, { useMemo } from 'react'
 import { Group, Rect, Shape } from 'react-konva'
 import type { ImageItem, Layer } from '@/types/editor'
 import type { SpriteAssetInfo } from '../../../../../../shared/engine/types'
-import { drawResolvedSprite, resolveSprite, spriteBoundsFromMeta, useSpriteImagesVersion } from '@/lib/spriteImages'
+import { drawResolvedSprite, useSpriteImagesVersion } from '@/lib/spriteImages'
+import { itemBounds, resolveImageItem } from '@/lib/imageItems'
 import { sortedImages } from '@/lib/layerOrder'
-import { imagePickKey, type ImagePick } from '@/lib/graphicAssets'
+import type { ImagePick } from '@/lib/graphicAssets'
 import { setStageCursor } from '../canvasUtils'
 
 const NO_ASSETS: Record<string, SpriteAssetInfo> = {}
@@ -58,7 +59,7 @@ export const KonvaImageItems = React.memo(function KonvaImageItems({
           key={item.id}
           item={item}
           layerId={layer.id}
-          asset={spriteAssets[imagePickKey(item)]}
+          assets={spriteAssets}
           selected={item.id === selectedImageId}
           interactive={interactive}
           place={place}
@@ -74,7 +75,7 @@ export const KonvaImageItems = React.memo(function KonvaImageItems({
 function ImageHandle({
   item,
   layerId,
-  asset,
+  assets,
   selected,
   interactive,
   place,
@@ -84,7 +85,7 @@ function ImageHandle({
 }: {
   item: ImageItem
   layerId: string
-  asset: SpriteAssetInfo | undefined
+  assets: Record<string, SpriteAssetInfo>
   selected: boolean
   interactive: boolean
   place: (x: number, y: number) => { x: number; y: number }
@@ -92,8 +93,8 @@ function ImageHandle({
   moveImage: (layerId: string, imageId: string, x: number, y: number) => void
   dragRef?: React.MutableRefObject<{ id: string; x: number; y: number } | null>
 }) {
-  // Without the asset (deleted or still loading) fall back to a tile-sized box so the item can still be picked.
-  const unflipped = asset ? spriteBoundsFromMeta(asset.meta, { scale: item.scale ?? 1 }) : { x: -16, y: -32, w: 32, h: 32 }
+  // Without the picture (deleted or still loading) itemBounds falls back to a tile-sized box so the item can still be picked.
+  const unflipped = itemBounds(item, assets)
   // Flipping mirrors the frame around the anchor.
   const bounds = {
     ...unflipped,
@@ -178,7 +179,7 @@ export const KonvaGhostImage = React.memo(function KonvaGhostImage({
   const version = useSpriteImagesVersion()
   if (!pending || !pointerPos) return null
   const at = snapToGrid ? snapEntityPos(pointerPos.x, pointerPos.y) : { x: Math.round(pointerPos.x), y: Math.round(pointerPos.y) }
-  const resolved = resolveSprite(spriteAssets[imagePickKey(pending)], {})
+  const resolved = resolveImageItem(pending, spriteAssets)
   return (
     <Shape
       key={version}
