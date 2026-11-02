@@ -174,7 +174,7 @@ export function useLayerManager(options: UseLayerManagerOptions) {
   )
 
   const handleCreateLayerOfType = useCallback(
-    (type: LayerType) => {
+    (type: LayerType, folderId?: string) => {
       let createdId: string | null = null
       let insertedAt = -1
       let countBefore = 0
@@ -218,6 +218,8 @@ export function useLayerManager(options: UseLayerManagerOptions) {
             name = counter === 1 ? 'Objects' : `Objects ${counter}`
           }
 
+          // Created from a folder's menu: a tile or image layer goes in as the folder's top layer, and the folder opens.
+          const folderAt = folderId && (type === 'tile' || type === 'image') ? prev.findIndex(l => l.id === folderId && l.type === 'folder') : -1
           const newLayer: Layer = {
             id: crypto.randomUUID(),
             name,
@@ -225,8 +227,18 @@ export function useLayerManager(options: UseLayerManagerOptions) {
             visible: true,
             locked: false,
             ...(type === 'image' ? { images: [] } : {}),
+            ...(folderAt >= 0 ? { folderId } : {}),
           }
           createdId = newLayer.id
+
+          if (folderAt >= 0) {
+            const next = prev.map((l, i) => (i === folderAt && l.collapsed ? { ...l, collapsed: false } : l))
+            next.splice(folderAt + 1, 0, newLayer)
+            // The Entities row is never between a folder and its layers: one sitting right below it ends up below the new layer.
+            insertedAt = folderAt
+            countBefore = prev.length
+            return next
+          }
 
           let insertIndex = 0
           if (type === 'tile' || type === 'image') {

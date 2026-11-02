@@ -156,7 +156,7 @@ export interface EditorBaseContextValue
   setActiveLayerId: (layerId: string | null) => void
   /** Plain click selects one layer; `additive` (Ctrl/Cmd+click) toggles it in the multi-selection. */
   selectLayer: (layerId: string, additive?: boolean) => void
-  handleCreateLayerOfType: (type: LayerType) => void
+  handleCreateLayerOfType: (type: LayerType, folderId?: string) => void
   handleDuplicateLayer: (id: string) => void
   toggleFolderCollapsed: (id: string) => void
 

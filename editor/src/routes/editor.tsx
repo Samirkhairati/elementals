@@ -276,10 +276,10 @@ export function EditorPage() {
   )
 
   const handleCreateLayerOfType = useCallback(
-    (type: LayerType) => {
+    (type: LayerType, folderId?: string) => {
       entityManager.setSelectedEntityId(null)
       setFocusedDomain('layers')
-      layerManager.handleCreateLayerOfType(type)
+      layerManager.handleCreateLayerOfType(type, folderId)
     },
     [entityManager.setSelectedEntityId, setFocusedDomain, layerManager.handleCreateLayerOfType]
   )

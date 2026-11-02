@@ -160,7 +160,8 @@ interface LayersPanelProps {
   toggleLayerLock: (id: string) => void
   deleteLayer: (id: string) => void
   reorderLayers: (newLayers: Layer[]) => void
-  createLayerOfType: (type: LayerType) => void
+  /** With a folder id, a tile or image layer is created inside that folder. */
+  createLayerOfType: (type: LayerType, folderId?: string) => void
   renameLayer: (id: string, newName: string) => void
   duplicateLayer: (id: string) => void
   /** Opens or closes a folder row (a view change, not an undo step). */
@@ -451,6 +452,18 @@ export function LayersPanel({
                     <Edit2 className="w-3.5 h-3.5 mr-2" />
                     Rename
                   </ContextMenuItem>
+                  {isFolderRow && (
+                    <ContextMenuSub>
+                      <ContextMenuSubTrigger>
+                        <Plus className="w-3.5 h-3.5 mr-2" />
+                        New Layer inside
+                      </ContextMenuSubTrigger>
+                      <ContextMenuSubContent className="w-44">
+                        <ContextMenuItem onClick={() => createLayerOfType('tile', layer.id)}>Tile Layer</ContextMenuItem>
+                        <ContextMenuItem onClick={() => createLayerOfType('image', layer.id)}>Image Layer</ContextMenuItem>
+                      </ContextMenuSubContent>
+                    </ContextMenuSub>
+                  )}
                   {!isFolderRow && (
                     <ContextMenuItem onClick={() => duplicateLayer(layer.id)}>
                       <Copy className="w-3.5 h-3.5 mr-2" />

@@ -166,6 +166,14 @@ describe('LayersPanel', () => {
       expect(props.selectLayer).not.toHaveBeenCalled()
     })
 
+    it('right-clicking a folder creates a tile or image layer inside it', async () => {
+      const { props } = renderPanel({ layers: folderLayers() })
+      fireEvent.contextMenu(screen.getByTestId('folder-row'))
+      fireEvent.click(await screen.findByText('New Layer inside'))
+      fireEvent.click(await screen.findByText('Image Layer'))
+      expect(props.createLayerOfType).toHaveBeenCalledWith('image', 'F')
+    })
+
     it('a loose tile layer can be moved into a folder from its menu', async () => {
       const { props } = renderPanel({ layers: folderLayers() })
       fireEvent.contextMenu(screen.getByText('Loose'))

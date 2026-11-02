@@ -146,6 +146,21 @@ describe('useLayerManager (StrictMode)', () => {
       expect(result.current.manager.layers.map(l => l.locked)).toEqual([true, true, true, false])
     })
 
+    it('a layer created from a folder goes in as its top layer, opens the folder and is selected', () => {
+      const layers = held().map(l => (l.id === 'F' ? { ...l, collapsed: true } : l))
+      const { result } = setup(layers)
+      act(() => result.current.manager.handleCreateLayerOfType('tile', 'F'))
+      const now = result.current.manager.layers
+      expect(now.map(l => l.id).slice(0, 2)).toEqual(['F', now[1].id])
+      expect(now[1]).toMatchObject({ type: 'tile', folderId: 'F' })
+      expect(now[0].collapsed).toBe(false)
+      expect(now).toHaveLength(5)
+      expect(result.current.manager.activeLayerId).toBe(now[1].id)
+      // other kinds cannot be held: they are created outside
+      act(() => result.current.manager.handleCreateLayerOfType('objects', 'F'))
+      expect(result.current.manager.layers.find(l => l.type === 'objects')?.folderId).toBeUndefined()
+    })
+
     it('deleting a folder keeps its layers, now outside it', () => {
       const { result } = setup(held())
       act(() => result.current.manager.handleDeleteLayer('F'))
