@@ -200,6 +200,7 @@ export function MapCanvas({
     pinSelection,
     selectedLayerIds,
     pendingImage,
+    spriteAssets,
     commitImagePlacement,
     cancelImagePlacement,
     clearImageSelection: () => setSelectedImageId?.(null),
@@ -323,7 +324,6 @@ export function MapCanvas({
                 setSelectedImageId={setSelectedImageId || (() => {})}
                 moveImage={moveImage || (() => {})}
                 snapToGrid={snapToGrid}
-                snapEntityPos={snapEntityPos}
                 spriteAssets={spriteAssets}
                 placing={!!pendingImage}
                 dragRef={imageDrag}
@@ -351,7 +351,6 @@ export function MapCanvas({
                 pending={pendingImage && isImageLayerActive ? pendingImage : null}
                 pointerPos={stagePointerPos}
                 snapToGrid={snapToGrid}
-                snapEntityPos={snapEntityPos}
                 spriteAssets={spriteAssets}
               />
 

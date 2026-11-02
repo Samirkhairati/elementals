@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { SpriteAssetInfo } from '../../../shared/engine/types'
-import { itemBounds, itemSourceSize, nextImageName } from './imageItems'
+import { flippedItemBounds, itemBounds, itemSourceSize, nextImageName, snapImageAnchor } from './imageItems'
 
 const sheet = {
   id: 'graphic:sky/sheet.png',
@@ -37,6 +37,20 @@ describe('imageItems', () => {
   it('falls back to a tile-sized box when the picture is unknown', () => {
     expect(itemBounds({ graphicId: 'gone.png' }, assets)).toEqual({ x: -16, y: -32, w: 32, h: 32 })
     expect(itemSourceSize({ graphicId: 'gone.png' }, assets)).toBeNull()
+  })
+
+  it('snapping puts the picture\'s edges on the grid, so a two-tile picture is not half a tile off', () => {
+    // 64x32 picture: anchor is the bottom-centre, so the anchor must sit on a tile line (x multiple of 32), not on a tile centre
+    const b = flippedItemBounds({ graphicId: 'sky/sheet.png' }, assets)
+    expect(snapImageAnchor(b, 101, 70)).toEqual({ x: 96, y: 64 })
+    expect(snapImageAnchor(b, 120, 90)).toEqual({ x: 128, y: 96 })
+    // a one-tile picture keeps the old behaviour: anchor at the tile's bottom-centre
+    const tile = { x: -16, y: -32, w: 32, h: 32 }
+    expect(snapImageAnchor(tile, 40, 50)).toEqual({ x: 48, y: 64 })
+    // flipping mirrors the frame around the anchor, and the left edge still lands on the line
+    const flipped = flippedItemBounds({ graphicId: 'sky/sheet.png', crop: { x: 0, y: 0, w: 48, h: 32 }, flipX: true }, assets)
+    const at = snapImageAnchor(flipped, 70, 64)
+    expect((at.x + flipped.x) % 32).toBe(0)
   })
 
   it('names copies Tree, Tree 2, Tree 3', () => {

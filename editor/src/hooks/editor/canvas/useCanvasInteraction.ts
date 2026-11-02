@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import type { ImagePick } from '@/lib/graphicAssets'
+import { flippedItemBounds, snapImageAnchor } from '@/lib/imageItems'
+import type { SpriteAssetInfo } from '../../../../../shared/engine/types'
 import Konva from 'konva'
 import {
   Layer,
@@ -52,6 +54,8 @@ interface UseCanvasInteractionProps {
   selectedLayerIds?: readonly string[]
   /** Image layers: a sprite waiting to be dropped, where the next click puts it, and how a click on empty canvas deselects. */
   pendingImage?: ImagePick | null
+  /** Pictures known to the editor: the pending image's size decides where its snapped anchor goes. */
+  spriteAssets?: Record<string, SpriteAssetInfo>
   commitImagePlacement?: (x: number, y: number) => void
   cancelImagePlacement?: () => void
   clearImageSelection?: () => void
@@ -88,6 +92,7 @@ export function useCanvasInteraction({
   pinSelection = false,
   selectedLayerIds = [],
   pendingImage = null,
+  spriteAssets,
   commitImagePlacement,
   cancelImagePlacement,
   clearImageSelection,
@@ -360,7 +365,7 @@ export function useCanvasInteraction({
             const stage = stageRef?.current
             const scale = stage?.scaleX() || 1
             const world = p && stage ? { x: (p.x - stage.x()) / scale, y: (p.y - stage.y()) / scale } : { x: coords.rawX * 32 + 16, y: coords.rawY * 32 + 32 }
-            const at = snapToGrid && snapEntityPos ? snapEntityPos(world.x, world.y) : { x: Math.round(world.x), y: Math.round(world.y) }
+            const at = snapToGrid ? snapImageAnchor(flippedItemBounds(pendingImage, spriteAssets ?? {}), world.x, world.y) : { x: Math.round(world.x), y: Math.round(world.y) }
             commitImagePlacement?.(at.x, at.y)
           } else {
             clearImageSelection?.()
@@ -413,6 +418,7 @@ export function useCanvasInteraction({
       selectedEntityId,
       setSelectedEntityId,
       pendingImage,
+      spriteAssets,
       commitImagePlacement,
       cancelImagePlacement,
       clearImageSelection,

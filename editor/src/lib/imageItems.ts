@@ -37,6 +37,23 @@ export function itemBounds(item: ItemLike, assets: Record<string, SpriteAssetInf
   return spriteBoundsFromMeta(asset.meta, { scale })
 }
 
+/** Where the item stands once flips are applied (a flip mirrors the frame around the anchor). */
+export function flippedItemBounds(item: ItemLike & { flipX?: boolean; flipY?: boolean }, assets: Record<string, SpriteAssetInfo>): Rect {
+  const b = itemBounds(item, assets)
+  return { ...b, x: item.flipX ? -(b.x + b.w) : b.x, y: item.flipY ? -(b.y + b.h) : b.y }
+}
+
+/**
+ * Snaps an anchor so the item's edges, not its anchor, land on the tile grid: the left edge on a vertical grid line and the bottom edge
+ * on a horizontal one. A one-tile picture ends up exactly where the entity snap puts it, but a picture two tiles wide no longer
+ * sits half a tile off (its anchor is its bottom-centre, which is a tile line only for even widths).
+ */
+export function snapImageAnchor(bounds: Rect, rawX: number, rawY: number, tile = 32): { x: number; y: number } {
+  const left = Math.round((rawX + bounds.x) / tile) * tile
+  const bottom = Math.round((rawY + bounds.y + bounds.h) / tile) * tile
+  return { x: left - bounds.x, y: bottom - (bounds.y + bounds.h) }
+}
+
 /** What to draw for an item right now, or null while its picture loads. */
 export function resolveImageItem(item: ItemLike, assets: Record<string, SpriteAssetInfo>): ResolvedSprite | null {
   const asset = assets[imagePickKey(item)]

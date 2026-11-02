@@ -3,7 +3,7 @@ import { Group, Rect, Shape } from 'react-konva'
 import type { ImageItem, Layer } from '@/types/editor'
 import type { SpriteAssetInfo } from '../../../../../../shared/engine/types'
 import { drawResolvedSprite, useSpriteImagesVersion } from '@/lib/spriteImages'
-import { itemBounds, resolveImageItem } from '@/lib/imageItems'
+import { flippedItemBounds, resolveImageItem, snapImageAnchor } from '@/lib/imageItems'
 import { sortedImages } from '@/lib/layerOrder'
 import type { ImagePick } from '@/lib/graphicAssets'
 import { setStageCursor } from '../canvasUtils'
@@ -19,7 +19,6 @@ interface KonvaImageItemsProps {
   setSelectedImageId: (id: string | null) => void
   moveImage: (layerId: string, imageId: string, x: number, y: number) => void
   snapToGrid: boolean
-  snapEntityPos: (rawX: number, rawY: number) => { x: number; y: number }
   spriteAssets?: Record<string, SpriteAssetInfo>
   /** While an image waits to be placed the items stay out of the way so a click lands on the map. */
   placing?: boolean
@@ -36,7 +35,6 @@ export const KonvaImageItems = React.memo(function KonvaImageItems({
   setSelectedImageId,
   moveImage,
   snapToGrid,
-  snapEntityPos,
   spriteAssets = NO_ASSETS,
   placing = false,
   dragRef,
@@ -46,10 +44,11 @@ export const KonvaImageItems = React.memo(function KonvaImageItems({
 
   const interactive = !layer.locked && !placing
 
-  const place = (x: number, y: number) => {
+  // Snapping puts the picture's edges on the grid, so the item's own size decides where its anchor goes.
+  const place = (item: ImageItem, x: number, y: number) => {
     const bx = Math.max(0, Math.min(mapWidthPx, x))
     const by = Math.max(0, Math.min(mapHeightPx, y))
-    return snapToGrid ? snapEntityPos(bx, by) : { x: Math.round(bx), y: Math.round(by) }
+    return snapToGrid ? snapImageAnchor(flippedItemBounds(item, spriteAssets), bx, by) : { x: Math.round(bx), y: Math.round(by) }
   }
 
   return (
@@ -88,19 +87,13 @@ function ImageHandle({
   assets: Record<string, SpriteAssetInfo>
   selected: boolean
   interactive: boolean
-  place: (x: number, y: number) => { x: number; y: number }
+  place: (item: ImageItem, x: number, y: number) => { x: number; y: number }
   setSelectedImageId: (id: string | null) => void
   moveImage: (layerId: string, imageId: string, x: number, y: number) => void
   dragRef?: React.MutableRefObject<{ id: string; x: number; y: number } | null>
 }) {
   // Without the picture (deleted or still loading) itemBounds falls back to a tile-sized box so the item can still be picked.
-  const unflipped = itemBounds(item, assets)
-  // Flipping mirrors the frame around the anchor.
-  const bounds = {
-    ...unflipped,
-    x: item.flipX ? -(unflipped.x + unflipped.w) : unflipped.x,
-    y: item.flipY ? -(unflipped.y + unflipped.h) : unflipped.y,
-  }
+  const bounds = flippedItemBounds(item, assets)
 
   return (
     <Group
@@ -122,7 +115,7 @@ function ImageHandle({
       }}
       onDragMove={(e) => {
         e.cancelBubble = true
-        const p = place(e.target.x(), e.target.y())
+        const p = place(item, e.target.x(), e.target.y())
         e.target.x(p.x)
         e.target.y(p.y)
         // The picture is drawn by its layer: tell it where the mouse has the image (Konva redraws while dragging).
@@ -130,7 +123,7 @@ function ImageHandle({
       }}
       onDragEnd={(e) => {
         e.cancelBubble = true
-        const p = place(e.target.x(), e.target.y())
+        const p = place(item, e.target.x(), e.target.y())
         e.target.x(p.x)
         e.target.y(p.y)
         setStageCursor(e.target.getStage(), 'move')
@@ -164,7 +157,6 @@ interface KonvaGhostImageProps {
   pending: ImagePick | null
   pointerPos: { x: number; y: number } | null
   snapToGrid: boolean
-  snapEntityPos: (rawX: number, rawY: number) => { x: number; y: number }
   spriteAssets?: Record<string, SpriteAssetInfo>
 }
 
@@ -173,12 +165,11 @@ export const KonvaGhostImage = React.memo(function KonvaGhostImage({
   pending,
   pointerPos,
   snapToGrid,
-  snapEntityPos,
   spriteAssets = NO_ASSETS,
 }: KonvaGhostImageProps) {
   const version = useSpriteImagesVersion()
   if (!pending || !pointerPos) return null
-  const at = snapToGrid ? snapEntityPos(pointerPos.x, pointerPos.y) : { x: Math.round(pointerPos.x), y: Math.round(pointerPos.y) }
+  const at = snapToGrid ? snapImageAnchor(flippedItemBounds(pending, spriteAssets), pointerPos.x, pointerPos.y) : { x: Math.round(pointerPos.x), y: Math.round(pointerPos.y) }
   const resolved = resolveImageItem(pending, spriteAssets)
   return (
     <Shape
