@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { checkNames } from '@/lib/importNames'
 import { EdButton } from '../ui/controls'
 import { ImageThumb } from './browse'
-import { defaultRowName, type Candidate, type ImportResult, type Importer } from './importFlow'
+import { defaultRowNames, type Candidate, type ImportResult, type Importer } from './importFlow'
 
 interface Props {
   candidates: Candidate[]
@@ -31,7 +31,10 @@ export function ImportDialog(props: Props) {
 
 function ImportBody({ candidates, importer, folder: startFolder, onClose, onImported }: Props) {
   const { noun } = importer
-  const [rows, setRows] = useState(() => candidates.map((c) => ({ c, name: defaultRowName(c, noun) })))
+  const [rows, setRows] = useState(() => {
+    const names = defaultRowNames(candidates, noun, importer.taken(startFolder))
+    return candidates.map((c, i) => ({ c, name: names[i] }))
+  })
   const [folder, setFolder] = useState(startFolder)
   const [busy, setBusy] = useState(false)
   const [failures, setFailures] = useState<Record<string, string>>({})

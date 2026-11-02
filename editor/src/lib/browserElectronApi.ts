@@ -128,6 +128,7 @@ export function createBrowserElectronApi(): ElectronAPI {
     getCharacters: () => c('get-characters'),
     pickSpriteFile: () => pickPng(),
     pickImageFiles: () => pickPngs(),
+    stageImage: (name: string, bytes: Uint8Array) => stageUpload(name, bytes),
     saveCharacter: (id: string, def: unknown) => c('save-character', id, def),
     renameCharacter: (id: string, newId: string) => c('rename-character', id, newId),
     deleteCharacter: (id: string) => c('delete-character', id),

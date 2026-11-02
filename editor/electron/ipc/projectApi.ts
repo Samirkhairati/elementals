@@ -166,4 +166,4 @@ export function createProjectChannels(
 }
 
 /** Channels that need a native dialog / window and therefore live in the main process only. */
-export const DIALOG_CHANNELS = ['pick-tileset-file', 'pick-sprite-file', 'pick-image-files', 'export-map'] as const;
+export const DIALOG_CHANNELS = ['pick-tileset-file', 'pick-sprite-file', 'pick-image-files', 'stage-image', 'export-map'] as const;

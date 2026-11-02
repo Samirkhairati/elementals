@@ -16,6 +16,8 @@ export interface Candidate {
   fileName: string
   /** Something an <img> can show ('' = none). */
   preview: string
+  /** Came from the clipboard: gets a free name of its own instead of whatever the clipboard calls it. */
+  pasted?: boolean
 }
 
 export interface ImportRow {
@@ -58,7 +60,7 @@ export async function pickCandidates(): Promise<{ ok: true; candidates: Candidat
 }
 
 /** Candidates from files dropped in from the OS (anything that is not a PNG is left out and counted). */
-export async function dropCandidates(files: File[]): Promise<{ ok: true; candidates: Candidate[]; skipped: number } | { ok: false; error: string }> {
+export async function dropCandidates(files: File[], options: { pasted?: boolean } = {}): Promise<{ ok: true; candidates: Candidate[]; skipped: number } | { ok: false; error: string }> {
   const pngs = onlyPngs(files)
   if (pngs.length === 0) return { ok: false, error: files.length > 0 ? 'Only PNG images can be imported.' : '' }
   try {
@@ -66,8 +68,10 @@ export async function dropCandidates(files: File[]): Promise<{ ok: true; candida
       pngs.map(async (file) => ({
         key: nextKey(),
         path: await pathOfDroppedFile(file),
-        fileName: file.name,
+        // Screenshots and copied images arrive as "image.png"; call them "pasted" instead.
+        fileName: options.pasted && /^(image)?\.?(png)?$/i.test(file.name) ? 'pasted.png' : file.name,
         preview: typeof URL.createObjectURL === 'function' ? URL.createObjectURL(file) : '',
+        ...(options.pasted ? { pasted: true } : {}),
       }))
     )
     return { ok: true, candidates, skipped: files.length - pngs.length }
@@ -77,6 +81,18 @@ export async function dropCandidates(files: File[]): Promise<{ ok: true; candida
 }
 
 export const defaultRowName = (c: Candidate, fallback: string) => sanitizeStem(c.fileName, fallback)
+
+/** The default names of a batch: a pasted picture whose name is taken (or used earlier in the batch) gets `-2`, `-3`... */
+export function defaultRowNames(candidates: Candidate[], fallback: string, taken: ReadonlySet<string>): string[] {
+  const used = new Set(taken)
+  return candidates.map((c) => {
+    const base = defaultRowName(c, fallback)
+    let name = base
+    if (c.pasted) for (let n = 2; used.has(name.toLowerCase()); n++) name = `${base}-${n}`
+    used.add(name.toLowerCase())
+    return name
+  })
+}
 
 const failure = (path: string, error: string) => ({ path, error })
 

@@ -1,4 +1,5 @@
-import { ipcMain, dialog, BrowserWindow } from 'electron';
+import { app, ipcMain, dialog, BrowserWindow } from 'electron';
+import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 
@@ -41,6 +42,26 @@ export function registerSpriteHandlers(): void {
     }));
     return { success: true, files };
   });
+
+  // A picture that only exists in memory (pasted from the clipboard): written to a temp file so the importers can copy it.
+  ipcMain.handle('stage-image', (_event, name: unknown, bytes: unknown) => {
+    try {
+      if (!(bytes instanceof Uint8Array) || bytes.length === 0) throw new Error('The picture is empty');
+      const dir = path.join(app.getPath('temp'), 'elementals-paste', crypto.randomBytes(6).toString('hex'));
+      fs.mkdirSync(dir, { recursive: true });
+      const sourcePath = path.join(dir, stagedName(name));
+      fs.writeFileSync(sourcePath, bytes);
+      return { success: true, sourcePath };
+    } catch (e) {
+      return { success: false, error: e instanceof Error ? e.message : String(e) };
+    }
+  });
+}
+
+/** A safe `<stem>.png` for whatever name the page sent. */
+export function stagedName(name: unknown): string {
+  const stem = (typeof name === 'string' ? path.parse(name).name : '').replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '');
+  return `${stem || 'pasted'}.png`;
 }
 
 /** `data:` URL of a PNG for a preview; empty when it cannot be read or is huge. */

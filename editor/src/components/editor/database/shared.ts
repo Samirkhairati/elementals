@@ -22,6 +22,8 @@ export interface LibraryControls {
   pick: () => void
   /** Files dropped from the OS onto `folder`: the import dialog opens for them. */
   dropFiles: (files: File[], folder: string) => void
+  /** Pictures pasted from the clipboard into `folder`: the same import dialog opens for them. */
+  pasteFiles: (files: File[], folder: string) => void
   /** What the last import did, or why it failed. */
   note: { ok: boolean; text: string } | null
 }

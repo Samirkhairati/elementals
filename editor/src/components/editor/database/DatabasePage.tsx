@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { Bug, Grid3x3, Image, Lock, Map as MapIcon, MessageSquareText, Package, PersonStanding, Search, ToggleLeft, X, Zap, type LucideIcon } from 'lucide-react'
 import { DATABASE_TABLES, GROUP_LABELS, characterCounts, getTable, unusedGraphics, type DatabaseTable, type TableGroup } from '@/lib/databaseModel'
+import { clipboardHasFiles, pastedPngs } from '@/lib/droppedFiles'
 import { Badge, InfoTip } from '../ui/controls'
 import { useDatabaseData, type DatabaseData } from './useDatabaseData'
 import { CharacterDetail, CharactersBrowser, CharactersToolbar } from './CharactersTable'
@@ -98,8 +99,33 @@ export function DatabasePage() {
         setFolders((cur) => ({ ...cur, [table.id]: into }))
         open(r.candidates, into)
       },
+      pasteFiles: async (files, into) => {
+        const r = await dropCandidates(files, { pasted: true })
+        if (!r.ok) return r.error ? setNote({ tableId: table.id, ok: false, text: r.error }) : undefined
+        open(r.candidates, into)
+      },
     }
   }, [importer, folder, note, table.id])
+
+  // Ctrl/Cmd+V with a picture on the clipboard imports it into the folder last clicked (text pastes are left alone).
+  const pasteRef = useRef<{ library?: LibraryControls; busy: boolean }>({ busy: false })
+  pasteRef.current = { library, busy: pending !== null }
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const { library: lib, busy } = pasteRef.current
+      const target = e.target as HTMLElement | null
+      const typing = !!target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))
+      if (!lib || busy || typing || e.defaultPrevented || !clipboardHasFiles(e.clipboardData)) return
+      e.preventDefault()
+      // The clipboard can only be read during the event, so take the files now and convert them after.
+      const data = e.clipboardData
+      void pastedPngs(data).then((files) => {
+        if (files.length > 0) lib.pasteFiles(files, lib.folder)
+      })
+    }
+    window.addEventListener('paste', onPaste)
+    return () => window.removeEventListener('paste', onPaste)
+  }, [])
 
   const imported = (result: ImportResult, into: string) => {
     const what = importer?.noun ?? 'file'

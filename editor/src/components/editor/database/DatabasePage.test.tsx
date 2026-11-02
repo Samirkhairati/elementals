@@ -381,6 +381,53 @@ describe('Graphics', () => {
       expect(screen.queryByRole('dialog')).toBeNull()
     })
 
+    const clip = (files: File[], types: string[] = ['Files']) => ({ clipboardData: { types, files, items: files.map((f) => ({ kind: 'file', getAsFile: () => f })) } })
+
+    it('pasting a picture opens the import for the folder clicked last, named "pasted"', async () => {
+      const imported: [string, string][] = []
+      install({
+        getPathForFile: () => '',
+        stageImage: (name: string) => Promise.resolve({ success: true, sourcePath: `/staged/${name}` }),
+        importGraphic: (src: string, id: string) => { imported.push([src, id]); return Promise.resolve({ success: true, graphic: graphic(id), image: PNG }) },
+      })
+      renderAt('/database?table=graphics')
+      fireEvent.click(await screen.findByRole('button', { name: /^props/ }))
+      fireEvent.paste(document.body, clip([new File(['x'], 'image.png', { type: 'image/png' })]))
+      const dialog = await screen.findByRole('dialog')
+      expect(within(dialog).getByRole('heading', { name: 'Import 1 picture' })).toBeInTheDocument()
+      expect(within(dialog).getByLabelText('Destination folder')).toHaveValue('props')
+      expect(within(dialog).getByLabelText('Name for pasted.png')).toHaveValue('pasted')
+      fireEvent.change(within(dialog).getByLabelText('Name for pasted.png'), { target: { value: 'screenshot' } })
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Import 1 picture' }))
+      // a pasted picture has no file on disk, so its bytes are staged first
+      await waitFor(() => expect(imported).toEqual([['/staged/image.png', 'props/screenshot.png']]))
+    })
+
+    it('pasted pictures never default to a name that is taken or used twice', async () => {
+      install({ getPathForFile: (f: File) => `/clip/${f.name}` })
+      renderAt('/database?table=graphics')
+      fireEvent.click(await screen.findByRole('button', { name: /^props/ }))
+      const chest = new File(['x'], 'chest.png', { type: 'image/png' }) // props/chest.png already exists
+      const a = new File(['x'], 'image.png', { type: 'image/png' })
+      const b = new File(['y'], 'image.png', { type: 'image/png' })
+      fireEvent.paste(document.body, clip([chest, a, b]))
+      const dialog = await screen.findByRole('dialog')
+      expect(within(dialog).getByRole('button', { name: 'Import 3 pictures' })).toBeEnabled()
+      const names = within(dialog).getAllByRole('textbox', { name: /^Name for/ }).map((i) => (i as HTMLInputElement).value)
+      expect(names).toEqual(['chest-2', 'pasted', 'pasted-2'])
+    })
+
+    it('leaves text pastes alone: in a text field, or when the clipboard holds no picture', async () => {
+      install()
+      renderAt('/database?table=graphics')
+      const search = await screen.findByRole('textbox', { name: 'Search' })
+      fireEvent.paste(search, clip([new File(['x'], 'image.png', { type: 'image/png' })]))
+      fireEvent.paste(document.body, clip([], ['text/plain']))
+      fireEvent.paste(document.body, clip([new File(['x'], 'notes.txt', { type: 'text/plain' })]))
+      await new Promise((r) => setTimeout(r, 20))
+      expect(screen.queryByRole('dialog')).toBeNull()
+    })
+
     it('keeps the files that failed in the dialog with the reason', async () => {
       install({
         pickImageFiles: picked('a', 'b'),

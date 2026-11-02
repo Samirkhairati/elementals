@@ -25,6 +25,47 @@ export async function pathOfDroppedFile(file: File): Promise<string> {
   const resolve = window.electronAPI?.getPathForFile
   if (!resolve) throw new Error('Dropping files is not supported here; use the file picker instead')
   const path = await resolve(file)
-  if (!path) throw new Error(`Could not find "${file.name}" on disk`)
-  return path
+  if (path) return path
+  // Not a file on disk (a screenshot or a copied image that was pasted): write its bytes to a temp file.
+  const stage = window.electronAPI?.stageImage
+  if (!stage) throw new Error(`Could not find "${file.name}" on disk`)
+  const staged = await stage(file.name, new Uint8Array(await file.arrayBuffer()))
+  if (!staged.success) throw new Error(staged.error)
+  return staged.sourcePath
+}
+
+const isImage = (f: File) => f.type.startsWith('image/') || /\.(png|jpe?g|gif|webp|bmp)$/i.test(f.name)
+
+/** `image/jpeg` (or any other picture the browser can draw) as a PNG file; a PNG is returned as it is. */
+async function asPng(file: File): Promise<File | null> {
+  if (onlyPngs([file]).length > 0) return file
+  try {
+    const bitmap = await createImageBitmap(file)
+    const canvas = document.createElement('canvas')
+    canvas.width = bitmap.width
+    canvas.height = bitmap.height
+    canvas.getContext('2d')?.drawImage(bitmap, 0, 0)
+    const blob = await new Promise<Blob | null>((done) => canvas.toBlob(done, 'image/png'))
+    return blob ? new File([blob], file.name.replace(/\.[^.]+$/, '') + '.png', { type: 'image/png' }) : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * The pictures on the clipboard as PNG files: a copied image or screenshot, or image files copied in Finder / Explorer.
+ * Empty when it holds only text (or nothing usable), so a normal text paste is left alone.
+ */
+export async function pastedPngs(dt: DataTransfer | null): Promise<File[]> {
+  if (!dt) return []
+  const files = Array.from(dt.files ?? [])
+  if (files.length === 0) for (const item of Array.from(dt.items ?? [])) if (item.kind === 'file') { const f = item.getAsFile(); if (f) files.push(f) }
+  const pngs = await Promise.all(files.filter(isImage).map(asPng))
+  return pngs.filter((f): f is File => f !== null)
+}
+
+/** True when the clipboard carries a picture or file (decided synchronously, before the bytes can be read). */
+export function clipboardHasFiles(dt: DataTransfer | null): boolean {
+  if (!dt) return false
+  return Array.from(dt.types ?? []).includes('Files') || Array.from(dt.items ?? []).some((i) => i.kind === 'file')
 }
