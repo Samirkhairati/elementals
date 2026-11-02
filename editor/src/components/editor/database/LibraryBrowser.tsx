@@ -3,6 +3,7 @@
 // decides what that means (and rewrites references).
 
 import { useMemo, useRef, useState } from 'react'
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { ChevronDown, ChevronRight, FolderPlus, Pencil, Trash2 } from 'lucide-react'
 import { canMoveFolder } from '@/lib/assetOps'
 import { isFileDrag } from '@/lib/droppedFiles'
@@ -36,6 +37,8 @@ interface Props {
   /** Dropping an item or a folder on a folder ('' = the top level). */
   onMove: (drag: DragPayload, targetFolder: string) => void
   folderActions: FolderActions
+  /** Delete on the selected item, and Delete… in an item's right-click menu: the table opens its confirm dialog. */
+  onDeleteItem?: (key: string) => void
   /** What to say when there is nothing at all. */
   emptyText: string
   /** Importing: the highlighted folder, and files dragged in from outside. */
@@ -50,7 +53,7 @@ const readDrag = (e: React.DragEvent): DragPayload | null => {
   }
 }
 
-export function LibraryBrowser({ items, folders, query, mode, selected, onSelect, thumb, badge, hint, onMove, folderActions, emptyText, library }: Props) {
+export function LibraryBrowser({ items, folders, query, mode, selected, onSelect, thumb, badge, hint, onMove, folderActions, onDeleteItem, emptyText, library }: Props) {
   const tree = useMemo(() => buildLibraryTree(items, folders, query), [items, folders, query])
   const searching = query.trim() !== ''
   const [closed, setClosed] = useState<Set<string>>(new Set())
@@ -131,7 +134,23 @@ export function LibraryBrowser({ items, folders, query, mode, selected, onSelect
     )
   }
 
-  const itemRow = (item: LibraryItem) => (
+  // Right-click: pick the item, then offer Delete… (the same confirm as the Delete button).
+  const withItemMenu = (item: LibraryItem, child: React.ReactElement) =>
+    onDeleteItem ? (
+      <ContextMenu key={item.key}>
+        <ContextMenuTrigger asChild onContextMenu={() => onSelect(item.key)}>{child}</ContextMenuTrigger>
+        <ContextMenuContent className="w-44">
+          <ContextMenuItem className="text-red-400 focus:text-red-400 focus:bg-red-500/10" onClick={() => onDeleteItem(item.key)}>
+            <Trash2 className="mr-2 h-3.5 w-3.5" />
+            Delete…
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
+    ) : (
+      child
+    )
+
+  const itemRow = (item: LibraryItem) => withItemMenu(item, (
     <button
       key={item.key}
       type="button"
@@ -145,7 +164,7 @@ export function LibraryBrowser({ items, folders, query, mode, selected, onSelect
       <span className="min-w-0 flex-1 truncate">{item.name}</span>
       {badge?.(item)}
     </button>
-  )
+  ))
 
   // Each level sits in a list with a guide line under its parent's arrow, so depth reads at a glance.
   const renderList = (node: FolderNode, root = false): React.ReactNode => (
@@ -191,7 +210,7 @@ export function LibraryBrowser({ items, folders, query, mode, selected, onSelect
         )}
         {node.items.length === 0 && node.path ? <p className="ed-hint mb-1">Empty</p> : (
           <div className="grid grid-cols-[repeat(auto-fill,minmax(76px,1fr))] gap-1.5">
-            {node.items.map((i) => <Tile key={i.key} selected={selected === i.key} name={i.name} title={i.key} hint={hint?.(i)} thumb={thumb(i, 56)} badge={badge?.(i)} onClick={() => onSelect(i.key)} dragProps={dragProps({ kind: 'item', key: i.key })} />)}
+            {node.items.map((i) => withItemMenu(i, <Tile key={i.key} selected={selected === i.key} name={i.name} title={i.key} hint={hint?.(i)} thumb={thumb(i, 56)} badge={badge?.(i)} onClick={() => onSelect(i.key)} dragProps={dragProps({ kind: 'item', key: i.key })} />))}
           </div>
         )}
       </section>
@@ -206,6 +225,14 @@ export function LibraryBrowser({ items, folders, query, mode, selected, onSelect
       className="relative flex min-h-[50vh] flex-col gap-1 rounded-md data-[drop=true]:ring-1 data-[drop=true]:ring-primary/60"
       data-drop={dropTarget === '' ? 'true' : undefined}
       onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropTarget(null) }}
+      onKeyDown={(e) => {
+        // Delete on the selected picture asks first, exactly like the Delete button. Typing in a field is left alone.
+        if (!onDeleteItem || (e.key !== 'Delete' && e.key !== 'Backspace')) return
+        if ((e.target as HTMLElement).closest('input, textarea, [contenteditable="true"]')) return
+        if (!selected || !items.some((i) => i.key === selected)) return
+        e.preventDefault()
+        onDeleteItem(selected)
+      }}
       {...dropProps('')}
     >
       {nothing ? <p className="ed-hint p-3">{emptyText}</p> : nothingFound ? <p className="ed-hint p-3">Nothing matches “{query}”.</p> : mode === 'tiles' ? <div className="flex flex-col gap-3">{renderTiles(tree)}</div> : renderList(tree, true)}

@@ -166,6 +166,30 @@ describe('Graphics', () => {
     expect(within(detail).getByRole('img', { name: 'props/chest.png' })).toBeInTheDocument()
   })
 
+  it('Delete on the selected picture asks first (nothing is deleted until confirmed), like the Delete button', async () => {
+    renderAt('/database?table=graphics&id=props/orphan.png')
+    const pane = await screen.findByTestId('list-pane')
+    const row = (await within(pane).findAllByText('orphan.png'))[0].closest('button') as HTMLElement
+    row.focus()
+    fireEvent.keyDown(row, { key: 'Delete' })
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText('props/orphan.png')).toBeInTheDocument()
+    expect(calls.some((c) => c[0] === 'deleteGraphic')).toBe(false)
+    fireEvent.click(within(dialog).getByRole('button', { name: /Delete/ }))
+    await waitFor(() => expect(calls.some((c) => c[0] === 'deleteGraphic' && c[1] === 'props/orphan.png')).toBe(true))
+  })
+
+  it('right-clicking a picture offers Delete… which opens the same confirm', async () => {
+    renderAt('/database?table=graphics')
+    const pane = await screen.findByTestId('list-pane')
+    const row = (await within(pane).findAllByText('orphan.png'))[0].closest('button') as HTMLElement
+    fireEvent.contextMenu(row)
+    fireEvent.click(await screen.findByText('Delete…'))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText('props/orphan.png')).toBeInTheDocument()
+    expect(calls.some((c) => c[0] === 'deleteGraphic')).toBe(false)
+  })
+
   it('views the picture in a zoom pane with a slider, steps, fit and 1:1', async () => {
     renderAt('/database?table=graphics&id=props/chest.png')
     const detail = await screen.findByTestId('graphic-detail')

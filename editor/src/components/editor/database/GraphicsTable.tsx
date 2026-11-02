@@ -22,7 +22,7 @@ function StatusLine({ outcome }: { outcome: Outcome | null }) {
   return outcome.ok ? <p role="status" className="ed-hint px-1 pb-1">{outcome.message}</p> : <p role="alert" className="px-1 pb-1 text-destructive">{outcome.error}</p>
 }
 
-type FolderDialog = { kind: 'new'; parent: string } | { kind: 'change'; folder: string } | { kind: 'delete'; folder: string } | null
+type FolderDialog = { kind: 'new'; parent: string } | { kind: 'item'; id: string } | { kind: 'change'; folder: string } | { kind: 'delete'; folder: string } | null
 
 export function GraphicsBrowser({ data, query, selected, onSelect, mode, library }: TableProps) {
   const { graphics, images } = data.sprites
@@ -62,12 +62,25 @@ export function GraphicsBrowser({ data, query, selected, onSelect, mode, library
         badge={(item) => (used[item.key] ? null : <Badge title="No sprite or map uses this picture">unused</Badge>)}
         hint={(item) => (used[item.key] ? `${size(item.key)?.width}×${size(item.key)?.height}` : 'unused')}
         onMove={(d, t) => void move(d, t)}
+        onDeleteItem={(id) => setDialog({ kind: 'item', id })}
         folderActions={{ onCreate: (parent) => setDialog({ kind: 'new', parent }), onRename: (folder) => setDialog({ kind: 'change', folder }), onDelete: (folder) => setDialog({ kind: 'delete', folder }) }}
         emptyText="No pictures yet. Import images, or drop them here."
         library={library}
       />
       {dialog?.kind === 'new' && <NewFolder parent={dialog.parent} actions={actions} onDone={setOutcome} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'change' && <ChangeFolder folder={dialog.folder} actions={actions} onDone={(o, next) => { setOutcome(o); if (o.ok && selected.startsWith(`${dialog.folder}/`)) onSelect(joinId(next, selected.slice(dialog.folder.length + 1))) }} onClose={() => setDialog(null)} />}
+      {dialog?.kind === 'item' && (
+        <DeleteDialog
+          open
+          title="Delete picture?"
+          subject={dialog.id}
+          description="The picture file is removed from the project. This cannot be undone."
+          guard={actions.deleteGuard([dialog.id])}
+          blockedHint="Change those first, or rename it instead."
+          onConfirm={async () => { const r = await actions.remove(dialog.id); setOutcome(r); if (r.ok && selected === dialog.id) onSelect(''); return r.error }}
+          onClose={() => setDialog(null)}
+        />
+      )}
       {dialog?.kind === 'delete' && <DeleteFolder folder={dialog.folder} data={data} actions={actions} onDone={setOutcome} onClose={() => setDialog(null)} />}
     </>
   )
