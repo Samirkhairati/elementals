@@ -7,7 +7,7 @@ How a map gets from the editor into the game, and how to keep the two in sync.
 | Format | Where | Written by | Read by |
 | --- | --- | --- | --- |
 | **Editor map** (own JSON: `layers[].data` keyed by tile index, `entities`, ...) | `project/maps/**/*.json` (folders allowed) | the editor (Electron) | the editor, `scripts/export-maps.mjs` |
-| **Tiled map** (Tiled 1.10 JSON with a non-standard top-level `entities` array) | `game/public/data/maps/<name>.json` | the editor's **Export** button or `npm run maps:export` | the game (`MapParser`) |
+| **Tiled map** (Tiled 1.10 JSON with a non-standard top-level `entities` array) | `game/public/data/maps/<name>.json` | right-click a map > **Export to Game** (writes it straight there), or `npm run maps:export` | the game (`MapParser`) |
 | **Tilesets** (`*.png`, optional sibling `*.json` with a display `name`) | `project/tilesets/**` | the editor | the editor and the script (image size comes from the PNG header) |
 
 The game never reads `project/`; the committed copies in `game/public/data/maps` are what ships.
@@ -24,7 +24,7 @@ Editing a map in the editor does **not** update the game by itself.
 
 The editor imports it from `src/hooks/useExportMap.ts` (relative path, no extension); Node imports it with explicit `.ts`
 paths (type stripping). Keep the files free of enums, namespaces, parameter properties and DOM/Node imports.
-The Export button validates the editor map and the converted map and refuses to write (alert with the first errors) when either is invalid.
+**Export to Game** (Maps panel context menu) validates the editor map and the converted map, then writes `game/public/data/maps/<id>.json` atomically with no dialog (`export-map-to-game` channel, `mapStore.exportMapToGame`; the id is the editor file name slugified, see below). It refuses to write (notice with the first errors) when either is invalid. **Export as File…** is the old save dialog. Run against a project copy (`ELEMENTALS_PROJECT_DIR`), the game folder is the one *beside that copy*, so the real game is never touched. A map that uses a tileset the game does not have yet still needs `npm run assets:sync`.
 
 ## Image layers
 
@@ -48,7 +48,7 @@ Recommended flow: edit in the editor -> `npm run maps:check` -> `npm run maps:ex
 (key order and whitespace ignored) with `game/public/data/maps/<name>.json`.
 **Name mapping:** `<name>` is the source *file* name without `.json`, lower-cased, runs of non `a-z0-9` replaced by `-`
 (`Old Town.json` -> `old-town`), folders ignored. Two sources mapping to the same name are INVALID.
-Note that the editor's Export button names its file after the map's internal `name` field, which can differ from the file name; the script reports that.
+Note that **Export as File…** names its file after the map's internal `name` field, which can differ from the file name; the script reports that.
 
 | Status | Meaning | Exit code |
 | --- | --- | --- |
@@ -75,3 +75,15 @@ DRIFTED  market  market.json  market.json
 - The older game-only maps (`city`, `map1`..`map5`) were removed from `game/public/data/maps/`; every game map now has an editor source.
 
 Tests: `npm run test:scripts` (CLI and library), `cd editor && npm test` (shared module, incl. a golden test against the previous export implementation).
+
+## Resizing a map
+
+Right-click a map > **Resize…** opens a crop-style dialog: the map is drawn small with a frame whose edges and corners are dragged
+(tile snapped), or each side can be typed (positive grows, negative crops). Cells that would be cut are tinted red and a warning lists
+the painted tiles, placed pictures and entities that disappear. The resize is applied to the open map (the map is opened first), saved by the
+normal autosave, and is one step in undo/redo (history snapshots carry the map size).
+
+The logic is pure: `editor/src/lib/mapResize.ts` (`applyResize`, `resizeLoss`) and `mapResizeView.ts` (preview geometry). Tile `(x, y)` becomes
+`(x + left, y + top)`; tile-layer indexes are rebuilt for the new width, entity anchors and image-layer items move by whole tiles (32 px), and
+anything whose anchor tile falls outside the new map is dropped. Map connections are not part of this yet; when they exist (they sit on map
+edges) they should hook into `applyResize` / `resizeLoss`.

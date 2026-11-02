@@ -95,6 +95,7 @@ export function createBrowserElectronApi(): ElectronAPI {
       if (result.success && typeof result.json === 'string') download(String(result.fileName ?? defaultName), result.json)
       return { success: result.success, error: result.error }
     },
+    exportMapToGame: (fileName: string, json: string) => c('export-map-to-game', fileName, json),
     // sprites + database
     getPathForFile: async (file: File) => {
       const staged = await stageUpload(file.name, new Uint8Array(await file.arrayBuffer()))

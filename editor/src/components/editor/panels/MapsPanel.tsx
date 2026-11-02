@@ -9,6 +9,8 @@ import {
   Edit2,
   Trash2,
   Download,
+  Gamepad2,
+  Scaling,
 } from 'lucide-react'
 import { MapData } from '@/types/editor'
 import {
@@ -54,7 +56,9 @@ interface MapsPanelProps {
   setRenameDialog: (v: any) => void
   handleDeleteMapFolder: (folderPath: string) => void
   handleDeleteMap: (folderPath: string | null, fileName: string) => void
-  handleExportMap: (m: any) => void
+  handleExportMap: (m: MapData) => void
+  handleExportMapToGame: (m: MapData) => void
+  handleResizeMap: (m: MapData) => void
   handleMapDrop: (e: React.DragEvent, targetFolder: string | null) => void
   onSelectMap: (m: MapData) => void
 }
@@ -74,6 +78,8 @@ export function MapsPanel({
   handleDeleteMapFolder,
   handleDeleteMap,
   handleExportMap,
+  handleExportMapToGame,
+  handleResizeMap,
   handleMapDrop,
   onSelectMap,
 }: MapsPanelProps) {
@@ -258,7 +264,7 @@ export function MapsPanel({
                   <span className="ed-row-label" title={m.name}>{m.name}</span>
                 </div>
               </ContextMenuTrigger>
-              <ContextMenuContent className="w-44">
+              <ContextMenuContent className="w-48">
                 <ContextMenuItem
                   onClick={() => {
                     setTimeout(() => {
@@ -276,9 +282,21 @@ export function MapsPanel({
                   <Edit2 className="w-3.5 h-3.5 mr-2" />
                   Rename
                 </ContextMenuItem>
+                <ContextMenuItem onClick={() => setTimeout(() => handleResizeMap(m), 0)}>
+                  <Scaling className="w-3.5 h-3.5 mr-2" />
+                  Resize…
+                </ContextMenuItem>
+                <ContextMenuSeparator />
+                <ContextMenuItem
+                  onClick={() => handleExportMapToGame(m)}
+                  title="Writes the map into the game's maps folder"
+                >
+                  <Gamepad2 className="w-3.5 h-3.5 mr-2" />
+                  Export to Game
+                </ContextMenuItem>
                 <ContextMenuItem onClick={() => handleExportMap(m)}>
                   <Download className="w-3.5 h-3.5 mr-2" />
-                  Export Map
+                  Export as File…
                 </ContextMenuItem>
                 <ContextMenuSeparator />
                 <ContextMenuItem

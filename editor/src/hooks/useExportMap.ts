@@ -19,14 +19,15 @@ function formatErrors(title: string, errors: string[]): string {
   return `${title}\n${shown.join('\n')}`
 }
 
-export async function exportMap(
-  mapToExportRaw: any,
+export type BuiltMap = { ok: true; json: string } | { ok: false; error: string }
+
+/** Validates the map and converts it to the Tiled JSON the game loads. Never throws; failures come back as `error`. */
+export async function buildGameMapJson(
+  mapToExportRaw: MapData,
   tilesets: TilesetData[],
   activeMap: MapData | null,
   layers: Layer[]
-): Promise<void> {
-  if (!window.electronAPI) return
-
+): Promise<BuiltMap> {
   const mapToExport: EditorMap = (activeMap && mapToExportRaw.fileName === activeMap.fileName)
     ? { ...mapToExportRaw, layers, entities: activeMap.entities || [] }
     : mapToExportRaw
@@ -41,28 +42,60 @@ export async function exportMap(
 
   const unreadable = tilesetInfos.filter(t => used.has(t.fileName) && (t.width === 0 || t.height === 0))
   if (unreadable.length > 0) {
-    alert('Export failed: ' + formatErrors(
-      'Some tileset images could not be loaded:',
-      unreadable.map(t => t.fileName)
-    ))
-    return
+    return {
+      ok: false,
+      error: formatErrors('Some tileset images could not be loaded:', unreadable.map(t => t.fileName)),
+    }
   }
 
   const editorCheck = validateEditorMap(mapToExport, { tilesets: tilesetInfos })
   if (!editorCheck.ok) {
-    alert('Export failed: ' + formatErrors(`The map "${mapToExport?.name}" is invalid:`, editorCheck.errors))
-    return
+    return { ok: false, error: formatErrors(`The map "${mapToExport?.name}" is invalid:`, editorCheck.errors) }
   }
 
   const tiledMap = convertEditorMapToTiled(mapToExport, tilesetInfos)
   const tiledCheck = validateTiledMap(tiledMap)
   if (!tiledCheck.ok) {
-    alert('Export failed: ' + formatErrors('The exported map would be invalid:', tiledCheck.errors))
+    return { ok: false, error: formatErrors('The exported map would be invalid:', tiledCheck.errors) }
+  }
+
+  return { ok: true, json: serializeTiledMap(tiledMap) }
+}
+
+/** "Export as file...": asks where to save the converted map. */
+export async function exportMap(
+  mapToExportRaw: MapData,
+  tilesets: TilesetData[],
+  activeMap: MapData | null,
+  layers: Layer[]
+): Promise<void> {
+  if (!window.electronAPI) return
+  const built = await buildGameMapJson(mapToExportRaw, tilesets, activeMap, layers)
+  if (!built.ok) {
+    alert('Export failed: ' + built.error)
     return
   }
 
-  const res = await window.electronAPI.exportMap(serializeTiledMap(tiledMap), mapToExport.name + '.json')
+  const res = await window.electronAPI.exportMap(built.json, mapToExportRaw.name + '.json')
   if (res && res.error && res.error !== 'Canceled') {
     alert('Export failed: ' + res.error)
   }
+}
+
+export type GameExportOutcome = { ok: true; id: string; changed: boolean } | { ok: false; error: string }
+
+/** "Export to game": writes the converted map to game/public/data/maps/<id>.json, no dialog. */
+export async function exportMapToGame(
+  mapToExportRaw: MapData,
+  tilesets: TilesetData[],
+  activeMap: MapData | null,
+  layers: Layer[]
+): Promise<GameExportOutcome> {
+  if (!window.electronAPI) return { ok: false, error: 'The editor is not connected to the project files.' }
+  const built = await buildGameMapJson(mapToExportRaw, tilesets, activeMap, layers)
+  if (!built.ok) return built
+
+  const res = await window.electronAPI.exportMapToGame(mapToExportRaw.fileName, built.json)
+  if (!res.success) return { ok: false, error: res.error }
+  return { ok: true, id: res.id, changed: res.changed }
 }

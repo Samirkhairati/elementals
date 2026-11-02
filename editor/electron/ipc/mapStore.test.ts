@@ -7,6 +7,8 @@ import {
   createMapFolder,
   deleteMap,
   deleteMapFolder,
+  exportMapToGame,
+  gameMapId,
   listMaps,
   moveMap,
   renameMap,
@@ -418,5 +420,36 @@ describe('map folders', () => {
     expect(() => deleteMapFolder(maps, 'ghost')).toThrow(/does not exist/);
     expect(() => deleteMapFolder(maps, 'a.json')).toThrow(/not a folder/);
     expect(fs.existsSync(path.join(maps, 'a.json'))).toBe(true);
+  });
+});
+
+describe('exporting to the game', () => {
+  const json = '{"width":2}';
+
+  it('names the game map after the editor file (same rule as the exporter script and the game)', () => {
+    expect(gameMapId('market.json')).toBe('market');
+    expect(gameMapId('City Map (2).json')).toBe('city-map-2');
+    expect(gameMapId('new_map_1.JSON')).toBe('new-map-1');
+    expect(gameMapId('Café.json')).toBe('cafe');
+  });
+
+  it('writes <id>.json into the game folder, creating it, and reports unchanged rewrites', () => {
+    const game = path.join(root, 'game', 'public', 'data', 'maps');
+    const first = exportMapToGame(game, 'New_Map.json', json);
+    expect(first).toEqual({ id: 'new-map', filePath: path.join(game, 'new-map.json'), changed: true });
+    expect(fs.readFileSync(first.filePath, 'utf8')).toBe(json);
+    expect(exportMapToGame(game, 'New_Map.json', json).changed).toBe(false);
+    expect(exportMapToGame(game, 'New_Map.json', '{"width":3}').changed).toBe(true);
+    expect(fs.readFileSync(first.filePath, 'utf8')).toBe('{"width":3}');
+    expect(fs.readdirSync(game)).toEqual(['new-map.json']);
+  });
+
+  it('refuses bad input without writing', () => {
+    const game = path.join(root, 'game');
+    expect(() => exportMapToGame(game, 'a.json', '')).toThrow(/non-empty/);
+    expect(() => exportMapToGame(game, 'a.json', 'not json')).toThrow(/valid JSON/);
+    expect(() => exportMapToGame(game, '...json', json)).toThrow(/cannot be turned/);
+    expect(() => exportMapToGame(game, '../x.json', json)).not.toThrow();
+    expect(fs.existsSync(path.join(root, 'x.json'))).toBe(false);
   });
 });

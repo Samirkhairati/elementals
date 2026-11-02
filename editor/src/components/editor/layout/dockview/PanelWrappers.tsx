@@ -38,6 +38,8 @@ const selectMaps = (c: EditorContextValue) => ({
   handleDeleteMapFolder: c.handleDeleteMapFolder,
   handleDeleteMap: c.handleDeleteMap,
   handleExportMap: c.handleExportMap,
+  handleExportMapToGame: c.handleExportMapToGame,
+  handleResizeMap: c.handleResizeMap,
   handleMapDrop: c.handleMapDrop,
   onSelectMap: c.onSelectMap,
 });
@@ -64,6 +66,8 @@ export function MapsWrapper(_props: IDockviewPanelProps) {
         handleDeleteMapFolder={ctx.handleDeleteMapFolder}
         handleDeleteMap={ctx.handleDeleteMap}
         handleExportMap={ctx.handleExportMap}
+        handleExportMapToGame={ctx.handleExportMapToGame}
+        handleResizeMap={ctx.handleResizeMap}
         handleMapDrop={ctx.handleMapDrop}
         onSelectMap={ctx.onSelectMap}
       />

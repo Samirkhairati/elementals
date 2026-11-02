@@ -8,6 +8,13 @@ import type { EntityData, Layer } from '@/types/editor'
 export interface HistorySnapshot {
   layers: Layer[]
   entities: EntityData[]
+  /** Map size in tiles; only set from the editor, so that undoing a resize brings the old size back. */
+  size?: { width: number; height: number }
+}
+
+/** The size to record in a snapshot for `map` (nothing when no map is open). */
+export function mapSize(map: { width: number; height: number } | null | undefined): HistorySnapshot['size'] {
+  return map ? { width: map.width, height: map.height } : undefined
 }
 
 export interface HistoryState {
@@ -20,16 +27,20 @@ export const MAX_HISTORY = 50
 export const EMPTY_HISTORY: HistoryState = { entries: [], index: -1 }
 
 export function cloneSnapshot(snapshot: HistorySnapshot): HistorySnapshot {
-  return {
+  const clone: HistorySnapshot = {
     layers: JSON.parse(JSON.stringify(snapshot.layers ?? [])),
     entities: JSON.parse(JSON.stringify(snapshot.entities ?? [])),
   }
+  if (snapshot.size) clone.size = { ...snapshot.size }
+  return clone
 }
 
 export function snapshotsEqual(a: HistorySnapshot | null | undefined, b: HistorySnapshot | null | undefined): boolean {
   if (a === b) return true
   if (!a || !b) return false
   return (
+    a.size?.width === b.size?.width &&
+    a.size?.height === b.size?.height &&
     JSON.stringify(a.layers ?? []) === JSON.stringify(b.layers ?? []) &&
     JSON.stringify(a.entities ?? []) === JSON.stringify(b.entities ?? [])
   )

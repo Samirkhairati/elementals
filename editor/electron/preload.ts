@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   renameMap: (folderPath: string | null, fileName: string, newName: string) => ipcRenderer.invoke('rename-map', folderPath, fileName, newName),
   moveMap: (fileName: string, oldFolder: string | null, newFolder: string | null) => ipcRenderer.invoke('move-map', fileName, oldFolder, newFolder),
   exportMap: (jsonData: string, defaultName: string) => ipcRenderer.invoke('export-map', jsonData, defaultName),
+  exportMapToGame: (fileName: string, json: string) => ipcRenderer.invoke('export-map-to-game', fileName, json),
   getCharacters: () => ipcRenderer.invoke('get-characters'),
   pickSpriteFile: () => ipcRenderer.invoke('pick-sprite-file'),
   saveCharacter: (id: string, def: unknown) => ipcRenderer.invoke('save-character', id, def),

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { graphicAssets } from '@/lib/graphicAssets'
 import { EntityData, Layer, LayerType, MapData } from '@/types/editor'
-import type { HistorySnapshot } from '@/lib/history'
+import { mapSize, type HistorySnapshot } from '@/lib/history'
 import { mapSaveQueue } from '@/lib/saveQueue'
 
 // Hooks
@@ -20,7 +20,9 @@ import { useSpriteAssets } from '@/hooks/useSpriteAssets'
 import { useDatabase } from '@/hooks/useDatabase'
 import { useCommonEvents } from '@/hooks/useCommonEvents'
 import { useEntityPlacement } from '@/hooks/editor/useEntityPlacement'
-import { exportMap } from '@/hooks/useExportMap'
+import { exportMap, exportMapToGame } from '@/hooks/useExportMap'
+import { applyResize, type ResizeEdges } from '@/lib/mapResize'
+import { ResizeMapDialog } from '@/components/editor/dialogs/ResizeMapDialog'
 
 // Layout
 import {
@@ -41,12 +43,12 @@ export function EditorPage() {
   // Callbacks handed to the managers are referentially stable (they always run the latest
   // closure), so the managers' own callbacks - and therefore the context value - stay stable too.
   // They may reference managers declared further down: they only run in event handlers.
-  const handleMapSelected = useStableCallback((initLayers: Layer[], initEntities?: EntityData[]) => {
+  const handleMapSelected = useStableCallback((initLayers: Layer[], initEntities?: EntityData[], size?: { width: number; height: number }) => {
     layerManager.setLayers(initLayers)
     layerManager.setActiveLayerId(initLayers?.[0]?.id || null)
     entityManager.setEntities(initEntities || [])
     entityManager.setSelectedEntityId(null)
-    historyState.resetHistory({ layers: initLayers, entities: initEntities || [] })
+    historyState.resetHistory({ layers: initLayers, entities: initEntities || [], size })
   })
 
   /** Reset every piece of per-map editor state (used once the active map is gone). */
@@ -83,6 +85,7 @@ export function EditorPage() {
     historyState.commitHistory({
       layers: layerManager.getLayers(),
       entities: entityManager.getEntities(),
+      size: mapSize(mapManager.getActiveMap()),
     })
   })
 
@@ -156,7 +159,7 @@ export function EditorPage() {
 
     layerManager.setLayers(snapshot.layers)
     entityManager.setEntities(entities)
-    mapManager.setActiveMap(m => (m ? { ...m, layers: snapshot.layers, entities } : m))
+    mapManager.setActiveMap(m => (m ? { ...m, layers: snapshot.layers, entities, ...snapshot.size } : m))
     layerManager.setActiveLayerId(current =>
       current && snapshot.layers.some(l => l.id === current) ? current : snapshot.layers[0]?.id ?? null
     )
@@ -294,6 +297,58 @@ export function EditorPage() {
     exportMap(m, tilesetManager.tilesets, mapManager.getActiveMap(), layerManager.getLayers())
   })
 
+  // ── Notices (small, self-dismissing messages) ────────────────────────────
+  const [notice, setNotice] = useState<{ kind: 'info' | 'error'; text: string } | null>(null)
+  useEffect(() => {
+    if (!notice) return
+    const timer = setTimeout(() => setNotice(null), notice.kind === 'error' ? 9000 : 4000)
+    return () => clearTimeout(timer)
+  }, [notice])
+
+  /** Right-click > "Export to game": writes game/public/data/maps/<id>.json straight away. */
+  const handleExportMapToGame = useStableCallback(async (m: MapData) => {
+    const res = await exportMapToGame(m, tilesetManager.tilesets, mapManager.getActiveMap(), layerManager.getLayers())
+    setNotice(
+      res.ok
+        ? { kind: 'info', text: res.changed ? `Exported "${m.name}" to the game as ${res.id}.json.` : `"${m.name}" was already up to date in the game.` }
+        : { kind: 'error', text: `Export to game failed. ${res.error}` }
+    )
+  })
+
+  // ── Resize map ───────────────────────────────────────────────────────────
+  const [resizeTarget, setResizeTarget] = useState<MapData | null>(null)
+
+  const sameMap = (a: MapData | null, b: MapData | null) =>
+    !!a && !!b && a.fileName === b.fileName && (a.folderPath || null) === (b.folderPath || null)
+
+  /** Right-click > "Resize...": the map is opened first, so the resize joins the normal undo history. */
+  const handleResizeMap = useStableCallback((m: MapData) => {
+    const active = mapManager.getActiveMap()
+    if (sameMap(active, m)) {
+      setResizeTarget({ ...active!, layers: layerManager.getLayers(), entities: entityManager.getEntities() })
+      return
+    }
+    mapManager.onSelectMap(m)
+    setResizeTarget(m)
+  })
+
+  const handleConfirmResize = useStableCallback((edges: ResizeEdges) => {
+    const active = mapManager.getActiveMap()
+    setResizeTarget(null)
+    if (!active || !sameMap(active, resizeTarget)) return
+    const resized = applyResize(
+      { ...active, layers: layerManager.getLayers(), entities: entityManager.getEntities() },
+      edges
+    )
+    layerManager.setLayers(resized.layers)
+    entityManager.setEntities(resized.entities ?? [])
+    entityManager.setSelectedEntityId(current => (current && resized.entities?.some(e => e.id === current) ? current : null))
+    layerManager.setSelectedImageId(null)
+    mapManager.setActiveMap(resized)
+    commitSnapshot()
+    setNotice({ kind: 'info', text: `Resized "${active.name}" to ${resized.width} × ${resized.height} tiles.` })
+  })
+
   // ── Context Value for all panels ─────────────────────────────────────────
   // Memoized so context only re-propagates to all Dockview panels when
   // something meaningful actually changes — not on every incidental re-render.
@@ -318,6 +373,8 @@ export function EditorPage() {
     handleDeleteMapFolder: mapManager.handleDeleteMapFolder,
     handleDeleteMap: mapManager.handleDeleteMap,
     handleExportMap,
+    handleExportMapToGame,
+    handleResizeMap,
     handleMapDrop: mapManager.handleMapDrop,
     onSelectMap: mapManager.onSelectMap,
     onClearActiveMap: handleDockClearActiveMap,
@@ -501,7 +558,7 @@ export function EditorPage() {
     mapManager.maps, mapManager.mapFolders, mapManager.activeMap,
     mapManager.expandedMapFolders, mapManager.toggleMapFolder,
     mapManager.handleDeleteMapFolder, mapManager.handleDeleteMap,
-    handleExportMap, mapManager.handleMapDrop, mapManager.onSelectMap,
+    handleExportMap, handleExportMapToGame, handleResizeMap, mapManager.handleMapDrop, mapManager.onSelectMap,
     handleDockClearActiveMap,
     dialogs.setCreateMapData, dialogs.setCreateMapDialog,
     dialogs.setCreateMapFolderName, dialogs.setCreateMapFolderDialog,
@@ -554,6 +611,26 @@ export function EditorPage() {
       <div className="flex flex-1 overflow-hidden h-full w-full">
         <EditorDockview />
         <EditorDialogs {...dialogs} />
+        <ResizeMapDialog
+          map={resizeTarget}
+          tilesets={tilesetManager.tilesets}
+          onClose={() => setResizeTarget(null)}
+          onConfirm={handleConfirmResize}
+        />
+        {notice && (
+          <div
+            role="status"
+            className={
+              'fixed bottom-4 right-4 z-[60] max-w-sm rounded-md border px-3 py-2 text-xs shadow-lg ' +
+              (notice.kind === 'error'
+                ? 'border-red-500/50 bg-red-950 text-red-200'
+                : 'border-border bg-popover text-popover-foreground')
+            }
+            onClick={() => setNotice(null)}
+          >
+            {notice.text}
+          </div>
+        )}
       </div>
     </EditorProvider>
   )

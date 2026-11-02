@@ -38,7 +38,7 @@ describe('useMapManager', () => {
     act(() => result.current.onSelectMap(map))
     expect(result.current.activeMap).toBe(map)
     expect(onMapSelected).toHaveBeenCalledTimes(1)
-    expect(onMapSelected).toHaveBeenCalledWith(map.layers, map.entities)
+    expect(onMapSelected).toHaveBeenCalledWith(map.layers, map.entities, { width: map.width, height: map.height })
   })
 
   it('onSelectMap migrates legacy entities and stamps the current schemaVersion', () => {
@@ -59,7 +59,7 @@ describe('useMapManager', () => {
     expect(Object.keys(active.entities![0].components)).toEqual(['Transform', 'Event'])
     expect(commandNodes(active.entities![0].components.Event!.states[0].graph)[0]).toMatchObject({ type: 'showText', params: { text: 'hello' } })
     expect(legacy.entities![0].components).toHaveProperty('Interactable') // input untouched
-    expect(onMapSelected).toHaveBeenCalledWith(active.layers, active.entities)
+    expect(onMapSelected).toHaveBeenCalledWith(active.layers, active.entities, { width: active.width, height: active.height })
   })
 
   it('loadMaps migrates every map it loads', async () => {

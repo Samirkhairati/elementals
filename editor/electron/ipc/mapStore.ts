@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import { atomicWriteJsonSync } from './atomicWrite.js';
+import { atomicWriteFileSync, atomicWriteJsonSync } from './atomicWrite.js';
 import {
   createFolder,
   deleteFolder,
@@ -209,3 +209,43 @@ export const renameMapFolder = (
 export const deleteMapFolder = (mapsDir: string, folderPath: string): void => {
   deleteFolder(mapsDir, folderPath);
 };
+
+/**
+ * The game's map id for an editor map file: lower-cased, every run of non `a-z0-9` becomes `-`.
+ * Must stay in step with `slugify` in scripts/lib/maps.mjs and `slugMapId` in game/src/data/mapIds.ts.
+ */
+export function gameMapId(fileName: string): string {
+  return fileName
+    .replace(/\.json$/i, '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+export interface GameExportResult {
+  /** Game map id (the file name without `.json`). */
+  id: string;
+  filePath: string;
+  /** False when the game already had exactly this content. */
+  changed: boolean;
+}
+
+/** Writes the converted (Tiled) map JSON to `<gameMapsDir>/<id>.json`, replacing the previous copy. */
+export function exportMapToGame(gameMapsDir: string, fileName: string, json: unknown): GameExportResult {
+  if (typeof json !== 'string' || json.trim() === '') throw new Error('Export data must be a non-empty string');
+  try {
+    JSON.parse(json);
+  } catch {
+    throw new Error('Export data is not valid JSON');
+  }
+  const id = gameMapId(typeof fileName === 'string' ? fileName : '');
+  if (!id) throw new Error(`"${String(fileName)}" cannot be turned into a game map id`);
+
+  const filePath = path.join(gameMapsDir, `${id}.json`);
+  if (fs.existsSync(filePath) && fs.readFileSync(filePath, 'utf8') === json) return { id, filePath, changed: false };
+  fs.mkdirSync(gameMapsDir, { recursive: true });
+  atomicWriteFileSync(filePath, json);
+  return { id, filePath, changed: true };
+}

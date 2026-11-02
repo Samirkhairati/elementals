@@ -65,6 +65,15 @@ describe('channels end to end (real temp project)', () => {
     expect(await call('get-common-events')).toMatchObject({ success: true, events: [] });
   });
 
+  it('exports a map to the configured game folder', async () => {
+    const game = path.join(tmp.create(), 'maps');
+    const gameApi = createProjectChannels(root, { gameMapsDir: game });
+    const res = (await gameApi['export-map-to-game']('Town Hall.json', '{"layers":[]}')) as { success: boolean; id: string };
+    expect(res).toMatchObject({ success: true, id: 'town-hall', changed: true });
+    expect(fs.readFileSync(path.join(game, 'town-hall.json'), 'utf8')).toBe('{"layers":[]}');
+    expect(await gameApi['export-map-to-game']('x.json', 'nope')).toMatchObject({ success: false });
+  });
+
   it('creates, saves and lists maps', async () => {
     const created = (await call('create-map', 'Town', 10, 8, null)) as { success: true; map: { fileName: string } };
     expect(created.success).toBe(true);

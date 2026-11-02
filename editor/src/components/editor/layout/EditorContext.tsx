@@ -142,6 +142,10 @@ export interface EditorBaseContextValue
   // Maps (renamed / wrapped fields)
   setCreateMapFolderName: Dialogs['setCreateMapFolderName']
   handleExportMap: (map: MapData) => void
+  /** Converts the map and writes it into the game's maps folder, no dialog. */
+  handleExportMapToGame: (map: MapData) => void
+  /** Opens the resize dialog for the map (opening the map first). */
+  handleResizeMap: (map: MapData) => void
   /** Called by the dock when the last map tab closed: persists pending edits, then clears the editor state. */
   onClearActiveMap: () => void
 

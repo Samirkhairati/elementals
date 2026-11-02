@@ -10,7 +10,7 @@ export function migrateLoadedMap(map: MapData): MapData {
 }
 
 interface UseMapManagerOptions {
-  onMapSelected?: (layers: Layer[], entities?: EntityData[]) => void
+  onMapSelected?: (layers: Layer[], entities?: EntityData[], size?: { width: number; height: number }) => void
   /** Called after the active map was removed (deleted) on disk. */
   onClearActiveMap?: () => void
   onOpenConfirmDialog?: (config: { title: string; description: string; action: () => void }) => void
@@ -94,7 +94,7 @@ export function useMapManager(options: UseMapManagerOptions = {}) {
     setActiveMapAndSync(m)
     const initLayers = m.layers || []
     const initEntities = m.entities || []
-    onMapSelected?.(initLayers, initEntities)
+    onMapSelected?.(initLayers, initEntities, { width: m.width, height: m.height })
   }, [onMapSelected, setActiveMapAndSync])
 
   const handleDeleteMap = useCallback((folderPath: string | null, fileName: string) => {

@@ -47,7 +47,7 @@ Worktree detection uses git plumbing only (`scripts/lib/worktree.mjs`); `npm run
 
 ```
 editor  --writes-->  project/maps/*.json (editor map format, tile index keyed)
-                           |  shared/mapExport.ts  (npm run maps:export, or the editor's Export button)
+                           |  shared/mapExport.ts  (npm run maps:export, or right-click a map > Export to Game)
                            v
                      game/public/data/maps/<id>.json  (Tiled 1.10 JSON + a top-level `entities` array)
                            |  MapParser -> PhaserTilemapAdapter + hydrateMapEntities
@@ -57,7 +57,7 @@ editor  --writes-->  project/maps/*.json (editor map format, tile index keyed)
 
 * The game **never reads `project/`**; the committed copies in `game/public/data/` are what ships. Editing in the editor does not update the game
   until you export. `maps:check` reports `IN SYNC | DRIFTED | MISSING_IN_GAME | INVALID`; `--write` only creates missing maps unless you pass
-  `--only <name> --force`. Map id = source file name, lower-cased, non `a-z0-9` runs -> `-` (the Export button names its file after the map's internal `name`, which can differ).
+  `--only <name> --force`. Map id = source file name, lower-cased, non `a-z0-9` runs -> `-` (Export to Game uses the file name; "Export as File…" uses the map's internal `name`, which can differ). Right-click a map > Resize… crops/grows it (`editor/src/lib/mapResize.ts`, see docs/maps.md).
 * `shared/` is imported by the editor with relative paths and by Node scripts with explicit `.ts` extensions (type stripping), and by the game via `@shared/*`.
   Keep it **free of enums, namespaces, parameter properties and DOM/Node imports**. If a doc and `shared/engine/types.ts` disagree, fix the types first.
 * Maps carry `schemaVersion` (current 4: events stored as graphs). Old data is migrated on load by pure, idempotent functions in `shared/engine/migrate.ts`

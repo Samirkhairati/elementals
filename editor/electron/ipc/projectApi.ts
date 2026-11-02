@@ -37,8 +37,17 @@ export function projectDirs(projectDir: string): ProjectDirs {
   };
 }
 
-export function createProjectChannels(projectDir: string): Record<string, ChannelFn> {
+/** Where "Export to game" writes: the game's committed maps, beside the project folder (`<repo>/game/public/data/maps`). */
+export function defaultGameMapsDir(projectDir: string): string {
+  return path.join(path.resolve(projectDir), '..', 'game', 'public', 'data', 'maps');
+}
+
+export function createProjectChannels(
+  projectDir: string,
+  options: { gameMapsDir?: string } = {}
+): Record<string, ChannelFn> {
   const { projectDir: root, mapsDir, tilesetsDir, charactersDir, graphicsDir } = projectDirs(projectDir);
+  const gameMapsDir = options.gameMapsDir ?? defaultGameMapsDir(projectDir);
   const roots = { charactersDir, graphicsDir };
   const tilesetCache = new TilesetCache();
   const imageCache = new TilesetCache();
@@ -83,6 +92,8 @@ export function createProjectChannels(projectDir: string): Record<string, Channe
       toResult(() => mapStore.saveMap(mapsDir, folderPath, fileName, mapData)),
     'delete-map': (folderPath: string | null, fileName: string) =>
       toResult(() => mapStore.deleteMap(mapsDir, folderPath, fileName)),
+    'export-map-to-game': (fileName: string, json: string) =>
+      toResult(() => mapStore.exportMapToGame(gameMapsDir, fileName, json)),
     'create-map-folder': (parentPath: string | null, folderName: string) =>
       toResult(() => mapStore.createMapFolder(mapsDir, parentPath, folderName)),
     'delete-map-folder': (folderPath: string) => toResult(() => mapStore.deleteMapFolder(mapsDir, folderPath)),
