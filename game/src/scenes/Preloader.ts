@@ -5,6 +5,7 @@ import { spriteRegistry } from "@/data/spriteRegistry";
 import { CharacterLoader } from "@/sprites/characterLoader";
 import { phaserLoaderPort } from "@/sprites/phaserLoaderPort";
 import { charactersForMap } from "@/sprites/preloadSets";
+import { imagePictureIds, pictureTextureKey, pictureUrl } from "@/world/imageLayers";
 import { bootParams } from "@/core/bootParams";
 
 export class Preloader extends Scene {
@@ -50,7 +51,22 @@ export class Preloader extends Scene {
     const requested = bootParams.map && MAPS.some((m) => m.key === bootParams.map) ? bootParams.map : undefined;
     const first = requested ?? MAPS[0].key;
     const raw = this.cache.tilemap.get(first)?.data;
+    await this.loadPictures();
     await new CharacterLoader(spriteRegistry, phaserLoaderPort(this)).ensure(charactersForMap(raw));
     this.scene.start("Game");
+  }
+
+  /** The pictures placed on image layers, one texture per file for every map (crops are frames of it, see world/imageLayers.ts). */
+  private loadPictures(): Promise<void> {
+    const ids = new Set<string>();
+    for (const map of MAPS) for (const id of imagePictureIds(this.cache.tilemap.get(map.key)?.data)) ids.add(id);
+    const missing = [...ids].filter((id) => !this.textures.exists(pictureTextureKey(id)));
+    if (missing.length === 0) return Promise.resolve();
+    this.load.setPath("");
+    for (const id of missing) this.load.image(pictureTextureKey(id), pictureUrl(id));
+    return new Promise((resolve) => {
+      this.load.once("complete", () => resolve());
+      this.load.start();
+    });
   }
 }

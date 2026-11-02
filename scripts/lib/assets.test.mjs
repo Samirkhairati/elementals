@@ -9,6 +9,7 @@ import {
   applyPlan,
   defaultPaths,
   loadCharacters,
+  loadMapPictures,
   planSync,
   runCli,
   syncAssets,
@@ -170,6 +171,51 @@ describe('validation errors (nothing is written)', () => {
       assert.throws(() => applyPlan(planSync({ projectDir: sb.projectDir, publicDir: sb.publicDir }), { publicDir: sb.publicDir }), /refusing to write/)
     })
   }
+})
+
+describe('pictures on image layers', () => {
+  const mapWith = (images) => ({ name: 'town', width: 2, height: 2, layers: [{ id: 'i', name: 'Sky', type: 'image', images }] })
+
+  test('are copied once however many items (crops) use them; characters\' graphics are not copied twice', () => {
+    const sb = sandbox()
+    sb.graphic('images/sky.png', 64, 32)
+    writeJson(path.join(sb.projectDir, 'maps/town.json'), mapWith([
+      { id: 'a', graphicId: 'images/sky.png', x: 0, y: 0 },
+      { id: 'b', graphicId: 'images/sky.png', x: 8, y: 0, crop: { x: 0, y: 0, w: 8, h: 8 } },
+      { id: 'c', graphicId: 'props/ball.png', x: 8, y: 0 },
+      { id: 'd', assetId: 'objects/ball', x: 8, y: 0 },
+    ]))
+    assert.deepEqual(Object.keys(loadMapPictures(sb.projectDir).pictures).sort(), ['images/sky.png', 'props/ball.png'])
+    const plan = planSync({ projectDir: sb.projectDir, publicDir: sb.publicDir })
+    assert.equal(plan.actions.filter((a) => a.rel === 'graphics/images/sky.png').length, 1)
+    assert.equal(plan.actions.filter((a) => a.rel === 'graphics/props/ball.png').length, 1)
+    sb.sync()
+    assert.deepEqual(fs.readFileSync(path.join(sb.publicDir, 'graphics/images/sky.png')), makePng(64, 32))
+  })
+
+  test('a missing or invalid picture is a warning, and nothing escapes the library', () => {
+    const sb = sandbox()
+    writeJson(path.join(sb.projectDir, 'maps/town.json'), mapWith([
+      { id: 'a', graphicId: 'gone.png', x: 0, y: 0 },
+      { id: 'b', graphicId: '../secret.png', x: 0, y: 0 },
+    ]))
+    const { pictures, warnings } = loadMapPictures(sb.projectDir)
+    assert.deepEqual(pictures, {})
+    assert.match(warnings.join('\n'), /"gone.png" is not in the graphics library/)
+    assert.match(warnings.join('\n'), /not a valid graphic id/)
+  })
+
+  test('a picture no map uses any more is removed from the game on the next sync', () => {
+    const sb = sandbox()
+    sb.graphic('images/sky.png', 64, 32)
+    const mapFile = path.join(sb.projectDir, 'maps/town.json')
+    writeJson(mapFile, mapWith([{ id: 'a', graphicId: 'images/sky.png', x: 0, y: 0 }]))
+    sb.sync()
+    assert.ok(fs.existsSync(path.join(sb.publicDir, 'graphics/images/sky.png')))
+    writeJson(mapFile, mapWith([]))
+    sb.sync()
+    assert.ok(!fs.existsSync(path.join(sb.publicDir, 'graphics/images/sky.png')))
+  })
 })
 
 describe('sync', () => {

@@ -3,6 +3,7 @@
 // from game/public:
 //
 //   graphics/<graphicId>                copies of every graphic some character refers to (project/graphics/<graphicId>)
+//   graphics/<graphicId>                (also) every picture an image layer of a project map places, copied once
 //   graphics/tilesets/<name>.png        project tilesets the game does not have yet (never overwritten, see --force)
 //   data/characters.json                CharacterManifest (shared/engine/graphics.ts): every character + web-relative sheet URLs
 //   data/database.json                  the global switches / variables
@@ -74,6 +75,46 @@ export function listFilesDeep(dir, filter = () => true) {
   }
   walk(dir)
   return out
+}
+
+// ── pictures placed on image layers ────────────────────────────────────────
+
+/**
+ * Pictures that image layers of the project's maps place (`graphicId`, one file each however many crops use it):
+ * { id: Buffer }. Ids that are invalid or missing are reported, not copied.
+ */
+export function loadMapPictures(projectDir) {
+  const pictures = {}
+  const warnings = []
+  const mapsDir = path.join(projectDir, 'maps')
+  const graphicsDir = path.join(projectDir, GRAPHICS_SRC)
+  for (const full of listFilesDeep(mapsDir, (f) => f.endsWith('.json'))) {
+    const rel = posix(path.relative(projectDir, full))
+    let map
+    try {
+      map = JSON.parse(fs.readFileSync(full, 'utf8'))
+    } catch {
+      continue // maps:check reports unreadable maps
+    }
+    for (const layer of Array.isArray(map?.layers) ? map.layers : []) {
+      if (layer?.type !== 'image') continue
+      for (const item of Array.isArray(layer.images) ? layer.images : []) {
+        const id = item?.graphicId
+        if (typeof id !== 'string' || pictures[id] !== undefined) continue
+        if (!isValidGraphicId(id)) {
+          warnings.push(`${rel}: image "${id}" is not a valid graphic id`)
+          continue
+        }
+        try {
+          pictures[id] = fs.readFileSync(path.join(graphicsDir, id))
+        } catch (e) {
+          if (e.code === 'ENOENT') warnings.push(`${rel}: picture "${id}" is not in the graphics library`)
+          else warnings.push(`${rel}: picture "${id}": ${e.message}`)
+        }
+      }
+    }
+  }
+  return { pictures, warnings }
 }
 
 // ── characters + graphics ──────────────────────────────────────────────────
@@ -184,6 +225,10 @@ export function planSync({ projectDir, publicDir, force = false }) {
     errors.push('project/sprites still holds v1 sprite assets; run `npm run assets:migrate`')
   }
   for (const [id, bytes] of Object.entries(chars.graphics)) add(`${GRAPHICS_OUT}/${id}`, 'graphic', bytes)
+  // pictures on image layers (the game draws them from one copy each)
+  const placed = loadMapPictures(projectDir)
+  warnings.push(...placed.warnings)
+  for (const [id, bytes] of Object.entries(placed.pictures)) if (chars.graphics[id] === undefined) add(`${GRAPHICS_OUT}/${id}`, 'graphic', bytes)
 
   // database
   let database = { version: 1, switches: [], variables: [] }

@@ -5,6 +5,7 @@ import { settingsStore } from "@/core/SettingsStore";
 import { gameState } from "@/core/GameState";
 import { bootParams } from "@/core/bootParams";
 import { MapSystem } from "@/world/MapSystem";
+import { ImageLayerRenderer } from "@/world/imageLayers";
 import { InputManager } from "@/components/InputManager";
 import { MAPS } from "@/constants/assets";
 import { resolveMapKey } from "@/data/mapIds";
@@ -54,6 +55,7 @@ export interface GameDebugHandle {
 
 export class Game extends Scene {
   private mapSystem!: MapSystem;
+  private imageLayers!: ImageLayerRenderer;
   private inputManager!: InputManager;
   private world!: World;
   private spatialSystem!: SpatialSystem;
@@ -77,6 +79,7 @@ export class Game extends Scene {
 
   create() {
     this.mapSystem = new MapSystem(this);
+    this.imageLayers = new ImageLayerRenderer(this, spriteRegistry);
     this.inputManager = new InputManager(this);
     this.cameraEffects = new CameraEffects(this);
 
@@ -207,6 +210,8 @@ export class Game extends Scene {
     const map = this.mapSystem.loadMap(mapKey);
     const rawMapData = this.cache.tilemap.get(mapKey)?.data;
     this.currentMapKey = mapKey;
+    // Pictures and sprites placed on the map's image layers (the old map's are destroyed first).
+    this.imageLayers.show(rawMapData);
 
     this.spatialSystem.setMap(map);
 
