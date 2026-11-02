@@ -8,7 +8,7 @@ import type { ImageItem } from '@/types/editor'
 import { imagePickLabel } from '@/lib/graphicAssets'
 import { flippedItemBounds, itemSourceSize, snapImageAnchor } from '@/lib/imageItems'
 import { sortedImages } from '@/lib/layerOrder'
-import { Badge, EdButton, Field, IconButton, NumberField, TextField, Toggle } from '../ui/controls'
+import { Badge, EdButton, Field, IconButton, InfoTip, NumberField, TextField, Toggle } from '../ui/controls'
 import { ZoomPane } from '../ui/ZoomPane'
 import { ImageItemView } from '../sprites/ImageItemView'
 import { ScaleField } from './ScaleField'
@@ -68,6 +68,7 @@ export function ImagesPanel() {
       <section className="ed-card" data-testid="image-layer-section">
         <div className="ed-card-head">
           <span className="ed-section-title flex-1">Images · {layer.name}</span>
+          <InfoTip>Images snap to the grid while the magnet in the top toolbar is on, and move freely when it is off.</InfoTip>
           <Badge>{images.length}</Badge>
           <button type="button" className="ed-btn" data-size="sm" data-variant="primary" aria-label="Add image" disabled={locked} onClick={() => setPickerOpen(true)}>
             <Plus />
@@ -92,8 +93,6 @@ export function ImagesPanel() {
               </IconButton>
             </div>
           )}
-          <p className="ed-hint">Images snap to the grid while the magnet in the top toolbar is on, and move freely when it is off.</p>
-
           {rows.length === 0 ? (
             <p className="ed-hint">No images yet. Use Add to place one.</p>
           ) : (
