@@ -320,8 +320,6 @@ export function MapCanvas({
               {/* Pick / drag handles of the active image layer (above the art, below the entities) */}
               <KonvaImageItems
                 layer={activeLayer}
-                mapWidthPx={mapWidthPx}
-                mapHeightPx={mapHeightPx}
                 selectedImageId={selectedImageId}
                 setSelectedImageId={setSelectedImageId || (() => {})}
                 moveImage={moveImage || (() => {})}

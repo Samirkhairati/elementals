@@ -33,7 +33,7 @@ A layer of type `folder` groups tile and image layers in the editor's layer list
 ## Image layers
 
 An editor layer of type `image` holds freely placed pictures (`images[]`: `assetId` for a sprite or `graphicId` for a picture from the graphics library, never both; pixel `x`/`y` = the sprite anchor, optional `z`, `scale`, `flipX`, `opacity`)
-instead of tile cells. In the editor they are drawn in layer `z` order (equal `z` keeps the list order) and placed with or without grid snapping. Snapping puts the picture's edges on the grid (its left edge on a vertical line, its bottom edge on a horizontal one), so a picture two tiles wide is not half a tile off; a one-tile picture lands exactly where an entity does (`snapImageAnchor`).
+instead of tile cells. In the editor they are drawn in layer `z` order (equal `z` keeps the list order) and placed with or without grid snapping. Snapping puts the picture's edges on the grid (its left edge on a vertical line, its bottom edge on a horizontal one), so a picture two tiles wide is not half a tile off; pictures can be dragged past the map's edge (they are never clamped to it); a one-tile picture lands exactly where an entity does (`snapImageAnchor`).
 The converter writes them as a Tiled `objectgroup` with the layer property `kind = image` (and `z` when set); each image is an object with type `image`,
 `x`/`y` and the property `sprite` (asset id) or `graphic` (graphic id) plus `cropX`/`cropY`/`cropW`/`cropH`, `z`, `scale`, `flipX`, `opacity` when set, sorted by draw order. The object's `name` is the item's `name` (its picture id when it has none).
 **Crops.** A picture item may carry `crop` (`x, y, w, h` in the picture's pixels, whole numbers inside the picture; pictures only, sprites have their own frames).

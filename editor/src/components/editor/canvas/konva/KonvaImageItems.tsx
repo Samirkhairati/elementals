@@ -13,8 +13,6 @@ const NO_ASSETS: Record<string, SpriteAssetInfo> = {}
 interface KonvaImageItemsProps {
   /** The active image layer: only its images can be picked and dragged. */
   layer: Layer | null
-  mapWidthPx: number
-  mapHeightPx: number
   selectedImageId: string | null
   setSelectedImageId: (id: string | null) => void
   moveImage: (layerId: string, imageId: string, x: number, y: number) => void
@@ -29,8 +27,6 @@ interface KonvaImageItemsProps {
 /** Pick/drag handles and the selection frame for the images of the active image layer. */
 export const KonvaImageItems = React.memo(function KonvaImageItems({
   layer,
-  mapWidthPx,
-  mapHeightPx,
   selectedImageId,
   setSelectedImageId,
   moveImage,
@@ -45,11 +41,9 @@ export const KonvaImageItems = React.memo(function KonvaImageItems({
   const interactive = !layer.locked && !placing
 
   // Snapping puts the picture's edges on the grid, so the item's own size decides where its anchor goes.
-  const place = (item: ImageItem, x: number, y: number) => {
-    const bx = Math.max(0, Math.min(mapWidthPx, x))
-    const by = Math.max(0, Math.min(mapHeightPx, y))
-    return snapToGrid ? snapImageAnchor(flippedItemBounds(item, spriteAssets), bx, by) : { x: Math.round(bx), y: Math.round(by) }
-  }
+  // Pictures may be dragged past the map's edge (scenery that runs off it); only the snap or the rounding applies.
+  const place = (item: ImageItem, x: number, y: number) =>
+    snapToGrid ? snapImageAnchor(flippedItemBounds(item, spriteAssets), x, y) : { x: Math.round(x), y: Math.round(y) }
 
   return (
     <Group>
