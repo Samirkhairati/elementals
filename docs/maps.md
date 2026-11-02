@@ -28,10 +28,10 @@ The Export button validates the editor map and the converted map and refuses to 
 
 ## Image layers
 
-An editor layer of type `image` holds freely placed sprite assets (`images[]`: `assetId`, pixel `x`/`y` = the sprite anchor, optional `z`, `scale`, `flipX`, `opacity`)
+An editor layer of type `image` holds freely placed pictures (`images[]`: `assetId` for a sprite or `graphicId` for a picture from the graphics library, never both; pixel `x`/`y` = the sprite anchor, optional `z`, `scale`, `flipX`, `opacity`)
 instead of tile cells. In the editor they are drawn in layer `z` order (equal `z` keeps the list order) and placed with or without grid snapping.
 The converter writes them as a Tiled `objectgroup` with the layer property `kind = image` (and `z` when set); each image is an object with type `image`,
-`x`/`y` and the properties `sprite` (asset id) plus `z`, `scale`, `flipX`, `opacity` when set, sorted by draw order.
+`x`/`y` and the property `sprite` (asset id) or `graphic` (graphic id) plus `z`, `scale`, `flipX`, `opacity` when set, sorted by draw order.
 **The game does not draw these layers yet**: `PhaserTilemapAdapter` still only logs object groups.
 
 ## Checking and exporting

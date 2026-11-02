@@ -312,7 +312,7 @@ export function CanvasWrapper(props: IDockviewPanelProps) {
   // Placement keeps going (Esc or a right-click ends it) so a row of trees is a row of clicks.
   const commitImagePlacement = useCallback(
     (x: number, y: number) => {
-      if (activeLayerId && pendingImage) addImage(activeLayerId, { assetId: pendingImage.assetId, x, y })
+      if (activeLayerId && pendingImage) addImage(activeLayerId, { ...pendingImage, x, y })
     },
     [addImage, activeLayerId, pendingImage]
   );

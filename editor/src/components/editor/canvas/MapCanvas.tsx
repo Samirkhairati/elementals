@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo, useRef } from 'react'
+import type { ImagePick } from '@/lib/graphicAssets'
 import { Stage, Layer as KonvaLayer, Rect } from 'react-konva'
 import {
   Layer,
@@ -74,7 +75,7 @@ interface MapCanvasProps {
   pinSelection?: boolean
   selectedLayerIds?: readonly string[]
   /** Image layers */
-  pendingImage?: { assetId: string } | null
+  pendingImage?: ImagePick | null
   commitImagePlacement?: (x: number, y: number) => void
   cancelImagePlacement?: () => void
   selectedImageId?: string | null

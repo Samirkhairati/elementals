@@ -16,7 +16,7 @@ export type RefSource =
   | { table: 'character'; id: string; sheet?: string; binding?: string }
   | { table: 'prefab'; id: string };
 
-export type RefWhere = 'sprite' | 'state-appearance' | 'node' | 'condition' | 'sheet' | 'binding' | 'tileset-layer';
+export type RefWhere = 'sprite' | 'state-appearance' | 'node' | 'condition' | 'sheet' | 'binding' | 'tileset-layer' | 'image-layer';
 
 export interface Reference {
   target: RefTarget;
@@ -30,7 +30,7 @@ export interface Reference {
 export interface RefMap {
   fileName: string;
   name: string;
-  layers?: { name: string; data?: Record<number, { tilesetId: string }> }[];
+  layers?: { name: string; type?: string; data?: Record<number, { tilesetId: string }>; images?: { id: string; assetId?: string; graphicId?: string }[] }[];
   entities?: { id: string; name: string; components?: Record<string, unknown> }[];
 }
 
@@ -94,6 +94,14 @@ export function buildReferenceIndex(input: ReferenceInput): ReferenceIndex {
       const used = new Set(Object.values(layer.data ?? {}).map((t) => t.tilesetId));
       for (const id of used) {
         all.push({ target: { table: 'tileset', id }, source: { table: 'map', mapFile: map.fileName, mapName, entityId: '', entityName: '', layer: layer.name }, where: 'tileset-layer', label: `${mapName} › layer ${layer.name}` });
+      }
+    }
+    for (const layer of map.layers ?? []) {
+      for (const item of layer.images ?? []) {
+        const source = { table: 'map' as const, mapFile: map.fileName, mapName, entityId: item.id, entityName: `image in ${layer.name}`, layer: layer.name };
+        const label = `${mapName} › layer ${layer.name} › image`;
+        if (item.graphicId) all.push({ target: { table: 'graphic', id: item.graphicId }, source, where: 'image-layer', label });
+        else if (item.assetId) addCharacter(item.assetId, '', source, 'image-layer', label);
       }
     }
     for (const entity of map.entities ?? []) {
@@ -207,8 +215,50 @@ function mapNodes(state: Record<string, unknown>, fn: (node: Record<string, unkn
   return changed ? { ...state, graph: { ...state.graph, nodes } } : state;
 }
 
-/** Renames a character id everywhere a map stores it (Sprite.asset, state appearance, Change Sprite nodes). */
+/** Maps the items of every image layer through `fn` (same item back = unchanged); the map object is kept when nothing changed. */
+function rewriteImageItems<M extends RefMap>(map: M, fn: (item: { id: string; assetId?: string; graphicId?: string }) => { id: string; assetId?: string; graphicId?: string }): { map: M; changed: boolean } {
+  if (!map.layers) return { map, changed: false };
+  let changed = false;
+  const layers = map.layers.map((layer) => {
+    if (!layer.images) return layer;
+    let layerChanged = false;
+    const images = layer.images.map((item) => {
+      const next = fn(item);
+      if (next !== item) layerChanged = true;
+      return next;
+    });
+    if (!layerChanged) return layer;
+    changed = true;
+    return { ...layer, images };
+  });
+  return changed ? { map: { ...map, layers }, changed } : { map, changed };
+}
+
+/** Points every use of the picture `from` on a map's image layers at `to`. */
+export function rewriteMapGraphicId<M extends RefMap>(map: M, from: string, to: string): { map: M; changed: boolean } {
+  return rewriteImageItems(map, (item) => (item.graphicId === from ? { ...item, graphicId: to } : item));
+}
+
+/** Points every tile painted from the tileset `from` (its file name) at `to`. */
+export function rewriteTilesetId<M extends RefMap>(map: M, from: string, to: string): { map: M; changed: boolean } {
+  if (!map.layers) return { map, changed: false };
+  let changed = false;
+  const layers = map.layers.map((layer) => {
+    if (!layer.data || !Object.values(layer.data).some((t) => t.tilesetId === from)) return layer;
+    changed = true;
+    return { ...layer, data: Object.fromEntries(Object.entries(layer.data).map(([k, t]) => [k, t.tilesetId === from ? { ...t, tilesetId: to } : t])) };
+  });
+  return changed ? { map: { ...map, layers }, changed } : { map, changed };
+}
+
+/** Renames a character id everywhere a map stores it (Sprite.asset, state appearance, Change Sprite nodes, image-layer sprites). */
 export function rewriteCharacterId<M extends RefMap>(map: M, from: string, to: string): { map: M; changed: boolean } {
+  const entities = rewriteCharacterInEntities(map, from, to);
+  const images = rewriteImageItems(entities.map, (item) => (item.assetId === from ? { ...item, assetId: to } : item));
+  return { map: images.map, changed: entities.changed || images.changed };
+}
+
+function rewriteCharacterInEntities<M extends RefMap>(map: M, from: string, to: string): { map: M; changed: boolean } {
   return rewriteEntities(map, (entity) => {
     let e: typeof entity = entity;
     const sprite = spriteOf(entity);

@@ -33,7 +33,7 @@ function imageObjects(layer: EditorLayer, nextId: () => number): TiledObject[] {
   // Draw order inside the layer: z first, array order for ties.
   items.sort((a, b) => (a.item.z ?? 0) - (b.item.z ?? 0) || a.index - b.index)
   return items.map(({ item }) => {
-    const properties: TiledProperty[] = [{ name: 'sprite', type: 'string', value: item.assetId }]
+    const properties: TiledProperty[] = [item.graphicId ? { name: 'graphic', type: 'string', value: item.graphicId } : { name: 'sprite', type: 'string', value: item.assetId ?? '' }]
     if (item.z !== undefined) properties.push({ name: 'z', type: 'int', value: Math.round(item.z) })
     if (item.scale !== undefined && item.scale !== 1) properties.push({ name: 'scale', type: 'float', value: item.scale })
     if (item.flipX) properties.push({ name: 'flipX', type: 'bool', value: true })
@@ -41,7 +41,7 @@ function imageObjects(layer: EditorLayer, nextId: () => number): TiledObject[] {
     if (item.opacity !== undefined && item.opacity !== 1) properties.push({ name: 'opacity', type: 'float', value: item.opacity })
     return {
       id: nextId(),
-      name: item.assetId,
+      name: item.graphicId || item.assetId || '',
       type: 'image',
       x: item.x,
       y: item.y,

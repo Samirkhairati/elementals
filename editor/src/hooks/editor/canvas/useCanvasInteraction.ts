@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import type { ImagePick } from '@/lib/graphicAssets'
 import Konva from 'konva'
 import {
   Layer,
@@ -50,7 +51,7 @@ interface UseCanvasInteractionProps {
   /** Layers added with Ctrl/Cmd+click, on top of the active layer. */
   selectedLayerIds?: readonly string[]
   /** Image layers: a sprite waiting to be dropped, where the next click puts it, and how a click on empty canvas deselects. */
-  pendingImage?: { assetId: string } | null
+  pendingImage?: ImagePick | null
   commitImagePlacement?: (x: number, y: number) => void
   cancelImagePlacement?: () => void
   clearImageSelection?: () => void

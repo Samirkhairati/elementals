@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { ArrowLeft, Plus, Trash2, X } from 'lucide-react'
 import {
   DropdownMenu,
@@ -16,6 +16,8 @@ import { ComponentCard } from './entity/ComponentCard'
 import { Badge, EdButton, Field, IconButton, NumberField, ReadoutField, TextField, Toggle } from '../ui/controls'
 import { accentVar, NamedIcon } from '../ui/icons'
 import { SpriteThumb } from '../sprites/SpriteThumb'
+import { PicturePicker } from '../dialogs/PicturePicker'
+import { imagePickKey, imagePickLabel } from '@/lib/graphicAssets'
 import { useEditorSelector, type EditorContextValue } from '../layout/EditorContext'
 
 interface PropertiesPanelProps {
@@ -38,6 +40,8 @@ interface PropertiesPanelProps {
 const selectSpriteAssets = (c: EditorContextValue) => c.spriteAssets
 const selectImageLayer = (c: EditorContextValue) => ({
   spriteList: c.spriteList,
+  graphics: c.graphics,
+  graphicImages: c.graphicImages,
   spriteAssets: c.spriteAssets,
   snapEntityPos: c.snapEntityPos,
   pendingImage: c.pendingImage,
@@ -54,41 +58,32 @@ function ImageLayerSection({ layer }: { layer: Layer }) {
   const ctx = useEditorSelector(selectImageLayer)
   const images = layer.images || []
   const selected = images.find((img) => img.id === ctx.selectedImageId) ?? null
-  const pendingAsset = ctx.pendingImage ? ctx.spriteAssets?.[ctx.pendingImage.assetId] : undefined
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const pendingLabel = ctx.pendingImage ? imagePickLabel(ctx.pendingImage) : ''
 
   return (
     <section className="ed-card" data-testid="image-layer-section">
       <div className="ed-card-head">
         <span className="ed-section-title flex-1">Images</span>
         <Badge>{images.length}</Badge>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button type="button" className="ed-btn" data-size="sm" data-variant="primary" aria-label="Add image" disabled={layer.locked}>
-              <Plus />
-              Add
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="max-h-72 w-64 overflow-y-auto p-1" data-testid="add-image-menu">
-            <DropdownMenuLabel className="px-2 py-1 text-ed-label font-normal text-muted-foreground">
-              Pick a sprite, then click the map. Esc or right-click stops.
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {(ctx.spriteList || []).length === 0 && <div className="px-2 py-2 text-ed-label text-muted-foreground">No sprites in the project yet.</div>}
-            {(ctx.spriteList || []).map((asset) => (
-              <DropdownMenuItem key={asset.id} onClick={() => ctx.startImagePlacement(asset.id)} className="flex items-center gap-2 px-2 py-1.5">
-                <div className="ed-checker flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border">
-                  <SpriteThumb asset={asset} size={28} />
-                </div>
-                <span className="truncate">{asset.id}</span>
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <button type="button" className="ed-btn" data-size="sm" data-variant="primary" aria-label="Add image" disabled={layer.locked} onClick={() => setPickerOpen(true)}>
+          <Plus />
+          Add
+        </button>
+        <PicturePicker
+          open={pickerOpen}
+          onOpenChange={setPickerOpen}
+          title="Add an image: pick a sprite or a picture"
+          sprites={ctx.spriteList}
+          graphics={ctx.graphics}
+          images={ctx.graphicImages}
+          onPick={ctx.startImagePlacement}
+        />
       </div>
       <div className="ed-card-body">
         {ctx.pendingImage && (
           <div className="flex items-center gap-2 rounded-md border border-primary/40 bg-primary/10 px-2 py-1.5 text-ed-label" data-testid="placing-banner">
-            <span className="min-w-0 flex-1 truncate">Placing {pendingAsset ? pendingAsset.id : ctx.pendingImage.assetId}: click the map</span>
+            <span className="min-w-0 flex-1 truncate">Placing {pendingLabel}: click the map</span>
             <IconButton title="Stop placing" aria-label="Stop placing" onClick={ctx.cancelImagePlacement}>
               <X />
             </IconButton>
@@ -102,13 +97,13 @@ function ImageLayerSection({ layer }: { layer: Layer }) {
         ) : (
           <div className="flex flex-col gap-0.5" data-testid="image-list">
             {images.map((img) => {
-              const asset = ctx.spriteAssets?.[img.assetId]
+              const asset = ctx.spriteAssets?.[imagePickKey(img)]
               return (
                 <div key={img.id} className="ed-row" data-selected={img.id === ctx.selectedImageId ? 'true' : undefined} onClick={() => ctx.setSelectedImageId(img.id)}>
                   <div className="ed-checker flex h-6 w-6 shrink-0 items-center justify-center rounded-sm">
                     {asset ? <SpriteThumb asset={asset} size={20} /> : <X className="text-muted-foreground" />}
                   </div>
-                  <span className="ed-row-label" title={img.assetId}>{img.assetId}</span>
+                  <span className="ed-row-label" title={imagePickLabel(img)}>{imagePickLabel(img)}</span>
                   <span className="ed-badge">{Math.round(img.x)}, {Math.round(img.y)}</span>
                   <IconButton title="Delete image" aria-label="Delete image" onClick={(e) => { e.stopPropagation(); ctx.deleteImage(layer.id, img.id) }}>
                     <Trash2 />

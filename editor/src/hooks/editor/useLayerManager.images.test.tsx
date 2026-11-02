@@ -101,7 +101,7 @@ describe('useLayerManager: image layers', () => {
 
   it('placement mode starts, stops and ends on Escape', () => {
     const { result } = withImageLayer()
-    act(() => result.current.manager.startImagePlacement('tree'))
+    act(() => result.current.manager.startImagePlacement({ assetId: 'tree' }))
     expect(result.current.manager.pendingImage).toEqual({ assetId: 'tree' })
     act(() => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))

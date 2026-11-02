@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { PREFABS, buildReferenceIndex, characterIdsOfMap, rewriteCharacterId, rewriteClipName, rewriteGraphicId } from '../../../shared/engine/index'
+import { PREFABS, buildReferenceIndex, characterIdsOfMap, rewriteCharacterId, rewriteClipName, rewriteGraphicId, rewriteMapGraphicId, rewriteTilesetId } from '../../../shared/engine/index'
 import type { CharacterDef, RefMap } from '../../../shared/engine/index'
 
 const node = (id: string, type: string, params: Record<string, unknown>) => ({ id, type, params, out: {}, x: 0, y: 0 })
@@ -135,5 +135,41 @@ describe('characterIdsOfMap (preload sets)', () => {
     expect(characterIdsOfMap(town)).toEqual(['characters/cloak', 'characters/oldman', 'characters/oldman-sad', 'objects/chest'])
     expect(characterIdsOfMap({ fileName: 'x', name: 'X' })).toEqual([])
     expect(characterIdsOfMap({ fileName: 'x', name: 'X', entities: [entity('e', 'E', { asset: '' })] })).toEqual([])
+  })
+})
+
+describe('image layers and tilesets', () => {
+  const withImages: RefMap = {
+    fileName: 'park.json', name: 'Park',
+    layers: [
+      { name: 'ground', type: 'tile', data: { 0: { tilesetId: 'grass.png' }, 1: { tilesetId: 'grass.png' } } },
+      { name: 'clouds', type: 'image', images: [{ id: 'i1', graphicId: 'sky/cloud.png' }, { id: 'i2', assetId: 'objects/chest' }] },
+    ],
+  }
+  const idx = buildReferenceIndex({ maps: [withImages], characters })
+
+  it('image items count as references to their picture or sprite', () => {
+    expect(idx.of({ table: 'graphic', id: 'sky/cloud.png' }).map((r) => r.label)).toEqual(['Park › layer clouds › image'])
+    expect(idx.of({ table: 'character', id: 'objects/chest' }).map((r) => r.where)).toEqual(['image-layer'])
+    expect(characterIdsOfMap(withImages)).toEqual(['objects/chest'])
+  })
+
+  it('rewriteMapGraphicId and rewriteCharacterId reach image layers and leave other maps alone', () => {
+    const moved = rewriteMapGraphicId(withImages, 'sky/cloud.png', 'scenery/cloud.png')
+    expect(moved.changed).toBe(true)
+    expect(moved.map.layers![1].images![0].graphicId).toBe('scenery/cloud.png')
+    expect(withImages.layers![1].images![0].graphicId).toBe('sky/cloud.png')
+    expect(rewriteMapGraphicId(withImages, 'nope.png', 'x.png')).toEqual({ map: withImages, changed: false })
+    const renamed = rewriteCharacterId(withImages, 'objects/chest', 'objects/box')
+    expect(renamed.changed).toBe(true)
+    expect(renamed.map.layers![1].images![1].assetId).toBe('objects/box')
+  })
+
+  it('rewriteTilesetId renames the tileset on every painted tile', () => {
+    const r = rewriteTilesetId(withImages, 'grass.png', 'meadow.png')
+    expect(r.changed).toBe(true)
+    expect(Object.values(r.map.layers![0].data!).map((t) => t.tilesetId)).toEqual(['meadow.png', 'meadow.png'])
+    expect(withImages.layers![0].data![0].tilesetId).toBe('grass.png')
+    expect(rewriteTilesetId(withImages, 'house.png', 'x.png').changed).toBe(false)
   })
 })

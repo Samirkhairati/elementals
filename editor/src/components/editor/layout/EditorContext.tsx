@@ -190,6 +190,8 @@ export interface EditorBaseContextValue
   reloadSprites: Sprites['reload']
   characters: Sprites['characters']
   graphics: Sprites['graphics']
+  /** data: URL of every graphic by id. */
+  graphicImages: Sprites['images']
   getCharacter: Sprites['getCharacter']
   pickSpriteFile: Sprites['pickFile']
   importGraphic: Sprites['importGraphic']

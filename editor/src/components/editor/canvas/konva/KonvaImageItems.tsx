@@ -4,6 +4,7 @@ import type { ImageItem, Layer } from '@/types/editor'
 import type { SpriteAssetInfo } from '../../../../../../shared/engine/types'
 import { drawResolvedSprite, resolveSprite, spriteBoundsFromMeta, useSpriteImagesVersion } from '@/lib/spriteImages'
 import { sortedImages } from '@/lib/layerOrder'
+import { imagePickKey, type ImagePick } from '@/lib/graphicAssets'
 import { setStageCursor } from '../canvasUtils'
 
 const NO_ASSETS: Record<string, SpriteAssetInfo> = {}
@@ -57,7 +58,7 @@ export const KonvaImageItems = React.memo(function KonvaImageItems({
           key={item.id}
           item={item}
           layerId={layer.id}
-          asset={spriteAssets[item.assetId]}
+          asset={spriteAssets[imagePickKey(item)]}
           selected={item.id === selectedImageId}
           interactive={interactive}
           place={place}
@@ -159,7 +160,7 @@ function ImageHandle({
 }
 
 interface KonvaGhostImageProps {
-  pending: { assetId: string } | null
+  pending: ImagePick | null
   pointerPos: { x: number; y: number } | null
   snapToGrid: boolean
   snapEntityPos: (rawX: number, rawY: number) => { x: number; y: number }
@@ -177,7 +178,7 @@ export const KonvaGhostImage = React.memo(function KonvaGhostImage({
   const version = useSpriteImagesVersion()
   if (!pending || !pointerPos) return null
   const at = snapToGrid ? snapEntityPos(pointerPos.x, pointerPos.y) : { x: Math.round(pointerPos.x), y: Math.round(pointerPos.y) }
-  const resolved = resolveSprite(spriteAssets[pending.assetId], {})
+  const resolved = resolveSprite(spriteAssets[imagePickKey(pending)], {})
   return (
     <Shape
       key={version}

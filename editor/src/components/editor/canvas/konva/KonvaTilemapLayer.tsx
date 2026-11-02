@@ -4,6 +4,7 @@ import { Layer as MapLayer, MapData } from '@/types/editor'
 import type { SpriteAssetInfo } from '../../../../../../shared/engine/types'
 import { drawResolvedSprite, resolveSprite, useSpriteImagesVersion } from '@/lib/spriteImages'
 import { renderOrder, sortedImages } from '@/lib/layerOrder'
+import { imagePickKey } from '@/lib/graphicAssets'
 
 const NO_ASSETS: Record<string, SpriteAssetInfo> = {}
 
@@ -40,7 +41,7 @@ export const KonvaTilemapLayer = React.memo(function KonvaTilemapLayer({
           sceneFunc={(context) => {
             const ctx = context._context as CanvasRenderingContext2D
             for (const item of sortedImages(layer.images)) {
-              const resolved = resolveSprite(spriteAssets[item.assetId], { scale: item.scale ?? 1 })
+              const resolved = resolveSprite(spriteAssets[imagePickKey(item)], { scale: item.scale ?? 1 })
               if (!resolved) continue
               const drag = dragRef?.current
               const at = drag && drag.id === item.id ? drag : item

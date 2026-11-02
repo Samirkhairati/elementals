@@ -85,7 +85,10 @@ function validateImages(images: unknown, label: string, errors: string[], warnin
     if (typeof item.id !== 'string' || item.id.length === 0) errors.push(`${ip}: id must be a non-empty string`)
     else if (seen.has(item.id)) errors.push(`${ip}: duplicate image id "${item.id}"`)
     else seen.add(item.id)
-    if (typeof item.assetId !== 'string' || item.assetId.length === 0) errors.push(`${ip}: assetId must be a non-empty string`)
+    const hasAsset = item.assetId !== undefined && item.assetId !== ''
+    const hasGraphic = item.graphicId !== undefined && item.graphicId !== ''
+    if (hasAsset === hasGraphic) errors.push(`${ip}: needs exactly one of assetId (a sprite) and graphicId (a picture)`)
+    else if ((hasAsset && typeof item.assetId !== 'string') || (hasGraphic && typeof item.graphicId !== 'string')) errors.push(`${ip}: assetId / graphicId must be a string`)
     if (!isFiniteNumber(item.x) || !isFiniteNumber(item.y)) errors.push(`${ip}: x/y must be finite numbers`)
     if (item.z !== undefined && !isFiniteNumber(item.z)) errors.push(`${ip}: z must be a finite number`)
     if (item.scale !== undefined && (!isFiniteNumber(item.scale) || item.scale <= 0)) errors.push(`${ip}: scale must be a positive number`)

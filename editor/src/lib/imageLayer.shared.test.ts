@@ -33,6 +33,13 @@ describe('image layers: validation', () => {
     expect(r.errors.some((e) => e.includes('scale must be a positive number'))).toBe(true)
   })
 
+  it('accepts a picture item and rejects an item with both or neither', () => {
+    const items = (images: NonNullable<EditorMap['layers'][number]['images']>) => validateEditorMap(map([{ ...imageLayer, images }])).errors
+    expect(items([{ id: 'p', graphicId: 'scenery/clouds.png', x: 0, y: 0 }])).toEqual([])
+    expect(items([{ id: 'p', assetId: 'tree', graphicId: 'a.png', x: 0, y: 0 }]).some((e) => e.includes('exactly one'))).toBe(true)
+    expect(items([{ id: 'p', x: 0, y: 0 }]).some((e) => e.includes('exactly one'))).toBe(true)
+  })
+
   it('warns when a non-image layer carries images', () => {
     const r = validateEditorMap(map([{ id: 't', name: 't', type: 'tile', visible: true, images: [] }]))
     expect(r.errors).toEqual([])
@@ -51,6 +58,13 @@ describe('image layers: export', () => {
       { name: 'kind', type: 'string', value: 'image' },
       { name: 'z', type: 'int', value: 3 },
     ])
+  })
+
+  it('writes a picture as a `graphic` property instead of `sprite`', () => {
+    const out = convertEditorMapToTiled(map([{ ...imageLayer, images: [{ id: 'p', graphicId: 'scenery/clouds.png', x: 8, y: 9 }] }]), [])
+    const object = out.layers[0].objects![0]
+    expect(object.name).toBe('scenery/clouds.png')
+    expect(object.properties).toEqual([{ name: 'graphic', type: 'string', value: 'scenery/clouds.png' }])
   })
 
   it('writes one object per image in draw order, with unique ids', () => {

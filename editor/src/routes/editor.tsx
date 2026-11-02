@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { graphicAssets } from '@/lib/graphicAssets'
 import { EntityData, Layer, LayerType, MapData } from '@/types/editor'
 import type { HistorySnapshot } from '@/lib/history'
 import { mapSaveQueue } from '@/lib/saveQueue'
@@ -308,6 +309,9 @@ export function EditorPage() {
   // ── Context Value for all panels ─────────────────────────────────────────
   // Memoized so context only re-propagates to all Dockview panels when
   // something meaningful actually changes — not on every incidental re-render.
+  // Sprites plus plain pictures ("graphic:<id>"), so image-layer items of either kind draw the same way.
+  const canvasAssets = useMemo(() => ({ ...sprites.assets, ...graphicAssets(sprites.graphics, sprites.images) }), [sprites.assets, sprites.graphics, sprites.images])
+
   const contextValue = useMemo<EditorBaseContextValue>(() => ({
     focusedDomain,
     setFocusedDomain,
@@ -446,7 +450,8 @@ export function EditorPage() {
     setHoverTile: tilesetManager.setHoverTile,
 
     // Sprite assets
-    spriteAssets: sprites.assets,
+    spriteAssets: canvasAssets,
+    graphicImages: sprites.images,
     spriteList: sprites.list,
     spriteFolders: sprites.folders,
     spriteWarnings: sprites.warnings,
@@ -497,7 +502,7 @@ export function EditorPage() {
     removeCommonEvent: common.removeEvent,
   }), [
     common.events, common.addEvent, common.renameEvent, common.setEventGraph, common.removeEvent,
-    sprites.assets, sprites.list, sprites.folders, sprites.warnings, sprites.getAsset, sprites.reload, sprites.pickFile,
+    canvasAssets, sprites.images, sprites.list, sprites.folders, sprites.warnings, sprites.getAsset, sprites.reload, sprites.pickFile,
     sprites.characters, sprites.graphics, sprites.getCharacter, sprites.importGraphic, sprites.saveCharacter, sprites.rename, sprites.remove,
     sprites.createFolder, sprites.renameFolder, sprites.moveFolder, sprites.deleteFolder,
     db.database, db.switches, db.variables, db.getSwitch, db.getVariable, db.addSwitch, db.renameSwitch,

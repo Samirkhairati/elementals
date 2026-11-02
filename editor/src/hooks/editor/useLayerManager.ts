@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import type { ImagePick } from '@/lib/graphicAssets'
 import { Layer, LayerType, ImageItem, TileSelection, ActiveTool, PaintMode, DebugInfo, MapData } from '@/types/editor'
 import { useSyncedState } from '@/hooks/useSyncedState'
 import { clampEntitiesIndex, entitiesIndexAfterInsert, entitiesIndexAfterRemove } from '@/lib/layerOrder'
@@ -20,7 +21,7 @@ export function useLayerManager(options: UseLayerManagerOptions) {
   /** Pinned: a right-drag samples every selected layer (not just the active one) and painting writes back to all of them. */
   const [pinSelection, setPinSelection] = useState(false)
   /** Image layers: the sprite asset waiting to be dropped on the map, and the image picked on the canvas. */
-  const [pendingImage, setPendingImage] = useState<{ assetId: string } | null>(null)
+  const [pendingImage, setPendingImage] = useState<ImagePick | null>(null)
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null)
   const [tileSelection, setTileSelection] = useState<TileSelection | null>(null)
   const [activeTool, setActiveTool] = useState<ActiveTool>('brush')
@@ -297,7 +298,7 @@ export function useLayerManager(options: UseLayerManagerOptions) {
   )
 
   // ── Image layers ──────────────────────────────────────────────────────────
-  const startImagePlacement = useCallback((assetId: string) => setPendingImage({ assetId }), [])
+  const startImagePlacement = useCallback((pick: ImagePick) => setPendingImage(pick), [])
   const cancelImagePlacement = useCallback(() => setPendingImage(null), [])
 
   useEffect(() => {
