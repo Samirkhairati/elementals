@@ -6,6 +6,7 @@ import { gameState } from "@/core/GameState";
 import { bootParams } from "@/core/bootParams";
 import { MapSystem } from "@/world/MapSystem";
 import { ImageLayerRenderer } from "@/world/imageLayers";
+import { followLerp } from "@/world/cameraFollow";
 import { InputManager } from "@/components/InputManager";
 import { MAPS } from "@/constants/assets";
 import { resolveMapKey } from "@/data/mapIds";
@@ -69,6 +70,8 @@ export class Game extends Scene {
   private runtime!: EventRuntime;
   private cameraEffects!: CameraEffects;
   private playerEntity?: Entity;
+  /** What the camera follows (the player's sprite). */
+  private followSprite: Phaser.GameObjects.Sprite | null = null;
   private currentMapKey = "";
   private characters!: CharacterLoader;
   private debugGraphics?: Phaser.GameObjects.Graphics;
@@ -240,6 +243,7 @@ export class Game extends Scene {
     this.world.update(0);
 
     const playerSprite = this.renderBridgeSystem.getSprite(this.playerEntity);
+    this.followSprite = playerSprite ?? null;
     if (playerSprite) {
       // The camera centres on the player's body (24 px above the feet); update() sets how fast it catches up
       this.cameras.main.startFollow(playerSprite, settingsStore.display.pixelSnapping, 1, 1, 0, 24);
@@ -317,9 +321,18 @@ export class Game extends Scene {
    * `followLag` is the time it takes to close most of the gap; 0 pins the camera to the player.
    */
   private updateCameraLag(delta: number) {
+    const cam = this.cameras.main;
+    const target = this.followSprite;
+    if (!target) return;
     const lag = settingsStore.camera.followLag;
-    const k = lag <= 0 ? 1 : 1 - Math.exp(-(Math.min(delta, 100) / 1000) / lag);
-    this.cameras.main.setLerp(k, k);
+    const dt = Math.min(delta, 100) / 1000;
+    // Where Phaser's follow wants the scroll to be (see Camera.preRender), to know how far the camera still has to go.
+    const wantX = target.x - cam.followOffset.x - cam.width * cam.originX;
+    const wantY = target.y - cam.followOffset.y - cam.height * cam.originY;
+    cam.setLerp(
+      followLerp(Math.abs(wantX - cam.scrollX), dt, lag, cam.zoom),
+      followLerp(Math.abs(wantY - cam.scrollY), dt, lag, cam.zoom)
+    );
   }
 
   /** Footprints of event entities (yellow = solid, magenta = walkable trigger, grey = no active state). */
