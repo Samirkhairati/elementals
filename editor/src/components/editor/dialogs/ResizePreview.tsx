@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { TilesetData } from '@/types/editor'
+import type { SpriteAssetInfo } from '../../../../../shared/engine/types'
+import { drawResolvedSprite, useSpriteImagesVersion } from '@/lib/spriteImages'
+import { resolveImageItem } from '@/lib/imageItems'
+import { sortedImages } from '@/lib/layerOrder'
 import { TILE_SIZE, anchorToTile } from '../../../../../shared/engine/constants'
 import { occupiedCells, type ResizableMap, type ResizeEdges } from '@/lib/mapResize'
 import {
@@ -18,6 +22,8 @@ import {
 interface Props {
   map: ResizableMap
   tilesets: TilesetData[]
+  /** Sprites and pictures, so placed images show as themselves; without them they are blue markers. */
+  spriteAssets?: Record<string, SpriteAssetInfo>
   edges: ResizeEdges
   onEdgesChange: (e: ResizeEdges) => void
 }
@@ -48,7 +54,7 @@ function useTilesetImages(tilesets: TilesetData[], map: ResizableMap) {
 }
 
 /** The stage of the resize dialog: the map drawn small, with a crop rectangle whose edges and corners can be dragged. */
-export function ResizePreview({ map, tilesets, edges, onEdgesChange }: Props) {
+export function ResizePreview({ map, tilesets, spriteAssets, edges, onEdgesChange }: Props) {
   const stageRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [size, setSize] = useState(DEFAULT_SIZE)
@@ -56,6 +62,7 @@ export function ResizePreview({ map, tilesets, edges, onEdgesChange }: Props) {
   const [frozen, setFrozen] = useState<ResizeView | null>(null)
   const dragging = useRef<Handle | null>(null)
   const { images, version } = useTilesetImages(tilesets, map)
+  const spriteVersion = useSpriteImagesVersion()
   const occupied = useMemo(() => occupiedCells(map), [map])
 
   useEffect(() => {
@@ -97,9 +104,29 @@ export function ResizePreview({ map, tilesets, edges, onEdgesChange }: Props) {
     fill(rect.x0, rect.y0, rect.x1, rect.y1, 'rgba(120,120,140,0.14)')
     fill(0, 0, map.width, map.height, 'rgba(0,0,0,0.35)')
 
-    // Tile layers, bottom first (the layer list is top first).
+    // Placed pictures that could not be drawn yet (or have no asset) stay as markers.
+    const unresolved: { x: number; y: number }[] = []
+
+    // Layers bottom first (the layer list is top first): tiles, and placed pictures at their real size.
     for (const layer of [...map.layers].reverse()) {
-      if (layer.type !== 'tile' || !layer.visible) continue
+      if (!layer.visible) continue
+      if (layer.type === 'image') {
+        const k = s / TILE_SIZE
+        for (const it of sortedImages(layer.images)) {
+          const resolved = spriteAssets ? resolveImageItem(it, spriteAssets) : null
+          if (!resolved) {
+            unresolved.push(it)
+            continue
+          }
+          ctx.save()
+          ctx.translate(sx(0), sy(0))
+          ctx.scale(k, k)
+          drawResolvedSprite(ctx, resolved, { anchorX: it.x, anchorY: it.y, opacity: it.opacity, mirrorX: it.flipX, mirrorY: it.flipY })
+          ctx.restore()
+        }
+        continue
+      }
+      if (layer.type !== 'tile') continue
       for (const [key, tile] of Object.entries(layer.data ?? {})) {
         const img = images.get(tile.tilesetId)
         if (!img || !img.complete || img.naturalWidth === 0) continue
@@ -118,7 +145,7 @@ export function ResizePreview({ map, tilesets, edges, onEdgesChange }: Props) {
       ctx.strokeRect(sx(col) + 2, sy(row) + 2, s - 4, s - 4)
     }
     for (const e of map.entities ?? []) marker(e.x, e.y, 'rgba(251,191,36,0.95)')
-    for (const l of map.layers) for (const it of l.images ?? []) marker(it.x, it.y, 'rgba(96,165,250,0.95)')
+    for (const it of unresolved) marker(it.x, it.y, 'rgba(96,165,250,0.95)')
 
     // Faint tile grid over the new area.
     if (s >= 10) {
@@ -155,7 +182,7 @@ export function ResizePreview({ map, tilesets, edges, onEdgesChange }: Props) {
     ctx.lineWidth = 1
     ctx.strokeRect(sx(0) + 0.5, sy(0) + 0.5, map.width * s, map.height * s)
     ctx.setLineDash([])
-  }, [map, view, size, rect.x0, rect.y0, rect.x1, rect.y1, occupied, images, version])
+  }, [map, view, size, rect.x0, rect.y0, rect.x1, rect.y1, occupied, images, version, spriteAssets, spriteVersion])
 
   const startDrag = (handle: Handle) => (e: React.PointerEvent) => {
     e.preventDefault()

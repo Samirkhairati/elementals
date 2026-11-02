@@ -618,6 +618,7 @@ export function EditorPage() {
         <ResizeMapDialog
           map={resizeTarget}
           tilesets={tilesetManager.tilesets}
+          spriteAssets={canvasAssets}
           onClose={() => setResizeTarget(null)}
           onConfirm={handleConfirmResize}
         />

@@ -49,6 +49,14 @@ function anchorCell(x: number, y: number): { col: number; row: number } {
   return anchorToTile(x, y)
 }
 
+/**
+ * A picture is lost when its anchor was inside the map and ends up outside the new one. Pictures that already ran past
+ * the map's edge (they can be dragged there) stay, moved along with the rest.
+ */
+function imageLost(map: ResizableMap, e: ResizeEdges, col: number, row: number, newW: number, newH: number): boolean {
+  return inside(col, row, map.width, map.height) && !inside(col + e.left, row + e.top, newW, newH)
+}
+
 export interface ResizeLoss {
   /** Painted tiles that fall outside the new map, per layer (only layers that lose something). */
   layers: { layerId: string; name: string; type: Layer['type']; tiles: number; images: number }[]
@@ -73,7 +81,7 @@ export function resizeLoss(map: ResizableMap, e: ResizeEdges): ResizeLoss {
     }
     for (const item of layer.images ?? []) {
       const { col, row } = anchorCell(item.x, item.y)
-      if (!inside(col + e.left, row + e.top, newW, newH)) images++
+      if (imageLost(map, e, col, row, newW, newH)) images++
     }
     if (tiles || images) {
       loss.layers.push({ layerId: layer.id, name: layer.name, type: layer.type, tiles, images })
@@ -128,7 +136,7 @@ function shiftLayer(layer: Layer, map: ResizableMap, e: ResizeEdges, newW: numbe
     next.images = layer.images
       .filter((item) => {
         const { col, row } = anchorCell(item.x, item.y)
-        return inside(col + e.left, row + e.top, newW, newH)
+        return !imageLost(map, e, col, row, newW, newH)
       })
       .map((item) => ({ ...item, x: item.x + e.left * TILE_SIZE, y: item.y + e.top * TILE_SIZE }))
   }

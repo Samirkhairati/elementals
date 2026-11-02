@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { AlertTriangle, RotateCcw } from 'lucide-react'
 import type { TilesetData } from '@/types/editor'
+import type { SpriteAssetInfo } from '../../../../../shared/engine/types'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { NumberField } from '../ui/controls'
 import { ResizePreview } from './ResizePreview'
@@ -21,6 +22,7 @@ interface Props {
   /** The map to resize with its current layers and entities; null keeps the dialog closed. */
   map: (ResizableMap & { name: string }) | null
   tilesets: TilesetData[]
+  spriteAssets?: Record<string, SpriteAssetInfo>
   onClose: () => void
   onConfirm: (edges: ResizeEdges) => void
 }
@@ -32,17 +34,17 @@ const SIDES: { key: keyof ResizeEdges; label: string }[] = [
   { key: 'bottom', label: 'Bottom' },
 ]
 
-export function ResizeMapDialog({ map, tilesets, onClose, onConfirm }: Props) {
+export function ResizeMapDialog({ map, tilesets, spriteAssets, onClose, onConfirm }: Props) {
   return (
     <Dialog open={map !== null} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-4xl">
-        {map && <ResizeBody map={map} tilesets={tilesets} onClose={onClose} onConfirm={onConfirm} />}
+        {map && <ResizeBody map={map} tilesets={tilesets} spriteAssets={spriteAssets} onClose={onClose} onConfirm={onConfirm} />}
       </DialogContent>
     </Dialog>
   )
 }
 
-function ResizeBody({ map, tilesets, onClose, onConfirm }: Props & { map: ResizableMap & { name: string } }) {
+function ResizeBody({ map, tilesets, spriteAssets, onClose, onConfirm }: Props & { map: ResizableMap & { name: string } }) {
   const [edges, setEdges] = useState<ResizeEdges>(NO_RESIZE)
   const problem = resizeProblem(map, edges)
   const next = resizedSize(map, edges)
@@ -66,7 +68,7 @@ function ResizeBody({ map, tilesets, onClose, onConfirm }: Props & { map: Resiza
       </DialogHeader>
 
       <div className="grid gap-4 py-3 md:grid-cols-[minmax(0,1fr)_220px]">
-        <ResizePreview map={map} tilesets={tilesets} edges={edges} onEdgesChange={setEdges} />
+        <ResizePreview map={map} tilesets={tilesets} spriteAssets={spriteAssets} edges={edges} onEdgesChange={setEdges} />
 
         <div className="flex max-h-[420px] flex-col gap-3 overflow-y-auto pr-1">
           <div className="rounded-md border border-border p-2 text-xs">

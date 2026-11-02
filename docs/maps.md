@@ -97,5 +97,5 @@ normal autosave, and is one step in undo/redo (history snapshots carry the map s
 
 The logic is pure: `editor/src/lib/mapResize.ts` (`applyResize`, `resizeLoss`) and `mapResizeView.ts` (preview geometry). Tile `(x, y)` becomes
 `(x + left, y + top)`; tile-layer indexes are rebuilt for the new width, entity anchors and image-layer items move by whole tiles (32 px), and
-anything whose anchor tile falls outside the new map is dropped. Map connections are not part of this yet; when they exist (they sit on map
+anything whose anchor tile falls outside the new map is dropped (a picture that already ran past the old map's edge is kept and moved along). The preview draws the placed pictures as themselves. Map connections are not part of this yet; when they exist (they sit on map
 edges) they should hook into `applyResize` / `resizeLoss`.

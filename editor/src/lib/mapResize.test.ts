@@ -140,4 +140,13 @@ describe('occupiedCells', () => {
     // tiles 0,3,5,11 + picture (0,2)=8 + entity (2,1)=6
     expect([...cells].flatMap((v, i) => (v ? [i] : []))).toEqual([0, 3, 5, 6, 8, 11])
   })
+
+  it('a picture that already runs past the map\'s edge is kept (and moved along), not counted as lost', () => {
+    const m = makeMap()
+    m.layers[1].images = [{ id: 'far', graphicId: 'a.png', x: -64, y: 500 }]
+    expect(resizeLoss(m, edges({ left: 1 })).images).toBe(0)
+    expect(hasLoss(resizeLoss({ ...m, layers: [m.layers[1]], entities: [] }, edges({ right: -1 })))).toBe(false)
+    const out = applyResize(m, edges({ left: 2, top: 1 }))
+    expect(out.layers[1].images![0]).toMatchObject({ x: -64 + 64, y: 500 + 32 })
+  })
 })
