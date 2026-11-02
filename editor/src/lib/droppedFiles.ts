@@ -2,9 +2,10 @@
 
 /** PNG files in a drop (other file types and dragged-in text are ignored). */
 export function pngFilesOf(dt: DataTransfer | null): File[] {
-  if (!dt) return []
-  return Array.from(dt.files ?? []).filter((f) => /\.png$/i.test(f.name) || f.type === 'image/png')
+  return dt ? onlyPngs(Array.from(dt.files ?? [])) : []
 }
+
+export const onlyPngs = (files: File[]): File[] => files.filter((f) => /\.png$/i.test(f.name) || f.type === 'image/png')
 
 /** True while the drag carries OS files (not an in-app drag of a tree row). */
 export function isFileDrag(dt: DataTransfer | null): boolean {

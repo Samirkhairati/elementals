@@ -203,6 +203,14 @@ describe('importTileset', () => {
     expect(listDir(sets)).toEqual(['tiles.json', 'tiles.png']);
   });
 
+  it('files it under the chosen name instead of the source file name', () => {
+    const { tileset } = importTileset(sets, cache, src('IMG_0042.png'), 'Forest', 'town', 'forest');
+    expect(tileset).toMatchObject({ name: 'Forest', fileName: 'forest.png', folderPath: 'town' });
+    expect(listDir(path.join(sets, 'town'))).toEqual(['forest.json', 'forest.png']);
+    // a blank stem falls back to the source's name
+    expect(importTileset(sets, cache, src('rocks.png'), 'Rocks', null, '  ').tileset.fileName).toBe('rocks.png');
+  });
+
   it('picks unique names without overwriting', () => {
     const p = src();
     expect(importTileset(sets, cache, p, 'one').tileset.fileName).toBe('tiles.png');

@@ -63,7 +63,7 @@ editor  --writes-->  project/maps/*.json (editor map format, tile index keyed)
 * Maps carry `schemaVersion` (current 4: events stored as graphs). Old data is migrated on load by pure, idempotent functions in `shared/engine/migrate.ts`
   (editor on load, exporter on export, game defensively); nothing is written back until the author edits. Existing user data is never "fixed".
 * Tilesets and sprites: PNGs under `project/`; `assets:sync` copies the ones in use to `game/public/graphics/` and writes manifests. The tileset/layer named `collision` is data, never drawn.
-* Graphics (`project/graphics`) and tilesets (`project/tilesets`) are imported, organised in folders, renamed, moved and deleted in **Database › Graphics / Tilesets** (`editor/src/lib/assetOps.ts` plans the change and rewrites
+* Graphics (`project/graphics`) and tilesets (`project/tilesets`) are imported (several files at once, picked or dragged in from the OS; the folder clicked last is the destination), organised in folders, renamed, moved and deleted in **Database › Graphics / Tilesets** (`editor/src/lib/assetOps.ts` plans the change and rewrites
   sprites and maps); the Map Editor only browses and picks them. A tileset's id is its file name (folders do not matter to maps); a graphic's id is its path. Image-layer items point at a sprite (`assetId`) or a picture (`graphicId`).
 
 ## Engine model (`shared/engine`, see docs/engine-design.md)

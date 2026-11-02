@@ -1,19 +1,20 @@
 import { useMemo, useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import { Copy, FolderPlus, Pencil, Trash2, Upload } from 'lucide-react'
+import { Copy, Pencil, Trash2 } from 'lucide-react'
 import { folderOfId, graphicDeleteGuard, joinId, leafOfId } from '@/lib/assetOps'
-import { formatBytes, defaultGraphicId } from '@/lib/databaseModel'
+import { formatBytes } from '@/lib/databaseModel'
 import { graphicUsage } from '@/lib/databaseModel'
 import type { LibraryItem } from '@/lib/libraryTree'
-import { Badge, EdButton, Field, InfoTip } from '../ui/controls'
+import { Badge, EdButton, Field } from '../ui/controls'
 import { ImageThumb } from './browse'
 import { ImageViewer, type SheetCut } from './ImageViewer'
 import { LibraryBrowser, type DragPayload } from './LibraryBrowser'
 import { ChangeDialog, DeleteDialog, NameDialog } from './LibraryDialogs'
+import { LibraryToolbar } from './LibraryToolbar'
 import { ReferencesSection } from './ReferencesSection'
 import { FOLDER_NAME, graphicActions, type Outcome } from './graphicActions'
 import type { DatabaseData } from './useDatabaseData'
-import type { TableProps } from './shared'
+import type { LibraryControls, TableProps } from './shared'
 
 /** A line that says what the last action did (or why it failed). */
 function StatusLine({ outcome }: { outcome: Outcome | null }) {
@@ -23,7 +24,7 @@ function StatusLine({ outcome }: { outcome: Outcome | null }) {
 
 type FolderDialog = { kind: 'new'; parent: string } | { kind: 'change'; folder: string } | { kind: 'delete'; folder: string } | null
 
-export function GraphicsBrowser({ data, query, selected, onSelect, mode }: TableProps) {
+export function GraphicsBrowser({ data, query, selected, onSelect, mode, library }: TableProps) {
   const { graphics, images } = data.sprites
   const actions = graphicActions(data)
   const used = data.refs.counts('graphic')
@@ -62,7 +63,8 @@ export function GraphicsBrowser({ data, query, selected, onSelect, mode }: Table
         hint={(item) => (used[item.key] ? `${size(item.key)?.width}×${size(item.key)?.height}` : 'unused')}
         onMove={(d, t) => void move(d, t)}
         folderActions={{ onCreate: (parent) => setDialog({ kind: 'new', parent }), onRename: (folder) => setDialog({ kind: 'change', folder }), onDelete: (folder) => setDialog({ kind: 'delete', folder }) }}
-        emptyText="No pictures yet. Import an image to start."
+        emptyText="No pictures yet. Import images, or drop them here."
+        library={library}
       />
       {dialog?.kind === 'new' && <NewFolder parent={dialog.parent} actions={actions} onDone={setOutcome} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'change' && <ChangeFolder folder={dialog.folder} actions={actions} onDone={(o, next) => { setOutcome(o); if (o.ok && selected.startsWith(`${dialog.folder}/`)) onSelect(joinId(next, selected.slice(dialog.folder.length + 1))) }} onClose={() => setDialog(null)} />}
@@ -214,42 +216,14 @@ function ChangeGraphic({ id, data, actions, onDone, onClose }: { id: string; dat
   )
 }
 
-/** Toolbar above the list: import a picture, make a folder. */
-export function GraphicsToolbar({ data, onSelect: onImported }: { data: DatabaseData; onSelect: (id: string) => void }) {
-  const [source, setSource] = useState<{ path: string; id: string } | null>(null)
-  const [error, setError] = useState('')
-  const [folderOpen, setFolderOpen] = useState(false)
+/** Toolbar above the list: import pictures (several at once), make a folder. */
+export function GraphicsToolbar({ data, library }: { data: DatabaseData; onSelect: (id: string) => void; library?: LibraryControls }) {
   const actions = graphicActions(data)
-  const pick = async () => {
-    const r = await data.sprites.pickFile()
-    if (!r.ok) return setError(r.error)
-    if (r.sourcePath) setSource({ path: r.sourcePath, id: defaultGraphicId('imported', `${r.defaultName}.png`)?.replace('sprites/imported/', 'imported/') ?? 'imported/image.png' })
-  }
-  const submit = async () => {
-    if (!source) return
-    const r = await data.sprites.importGraphic(source.path, source.id)
-    if (!r.ok) return setError(r.error)
-    const id = source.id
-    setSource(null)
-    setError('')
-    await data.reload()
-    onImported(id)
-  }
   return (
-    <div className="flex flex-col gap-1 border-b border-border p-2">
-      <div className="flex items-center gap-1">
-        <EdButton size="sm" onClick={() => void pick()}><Upload /> Import…</EdButton>
-        <EdButton size="sm" onClick={() => setFolderOpen(true)}><FolderPlus /> New folder…</EdButton>
-        <InfoTip>Import copies a PNG into the project. Put it in a folder by typing the folder in its id (folder/name.png); rename and rearrange afterwards from here and every sprite and map follows.</InfoTip>
-      </div>
-      {source && (
-        <div className="flex items-center gap-1">
-          <input className="ed-input" aria-label="Graphic id" value={source.id} onChange={(e) => setSource({ ...source, id: e.target.value })} />
-          <EdButton size="sm" variant="primary" onClick={() => void submit()}>Add</EdButton>
-        </div>
-      )}
-      {error && <p role="alert" className="text-destructive">{error}</p>}
-      {folderOpen && <NewFolder parent="" actions={actions} onDone={() => undefined} onClose={() => setFolderOpen(false)} />}
-    </div>
+    <LibraryToolbar
+      library={library}
+      info="Import copies PNGs into the project: pick several, or drag them from your computer onto the list or onto a folder. They go into the folder you clicked last. Rename and rearrange afterwards from here and every sprite and map follows."
+      newFolder={(onClose) => <NewFolder parent="" actions={actions} onDone={() => undefined} onClose={onClose} />}
+    />
   )
 }

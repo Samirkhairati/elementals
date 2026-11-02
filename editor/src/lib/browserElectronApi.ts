@@ -53,6 +53,29 @@ function pickPng(): Promise<Result> {
   })
 }
 
+/** Stand-in for the native multi-select dialog: a `multiple` file input, then stage every chosen PNG. */
+function pickPngs(): Promise<Result> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.multiple = true
+    input.accept = '.png,image/png'
+    input.addEventListener('cancel', () => resolve({ success: false, canceled: true }))
+    input.addEventListener('change', async () => {
+      const chosen = Array.from(input.files ?? [])
+      if (chosen.length === 0) return resolve({ success: false, canceled: true })
+      const files: { sourcePath: string; defaultName: string; previewUrl: string }[] = []
+      for (const file of chosen) {
+        const staged = await stageUpload(file.name, new Uint8Array(await file.arrayBuffer()))
+        if (!staged.success || typeof staged.sourcePath !== 'string') return resolve({ success: false, error: String(staged.error ?? `Could not read ${file.name}`) })
+        files.push({ sourcePath: staged.sourcePath, defaultName: file.name.replace(/\.[^.]+$/, ''), previewUrl: URL.createObjectURL(file) })
+      }
+      resolve({ success: true, files })
+    })
+    input.click()
+  })
+}
+
 function download(fileName: string, text: string): void {
   const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }))
   const link = document.createElement('a')
@@ -71,7 +94,7 @@ export function createBrowserElectronApi(): ElectronAPI {
     // tilesets
     getTilesets: () => c('get-tilesets'),
     pickTilesetFile: () => pickPng(),
-    importTileset: (sourcePath: string, name: string, folderPath: string | null) => c('import-tileset', sourcePath, name, folderPath),
+    importTileset: (sourcePath: string, name: string, folderPath: string | null, fileStem?: string) => c('import-tileset', sourcePath, name, folderPath, fileStem),
     createFolder: (parent: string | null, name: string) => c('create-folder', parent, name),
     renameFolder: (oldPath: string, newName: string) => c('rename-folder', oldPath, newName),
     renameTileset: (folder: string | null, file: string, newName: string) => c('rename-tileset', folder, file, newName),
@@ -104,6 +127,7 @@ export function createBrowserElectronApi(): ElectronAPI {
     },
     getCharacters: () => c('get-characters'),
     pickSpriteFile: () => pickPng(),
+    pickImageFiles: () => pickPngs(),
     saveCharacter: (id: string, def: unknown) => c('save-character', id, def),
     renameCharacter: (id: string, newId: string) => c('rename-character', id, newId),
     deleteCharacter: (id: string) => c('delete-character', id),

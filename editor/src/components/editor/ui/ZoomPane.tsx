@@ -103,7 +103,7 @@ export function ZoomPane({ width, height, children, toolbar, maxFit = 8, classNa
 
   const overflows = width * zoom > box.w || height * zoom > box.h
   return (
-    <div className={cn('flex min-h-0 min-w-0 flex-col gap-2', className)} data-testid="zoom-pane">
+    <div className={cn('flex min-h-0 min-w-0 flex-1 flex-col gap-2', className)} data-testid="zoom-pane">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         {typeof toolbar === 'function' ? toolbar(zoom) : toolbar}
         <ZoomControls
@@ -117,14 +117,19 @@ export function ZoomPane({ width, height, children, toolbar, maxFit = 8, classNa
           onFit={() => setUserZoom(null)}
         />
       </div>
-      <div
-        ref={scroller}
-        data-testid="zoom-viewport"
-        className={cn('ed-checker flex min-h-[200px] flex-1 overflow-auto rounded border border-border', overflows && (panning ? 'cursor-grabbing' : 'cursor-grab'))}
-        onMouseDown={beginPan}
-      >
-        <div className="m-auto shrink-0 select-none" style={{ width: width * zoom, height: height * zoom }}>
-          {children(zoom)}
+      {/* The viewport is sized by the layout alone (the scroller is absolutely positioned inside it): if the picture
+          could stretch it, "fit" would be computed from a box that shrinks as the picture does, and the picture
+          would creep down to its size frame by frame. */}
+      <div className="relative min-h-[200px] flex-1">
+        <div
+          ref={scroller}
+          data-testid="zoom-viewport"
+          className={cn('ed-checker absolute inset-0 flex overflow-auto rounded border border-border', overflows && (panning ? 'cursor-grabbing' : 'cursor-grab'))}
+          onMouseDown={beginPan}
+        >
+          <div className="m-auto shrink-0 select-none" style={{ width: width * zoom, height: height * zoom }}>
+            {children(zoom)}
+          </div>
         </div>
       </div>
       <p className="ed-hint">Ctrl/⌘ + scroll or pinch to zoom, drag to move around.</p>

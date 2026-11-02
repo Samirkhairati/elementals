@@ -603,7 +603,7 @@ the game*. Initial copy (Appendix A has the full list):
   summary (columns × rows, frame size, margin, spacing), a warning when the frames do not fill the picture, and a link to edit the cut.
 * **Used by**: character sheets and map image layers that use the picture (with *Open* links), and **Ends up in**: the maps that show a
   sprite cut from it. `unused` badge otherwise.
-* Toolbar: *Import…*, *New folder…*. Per picture: *Rename / move…*, *Delete*. Per folder (hover): new folder inside, rename / move, delete.
+* Toolbar: *Import…* (pick several PNGs), *New folder…*. The folder you clicked last is highlighted and is where imports go; files dragged in from the OS onto the list (or onto a folder) open the same *Import N pictures* dialog: a preview per file and its name (the file name by default, editable; clashes inside the batch or with the library block the button), plus the destination folder. Per picture: *Rename / move…*, *Delete*. Per folder (hover): new folder inside, rename / move, delete.
 
 ### 9.2 Tilesets
 

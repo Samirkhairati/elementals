@@ -60,8 +60,8 @@ export function createProjectChannels(
         for (const w of result.warnings) console.warn(`[tilesets] ${w.file}: ${w.error}`);
         return result;
       }),
-    'import-tileset': (sourcePath: string, name: string, folderPath: string | null = null) =>
-      toResult(() => tilesetStore.importTileset(tilesetsDir, tilesetCache, sourcePath, name, folderPath)),
+    'import-tileset': (sourcePath: string, name: string, folderPath: string | null = null, fileStem?: string) =>
+      toResult(() => tilesetStore.importTileset(tilesetsDir, tilesetCache, sourcePath, name, folderPath, fileStem)),
     'create-folder': (parentPath: string | null, folderName: string) =>
       toResult(() => tilesetStore.createTilesetFolder(tilesetsDir, parentPath, folderName)),
     'rename-folder': (oldFolderPath: string, newFolderName: string) =>
@@ -147,4 +147,4 @@ export function createProjectChannels(
 }
 
 /** Channels that need a native dialog / window and therefore live in the main process only. */
-export const DIALOG_CHANNELS = ['pick-tileset-file', 'pick-sprite-file', 'export-map'] as const;
+export const DIALOG_CHANNELS = ['pick-tileset-file', 'pick-sprite-file', 'pick-image-files', 'export-map'] as const;

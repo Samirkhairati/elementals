@@ -17,7 +17,7 @@ interface ElectronAPI {
   ping: () => Promise<void>;
   getTilesets: () => Promise<{ success: boolean; folders?: string[]; tilesets?: TilesetData[]; warnings?: { file: string; error: string }[]; error?: string }>;
   pickTilesetFile: () => Promise<{ success: boolean; canceled?: boolean; sourcePath?: string; defaultName?: string; error?: string }>;
-  importTileset: (sourcePath: string, name: string, folderPath: string | null) => Promise<{ success: boolean; tileset?: TilesetData; error?: string }>;
+  importTileset: (sourcePath: string, name: string, folderPath: string | null, fileStem?: string) => Promise<{ success: boolean; tileset?: TilesetData; error?: string }>;
   createFolder: (parentPath: string | null, folderName: string) => Promise<{ success: boolean; folderPath?: string; error?: string }>;
   renameFolder: (oldFolderPath: string, newFolderName: string) => Promise<{ success: boolean; newFolderPath?: string; error?: string }>;
   renameTileset: (folderPath: string | null, fileName: string, newName: string) => Promise<{ success: boolean; error?: string }>;
@@ -41,6 +41,8 @@ interface ElectronAPI {
   /** Absolute path of a dropped file. The browser harness stages the bytes and returns the staged path. */
   getPathForFile: (file: File) => string | Promise<string>;
   getCharacters: () => Promise<({ success: true; characters: CharacterInfo[]; graphics: GraphicInfo[]; images: Record<string, string>; folders: string[]; graphicFolders: string[]; warnings: { file: string; error: string }[] }) | IpcFailure>;
+  /** Native multi-select picker for PNGs; every file carries a data/blob URL to preview it by (empty when too big). */
+  pickImageFiles: () => Promise<({ success: true; files: { sourcePath: string; defaultName: string; previewUrl: string }[] }) | IpcFailure>;
   pickSpriteFile: () => Promise<({ success: true; sourcePath: string; defaultName: string }) | IpcFailure>;
   saveCharacter: (id: string, def: CharacterDef) => Promise<({ success: true; character: CharacterInfo }) | IpcFailure>;
   renameCharacter: (id: string, newId: string) => Promise<({ success: true; id: string }) | IpcFailure>;

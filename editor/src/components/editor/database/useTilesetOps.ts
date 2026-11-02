@@ -5,8 +5,8 @@ import { opError, type OpResult } from '@/lib/opResult'
 export interface TilesetOps {
   /** Native file picker -> the chosen path (null when cancelled). */
   pickFile: () => Promise<OpResult<{ sourcePath: string | null; defaultName: string }>>
-  /** Copies a PNG into the tileset library under `folder` (a free file name is picked). */
-  importTileset: (sourcePath: string, name: string, folder: string | null) => Promise<OpResult<{ tileset: TilesetData }>>
+  /** Copies a PNG into the tileset library under `folder`; `fileStem` is the file name to use (the source's by default; a free one is picked). */
+  importTileset: (sourcePath: string, name: string, folder: string | null, fileStem?: string) => Promise<OpResult<{ tileset: TilesetData }>>
   /** Changes the name shown in the editor (the file, and so the id maps use, stays). */
   setName: (folder: string | null, fileName: string, name: string) => Promise<OpResult>
   /** Renames the file, which is the id maps store. References are NOT rewritten (see lib/assetOps). */
@@ -54,7 +54,7 @@ export function useTilesetOps(reload: () => Promise<void>): TilesetOps {
           return { ok: false, error: e instanceof Error ? e.message : String(e) }
         }
       },
-      importTileset: (sourcePath, name, folder) => then(ipc(() => api()?.importTileset(sourcePath, name, folder), (r) => ({ tileset: r.tileset as TilesetData }))),
+      importTileset: (sourcePath, name, folder, fileStem) => then(ipc(() => api()?.importTileset(sourcePath, name, folder, fileStem), (r) => ({ tileset: r.tileset as TilesetData }))),
       setName: (folder, fileName, name) => then(ipc(() => api()?.renameTileset(folder, fileName, name), () => ({}))),
       renameFile: (folder, fileName, newStem) => then(ipc(() => api()?.renameTilesetFile(folder, fileName, newStem), (r) => ({ fileName: r.fileName as string }))),
       move: (fileName, oldFolder, newFolder) => then(ipc(() => api()?.moveTileset(fileName, oldFolder, newFolder), () => ({}))),

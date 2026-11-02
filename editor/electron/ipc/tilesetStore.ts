@@ -132,12 +132,14 @@ export function importTileset(
   cache: TilesetCache,
   sourcePath: string,
   name: string,
-  folderPath: string | null = null
+  folderPath: string | null = null,
+  fileStem?: string
 ): { tileset: TilesetFile } {
   assertPngSource(sourcePath);
 
   const parsed = path.parse(path.basename(sourcePath));
-  const stem = parsed.name.replace(/^\.+/, '') || 'tileset';
+  // The file name (the id maps store) is the source's unless the caller picked one.
+  const stem = (typeof fileStem === 'string' && fileStem.trim() !== '' ? fileStem.trim() : parsed.name).replace(/^\.+/, '') || 'tileset';
   const displayName = typeof name === 'string' && name.trim() !== '' ? name : stem;
 
   const targetDir = resolveInside(tilesetsDir, [folderPath]);

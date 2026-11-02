@@ -5,9 +5,11 @@
 import { useMemo, useRef, useState } from 'react'
 import { ChevronDown, ChevronRight, FolderPlus, Pencil, Trash2 } from 'lucide-react'
 import { canMoveFolder } from '@/lib/assetOps'
+import { isFileDrag } from '@/lib/droppedFiles'
 import { buildLibraryTree, type FolderNode, type LibraryItem } from '@/lib/libraryTree'
 import { Tile } from './browse'
 import type { ViewMode } from './browse'
+import type { LibraryControls } from './shared'
 
 export type DragPayload = { kind: 'item'; key: string } | { kind: 'folder'; key: string }
 
@@ -36,6 +38,8 @@ interface Props {
   folderActions: FolderActions
   /** What to say when there is nothing at all. */
   emptyText: string
+  /** Importing: the highlighted folder, and files dragged in from outside. */
+  library?: LibraryControls
 }
 
 const readDrag = (e: React.DragEvent): DragPayload | null => {
@@ -46,7 +50,7 @@ const readDrag = (e: React.DragEvent): DragPayload | null => {
   }
 }
 
-export function LibraryBrowser({ items, folders, query, mode, selected, onSelect, thumb, badge, hint, onMove, folderActions, emptyText }: Props) {
+export function LibraryBrowser({ items, folders, query, mode, selected, onSelect, thumb, badge, hint, onMove, folderActions, emptyText, library }: Props) {
   const tree = useMemo(() => buildLibraryTree(items, folders, query), [items, folders, query])
   const searching = query.trim() !== ''
   const [closed, setClosed] = useState<Set<string>>(new Set())
@@ -59,9 +63,6 @@ export function LibraryBrowser({ items, folders, query, mode, selected, onSelect
   const toggle = (path: string) => setClosed((s) => { const n = new Set(s); if (n.has(path)) n.delete(path); else n.add(path); return n })
   const isOpen = (path: string) => searching || !closed.has(path)
 
-  if (items.length === 0 && folders.length === 0) return <p className="ed-hint p-3">{emptyText}</p>
-  if (searching && tree.items.length === 0 && tree.folders.length === 0) return <p className="ed-hint p-3">Nothing matches “{query}”.</p>
-
   const accepts = (target: string): boolean => {
     const d = dragRef.current
     if (!d) return false
@@ -69,21 +70,28 @@ export function LibraryBrowser({ items, folders, query, mode, selected, onSelect
     return canMoveFolder(d.key, target)
   }
   // Handlers stop at the innermost folder, so dropping into a nested folder does not also count for its parents.
+  // Files from outside (Finder / Explorer) are imported into the folder they land on; on empty space that is the
+  // folder last clicked.
   const dropProps = (target: string) => ({
     onDragOver: (e: React.DragEvent) => {
-      if (!accepts(target)) return
+      const files = !!library && isFileDrag(e.dataTransfer)
+      if (!files && !accepts(target)) return
       e.preventDefault()
       e.stopPropagation()
-      e.dataTransfer.dropEffect = 'move'
+      e.dataTransfer.dropEffect = files ? 'copy' : 'move'
       setDropTarget(target)
     },
     onDrop: (e: React.DragEvent) => {
       e.preventDefault()
       e.stopPropagation()
+      setDropTarget(null)
+      if (library && isFileDrag(e.dataTransfer)) {
+        library.dropFiles(Array.from(e.dataTransfer.files), target === '' ? library.folder : target)
+        return
+      }
       const drag = dragRef.current ?? readDrag(e)
       const ok = !!drag && accepts(target)
       dragRef.current = null
-      setDropTarget(null)
       setDragging(null)
       if (drag && ok) onMove(drag, target)
     },
@@ -108,8 +116,8 @@ export function LibraryBrowser({ items, folders, query, mode, selected, onSelect
   const folderRow = (node: FolderNode) => {
     const open = isOpen(node.path)
     return (
-      <div className="ed-row group" data-dim={isDragged('folder', node.path) ? 'true' : undefined} {...dragProps({ kind: 'folder', key: node.path })}>
-        <button type="button" className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-ed-label font-medium text-foreground" aria-expanded={open} onClick={() => toggle(node.path)}>
+      <div className="ed-row group" data-dim={isDragged('folder', node.path) ? 'true' : undefined} data-current={library?.folder === node.path ? 'true' : undefined} {...dragProps({ kind: 'folder', key: node.path })}>
+        <button type="button" className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-ed-label font-medium text-foreground" aria-expanded={open} aria-current={library?.folder === node.path ? 'true' : undefined} onClick={() => { library?.setFolder(node.path); toggle(node.path) }}>
           {open ? <ChevronDown className="text-muted-foreground" /> : <ChevronRight className="text-muted-foreground" />}
           <span className="min-w-0 flex-1 truncate">{node.name}</span>
           <span className="ed-hint tabular-nums opacity-70 group-hover:hidden">{countIn(node)}</span>
@@ -165,7 +173,15 @@ export function LibraryBrowser({ items, folders, query, mode, selected, onSelect
       <section key={node.path || '(root)'} {...dropProps(node.path)} data-drop={dropTarget === node.path ? 'true' : undefined} className="rounded-md data-[drop=true]:bg-primary/15">
         {node.path && (
           <div className="mb-1 flex items-center gap-1 group">
-            <span className="ed-section-title flex-1 truncate" {...dragProps({ kind: 'folder', key: node.path })}>{node.path}</span>
+            <button
+              type="button"
+              className="ed-section-title min-w-0 flex-1 truncate rounded-sm px-1 text-left data-[current=true]:bg-primary/20 data-[current=true]:text-foreground"
+              data-current={library?.folder === node.path ? 'true' : undefined}
+              aria-current={library?.folder === node.path ? 'true' : undefined}
+              title="Imports and dropped files go into this folder"
+              onClick={() => library?.setFolder(node.path)}
+              {...dragProps({ kind: 'folder', key: node.path })}
+            >{node.path}</button>
             <span className="flex items-center opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
               <button type="button" className="ed-iconbtn" title="New folder inside" aria-label={`New folder in ${node.path}`} onClick={() => folderActions.onCreate(node.path)}><FolderPlus /></button>
               <button type="button" className="ed-iconbtn" title="Rename or move folder" aria-label={`Rename folder ${node.path}`} onClick={() => folderActions.onRename(node.path)}><Pencil /></button>
@@ -183,14 +199,18 @@ export function LibraryBrowser({ items, folders, query, mode, selected, onSelect
     ...node.folders.flatMap(renderTiles),
   ]
 
+  const nothing = items.length === 0 && folders.length === 0
+  const nothingFound = searching && tree.items.length === 0 && tree.folders.length === 0
   return (
     <div
       className="relative flex min-h-[50vh] flex-col gap-1 rounded-md data-[drop=true]:ring-1 data-[drop=true]:ring-primary/60"
       data-drop={dropTarget === '' ? 'true' : undefined}
+      onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropTarget(null) }}
       {...dropProps('')}
     >
-      {mode === 'tiles' ? <div className="flex flex-col gap-3">{renderTiles(tree)}</div> : renderList(tree, true)}
+      {nothing ? <p className="ed-hint p-3">{emptyText}</p> : nothingFound ? <p className="ed-hint p-3">Nothing matches “{query}”.</p> : mode === 'tiles' ? <div className="flex flex-col gap-3">{renderTiles(tree)}</div> : renderList(tree, true)}
       {dragging && <p className="ed-hint pointer-events-none absolute inset-x-0 bottom-1 text-center">Drop on a folder, or on empty space for the top level</p>}
+      {dropTarget !== null && !dragging && library && <p className="ed-hint pointer-events-none absolute inset-x-0 bottom-1 text-center">Drop to import into {dropTarget || library.folder || 'the top level'}</p>}
     </div>
   )
 }

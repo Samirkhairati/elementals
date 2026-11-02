@@ -10,7 +10,9 @@ import { FlagsTable } from './FlagsTable'
 import { GraphicDetail, GraphicsBrowser, GraphicsToolbar } from './GraphicsTable'
 import { MapDetail, MapsBrowser } from './MapsTable'
 import { TilesetDetail, TilesetsBrowser, TilesetsToolbar } from './TilesetsTable'
-import type { TableProps } from './shared'
+import { ImportDialog } from './ImportDialog'
+import { dropCandidates, graphicImporter, pickCandidates, tilesetImporter, type Candidate, type ImportResult, type Importer } from './importFlow'
+import type { LibraryControls, TableProps } from './shared'
 
 const ICONS: Record<string, LucideIcon> = { Image, Grid3x3, PersonStanding, ToggleLeft, Map: MapIcon, MessageSquareText, Bug, Package, Zap }
 
@@ -24,17 +26,19 @@ interface TableView {
   Browser: React.ComponentType<TableProps>
   Detail: React.ComponentType<{ data: DatabaseData; id: string; tab?: string; onSelect?: (id: string) => void }>
   /** Extra controls above the browser. */
-  Toolbar?: React.ComponentType<{ data: DatabaseData; onSelect: (id: string) => void }>
+  Toolbar?: React.ComponentType<{ data: DatabaseData; onSelect: (id: string) => void; library?: LibraryControls }>
   /** The browser can show tiles with pictures as well as a list. */
   tiles?: boolean
+  /** Libraries that take imported files (and files dragged in from outside). */
+  importer?: (data: DatabaseData) => Importer
   /** The table uses the whole content area (no browser/detail split). */
   full?: React.ComponentType<{ data: DatabaseData }>
 }
 
 /** Table id -> its components. A new table = one entry here and one in DATABASE_TABLES. */
 const VIEWS: Record<string, TableView> = {
-  graphics: { Browser: GraphicsBrowser, Detail: GraphicDetail, Toolbar: GraphicsToolbar, tiles: true },
-  tilesets: { Browser: TilesetsBrowser, Detail: TilesetDetail, Toolbar: TilesetsToolbar, tiles: true },
+  graphics: { Browser: GraphicsBrowser, Detail: GraphicDetail, Toolbar: GraphicsToolbar, tiles: true, importer: graphicImporter },
+  tilesets: { Browser: TilesetsBrowser, Detail: TilesetDetail, Toolbar: TilesetsToolbar, tiles: true, importer: tilesetImporter },
   characters: { Browser: CharactersBrowser, Detail: CharacterDetail, Toolbar: CharactersToolbar, tiles: true },
   maps: { Browser: MapsBrowser, Detail: MapDetail },
   flags: { Browser: () => null, Detail: () => null, full: FlagsTable },
@@ -66,6 +70,46 @@ export function DatabasePage() {
   const view = VIEWS[table.id]
   const selected = search.id ?? ''
   const go = (next: DatabaseSearch) => void navigate({ to: '/database', search: next as never })
+
+  // ── Importing: the folder last clicked is where imports and dropped files go ─────────────────────
+  const importer = useMemo(() => view.importer?.(data), [view, data])
+  const [folders, setFolders] = useState<Record<string, string>>({})
+  // A folder that was renamed or deleted since is no longer "the one clicked last".
+  const clicked = folders[table.id] ?? ''
+  const folder = importer?.folders.includes(clicked) ? clicked : ''
+  const [pending, setPending] = useState<{ tableId: string; candidates: Candidate[]; folder: string } | null>(null)
+  const [note, setNote] = useState<{ tableId: string; ok: boolean; text: string } | null>(null)
+
+  const library = useMemo<LibraryControls | undefined>(() => {
+    if (!importer) return undefined
+    const open = (candidates: Candidate[], into: string) => { setNote(null); setPending({ tableId: table.id, candidates, folder: into }) }
+    return {
+      folder,
+      setFolder: (f) => setFolders((cur) => ({ ...cur, [table.id]: f })),
+      note: note?.tableId === table.id ? note : null,
+      pick: async () => {
+        const r = await pickCandidates()
+        if (r.ok) open(r.candidates, folder)
+        else if (!r.canceled) setNote({ tableId: table.id, ok: false, text: r.error })
+      },
+      dropFiles: async (files, into) => {
+        const r = await dropCandidates(files)
+        if (!r.ok) return r.error ? setNote({ tableId: table.id, ok: false, text: r.error }) : undefined
+        setFolders((cur) => ({ ...cur, [table.id]: into }))
+        open(r.candidates, into)
+      },
+    }
+  }, [importer, folder, note, table.id])
+
+  const imported = (result: ImportResult, into: string) => {
+    const what = importer?.noun ?? 'file'
+    const n = result.imported.length
+    const failed = result.failed.length
+    setNote({ tableId: table.id, ok: failed === 0, text: `Imported ${n} ${n === 1 ? what : `${what}s`}${into ? ` into ${into}` : ''}${failed ? `; ${failed} failed` : ''}.` })
+    setFolders((cur) => ({ ...cur, [table.id]: into }))
+    const last = result.imported[result.imported.length - 1]
+    if (last) go({ table: table.id, id: last })
+  }
 
   const groups = useMemo(() => {
     const map = new Map<TableGroup, DatabaseTable[]>()
@@ -133,20 +177,23 @@ export function DatabasePage() {
                 {query && <button type="button" className="ed-iconbtn absolute right-3" title="Clear the search" aria-label="Clear search" onClick={() => setQuery('')}><X /></button>}
               </div>
               <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-                {view.Toolbar && <view.Toolbar data={data} onSelect={(id) => go({ table: table.id, id })} />}
+                {view.Toolbar && <view.Toolbar data={data} onSelect={(id) => go({ table: table.id, id })} library={library} />}
                 {view.tiles && (
                   <div className="flex items-center justify-between px-2 pt-2">
                     <span className="ed-hint">Show as</span>
                     <ViewToggle mode={mode} onChange={setMode} />
                   </div>
                 )}
-                <div className="p-2"><view.Browser data={data} query={query} selected={selected} mode={view.tiles ? mode : 'list'} onSelect={(id) => go({ table: table.id, id })} /></div>
+                <div className="p-2"><view.Browser data={data} query={query} selected={selected} mode={view.tiles ? mode : 'list'} onSelect={(id) => go({ table: table.id, id })} library={library} /></div>
               </div>
             </div>
             <div className="min-h-0 min-w-0 flex-1"><view.Detail data={data} id={selected} tab={search.tab} onSelect={(id) => go({ table: table.id, id })} /></div>
           </div>
         )}
       </section>
+      {pending && pending.tableId === table.id && importer && (
+        <ImportDialog candidates={pending.candidates} importer={importer} folder={pending.folder} onClose={() => setPending(null)} onImported={imported} />
+      )}
     </div>
   )
 }

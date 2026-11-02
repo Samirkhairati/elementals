@@ -276,25 +276,100 @@ describe('Graphics', () => {
     expect(await screen.findByRole('status')).toHaveTextContent('Moved chest.png')
   })
 
-  it('import copies the picked file under the chosen id and surfaces failures', async () => {
-    const imported: unknown[] = []
-    install({
-      pickSpriteFile: () => Promise.resolve({ success: true, sourcePath: '/tmp/flower.png', defaultName: 'flower' }),
-      importGraphic: (src: string, id: string) => {
-        imported.push([src, id])
-        return Promise.resolve(id === 'imported/flower.png' ? { success: true, graphic: graphic(id), image: PNG } : { success: false, error: 'already exists' })
-      },
+  describe('importing', () => {
+    const picked = (...names: string[]) => () => Promise.resolve({ success: true, files: names.map((n) => ({ sourcePath: `/tmp/${n}.png`, defaultName: n, previewUrl: PNG })) })
+
+    it('Import… takes several files, each with a preview and an editable name (the file name by default)', async () => {
+      const imported: [string, string][] = []
+      install({
+        pickImageFiles: picked('flower', 'Big Tree'),
+        importGraphic: (src: string, id: string) => { imported.push([src, id]); return Promise.resolve({ success: true, graphic: graphic(id), image: PNG }) },
+      })
+      renderAt('/database?table=graphics')
+      fireEvent.click(await screen.findByRole('button', { name: /Import…/ }))
+      const dialog = await screen.findByRole('dialog')
+      expect(within(dialog).getByRole('heading', { name: 'Import 2 pictures' })).toBeInTheDocument()
+      expect(dialog.querySelectorAll('img')).toHaveLength(2) // a preview per file
+      expect(within(dialog).getByLabelText('Name for flower.png')).toHaveValue('flower')
+      expect(within(dialog).getByLabelText('Name for Big Tree.png')).toHaveValue('Big-Tree')
+      fireEvent.change(within(dialog).getByLabelText('Name for Big Tree.png'), { target: { value: 'oak' } })
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Import 2 pictures' }))
+      await waitFor(() => expect(imported).toEqual([['/tmp/flower.png', 'flower.png'], ['/tmp/Big Tree.png', 'oak.png']]))
+      expect(await screen.findByRole('status')).toHaveTextContent('Imported 2 pictures')
     })
-    renderAt('/database?table=graphics')
-    fireEvent.click(await screen.findByRole('button', { name: /Import…/ }))
-    const field = await screen.findByLabelText('Graphic id')
-    expect(field).toHaveValue('imported/flower.png')
-    fireEvent.change(field, { target: { value: 'props/chest.png' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
-    expect((await screen.findAllByRole('alert')).some((a) => a.textContent?.includes('already exists'))).toBe(true)
-    fireEvent.change(screen.getByLabelText('Graphic id'), { target: { value: 'imported/flower.png' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
-    await waitFor(() => expect(imported).toHaveLength(2))
+
+    it('stops names that clash with each other or with the library, and lets you leave a file out', async () => {
+      install({ pickImageFiles: picked('chest', 'Chest', 'rock') })
+      renderAt('/database?table=graphics')
+      fireEvent.click(await screen.findByRole('button', { name: /Import…/ }))
+      const dialog = await screen.findByRole('dialog')
+      expect(within(dialog).getAllByText('Used twice in this import.')).toHaveLength(2)
+      expect(within(dialog).getByRole('button', { name: 'Import 3 pictures' })).toBeDisabled()
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Leave out Chest.png' }))
+      expect(within(dialog).getByRole('button', { name: 'Import 2 pictures' })).toBeEnabled()
+      // the destination decides what is taken: props/chest.png exists
+      fireEvent.change(within(dialog).getByLabelText('Destination folder'), { target: { value: 'props' } })
+      expect(within(dialog).getByText('Already exists here.')).toBeInTheDocument()
+      expect(within(dialog).getByRole('button', { name: 'Import 2 pictures' })).toBeDisabled()
+    })
+
+    it('imports into the folder clicked last, which stays highlighted', async () => {
+      const imported: string[] = []
+      install({
+        pickImageFiles: picked('flower'),
+        importGraphic: (_src: string, id: string) => { imported.push(id); return Promise.resolve({ success: true, graphic: graphic(id), image: PNG }) },
+      })
+      renderAt('/database?table=graphics')
+      const folder = await screen.findByRole('button', { name: /^props/ })
+      fireEvent.click(folder)
+      await waitFor(() => expect(screen.getByRole('button', { name: /^props/ })).toHaveAttribute('aria-current', 'true'))
+      expect(screen.getByTestId('import-target')).toHaveTextContent('Importing into props')
+      fireEvent.click(screen.getByRole('button', { name: /Import…/ }))
+      const dialog = await screen.findByRole('dialog')
+      expect(within(dialog).getByLabelText('Destination folder')).toHaveValue('props')
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Import 1 picture' }))
+      await waitFor(() => expect(imported).toEqual(['props/flower.png']))
+      fireEvent.click(screen.getByRole('button', { name: 'Clear the import folder' }))
+      expect(screen.getByTestId('import-target')).toHaveTextContent('Importing into the top level')
+    })
+
+    it('dragging files from outside onto a folder opens the import for that folder', async () => {
+      install({ getPathForFile: (f: File) => `/dropped/${f.name}` })
+      renderAt('/database?table=graphics')
+      const target = (await screen.findByRole('button', { name: /^props/ })).closest('section, li') as HTMLElement
+      const png = new File(['x'], 'rain.png', { type: 'image/png' })
+      const text = new File(['x'], 'notes.txt', { type: 'text/plain' })
+      fireEvent.dragOver(target, { dataTransfer: { types: ['Files'], files: [png, text] } })
+      fireEvent.drop(target, { dataTransfer: { types: ['Files'], files: [png, text] } })
+      const dialog = await screen.findByRole('dialog')
+      expect(within(dialog).getByRole('heading', { name: 'Import 1 picture' })).toBeInTheDocument()
+      expect(within(dialog).getByLabelText('Destination folder')).toHaveValue('props')
+      expect(within(dialog).getByLabelText('Name for rain.png')).toHaveValue('rain')
+      expect(screen.getByTestId('import-target')).toHaveTextContent('Importing into props')
+    })
+
+    it('reports files that are not PNGs instead of opening an empty import', async () => {
+      install({ getPathForFile: (f: File) => `/dropped/${f.name}` })
+      renderAt('/database?table=graphics')
+      const target = (await screen.findByRole('button', { name: /^props/ })).closest('section, li') as HTMLElement
+      fireEvent.drop(target, { dataTransfer: { types: ['Files'], files: [new File(['x'], 'notes.txt', { type: 'text/plain' })] } })
+      expect(await screen.findByText('Only PNG images can be imported.')).toBeInTheDocument()
+      expect(screen.queryByRole('dialog')).toBeNull()
+    })
+
+    it('keeps the files that failed in the dialog with the reason', async () => {
+      install({
+        pickImageFiles: picked('a', 'b'),
+        importGraphic: (_src: string, id: string) => Promise.resolve(id === 'b.png' ? { success: false, error: 'already exists' } : { success: true, graphic: graphic(id), image: PNG }),
+      })
+      renderAt('/database?table=graphics')
+      fireEvent.click(await screen.findByRole('button', { name: /Import…/ }))
+      const dialog = await screen.findByRole('dialog')
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Import 2 pictures' }))
+      expect(await within(dialog).findByText('already exists')).toBeInTheDocument()
+      expect(within(dialog).queryByLabelText('Name for a.png')).toBeNull()
+      expect(within(dialog).getByRole('button', { name: 'Import 1 picture' })).toBeEnabled()
+    })
   })
 })
 
@@ -311,6 +386,23 @@ describe('Tilesets', () => {
       saveMap: (folder: string | null, file: string, map: { layers: { data?: Record<number, { tilesetId: string }> }[] }) => { calls.push(['saveMap', file, map.layers[0].data?.[0]?.tilesetId]); return Promise.resolve({ success: true }) },
       getTilesets: () => Promise.resolve({ success: true, folders: ['Outside'], tilesets: [{ name: 'grass', fileName: 'grass.png', folderPath: null, dataUrl: PNG, width: 64, height: 64 }, { name: 'lonely', fileName: 'lonely.png', folderPath: null, dataUrl: PNG, width: 32, height: 32 }] }),
     })
+  })
+
+  it('Import… files several tilesets under the names you give them (one name per file, free in every folder)', async () => {
+    const imported: unknown[][] = []
+    install({
+      pickImageFiles: () => Promise.resolve({ success: true, files: [{ sourcePath: '/tmp/IMG_1.png', defaultName: 'IMG_1', previewUrl: PNG }, { sourcePath: '/tmp/grass.png', defaultName: 'grass', previewUrl: PNG }] }),
+      importTileset: (...args: unknown[]) => { imported.push(args); return Promise.resolve({ success: true, tileset: { name: String(args[1]), fileName: `${String(args[3])}.png`, folderPath: args[2], dataUrl: PNG } }) },
+      getTilesets: () => Promise.resolve({ success: true, folders: ['Outside'], tilesets: [{ name: 'grass', fileName: 'grass.png', folderPath: null, dataUrl: PNG, width: 64, height: 64 }] }),
+    })
+    renderAt('/database?table=tilesets')
+    fireEvent.click(await screen.findByRole('button', { name: /Import…/ }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText('Already exists here.')).toBeInTheDocument() // grass.png is in the library already
+    fireEvent.change(within(dialog).getByLabelText('Name for grass.png'), { target: { value: 'grass-2' } })
+    fireEvent.change(within(dialog).getByLabelText('Name for IMG_1.png'), { target: { value: 'forest' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Import 2 tilesets' }))
+    await waitFor(() => expect(imported).toEqual([['/tmp/IMG_1.png', 'forest', null, 'forest'], ['/tmp/grass.png', 'grass-2', null, 'grass-2']]))
   })
 
   it('a tileset shows the maps that paint with it, and the viewer has the tile grid', async () => {

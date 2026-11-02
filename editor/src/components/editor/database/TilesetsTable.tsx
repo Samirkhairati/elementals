@@ -1,25 +1,26 @@
 import { useEffect, useMemo, useState } from 'react'
-import { FolderPlus, Pencil, Trash2, Upload } from 'lucide-react'
+import { Pencil, Trash2 } from 'lucide-react'
 import { folderOfId, joinId, leafOfId } from '@/lib/assetOps'
 import type { LibraryItem } from '@/lib/libraryTree'
 import { tilesetGrid } from '@/lib/databaseModel'
 import { TILE_SIZE } from '../../../../../shared/engine/constants'
-import { Badge, EdButton, Field, InfoTip } from '../ui/controls'
+import { Badge, EdButton, Field } from '../ui/controls'
 import { ImageThumb } from './browse'
 import { ImageViewer } from './ImageViewer'
 import { LibraryBrowser, type DragPayload } from './LibraryBrowser'
 import { ChangeDialog, DeleteDialog, NameDialog } from './LibraryDialogs'
+import { LibraryToolbar } from './LibraryToolbar'
 import { ReferencesSection } from './ReferencesSection'
 import { FOLDER_NAME, type Outcome } from './graphicActions'
 import { folderOfTileset, stemOf, tilesetActions, type TilesetActions } from './tilesetActions'
 import type { DatabaseData } from './useDatabaseData'
-import type { TableProps } from './shared'
+import type { LibraryControls, TableProps } from './shared'
 
 const FILE_STEM = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/
 
 type FolderDialog = { kind: 'new'; parent: string } | { kind: 'change'; folder: string } | { kind: 'delete'; folder: string } | null
 
-export function TilesetsBrowser({ data, query, selected, onSelect, mode }: TableProps) {
+export function TilesetsBrowser({ data, query, selected, onSelect, mode, library }: TableProps) {
   const actions = tilesetActions(data)
   const used = data.refs.counts('tileset')
   const items = useMemo<LibraryItem[]>(() => data.tilesets.map((t) => ({ key: t.fileName, name: t.name, folder: folderOfTileset(t) })), [data.tilesets])
@@ -57,7 +58,8 @@ export function TilesetsBrowser({ data, query, selected, onSelect, mode }: Table
         hint={(item) => (used[item.key] ? undefined : 'unused')}
         onMove={(d, t) => void move(d, t)}
         folderActions={{ onCreate: (parent) => setDialog({ kind: 'new', parent }), onRename: (folder) => setDialog({ kind: 'change', folder }), onDelete: (folder) => setDialog({ kind: 'delete', folder }) }}
-        emptyText="No tilesets yet. Use Import… to add one."
+        emptyText="No tilesets yet. Use Import…, or drop images here."
+        library={library}
       />
       {dialog?.kind === 'new' && <NewTilesetFolder parent={dialog.parent} actions={actions} onDone={setOutcome} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'change' && <ChangeTilesetFolder folder={dialog.folder} actions={actions} onDone={setOutcome} onClose={() => setDialog(null)} />}
@@ -198,40 +200,14 @@ function useImageSize(url?: string): { w: number; h: number } | null {
   return size
 }
 
-/** Toolbar above the list: import a tileset, make a folder. */
-export function TilesetsToolbar({ data, onSelect: onImported }: { data: DatabaseData; onSelect: (id: string) => void }) {
+/** Toolbar above the list: import tilesets (several at once), make a folder. */
+export function TilesetsToolbar({ data, library }: { data: DatabaseData; onSelect: (id: string) => void; library?: LibraryControls }) {
   const actions = tilesetActions(data)
-  const [source, setSource] = useState<{ path: string; name: string } | null>(null)
-  const [error, setError] = useState('')
-  const [folderOpen, setFolderOpen] = useState(false)
-  const pick = async () => {
-    const r = await data.tilesetOps.pickFile()
-    if (!r.ok) return setError(r.error)
-    if (r.sourcePath) setSource({ path: r.sourcePath, name: r.defaultName })
-  }
-  const submit = async () => {
-    if (!source) return
-    const r = await data.tilesetOps.importTileset(source.path, source.name, null)
-    if (!r.ok) return setError(r.error)
-    setSource(null)
-    setError('')
-    onImported(r.tileset.fileName)
-  }
   return (
-    <div className="flex flex-col gap-1 border-b border-border p-2">
-      <div className="flex items-center gap-1">
-        <EdButton size="sm" onClick={() => void pick()}><Upload /> Import…</EdButton>
-        <EdButton size="sm" onClick={() => setFolderOpen(true)}><FolderPlus /> New folder…</EdButton>
-        <InfoTip>Import copies a PNG into the project. It lands at the top level; drag it onto a folder to file it. The map editor lists what you add here and lets you pick it.</InfoTip>
-      </div>
-      {source && (
-        <div className="flex flex-col gap-1">
-          <input className="ed-input" aria-label="Tileset name" value={source.name} onChange={(e) => setSource({ ...source, name: e.target.value })} />
-          <EdButton size="sm" variant="primary" onClick={() => void submit()}>Add</EdButton>
-        </div>
-      )}
-      {error && <p role="alert" className="text-destructive">{error}</p>}
-      {folderOpen && <NewTilesetFolder parent="" actions={actions} onDone={() => undefined} onClose={() => setFolderOpen(false)} />}
-    </div>
+    <LibraryToolbar
+      library={library}
+      info="Import copies PNGs into the project: pick several, or drag them from your computer onto the list or onto a folder. They go into the folder you clicked last. The map editor lists what you add here and lets you pick it."
+      newFolder={(onClose) => <NewTilesetFolder parent="" actions={actions} onDone={() => undefined} onClose={onClose} />}
+    />
   )
 }
