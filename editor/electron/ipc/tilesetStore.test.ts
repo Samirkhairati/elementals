@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fakePng, listDir, makeTempDirTracker } from '../__testutils__/helpers';
+import { fakePng, listDir, makePng, makeTempDirTracker } from '../__testutils__/helpers';
 import { TilesetCache } from './tilesetCache';
 import {
   createTilesetFolder,
@@ -130,9 +130,9 @@ describe('listTilesets', () => {
     expect(first.warnings).toEqual([]);
     expect(first.folders).toEqual(['town', path.join('town', 'deep')]);
     expect([...first.tilesets].sort((x, y) => x.fileName.localeCompare(y.fileName))).toEqual([
-      { name: 'Grass Tiles', fileName: 'grass.png', folderPath: null, dataUrl: b64(fakePng('g')) },
-      { name: 'house', fileName: 'house.png', folderPath: 'town', dataUrl: b64(fakePng('h')) },
-      { name: 'tree', fileName: 'tree.png', folderPath: path.join('town', 'deep'), dataUrl: b64(fakePng('t')) },
+      { name: 'Grass Tiles', fileName: 'grass.png', folderPath: null, dataUrl: b64(fakePng('g')), width: 0, height: 0 },
+      { name: 'house', fileName: 'house.png', folderPath: 'town', dataUrl: b64(fakePng('h')), width: 0, height: 0 },
+      { name: 'tree', fileName: 'tree.png', folderPath: path.join('town', 'deep'), dataUrl: b64(fakePng('t')), width: 0, height: 0 },
     ]);
     expect(cache.misses).toBe(3);
 
@@ -198,7 +198,7 @@ describe('importTileset', () => {
 
   it('copies the PNG, writes metadata and returns the tileset', () => {
     const { tileset } = importTileset(sets, cache, src(), 'My Tiles', null);
-    expect(tileset).toEqual({ name: 'My Tiles', fileName: 'tiles.png', folderPath: null, dataUrl: b64(fakePng('img')) });
+    expect(tileset).toEqual({ name: 'My Tiles', fileName: 'tiles.png', folderPath: null, dataUrl: b64(fakePng('img')), width: 0, height: 0 });
     expect(readJson('tiles.json')).toEqual({ name: 'My Tiles' });
     expect(listDir(sets)).toEqual(['tiles.json', 'tiles.png']);
   });
@@ -389,6 +389,13 @@ describe('tileset folders', () => {
 
   it('reports a missing folder on delete', () => {
     expect(() => deleteTilesetFolder(sets, cache, 'ghost')).toThrow(/does not exist/);
+  });
+});
+
+describe('tileset size', () => {
+  it('is read from the PNG header', () => {
+    put('wide.png', makePng(96, 64));
+    expect(listTilesets(sets, cache).tilesets[0]).toMatchObject({ fileName: 'wide.png', width: 96, height: 64 });
   });
 });
 

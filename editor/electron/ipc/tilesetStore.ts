@@ -12,6 +12,7 @@ import {
 } from './folderOps.js';
 import { assertSafeFileName, resolveInside, resolveStrictlyInside } from './pathSafety.js';
 import { errorMessage } from './result.js';
+import { readPngSizeFromFile } from './pngHeader.js';
 import { TilesetCache } from './tilesetCache.js';
 
 /**
@@ -27,6 +28,9 @@ export interface TilesetFile {
   fileName: string;
   folderPath: string | null;
   dataUrl: string;
+  /** Pixel size, read from the PNG header (0 when it cannot be read). */
+  width: number;
+  height: number;
 }
 
 export interface TilesetListing {
@@ -38,6 +42,14 @@ export interface TilesetListing {
 interface TilesetMetadata {
   name?: unknown;
   [key: string]: unknown;
+}
+
+function pngSize(pngPath: string): { width: number; height: number } {
+  try {
+    return readPngSizeFromFile(pngPath);
+  } catch {
+    return { width: 0, height: 0 };
+  }
 }
 
 const jsonSiblingOf = (pngPath: string): string => pngPath.slice(0, -PNG_EXT.length) + '.json';
@@ -77,7 +89,7 @@ export function listTilesets(tilesetsDir: string, cache: TilesetCache): TilesetL
 
       const dataUrl = cache.getDataUrl(fullPath);
       live.add(fullPath);
-      tilesets.push({ name, fileName, folderPath, dataUrl });
+      tilesets.push({ name, fileName, folderPath, dataUrl, ...pngSize(fullPath) });
     },
     warnings
   );
@@ -152,7 +164,7 @@ export function importTileset(
 
   cache.invalidate(finalDest);
   return {
-    tileset: { name: displayName, fileName, folderPath, dataUrl: cache.getDataUrl(finalDest) },
+    tileset: { name: displayName, fileName, folderPath, dataUrl: cache.getDataUrl(finalDest), ...pngSize(finalDest) },
   };
 }
 

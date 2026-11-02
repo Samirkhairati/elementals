@@ -1,15 +1,15 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
-import { Bug, Grid3x3, Image, Lock, Map as MapIcon, MessageSquareText, Package, PersonStanding, Search, ToggleLeft, Zap, type LucideIcon } from 'lucide-react'
+import { Bug, Grid3x3, Image, Lock, Map as MapIcon, MessageSquareText, Package, PersonStanding, Search, ToggleLeft, X, Zap, type LucideIcon } from 'lucide-react'
 import { DATABASE_TABLES, GROUP_LABELS, characterCounts, getTable, unusedGraphics, type DatabaseTable, type TableGroup } from '@/lib/databaseModel'
 import { Badge, InfoTip } from '../ui/controls'
 import { useDatabaseData, type DatabaseData } from './useDatabaseData'
 import { CharacterDetail, CharactersBrowser, CharactersToolbar } from './CharactersTable'
 import { ViewToggle, useViewMode } from './browse'
 import { FlagsTable } from './FlagsTable'
-import { GraphicDetail, GraphicsBrowser, ImportGraphic } from './GraphicsTable'
+import { GraphicDetail, GraphicsBrowser, GraphicsToolbar } from './GraphicsTable'
 import { MapDetail, MapsBrowser } from './MapsTable'
-import { TilesetDetail, TilesetsBrowser } from './TilesetsTable'
+import { TilesetDetail, TilesetsBrowser, TilesetsToolbar } from './TilesetsTable'
 import type { TableProps } from './shared'
 
 const ICONS: Record<string, LucideIcon> = { Image, Grid3x3, PersonStanding, ToggleLeft, Map: MapIcon, MessageSquareText, Bug, Package, Zap }
@@ -33,8 +33,8 @@ interface TableView {
 
 /** Table id -> its components. A new table = one entry here and one in DATABASE_TABLES. */
 const VIEWS: Record<string, TableView> = {
-  graphics: { Browser: GraphicsBrowser, Detail: GraphicDetail, Toolbar: ImportGraphic, tiles: true },
-  tilesets: { Browser: TilesetsBrowser, Detail: TilesetDetail, tiles: true },
+  graphics: { Browser: GraphicsBrowser, Detail: GraphicDetail, Toolbar: GraphicsToolbar, tiles: true },
+  tilesets: { Browser: TilesetsBrowser, Detail: TilesetDetail, Toolbar: TilesetsToolbar, tiles: true },
   characters: { Browser: CharactersBrowser, Detail: CharacterDetail, Toolbar: CharactersToolbar, tiles: true },
   maps: { Browser: MapsBrowser, Detail: MapDetail },
   flags: { Browser: () => null, Detail: () => null, full: FlagsTable },
@@ -121,26 +121,27 @@ export function DatabasePage() {
           <h2 className="text-ed-title">{table.label}</h2>
           {table.access === 'readonly' && <Badge title={table.info}><Lock className="mr-1 inline h-3 w-3" />Read-only</Badge>}
           <InfoTip>{table.info}</InfoTip>
-          {!view.full && (
-            <div className="relative ml-auto flex items-center">
-              <Search className="pointer-events-none absolute left-2 h-3.5 w-3.5 text-muted-foreground" />
-              <input className="ed-input pl-7" placeholder={`Search ${table.label.toLowerCase()}…`} aria-label="Search" value={query} onChange={(e) => setQuery(e.target.value)} />
-            </div>
-          )}
         </header>
         {view.full ? (
           <div className="min-h-0 flex-1"><view.full data={data} /></div>
         ) : (
           <div className="flex min-h-0 flex-1">
-            <div className="flex w-72 shrink-0 flex-col overflow-y-auto border-r border-sidebar-border">
-              {view.Toolbar && <view.Toolbar data={data} onSelect={(id) => go({ table: table.id, id })} />}
-              {view.tiles && (
-                <div className="flex items-center justify-between px-2 pt-2">
-                  <span className="ed-hint">Show as</span>
-                  <ViewToggle mode={mode} onChange={setMode} />
-                </div>
-              )}
-              <div className="p-2"><view.Browser data={data} query={query} selected={selected} mode={view.tiles ? mode : 'list'} onSelect={(id) => go({ table: table.id, id })} /></div>
+            <div className="flex w-72 shrink-0 flex-col border-r border-sidebar-border" data-testid="list-pane">
+              <div className="relative flex shrink-0 items-center border-b border-sidebar-border p-2">
+                <Search className="pointer-events-none absolute left-4 h-3.5 w-3.5 text-muted-foreground" />
+                <input className="ed-input pl-7 pr-7" placeholder={`Search ${table.label.toLowerCase()}…`} aria-label="Search" value={query} onChange={(e) => setQuery(e.target.value)} />
+                {query && <button type="button" className="ed-iconbtn absolute right-3" title="Clear the search" aria-label="Clear search" onClick={() => setQuery('')}><X /></button>}
+              </div>
+              <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+                {view.Toolbar && <view.Toolbar data={data} onSelect={(id) => go({ table: table.id, id })} />}
+                {view.tiles && (
+                  <div className="flex items-center justify-between px-2 pt-2">
+                    <span className="ed-hint">Show as</span>
+                    <ViewToggle mode={mode} onChange={setMode} />
+                  </div>
+                )}
+                <div className="p-2"><view.Browser data={data} query={query} selected={selected} mode={view.tiles ? mode : 'list'} onSelect={(id) => go({ table: table.id, id })} /></div>
+              </div>
             </div>
             <div className="min-h-0 min-w-0 flex-1"><view.Detail data={data} id={selected} tab={search.tab} onSelect={(id) => go({ table: table.id, id })} /></div>
           </div>

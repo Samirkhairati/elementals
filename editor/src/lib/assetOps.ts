@@ -75,11 +75,11 @@ const refsOf = (refs: ProjectReferences, table: 'graphic' | 'tileset', ids: read
 
 // ── graphics ────────────────────────────────────────────────────────────────────────────────────
 
-/** Plan renaming / moving graphics (one, or everything under a folder): `existing` are all graphic ids that exist now. */
+/** Plan renaming / moving graphics (one, or everything under a folder; no changes = an empty folder, nothing to rewrite): `existing` are all graphic ids that exist now. */
 export function planGraphicChanges(refs: ProjectReferences, characters: Record<string, CharacterInfo>, maps: readonly MapData[], existing: ReadonlySet<string>, changes: readonly IdChange[]): AssetPlan {
   const moving = new Set(changes.map((c) => c.from))
   const targets = new Set<string>()
-  let problem = changes.length === 0 ? 'Nothing to change.' : ''
+  let problem = ''
   for (const c of changes) {
     if (problem) break
     if (!isValidGraphicId(c.to)) problem = `“${c.to}” is not a valid graphic id: use letters, digits, “-” and “_” in each part, ending in .png.`

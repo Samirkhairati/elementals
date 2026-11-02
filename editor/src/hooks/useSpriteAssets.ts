@@ -44,6 +44,15 @@ export interface UseSpriteAssets {
   renameFolder: (folderId: string, newName: string) => Promise<OpResult<{ folderId: string }>>
   moveFolder: (folderId: string, newParentId: string | null) => Promise<OpResult<{ folderId: string }>>
   deleteFolder: (folderId: string) => Promise<OpResult>
+  /** Every folder under project/graphics, empty ones included, sorted. */
+  graphicFolders: string[]
+  /** Renames and/or moves a graphic to a new id. Refuses to overwrite. References are NOT rewritten (see lib/assetOps). */
+  renameGraphic: (id: string, newId: string) => Promise<OpResult<{ id: string }>>
+  deleteGraphic: (id: string) => Promise<OpResult>
+  createGraphicFolder: (parentId: string | null, name: string) => Promise<OpResult<{ folderId: string }>>
+  renameGraphicFolder: (folderId: string, newName: string) => Promise<OpResult<{ folderId: string }>>
+  moveGraphicFolder: (folderId: string, newParentId: string | null) => Promise<OpResult<{ folderId: string }>>
+  deleteGraphicFolder: (folderId: string) => Promise<OpResult>
 }
 
 interface State {
@@ -51,6 +60,7 @@ interface State {
   graphics: GraphicInfo[]
   images: Record<string, string>
   folders: string[]
+  graphicFolders: string[]
   loading: boolean
   error: string | null
   warnings: SpriteWarning[]
@@ -64,7 +74,7 @@ const byId = <T extends { id: string }>(a: T, b: T) => (a.id < b.id ? -1 : a.id 
  * through IPC first and update local state from the main process' answer, so the state mirrors the disk.
  */
 export function useSpriteAssets(): UseSpriteAssets {
-  const [state, setState] = useState<State>({ characters: {}, graphics: [], images: {}, folders: [], loading: true, error: null, warnings: [] })
+  const [state, setState] = useState<State>({ characters: {}, graphics: [], images: {}, folders: [], graphicFolders: [], loading: true, error: null, warnings: [] })
   // Latest-wins guard for async loads; bumped on unmount so late answers are ignored.
   const [requests] = useState(() => ({ latest: 0 }))
 
@@ -73,7 +83,7 @@ export function useSpriteAssets(): UseSpriteAssets {
     setState((s) => ({ ...s, loading: true }))
     const result = await runIpc(
       () => api()?.getCharacters(),
-      (r) => ({ characters: r.characters ?? [], graphics: r.graphics ?? [], images: r.images ?? {}, folders: r.folders ?? [], warnings: r.warnings ?? [] })
+      (r) => ({ characters: r.characters ?? [], graphics: r.graphics ?? [], images: r.images ?? {}, folders: r.folders ?? [], graphicFolders: r.graphicFolders ?? [], warnings: r.warnings ?? [] })
     )
     if (id !== requests.latest) return // a newer reload (or unmount) superseded this one
     if (!result.ok) {
@@ -85,6 +95,7 @@ export function useSpriteAssets(): UseSpriteAssets {
       graphics: result.graphics,
       images: result.images,
       folders: result.folders,
+      graphicFolders: result.graphicFolders,
       loading: false,
       error: null,
       warnings: result.warnings,
@@ -190,6 +201,14 @@ export function useSpriteAssets(): UseSpriteAssets {
   const moveFolder = useCallback<UseSpriteAssets['moveFolder']>((folderId, newParentId) => folderOp(() => api()?.moveCharacterFolder(folderId, newParentId), (r: { folderId: string }) => ({ folderId: r.folderId }) as never), [folderOp])
   const deleteFolder = useCallback<UseSpriteAssets['deleteFolder']>((folderId) => folderOp(() => api()?.deleteCharacterFolder(folderId), () => ({}) as never), [folderOp])
 
+  // Ids change with every graphic rename or folder move, so these re-read the project afterwards too.
+  const renameGraphic = useCallback<UseSpriteAssets['renameGraphic']>((id, newId) => folderOp(() => api()?.renameGraphic(id, newId), (r: { id: string }) => ({ id: r.id }) as never), [folderOp])
+  const deleteGraphic = useCallback<UseSpriteAssets['deleteGraphic']>((id) => folderOp(() => api()?.deleteGraphic(id), () => ({}) as never), [folderOp])
+  const createGraphicFolder = useCallback<UseSpriteAssets['createGraphicFolder']>((parentId, name) => folderOp(() => api()?.createGraphicFolder(parentId, name), (r: { folderId: string }) => ({ folderId: r.folderId }) as never), [folderOp])
+  const renameGraphicFolder = useCallback<UseSpriteAssets['renameGraphicFolder']>((folderId, newName) => folderOp(() => api()?.renameGraphicFolder(folderId, newName), (r: { folderId: string }) => ({ folderId: r.folderId }) as never), [folderOp])
+  const moveGraphicFolder = useCallback<UseSpriteAssets['moveGraphicFolder']>((folderId, newParentId) => folderOp(() => api()?.moveGraphicFolder(folderId, newParentId), (r: { folderId: string }) => ({ folderId: r.folderId }) as never), [folderOp])
+  const deleteGraphicFolder = useCallback<UseSpriteAssets['deleteGraphicFolder']>((folderId) => folderOp(() => api()?.deleteGraphicFolder(folderId), () => ({}) as never), [folderOp])
+
   const assets = useMemo(() => Object.fromEntries(Object.values(state.characters).map((c) => [c.id, characterToAssetInfo(c) as SpriteAssetInfo])), [state.characters])
   const list = useMemo(() => Object.values(assets).sort(byId), [assets])
   const getAsset = useCallback((id: string | null | undefined) => (id ? assets[id] : undefined), [assets])
@@ -217,5 +236,12 @@ export function useSpriteAssets(): UseSpriteAssets {
     renameFolder,
     moveFolder,
     deleteFolder,
+    graphicFolders: state.graphicFolders,
+    renameGraphic,
+    deleteGraphic,
+    createGraphicFolder,
+    renameGraphicFolder,
+    moveGraphicFolder,
+    deleteGraphicFolder,
   }
 }

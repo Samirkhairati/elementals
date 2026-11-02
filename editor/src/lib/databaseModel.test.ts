@@ -24,10 +24,11 @@ const def = (image: string, over: Partial<CharacterDef> = {}): CharacterDef => (
 const info = (id: string, d: CharacterDef): CharacterInfo => ({ id, def: d, images: {} })
 
 describe('table registry', () => {
-  it('has unique ids; Visual tables are read-only, Design tables editable; unbuilt ones are planned', () => {
+  it('has unique ids; Visual and Design tables are editable, Maps read-only; unbuilt ones are planned', () => {
     const ids = DATABASE_TABLES.map((t) => t.id)
     expect(new Set(ids).size).toBe(ids.length)
-    for (const t of DATABASE_TABLES.filter((t) => t.group === 'visual')) expect(t.access).toBe('readonly')
+    for (const t of DATABASE_TABLES.filter((t) => t.group === 'visual')) expect(t.access).toBe('editable')
+    expect(getTable('maps')?.access).toBe('readonly')
     expect(getTable('characters')).toMatchObject({ group: 'design', access: 'editable', status: 'ready' })
     expect(getTable('flags')?.group).toBe('design')
     expect(DATABASE_TABLES.filter((t) => t.status === 'planned').map((t) => t.id)).toEqual(expect.arrayContaining(['pokemon', 'items', 'moves', 'text']))

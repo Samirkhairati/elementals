@@ -129,6 +129,9 @@ export interface TilesetData {
   fileName: string
   folderPath: string | null
   dataUrl: string
+  /** Pixel size from the PNG header; missing or 0 when unknown. */
+  width?: number
+  height?: number
 }
 
 export type ActiveTool = 'brush' | 'eraser' | 'rectangle' | 'bucket'

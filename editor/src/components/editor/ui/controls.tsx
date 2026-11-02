@@ -6,6 +6,7 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Info, Magnet, Maximize, Minus, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { MAX_ZOOM, MIN_ZOOM, sliderToZoom, zoomLabel, zoomToSlider } from '@/lib/zoom'
 
 // ── Field row ───────────────────────────────────────────────────────────────────────────────────
 
@@ -123,20 +124,44 @@ interface ZoomControlsProps {
   /** True while the view already is the fitted one. */
   fitted?: boolean
   className?: string
+  /** Adds a slider between the buttons (log scale): called with the new zoom factor. */
+  onZoomTo?: (zoom: number) => void
+  /** Adds a "100%" button. */
+  onActualSize?: () => void
 }
 
-export function ZoomControls({ zoom, onZoomIn, onZoomOut, onFit, fitted, className }: ZoomControlsProps) {
+export function ZoomControls({ zoom, onZoomIn, onZoomOut, onFit, fitted, className, onZoomTo, onActualSize }: ZoomControlsProps) {
+  const readout = (
+    <span className="ed-mono w-14 text-center text-ed-label text-muted-foreground" data-testid="zoom-readout">
+      {zoomLabel(zoom)}
+    </span>
+  )
   return (
     <div className={cn('flex items-center gap-0.5 rounded-md border border-border bg-background/80 p-0.5 backdrop-blur', className)} data-testid="zoom-controls" onMouseDown={(e) => e.stopPropagation()}>
       <IconButton title="Zoom out" aria-label="Zoom out" onClick={onZoomOut}>
         <Minus />
       </IconButton>
-      <span className="ed-mono w-11 text-center text-ed-label text-muted-foreground" data-testid="zoom-readout">
-        {Math.round(zoom * 100)}%
-      </span>
-      <IconButton title="Zoom in" aria-label="Zoom in" onClick={onZoomIn}>
-        <Plus />
-      </IconButton>
+      {onZoomTo ? (
+        <>
+          <Slider aria-label="Zoom" className="w-28 flex-none" min={Math.log2(MIN_ZOOM)} max={Math.log2(MAX_ZOOM)} step={0.01} value={zoomToSlider(zoom)} onChange={(v) => onZoomTo(sliderToZoom(v))} />
+          <IconButton title="Zoom in" aria-label="Zoom in" onClick={onZoomIn}>
+            <Plus />
+          </IconButton>
+          {readout}
+        </>
+      ) : (
+        <>
+          {readout}
+          <IconButton title="Zoom in" aria-label="Zoom in" onClick={onZoomIn}>
+            <Plus />
+          </IconButton>
+        </>
+      )}
+      {onActualSize && (
+        <IconButton title="Actual size (100%)" aria-label="Actual size" active={Math.abs(zoom - 1) < 1e-6} onClick={onActualSize}>
+          <span className="text-[10px] font-medium leading-none">1:1</span>
+        </IconButton>
+      )}
       <IconButton title="Reset the view to fit" aria-label="Fit view" active={fitted} onClick={onFit}>
         <Maximize />
       </IconButton>

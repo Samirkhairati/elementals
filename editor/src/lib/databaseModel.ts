@@ -21,12 +21,12 @@ export interface DatabaseTable {
 
 export const GROUP_LABELS: Record<TableGroup, string> = { visual: 'Visual', design: 'Design', world: 'World', text: 'Text', game: 'Game' }
 
-export const READONLY_INFO = 'Visual resources are shown exactly as stored. To use one, attach it to a sprite; to change it, edit the image file.'
+export const LIBRARY_INFO = 'Import, rename, move into folders and delete here. Every sprite and map that uses a picture is updated for you; the map editor only lets you pick them.'
 
 /** Adding Pokémon or Items later = adding one entry here and one component in the shell's table map. */
 export const DATABASE_TABLES: readonly DatabaseTable[] = [
-  { id: 'graphics', label: 'Graphics', group: 'visual', icon: 'Image', access: 'readonly', status: 'ready', info: READONLY_INFO },
-  { id: 'tilesets', label: 'Tilesets', group: 'visual', icon: 'Grid3x3', access: 'readonly', status: 'ready', info: READONLY_INFO },
+  { id: 'graphics', label: 'Graphics', group: 'visual', icon: 'Image', access: 'editable', status: 'ready', info: LIBRARY_INFO },
+  { id: 'tilesets', label: 'Tilesets', group: 'visual', icon: 'Grid3x3', access: 'editable', status: 'ready', info: LIBRARY_INFO },
   { id: 'characters', label: 'Sprites', group: 'design', icon: 'PersonStanding', access: 'editable', status: 'ready', info: 'Anything drawn that can animate: a person, a flower, a chest, a door.' },
   { id: 'flags', label: 'Flags', group: 'design', icon: 'ToggleLeft', access: 'editable', status: 'ready', info: 'Switches, variables, stages and common events used by events.' },
   { id: 'maps', label: 'Maps', group: 'world', icon: 'Map', access: 'readonly', status: 'ready', info: 'A read-only overview. Open a map in the Map Editor to change it.' },
