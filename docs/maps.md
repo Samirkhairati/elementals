@@ -67,16 +67,11 @@ Usage errors exit 2.
 ```
 STATUS   MAP     SOURCE       GAME FILE
 -------  ------  -----------  -----------
-DRIFTED  map2    map2.json    map2.json
 DRIFTED  market  market.json  market.json
 ```
 
-- `market`: only drifted because the exporter now writes canonical engine entities (`Event` instead of `Interactable`) and
-  `schemaVersion: 2` (see `docs/engine-design.md`, Migration); the committed game copy still has the legacy entity. Re-export it with
-  `node scripts/export-maps.mjs --write --only market --force`.
-- `map2`: `project/maps/map2.json` has the internal name `city` and corresponds to the game's **`city.json`** (the game's `map2.json` is a different map),
-  so the file-name mapping compares it with the wrong game map. Compared with `city.json` it is still DRIFTED: the editor map uses extra `interior`/`outside`
-  tilesets, orders its layers differently, and (in the uncommitted working-tree edit) has one entity. Decide whether the editor or the game copy is the truth before exporting.
-- `city`, `map1`, `map3`, `map4`, `map5` exist only in the game; there is no editor source for them.
+- `market` is the only map. It is DRIFTED because the editor copy has been edited since the last export; re-export with
+  `node scripts/export-maps.mjs --write --only market --force` when you want the game to pick the changes up.
+- The older game-only maps (`city`, `map1`..`map5`) were removed from `game/public/data/maps/`; every game map now has an editor source.
 
 Tests: `npm run test:scripts` (CLI and library), `cd editor && npm test` (shared module, incl. a golden test against the previous export implementation).
