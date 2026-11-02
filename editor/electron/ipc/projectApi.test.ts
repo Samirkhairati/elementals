@@ -74,6 +74,47 @@ describe('channels end to end (real temp project)', () => {
     expect(await gameApi['export-map-to-game']('x.json', 'nope')).toMatchObject({ success: false });
   });
 
+  describe('export also syncs the game assets', () => {
+    const repoWith = (script: string | null) => {
+      const repo = tmp.create();
+      const project = path.join(repo, 'project');
+      fs.mkdirSync(project, { recursive: true });
+      if (script !== null) {
+        fs.mkdirSync(path.join(repo, 'scripts', 'lib'), { recursive: true });
+        fs.writeFileSync(path.join(repo, 'scripts', 'lib', 'assets.mjs'), script);
+      }
+      return { repo, project };
+    };
+
+    it('runs the repo\'s asset sync into game/public and reports what it wrote', async () => {
+      const { repo, project } = repoWith(
+        `import fs from 'fs'; import path from 'path';
+         export function syncAssets({ projectDir, publicDir, write }) {
+           if (!write) throw new Error('must write');
+           fs.mkdirSync(path.join(publicDir, 'graphics'), { recursive: true });
+           fs.writeFileSync(path.join(publicDir, 'graphics', 'p.png'), projectDir);
+           return { plan: { errors: [] }, applied: ['a', 'b'] };
+         }`
+      );
+      const api2 = createProjectChannels(project);
+      const res = (await api2['export-map-to-game']('city.json', '{"layers":[]}')) as { success: boolean; assets: { written: number } };
+      expect(res).toMatchObject({ success: true, assets: { written: 2 } });
+      expect(fs.existsSync(path.join(repo, 'game', 'public', 'graphics', 'p.png'))).toBe(true);
+    });
+
+    it('still exports when there is no script (a project copy) or the sync fails', async () => {
+      const none = repoWith(null);
+      const r1 = (await createProjectChannels(none.project)['export-map-to-game']('a.json', '{}')) as { success: boolean; assets: { written: number; skipped?: string } };
+      expect(r1).toMatchObject({ success: true, assets: { written: 0 } });
+      expect(r1.assets.skipped).toMatch(/no asset sync script/);
+
+      const bad = repoWith('export function syncAssets() { throw new Error("boom") }');
+      const r2 = (await createProjectChannels(bad.project)['export-map-to-game']('a.json', '{}')) as { success: boolean; assets: { skipped?: string } };
+      expect(r2.success).toBe(true);
+      expect(r2.assets.skipped).toMatch(/boom/);
+    });
+  });
+
   it('creates, saves and lists maps', async () => {
     const created = (await call('create-map', 'Town', 10, 8, null)) as { success: true; map: { fileName: string } };
     expect(created.success).toBe(true);

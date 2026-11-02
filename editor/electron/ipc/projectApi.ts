@@ -5,6 +5,7 @@ import * as mapStore from './mapStore.js';
 import { toResult } from './result.js';
 import * as characterStore from './characterStore.js';
 import { TilesetCache } from './tilesetCache.js';
+import { syncGameAssets } from './gameAssets.js';
 import * as tilesetStore from './tilesetStore.js';
 import * as graphicStore from './graphicStore.js';
 
@@ -92,8 +93,12 @@ export function createProjectChannels(
       toResult(() => mapStore.saveMap(mapsDir, folderPath, fileName, mapData)),
     'delete-map': (folderPath: string | null, fileName: string) =>
       toResult(() => mapStore.deleteMap(mapsDir, folderPath, fileName)),
-    'export-map-to-game': (fileName: string, json: string) =>
-      toResult(() => mapStore.exportMapToGame(gameMapsDir, fileName, json)),
+    'export-map-to-game': async (fileName: string, json: string) => {
+      const exported = toResult(() => mapStore.exportMapToGame(gameMapsDir, fileName, json));
+      if (!exported.success) return exported;
+      // The pictures, tilesets and sprites the map uses go to the game with it (what `npm run assets:sync` does).
+      return { ...exported, assets: await syncGameAssets(root, gameMapsDir) };
+    },
     'create-map-folder': (parentPath: string | null, folderName: string) =>
       toResult(() => mapStore.createMapFolder(mapsDir, parentPath, folderName)),
     'delete-map-folder': (folderPath: string) => toResult(() => mapStore.deleteMapFolder(mapsDir, folderPath)),

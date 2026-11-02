@@ -310,7 +310,13 @@ export function EditorPage() {
     const res = await exportMapToGame(m, tilesetManager.tilesets, mapManager.getActiveMap(), layerManager.getLayers())
     setNotice(
       res.ok
-        ? { kind: 'info', text: res.changed ? `Exported "${m.name}" to the game as ${res.id}.json.` : `"${m.name}" was already up to date in the game.` }
+        ? {
+            kind: 'info',
+            text:
+              (res.changed ? `Exported "${m.name}" to the game as ${res.id}.json.` : `"${m.name}" was already up to date in the game.`) +
+              (res.assetsWritten ? ` Copied ${res.assetsWritten} asset file${res.assetsWritten === 1 ? '' : 's'} to the game.` : '') +
+              (res.assetsNote ? ` Assets were not synced (${res.assetsNote}): run npm run assets:sync.` : ''),
+          }
         : { kind: 'error', text: `Export to game failed. ${res.error}` }
     )
   })

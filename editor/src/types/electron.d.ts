@@ -37,7 +37,7 @@ interface ElectronAPI {
   moveMap: (fileName: string, oldFolder: string | null, newFolder: string | null) => Promise<{ success: boolean; error?: string }>;
   exportMap: (jsonData: string, defaultName: string) => Promise<{ success: boolean; canceled?: boolean; filePath?: string; error?: string }>;
   /** Writes the converted map straight into the game's maps folder (no dialog). `fileName` is the editor map file name. */
-  exportMapToGame: (fileName: string, json: string) => Promise<({ success: true; id: string; filePath: string; changed: boolean }) | IpcFailure>;
+  exportMapToGame: (fileName: string, json: string) => Promise<({ success: true; id: string; filePath: string; changed: boolean; assets?: { written: number; skipped?: string } }) | IpcFailure>;
   /** Absolute path of a dropped file. The browser harness stages the bytes and returns the staged path. */
   getPathForFile: (file: File) => string | Promise<string>;
   getCharacters: () => Promise<({ success: true; characters: CharacterInfo[]; graphics: GraphicInfo[]; images: Record<string, string>; folders: string[]; graphicFolders: string[]; warnings: { file: string; error: string }[] }) | IpcFailure>;

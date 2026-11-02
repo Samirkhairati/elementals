@@ -82,7 +82,7 @@ export async function exportMap(
   }
 }
 
-export type GameExportOutcome = { ok: true; id: string; changed: boolean } | { ok: false; error: string }
+export type GameExportOutcome = { ok: true; id: string; changed: boolean; assetsWritten: number; assetsNote?: string } | { ok: false; error: string }
 
 /** "Export to game": writes the converted map to game/public/data/maps/<id>.json, no dialog. */
 export async function exportMapToGame(
@@ -102,7 +102,7 @@ export async function exportMapToGame(
 
     const res = await window.electronAPI.exportMapToGame(mapToExportRaw.fileName, built.json)
     if (!res.success) return { ok: false, error: res.error }
-    return { ok: true, id: res.id, changed: res.changed }
+    return { ok: true, id: res.id, changed: res.changed, assetsWritten: res.assets?.written ?? 0, assetsNote: res.assets?.skipped }
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) }
   }
