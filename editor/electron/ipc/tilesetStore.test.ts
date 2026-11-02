@@ -5,10 +5,13 @@ import { fakePng, listDir, makeTempDirTracker } from '../__testutils__/helpers';
 import { TilesetCache } from './tilesetCache';
 import {
   createTilesetFolder,
+  deleteTileset,
   deleteTilesetFolder,
   importTileset,
   listTilesets,
   moveTileset,
+  moveTilesetFolder,
+  renameTilesetFile,
   renameTileset,
   renameTilesetFolder,
 } from './tilesetStore';
@@ -386,5 +389,43 @@ describe('tileset folders', () => {
 
   it('reports a missing folder on delete', () => {
     expect(() => deleteTilesetFolder(sets, cache, 'ghost')).toThrow(/does not exist/);
+  });
+});
+
+describe('tileset ids (file names)', () => {
+  it('import picks a file name that is free in every folder', () => {
+    put('Outside/grass.png', fakePng('a'));
+    const src = path.join(source, 'grass.png');
+    fs.writeFileSync(src, fakePng('b'));
+    const { tileset } = importTileset(sets, cache, src, 'Grass 2', 'Inside');
+    expect(tileset.fileName).toBe('grass_1.png');
+  });
+
+  it('renameTilesetFile renames the png and its metadata, and refuses a name taken in another folder', () => {
+    put('Outside/grass.png', fakePng('a'));
+    put('Outside/grass.json', { name: 'Grass' });
+    put('Inside/floor.png', fakePng('b'));
+    expect(renameTilesetFile(sets, cache, 'Outside', 'grass.png', 'meadow')).toEqual({ fileName: 'meadow.png' });
+    expect(listDir(path.join(sets, 'Outside'))).toEqual(['meadow.json', 'meadow.png']);
+    expect(readJson('Outside', 'meadow.json')).toEqual({ name: 'Grass' });
+    expect(() => renameTilesetFile(sets, cache, 'Outside', 'meadow.png', 'floor')).toThrow(/already exists/);
+    expect(() => renameTilesetFile(sets, cache, 'Outside', 'meadow.png', '../x')).toThrow(/letters, digits/);
+  });
+
+  it('deleteTileset removes the png and the metadata', () => {
+    put('Outside/grass.png', fakePng('a'));
+    put('Outside/grass.json', { name: 'Grass' });
+    deleteTileset(sets, cache, 'Outside', 'grass.png');
+    expect(listDir(path.join(sets, 'Outside'))).toEqual([]);
+    expect(() => deleteTileset(sets, cache, 'Outside', 'grass.png')).toThrow(/does not exist/);
+  });
+
+  it('moveTilesetFolder nests a folder and keeps what is inside', () => {
+    put('A/one.png', fakePng('a'));
+    fs.mkdirSync(path.join(sets, 'B'));
+    expect(moveTilesetFolder(sets, cache, 'A', 'B')).toEqual({ newFolderPath: 'B/A' });
+    expect(listDir(path.join(sets, 'B', 'A'))).toEqual(['one.png']);
+    expect(() => moveTilesetFolder(sets, cache, 'B', 'B/A')).toThrow(/into itself/);
+    expect(moveTilesetFolder(sets, cache, 'B/A', null)).toEqual({ newFolderPath: 'A' });
   });
 });

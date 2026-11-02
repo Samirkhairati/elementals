@@ -58,6 +58,8 @@ export interface CharacterListing {
   images: Record<string, string>;
   /** Every plain folder under project/database/characters (ids, "/"-separated, sorted). */
   folders: string[];
+  /** Every folder under project/graphics, empty ones included (ids, "/"-separated, sorted). */
+  graphicFolders: string[];
   warnings: ListWarning[];
 }
 
@@ -95,6 +97,11 @@ function imagesOf(graphicsDir: string, def: unknown, cache: ImageCache): Record<
     }
   }
   return images;
+}
+
+/** Every folder below project/graphics (ids, "/"-separated, sorted), empty ones included. */
+export function listGraphicFolders(graphicsDir: string): string[] {
+  return walkTree(graphicsDir, () => undefined, []).map(toId).sort();
 }
 
 /** Lists graphics (id, size) below project/graphics. */
@@ -147,7 +154,7 @@ export function listCharacters(roots: CharacterRoots, cache: ImageCache): Charac
     images[g.id] = cache.getDataUrl(path.join(roots.graphicsDir, g.id));
   }
   cache.retainOnly(live);
-  return { characters, graphics, images, folders: walked.map(toId).sort(), warnings };
+  return { characters, graphics, images, folders: walked.map(toId).sort(), graphicFolders: listGraphicFolders(roots.graphicsDir), warnings };
 }
 
 /** Shape checks needed to write safely; semantic validation happens in the renderer and in the sync. */

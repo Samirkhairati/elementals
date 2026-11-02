@@ -6,6 +6,7 @@ import { toResult } from './result.js';
 import * as characterStore from './characterStore.js';
 import { TilesetCache } from './tilesetCache.js';
 import * as tilesetStore from './tilesetStore.js';
+import * as graphicStore from './graphicStore.js';
 
 /**
  * Every IPC channel that only needs the project directory (no dialogs, no window), as a table of
@@ -62,6 +63,12 @@ export function createProjectChannels(projectDir: string): Record<string, Channe
       toResult(() => tilesetStore.moveTileset(tilesetsDir, tilesetCache, fileName, oldFolder, newFolder)),
     'delete-folder': (folderPath: string) =>
       toResult(() => tilesetStore.deleteTilesetFolder(tilesetsDir, tilesetCache, folderPath)),
+    'rename-tileset-file': (folderPath: string | null, fileName: string, newStem: string) =>
+      toResult(() => tilesetStore.renameTilesetFile(tilesetsDir, tilesetCache, folderPath, fileName, newStem)),
+    'delete-tileset': (folderPath: string | null, fileName: string) =>
+      toResult(() => tilesetStore.deleteTileset(tilesetsDir, tilesetCache, folderPath, fileName)),
+    'move-tileset-folder': (folderPath: string, newParent: string | null) =>
+      toResult(() => tilesetStore.moveTilesetFolder(tilesetsDir, tilesetCache, folderPath, newParent)),
 
     // ── maps ──
     'get-maps': () =>
@@ -98,6 +105,12 @@ export function createProjectChannels(projectDir: string): Record<string, Channe
     'delete-character': (id: string) => toResult(() => characterStore.deleteCharacter(roots, id)),
     'import-graphic': (sourcePath: string, graphicId: string) =>
       toResult(() => characterStore.importGraphic(graphicsDir, imageCache, sourcePath, graphicId)),
+    'rename-graphic': (id: string, newId: string) => toResult(() => graphicStore.renameGraphic(graphicsDir, imageCache, id, newId)),
+    'delete-graphic': (id: string) => toResult(() => graphicStore.deleteGraphic(graphicsDir, imageCache, id)),
+    'create-graphic-folder': (parentId: string | null, name: string) => toResult(() => graphicStore.createGraphicFolder(graphicsDir, parentId ?? null, name)),
+    'rename-graphic-folder': (folderId: string, newName: string) => toResult(() => graphicStore.renameGraphicFolder(graphicsDir, imageCache, folderId, newName)),
+    'move-graphic-folder': (folderId: string, newParentId: string | null) => toResult(() => graphicStore.moveGraphicFolder(graphicsDir, imageCache, folderId, newParentId ?? null)),
+    'delete-graphic-folder': (folderId: string) => toResult(() => graphicStore.deleteGraphicFolder(graphicsDir, imageCache, folderId)),
     'create-character-folder': (parentId: string | null, name: string) =>
       toResult(() => characterStore.createCharacterFolder(charactersDir, parentId ?? null, name)),
     'rename-character-folder': (folderId: string, newName: string) =>

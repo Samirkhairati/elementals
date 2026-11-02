@@ -23,6 +23,9 @@ interface ElectronAPI {
   renameTileset: (folderPath: string | null, fileName: string, newName: string) => Promise<{ success: boolean; error?: string }>;
   moveTileset: (fileName: string, oldFolder: string | null, newFolder: string | null) => Promise<{ success: boolean; error?: string }>;
   deleteFolder: (folderPath: string) => Promise<{ success: boolean; error?: string }>;
+  renameTilesetFile: (folderPath: string | null, fileName: string, newStem: string) => Promise<{ success: boolean; fileName?: string; error?: string }>;
+  deleteTileset: (folderPath: string | null, fileName: string) => Promise<{ success: boolean; error?: string }>;
+  moveTilesetFolder: (folderPath: string, newParent: string | null) => Promise<{ success: boolean; newFolderPath?: string; error?: string }>;
   getMaps: () => Promise<{ success: boolean; folders?: string[]; maps?: any[]; warnings?: { file: string; error: string }[]; error?: string }>;
   createMap: (name: string, width: number, height: number, folderPath: string | null) => Promise<{ success: boolean; map?: any; error?: string }>;
   saveMap: (folderPath: string | null, fileName: string, mapData: any) => Promise<{ success: boolean; error?: string }>;
@@ -35,12 +38,18 @@ interface ElectronAPI {
   exportMap: (jsonData: string, defaultName: string) => Promise<{ success: boolean; canceled?: boolean; filePath?: string; error?: string }>;
   /** Absolute path of a dropped file. The browser harness stages the bytes and returns the staged path. */
   getPathForFile: (file: File) => string | Promise<string>;
-  getCharacters: () => Promise<({ success: true; characters: CharacterInfo[]; graphics: GraphicInfo[]; images: Record<string, string>; folders: string[]; warnings: { file: string; error: string }[] }) | IpcFailure>;
+  getCharacters: () => Promise<({ success: true; characters: CharacterInfo[]; graphics: GraphicInfo[]; images: Record<string, string>; folders: string[]; graphicFolders: string[]; warnings: { file: string; error: string }[] }) | IpcFailure>;
   pickSpriteFile: () => Promise<({ success: true; sourcePath: string; defaultName: string }) | IpcFailure>;
   saveCharacter: (id: string, def: CharacterDef) => Promise<({ success: true; character: CharacterInfo }) | IpcFailure>;
   renameCharacter: (id: string, newId: string) => Promise<({ success: true; id: string }) | IpcFailure>;
   deleteCharacter: (id: string) => Promise<({ success: true }) | IpcFailure>;
   importGraphic: (sourcePath: string, graphicId: string) => Promise<({ success: true; graphic: GraphicInfo; image: string }) | IpcFailure>;
+  renameGraphic: (id: string, newId: string) => Promise<({ success: true; id: string }) | IpcFailure>;
+  deleteGraphic: (id: string) => Promise<({ success: true }) | IpcFailure>;
+  createGraphicFolder: (parentId: string | null, name: string) => Promise<({ success: true; folderId: string }) | IpcFailure>;
+  renameGraphicFolder: (folderId: string, newName: string) => Promise<({ success: true; folderId: string }) | IpcFailure>;
+  moveGraphicFolder: (folderId: string, newParentId: string | null) => Promise<({ success: true; folderId: string }) | IpcFailure>;
+  deleteGraphicFolder: (folderId: string) => Promise<({ success: true }) | IpcFailure>;
   createCharacterFolder: (parentId: string | null, name: string) => Promise<({ success: true; folderId: string }) | IpcFailure>;
   renameCharacterFolder: (folderId: string, newName: string) => Promise<({ success: true; folderId: string }) | IpcFailure>;
   moveCharacterFolder: (folderId: string, newParentId: string | null) => Promise<({ success: true; folderId: string }) | IpcFailure>;

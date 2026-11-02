@@ -10,7 +10,7 @@ import {
   walkTree,
   type ListWarning,
 } from './folderOps.js';
-import { assertSafeFileName, resolveInside } from './pathSafety.js';
+import { assertSafeFileName, resolveInside, resolveStrictlyInside } from './pathSafety.js';
 import { errorMessage } from './result.js';
 import { TilesetCache } from './tilesetCache.js';
 
@@ -108,6 +108,13 @@ function assertPngSource(sourcePath: string): void {
   }
 }
 
+/** File names (`grass.png`) of every tileset below the root: the ids maps store, so they are unique project-wide. */
+export function allTilesetFileNames(tilesetsDir: string): Set<string> {
+  const names = new Set<string>();
+  walkTree(tilesetsDir, ({ name }) => { if (name.endsWith(PNG_EXT)) names.add(name); }, []);
+  return names;
+}
+
 export function importTileset(
   tilesetsDir: string,
   cache: TilesetCache,
@@ -124,10 +131,12 @@ export function importTileset(
   const targetDir = resolveInside(tilesetsDir, [folderPath]);
   fs.mkdirSync(targetDir, { recursive: true });
 
+  // Maps refer to a tileset by its file name alone, so the name has to be free in every folder.
+  const taken = allTilesetFileNames(tilesetsDir);
   let fileName = `${stem}${PNG_EXT}`;
   for (let counter = 1; ; counter++) {
     const candidate = path.join(targetDir, fileName);
-    if (!pathExists(candidate) && !pathExists(jsonSiblingOf(candidate))) break;
+    if (!taken.has(fileName) && !pathExists(candidate) && !pathExists(jsonSiblingOf(candidate))) break;
     fileName = `${stem}_${counter}${PNG_EXT}`;
   }
   assertSafeFileName(fileName, PNG_EXT);
@@ -223,4 +232,79 @@ export function renameTilesetFolder(
 export function deleteTilesetFolder(tilesetsDir: string, cache: TilesetCache, folderPath: string): void {
   const { removed } = deleteFolder(tilesetsDir, folderPath);
   cache.invalidateTree(removed);
+}
+
+const STEM = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
+
+/**
+ * Give the tileset a new file name (`grass.png` -> `meadow.png`), which is the id maps store; the metadata file
+ * follows. Refuses a name any tileset in any folder already has. Rewriting the maps is the caller's job.
+ */
+export function renameTilesetFile(
+  tilesetsDir: string,
+  cache: TilesetCache,
+  folderPath: string | null,
+  fileName: string,
+  newStem: string
+): { fileName: string } {
+  assertSafeFileName(fileName, PNG_EXT);
+  if (typeof newStem !== 'string' || !STEM.test(newStem)) {
+    throw new Error('A tileset file name uses letters, digits, "_" and "-" only');
+  }
+  const newFileName = `${newStem}${PNG_EXT}`;
+  if (newFileName === fileName) return { fileName };
+  const oldPng = resolveInside(tilesetsDir, [folderPath, fileName]);
+  if (!pathExists(oldPng)) throw new Error('Tileset does not exist.');
+  if (allTilesetFileNames(tilesetsDir).has(newFileName)) {
+    throw new Error(`A tileset called "${newFileName}" already exists`);
+  }
+  const newPng = path.join(path.dirname(oldPng), newFileName);
+  const oldJson = jsonSiblingOf(oldPng);
+  const newJson = jsonSiblingOf(newPng);
+  if (pathExists(newPng) || pathExists(newJson)) throw new Error(`A tileset called "${newFileName}" already exists`);
+  fs.renameSync(oldPng, newPng);
+  if (pathExists(oldJson)) {
+    try {
+      fs.renameSync(oldJson, newJson);
+    } catch (error: unknown) {
+      fs.renameSync(newPng, oldPng);
+      throw error;
+    }
+  }
+  cache.invalidate(oldPng);
+  cache.invalidate(newPng);
+  return { fileName: newFileName };
+}
+
+/** Delete a tileset (PNG and metadata). Whether maps still use it is the caller's check. */
+export function deleteTileset(tilesetsDir: string, cache: TilesetCache, folderPath: string | null, fileName: string): void {
+  assertSafeFileName(fileName, PNG_EXT);
+  const png = resolveInside(tilesetsDir, [folderPath, fileName]);
+  if (!pathExists(png)) throw new Error('Tileset does not exist.');
+  fs.rmSync(png);
+  fs.rmSync(jsonSiblingOf(png), { force: true });
+  cache.invalidate(png);
+}
+
+/** Move a whole folder (with everything in it) below another folder, or to the top when `newParent` is null. */
+export function moveTilesetFolder(
+  tilesetsDir: string,
+  cache: TilesetCache,
+  folderPath: string,
+  newParent: string | null
+): { newFolderPath: string } {
+  const from = resolveStrictlyInside(tilesetsDir, [folderPath]);
+  if (!pathExists(from) || !fs.lstatSync(from).isDirectory()) throw new Error('Folder does not exist.');
+  if (newParent !== null) {
+    resolveExistingFolder(tilesetsDir, newParent);
+    if (newParent === folderPath || newParent.startsWith(`${folderPath}/`)) throw new Error('A folder cannot be moved into itself');
+  }
+  const leaf = folderPath.split('/').pop() as string;
+  const newFolderPath = newParent ? `${newParent}/${leaf}` : leaf;
+  if (newFolderPath === folderPath) return { newFolderPath };
+  const to = resolveStrictlyInside(tilesetsDir, [newFolderPath]);
+  if (pathExists(to)) throw new Error('A folder with that name already exists');
+  fs.renameSync(from, to);
+  cache.invalidateTree(from);
+  return { newFolderPath };
 }
