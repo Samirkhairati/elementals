@@ -115,7 +115,7 @@ export function DatabasePage() {
       const { library: lib, busy } = pasteRef.current
       const target = e.target as HTMLElement | null
       const typing = !!target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))
-      if (!lib || busy || typing || e.defaultPrevented || !clipboardHasFiles(e.clipboardData)) return
+      if (!lib || busy || typing || e.defaultPrevented || document.querySelector('[role="dialog"]') || !clipboardHasFiles(e.clipboardData)) return
       e.preventDefault()
       // The clipboard can only be read during the event, so take the files now and convert them after.
       const data = e.clipboardData

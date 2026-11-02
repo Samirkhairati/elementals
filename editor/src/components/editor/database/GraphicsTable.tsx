@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import { Copy, Pencil, Trash2 } from 'lucide-react'
+import { Copy, Pencil, Replace, Trash2 } from 'lucide-react'
 import { folderOfId, graphicDeleteGuard, joinId, leafOfId } from '@/lib/assetOps'
 import { formatBytes } from '@/lib/databaseModel'
 import { graphicUsage } from '@/lib/databaseModel'
@@ -12,6 +12,7 @@ import { LibraryBrowser, type DragPayload } from './LibraryBrowser'
 import { ChangeDialog, DeleteDialog, NameDialog } from './LibraryDialogs'
 import { LibraryToolbar } from './LibraryToolbar'
 import { ReferencesSection } from './ReferencesSection'
+import { ReplaceGraphicDialog } from './ReplaceGraphicDialog'
 import { FOLDER_NAME, graphicActions, type Outcome } from './graphicActions'
 import type { DatabaseData } from './useDatabaseData'
 import type { LibraryControls, TableProps } from './shared'
@@ -146,7 +147,7 @@ export function GraphicDetail({ data, id, onSelect }: { data: DatabaseData; id: 
   // The maps that show a sprite which is cut from this picture: a second hop, so "where does this end up?" has an answer.
   const reach = useMemo(() => usage.flatMap((u) => data.refs.of({ table: 'character', id: u.characterId }).filter((r) => r.source.table === 'map')), [usage, data.refs])
   const [copied, setCopied] = useState(false)
-  const [dialog, setDialog] = useState<'change' | 'delete' | null>(null)
+  const [dialog, setDialog] = useState<'change' | 'delete' | 'replace' | null>(null)
   const [outcome, setOutcome] = useState<Outcome | null>(null)
   const actions = graphicActions(data)
   if (!graphic) return <p className="ed-hint p-4">Pick a picture on the left.</p>
@@ -168,6 +169,7 @@ export function GraphicDetail({ data, id, onSelect }: { data: DatabaseData; id: 
         </button>
         <code className="ed-hint">{copied ? 'copied' : id}</code>
         <span className="ml-auto flex items-center gap-2">
+          <EdButton size="sm" onClick={() => setDialog('replace')} title="Put another picture in its place; the id stays, so everything that uses it shows the new one"><Replace /> Replace…</EdButton>
           <EdButton size="sm" onClick={() => setDialog('change')}><Pencil /> Rename…</EdButton>
           <EdButton size="sm" variant="danger" onClick={() => setDialog('delete')}><Trash2 /> Delete</EdButton>
         </span>
@@ -191,6 +193,19 @@ export function GraphicDetail({ data, id, onSelect }: { data: DatabaseData; id: 
       <ReferencesSection refs={refs} empty="Nothing uses this picture. It is safe to rename, move or delete." />
       {reach.length > 0 && <ReferencesSection title="Ends up in" refs={reach} empty="" />}
 
+      {dialog === 'replace' && (
+        <ReplaceGraphicDialog
+          id={id}
+          current={{ url: images[id], width: graphic.width, height: graphic.height }}
+          onReplace={async (source) => {
+            const r = await data.sprites.replaceGraphic(source, id)
+            if (!r.ok) return r.error
+            setOutcome({ ok: true, error: '', message: `Replaced ${leafOfId(id)}${r.graphic.width !== graphic.width || r.graphic.height !== graphic.height ? ` (${graphic.width}×${graphic.height} → ${r.graphic.width}×${r.graphic.height} px)` : ''}.` })
+            return ''
+          }}
+          onClose={() => setDialog(null)}
+        />
+      )}
       {dialog === 'change' && <ChangeGraphic id={id} data={data} actions={actions} onDone={(o, next) => { setOutcome(o); if (o.ok) onSelect?.(next) }} onClose={() => setDialog(null)} />}
       {dialog === 'delete' && (
         <DeleteDialog

@@ -121,6 +121,7 @@ export function createApiHandler(options: ApiHandlerOptions): ApiHandler {
     ...projectChannels,
     'import-tileset': guarded(projectChannels['import-tileset']),
     'import-graphic': guarded(projectChannels['import-graphic']),
+    'replace-graphic': guarded(projectChannels['replace-graphic']),
     // The browser has no save dialog: hand the JSON back and let the page download it.
     'export-map': (jsonData: unknown, defaultName: unknown) =>
       typeof jsonData === 'string'

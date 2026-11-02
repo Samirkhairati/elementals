@@ -50,6 +50,8 @@ interface ElectronAPI {
   renameCharacter: (id: string, newId: string) => Promise<({ success: true; id: string }) | IpcFailure>;
   deleteCharacter: (id: string) => Promise<({ success: true }) | IpcFailure>;
   importGraphic: (sourcePath: string, graphicId: string) => Promise<({ success: true; graphic: GraphicInfo; image: string }) | IpcFailure>;
+  /** Puts a PNG in the place of an existing graphic (same id). */
+  replaceGraphic: (sourcePath: string, graphicId: string) => Promise<({ success: true; graphic: GraphicInfo; image: string; assets?: { written: number; skipped?: string } }) | IpcFailure>;
   renameGraphic: (id: string, newId: string) => Promise<({ success: true; id: string }) | IpcFailure>;
   deleteGraphic: (id: string) => Promise<({ success: true }) | IpcFailure>;
   createGraphicFolder: (parentId: string | null, name: string) => Promise<({ success: true; folderId: string }) | IpcFailure>;

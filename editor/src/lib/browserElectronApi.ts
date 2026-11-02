@@ -133,6 +133,7 @@ export function createBrowserElectronApi(): ElectronAPI {
     renameCharacter: (id: string, newId: string) => c('rename-character', id, newId),
     deleteCharacter: (id: string) => c('delete-character', id),
     importGraphic: (sourcePath: string, graphicId: string) => c('import-graphic', sourcePath, graphicId),
+    replaceGraphic: (sourcePath: string, graphicId: string) => c('replace-graphic', sourcePath, graphicId),
     renameGraphic: (id: string, newId: string) => c('rename-graphic', id, newId),
     deleteGraphic: (id: string) => c('delete-graphic', id),
     createGraphicFolder: (parentId: string | null, name: string) => c('create-graphic-folder', parentId, name),

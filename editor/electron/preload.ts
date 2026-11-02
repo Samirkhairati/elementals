@@ -36,6 +36,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   renameCharacter: (id: string, newId: string) => ipcRenderer.invoke('rename-character', id, newId),
   deleteCharacter: (id: string) => ipcRenderer.invoke('delete-character', id),
   importGraphic: (sourcePath: string, graphicId: string) => ipcRenderer.invoke('import-graphic', sourcePath, graphicId),
+  replaceGraphic: (sourcePath: string, graphicId: string) => ipcRenderer.invoke('replace-graphic', sourcePath, graphicId),
   renameGraphic: (id: string, newId: string) => ipcRenderer.invoke('rename-graphic', id, newId),
   deleteGraphic: (id: string) => ipcRenderer.invoke('delete-graphic', id),
   createGraphicFolder: (parentId: string | null, name: string) => ipcRenderer.invoke('create-graphic-folder', parentId, name),

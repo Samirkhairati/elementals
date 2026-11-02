@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { pathExists } from './folderOps.js';
 import { resolveStrictlyInside } from './pathSafety.js';
+import { assertPngFile } from './pngHeader.js';
 import {
   createCharacterFolder,
   deleteCharacterFolder,
@@ -34,6 +35,31 @@ export function renameGraphic(graphicsDir: string, cache: ImageCache, id: string
   cache.invalidate(from);
   cache.invalidate(to);
   return { id: newId };
+}
+
+/**
+ * Puts another PNG in the place of an existing graphic: same id, so every sprite, crop and map that uses it keeps
+ * working (they now draw the new picture). The old file is swapped atomically; nothing is left half written.
+ */
+export function replaceGraphic(
+  graphicsDir: string,
+  cache: ImageCache,
+  sourcePath: string,
+  id: string
+): { graphic: { id: string; width: number; height: number; bytes: number; mtimeMs: number }; image: string } {
+  const target = graphicFile(graphicsDir, id);
+  if (!pathExists(target)) throw new Error(`Graphic "${id}" does not exist.`);
+  const size = assertPngFile(sourcePath, 'Graphic');
+  const temp = `${target}.${process.pid}.tmp`;
+  try {
+    fs.copyFileSync(sourcePath, temp);
+    fs.renameSync(temp, target);
+  } finally {
+    fs.rmSync(temp, { force: true });
+  }
+  cache.invalidate(target);
+  const stat = fs.statSync(target);
+  return { graphic: { id, width: size.width, height: size.height, bytes: stat.size, mtimeMs: stat.mtimeMs }, image: cache.getDataUrl(target) };
 }
 
 export function deleteGraphic(graphicsDir: string, cache: ImageCache, id: string): void {

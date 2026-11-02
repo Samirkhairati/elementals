@@ -300,6 +300,52 @@ describe('Graphics', () => {
     expect(await screen.findByRole('status')).toHaveTextContent('Moved chest.png')
   })
 
+  describe('replacing a picture', () => {
+    const clip = (files: File[]) => ({ clipboardData: { types: ['Files'], files, items: files.map((f) => ({ kind: 'file', getAsFile: () => f })) } })
+
+    it('Replace… takes a pasted picture and puts it in the place of this one (same id)', async () => {
+      const calls: [string, string][] = []
+      install({
+        getPathForFile: () => '/clip/new.png',
+        replaceGraphic: (src: string, id: string) => { calls.push([src, id]); return Promise.resolve({ success: true, graphic: graphic(id, 64, 32), image: PNG }) },
+      })
+      renderAt('/database?table=graphics&id=props/chest.png')
+      fireEvent.click(await screen.findByRole('button', { name: 'Replace…' }))
+      const dialog = await screen.findByRole('dialog')
+      expect(within(dialog).getByRole('button', { name: /^Replace/ })).toBeDisabled() // nothing picked yet
+      fireEvent.paste(document.body, clip([new File(['x'], 'image.png', { type: 'image/png' })]))
+      await waitFor(() => expect(within(dialog).getByRole('button', { name: /^Replace/ })).toBeEnabled())
+      // the page behind must not open its own import for the same paste
+      expect(screen.getAllByRole('dialog')).toHaveLength(1)
+      fireEvent.click(within(dialog).getByRole('button', { name: /^Replace/ }))
+      await waitFor(() => expect(calls).toEqual([['/clip/new.png', 'props/chest.png']]))
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+      expect(await screen.findByRole('status')).toHaveTextContent('Replaced chest.png')
+    })
+
+    it('shows why it failed and stays open', async () => {
+      install({ getPathForFile: () => '/clip/new.png', replaceGraphic: () => Promise.resolve({ success: false, error: 'Not a PNG' }) })
+      renderAt('/database?table=graphics&id=props/chest.png')
+      fireEvent.click(await screen.findByRole('button', { name: 'Replace…' }))
+      const dialog = await screen.findByRole('dialog')
+      fireEvent.drop(within(dialog).getByTestId('replace-drop'), { dataTransfer: { files: [new File(['x'], 'a.png', { type: 'image/png' })], types: ['Files'] } })
+      await waitFor(() => expect(within(dialog).getByRole('button', { name: /^Replace/ })).toBeEnabled())
+      fireEvent.click(within(dialog).getByRole('button', { name: /^Replace/ }))
+      expect(await within(dialog).findByRole('alert')).toHaveTextContent('Not a PNG')
+    })
+
+    it('Choose file… uses the native picker', async () => {
+      install({
+        pickImageFiles: () => Promise.resolve({ success: true, files: [{ sourcePath: '/tmp/x.png', defaultName: 'x', previewUrl: PNG }] }),
+      })
+      renderAt('/database?table=graphics&id=props/chest.png')
+      fireEvent.click(await screen.findByRole('button', { name: 'Replace…' }))
+      const dialog = await screen.findByRole('dialog')
+      fireEvent.click(within(dialog).getByRole('button', { name: /Choose file/ }))
+      await waitFor(() => expect(within(dialog).getByRole('button', { name: /^Replace/ })).toBeEnabled())
+    })
+  })
+
   describe('importing', () => {
     const picked = (...names: string[]) => () => Promise.resolve({ success: true, files: names.map((n) => ({ sourcePath: `/tmp/${n}.png`, defaultName: n, previewUrl: PNG })) })
 

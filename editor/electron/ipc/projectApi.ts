@@ -131,6 +131,9 @@ export function createProjectChannels(
     'delete-character': (id: string) => toResult(() => characterStore.deleteCharacter(roots, id)),
     'import-graphic': async (sourcePath: string, graphicId: string) =>
       withAssetSync(toResult(() => characterStore.importGraphic(graphicsDir, imageCache, sourcePath, graphicId))),
+    // The new picture reaches the game's copy right away, like an import.
+    'replace-graphic': async (sourcePath: string, graphicId: string) =>
+      withAssetSync(toResult(() => graphicStore.replaceGraphic(graphicsDir, imageCache, sourcePath, graphicId))),
     'rename-graphic': (id: string, newId: string) => toResult(() => graphicStore.renameGraphic(graphicsDir, imageCache, id, newId)),
     'delete-graphic': (id: string) => toResult(() => graphicStore.deleteGraphic(graphicsDir, imageCache, id)),
     'create-graphic-folder': (parentId: string | null, name: string) => toResult(() => graphicStore.createGraphicFolder(graphicsDir, parentId ?? null, name)),

@@ -35,6 +35,8 @@ export interface UseSpriteAssets {
   pickFile: () => Promise<OpResult<{ sourcePath: string | null; defaultName: string }>>
   /** Copies an image into project/graphics under `graphicId` (refuses to overwrite). */
   importGraphic: (sourcePath: string, graphicId: string) => Promise<OpResult<{ graphic: GraphicInfo; image: string }>>
+  /** Puts another image in the place of a graphic: same id, so everything that uses it now shows the new picture. */
+  replaceGraphic: (sourcePath: string, graphicId: string) => Promise<OpResult<{ graphic: GraphicInfo; image: string }>>
   /** Creates or overwrites a character record. */
   saveCharacter: (id: string, def: CharacterDef) => Promise<OpResult<{ character: CharacterInfo }>>
   /** Rename and/or move to a new id. Refuses to overwrite. References are NOT rewritten (see the rename flow). */
@@ -138,6 +140,18 @@ export function useSpriteAssets(): UseSpriteAssets {
     [setFailure]
   )
 
+  const replaceGraphic = useCallback<UseSpriteAssets['replaceGraphic']>(
+    async (sourcePath, graphicId) => {
+      const result = await runIpc(
+        () => api()?.replaceGraphic(sourcePath, graphicId),
+        (r) => ({ graphic: r.graphic, image: r.image })
+      )
+      if (result.ok) setState((s) => ({ ...s, error: null, graphics: [...s.graphics.filter((g) => g.id !== result.graphic.id), result.graphic].sort(byId), images: { ...s.images, [result.graphic.id]: result.image } }))
+      return setFailure(result) as OpResult<{ graphic: GraphicInfo; image: string }>
+    },
+    [setFailure]
+  )
+
   const saveCharacter = useCallback<UseSpriteAssets['saveCharacter']>(
     async (id, def) => {
       const result = await runIpc(
@@ -229,6 +243,7 @@ export function useSpriteAssets(): UseSpriteAssets {
     reload,
     pickFile,
     importGraphic,
+    replaceGraphic,
     saveCharacter,
     rename,
     remove,
