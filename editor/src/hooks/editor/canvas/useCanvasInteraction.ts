@@ -116,6 +116,8 @@ export function useCanvasInteraction({
     entity?: EntityData
   } | null>(null)
   const isRightDraggingRef = useRef(false)
+  // The current press is Shift + left button standing in for the right button.
+  const shiftSecondaryRef = useRef(false)
 
   // ── Keyboard Listeners for Spacebar Pan Mode ─────────────────────────────
   useEffect(() => {
@@ -264,6 +266,11 @@ export function useCanvasInteraction({
   // ── Stage Mouse Down ─────────────────────────────────────────────────────
   const handleStageMouseDown = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
+      // Shift + left button is the same gesture as the right button (sampling, context menu, cancel)
+      const secondary = e.evt.button === 2 || (e.evt.button === 0 && e.evt.shiftKey)
+      shiftSecondaryRef.current = secondary && e.evt.button === 0
+      const button = secondary ? 2 : e.evt.button
+
       // Middle-click OR Space + Left-click pan start
       if (e.evt.button === 1 || (e.evt.button === 0 && isSpaceDownRef.current)) {
         startPan(e.evt.clientX, e.evt.clientY)
@@ -280,13 +287,13 @@ export function useCanvasInteraction({
 
       // If an interactive entity or collider transformer was clicked
       if (isEntityOrTransformer) {
-        if (e.evt.button === 0) {
+        if (button === 0) {
           // Left click on entity / transformer:
           // Do NOT paint tiles, do NOT bucket fill, do NOT rectangle fill.
           // Let Konva's entity drag / transform events handle it cleanly!
           return
         }
-        if (e.evt.button === 2) {
+        if (button === 2) {
           // Right click on entity: KonvaEntityNode handles recording the right-click target
           return
         }
@@ -294,7 +301,7 @@ export function useCanvasInteraction({
 
       // If pending entity placement mode is active
       if (pendingPlacement) {
-        if (e.evt.button === 0) {
+        if (button === 0) {
           const stage = stageRef?.current
           let posX = coords.rawX * 32 + 16
           let posY = coords.rawY * 32 + 32
@@ -309,7 +316,7 @@ export function useCanvasInteraction({
           commitPlacement?.(posX, posY)
           return
         }
-        if (e.evt.button === 2) {
+        if (button === 2) {
           cancelPlacement?.()
           return
         }
@@ -317,18 +324,18 @@ export function useCanvasInteraction({
 
       // If an entity was selected, clicking elsewhere on the canvas should ONLY deselect on the first
       // click and NOT start painting immediately!
-      if (e.evt.button === 0 && selectedEntityId) {
+      if (button === 0 && selectedEntityId) {
         setSelectedEntityId?.(null)
         return
       }
 
-      if (pendingImage && e.evt.button === 2) {
+      if (pendingImage && button === 2) {
         cancelImagePlacement?.()
         return
       }
 
       // Right-click tile down: prepare for possible tile drag selection or single-click context menu
-      if (e.evt.button === 2) {
+      if (button === 2) {
         rightClickRef.current = {
           clientX: e.evt.clientX,
           clientY: e.evt.clientY,
@@ -345,7 +352,7 @@ export function useCanvasInteraction({
       // Image layer: a click drops the pending image, otherwise it only deselects (tiles are never painted here).
       const activeLayer = layersRef.current.find((l) => l.id === activeLayerIdRef.current)
       if (activeLayer?.type === 'image') {
-        if (e.evt.button === 0) {
+        if (button === 0) {
           if (pendingImage && coords.isInside && !activeLayer.locked && activeLayer.visible) {
             // Same maths as the ghost preview, so the image lands where the preview showed it.
             const p = stageRef?.current?.getPointerPosition()
@@ -362,7 +369,7 @@ export function useCanvasInteraction({
       }
 
       // Left-click tools on tilemap
-      if (e.evt.button === 0) {
+      if (button === 0) {
         if (activeToolRef.current === 'bucket') {
           if (isInside) handlePaintBucket(x, y)
           return
@@ -493,6 +500,9 @@ export function useCanvasInteraction({
     }
 
     const handleGlobalMouseUp = (e: MouseEvent) => {
+      // A Shift-initiated press ends as a right-button release, even if Shift was let go first.
+      const secondaryUp = e.button === 2 || (e.button === 0 && shiftSecondaryRef.current)
+      if (e.button === 0) shiftSecondaryRef.current = false
       if (isPanningRef.current) {
         if (e.button === 1 || e.button === 0) {
           endPan()
@@ -501,7 +511,7 @@ export function useCanvasInteraction({
       }
 
       // Right-click released
-      if (e.button === 2) {
+      if (secondaryUp) {
         if (rightClickRef.current) {
           if (isRightDraggingRef.current) {
             // Dragged -> Commit tile selection marquee!
@@ -534,7 +544,7 @@ export function useCanvasInteraction({
       }
 
       // Left-click released
-      if (e.button === 0) {
+      if (e.button === 0 && !secondaryUp) {
         if (activeToolRef.current === 'rectangle' && rectStartRef.current && rectCurrentRef.current) {
           handleRectangleFill(rectStartRef.current, rectCurrentRef.current)
           setRectStart(null)
