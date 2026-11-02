@@ -20,7 +20,7 @@ export function overlayRgb(id: unknown): string {
 }
 
 /** The on/off switches of the View group (everything in the settings except the overlay colour). */
-export type CanvasViewToggle = 'sprites' | 'labels' | 'badges' | 'clip'
+export type CanvasViewToggle = 'sprites' | 'labels' | 'badges' | 'clip' | 'lockImages'
 
 export interface CanvasViewSettings {
   /** Draw real sprites (off = placeholder tiles only). */
@@ -32,9 +32,11 @@ export interface CanvasViewSettings {
   badges: boolean
   /** Hide whatever is drawn outside the map (pictures and sprites that run past its edge). Off by default: the edge shows what is there. */
   clip: boolean
+  /** Pictures can only be picked while their own layer is the selected one. Off: any picture can be picked while no layer (or an image layer) is selected. */
+  lockImages: boolean
 }
 
-export const DEFAULT_CANVAS_VIEW: CanvasViewSettings = { sprites: true, labels: true, badges: true, clip: false }
+export const DEFAULT_CANVAS_VIEW: CanvasViewSettings = { sprites: true, labels: true, badges: true, clip: false, lockImages: true }
 
 const STORAGE_KEY = 'elementals.canvasView'
 
@@ -48,6 +50,7 @@ function load(): CanvasViewSettings {
       labels: parsed.labels !== false,
       badges: parsed.badges !== false,
       clip: parsed.clip === true,
+      lockImages: parsed.lockImages !== false,
     }
   } catch {
     return DEFAULT_CANVAS_VIEW
@@ -63,7 +66,7 @@ export function getCanvasView(): CanvasViewSettings {
 
 export function setCanvasView(patch: Partial<CanvasViewSettings>) {
   const next = { ...state, ...patch }
-  if (next.sprites === state.sprites && next.labels === state.labels && next.badges === state.badges && next.clip === state.clip) return
+  if (next.sprites === state.sprites && next.labels === state.labels && next.badges === state.badges && next.clip === state.clip && next.lockImages === state.lockImages) return
   state = next
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state))

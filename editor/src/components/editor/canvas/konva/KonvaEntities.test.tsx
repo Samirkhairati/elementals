@@ -184,6 +184,18 @@ describe('KonvaEntities', () => {
     expect(nodes().every((n) => n.props.draggable === true && n.props.listening === true)).toBe(true)
   })
 
+  it('can be split into a drawing part that never listens and a hit part (for stacking above pictures) that has no sprite', () => {
+    renderEntities([entity('a', 16, 32)], { part: 'sprites' })
+    expect(nodes().every((n) => n.props.listening === false && n.props.draggable === false)).toBe(true)
+    expect(recorded.some((r) => r.kind === 'Shape' && r.props.name === 'entity-sprite')).toBe(true)
+    expect(recorded.some((r) => r.kind === 'Rect')).toBe(false)
+
+    renderEntities([entity('a', 16, 32)], { part: 'hits' })
+    expect(nodes().every((n) => n.props.listening === true && n.props.draggable === true)).toBe(true)
+    expect(recorded.some((r) => r.kind === 'Shape')).toBe(false)
+    expect(recorded.some((r) => r.kind === 'Rect')).toBe(true)
+  })
+
   it('moving an entity reports a snapped, clamped position once on drop', () => {
     const moveEntity = vi.fn()
     renderEntities([entity('a', 16, 32)], { moveEntity, snapEntityPos: (x, y) => ({ x: Math.floor(x / 32) * 32 + 16, y: Math.ceil(y / 32) * 32 }) })

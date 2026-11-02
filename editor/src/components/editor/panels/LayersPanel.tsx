@@ -144,7 +144,8 @@ interface LayersPanelProps {
   hasActiveMap: boolean
   layers: Layer[]
   activeLayerId: string | null
-  setActiveLayerId: (id: string) => void
+  /** `null` = no layer selected (clicking the selected layer again). */
+  setActiveLayerId: (id: string | null) => void
   /** Plain click selects one layer; Ctrl/Cmd+click adds it to the multi-selection. Falls back to `setActiveLayerId`. */
   selectLayer?: (id: string, additive?: boolean) => void
   /** Layers picked in addition to the active one. */
@@ -364,7 +365,9 @@ export function LayersPanel({
                         return
                       }
                       const additive = e.metaKey || e.ctrlKey
-                      if (selectLayer) selectLayer(layer.id, additive)
+                      // Clicking the selected layer again deselects it (a multi-selection collapses to this one layer first).
+                      if (!additive && isSelected && selectedLayerIds.length === 0) setActiveLayerId(null)
+                      else if (selectLayer) selectLayer(layer.id, additive)
                       else setActiveLayerId(layer.id)
                       setSelectedEntityId?.(null)
                     }}

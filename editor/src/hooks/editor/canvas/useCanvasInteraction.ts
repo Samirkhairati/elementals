@@ -61,6 +61,13 @@ interface UseCanvasInteractionProps {
   clearImageSelection?: () => void
 }
 
+/** True for the pick/drag handle of a picture on an image layer (see KonvaImageItems). */
+type NodeLike = { name(): string; getParent(): NodeLike | null }
+export function isPictureHandle(node: NodeLike | null): boolean {
+  for (let n: NodeLike | null = node; n; n = n.getParent()) if (n.name() === 'image-handle') return true
+  return false
+}
+
 export function useCanvasInteraction({
   activeMap,
   layers,
@@ -289,7 +296,8 @@ export function useCanvasInteraction({
       const { x, y, isInside } = coords
 
       // Check if user clicked on an entity, collider shape, transformer handle
-      const isEntityOrTransformer = e.target !== e.target.getStage()
+      // (A picture handle is neither: right-clicking over a picture still opens the tile menu.)
+      const isEntityOrTransformer = e.target !== e.target.getStage() && !isPictureHandle(e.target)
 
       // If an interactive entity or collider transformer was clicked
       if (isEntityOrTransformer) {

@@ -79,6 +79,8 @@ interface MapCanvasProps {
   cancelImagePlacement?: () => void
   selectedImageId?: string | null
   setSelectedImageId?: (id: string | null) => void
+  /** Picking an image of another layer (toolbar lock off) makes that layer the active one. */
+  activateLayer?: (layerId: string) => void
   moveImage?: (layerId: string, imageId: string, x: number, y: number) => void
 }
 
@@ -124,6 +126,7 @@ export function MapCanvas({
   cancelImagePlacement,
   selectedImageId = null,
   setSelectedImageId,
+  activateLayer,
   moveImage,
 }: MapCanvasProps) {
   // Preload and cache tileset image textures
@@ -218,6 +221,13 @@ export function MapCanvas({
 
   const activeLayer = useMemo(() => layers.find((l) => l.id === activeLayerId) ?? null, [layers, activeLayerId])
   const isImageLayerActive = activeLayer?.type === 'image'
+  // Entity placement and image placement both need clicks to land on the map, not on pictures.
+  const placingAnything = !!pendingImage || !!pendingPlacement
+  // Toolbar lock off: while no layer or an image layer is active (never a tile layer: painting wins) any image can be picked.
+  const otherImageLayers = useMemo(
+    () => (!view.lockImages && !placingAnything && (activeLayer === null || isImageLayerActive) ? layers.filter((l) => l.type === 'image') : []),
+    [view.lockImages, placingAnything, activeLayer, isImageLayerActive, layers]
+  )
 
   const handleUpdateTag = useCallback(
     (entityId: string, patch: Record<string, any>) => {
@@ -325,16 +335,37 @@ export function MapCanvas({
                 paintingEnabled={!isImageLayerActive}
               />
 
-              {/* Pick / drag handles of the active image layer (above the art, below the entities) */}
+              {/* Pick / drag handles of the active image layer (above the art; the entities' own handles are above these) */}
               <KonvaImageItems
                 layer={activeLayer}
+                otherLayers={otherImageLayers}
+                activateLayer={activateLayer}
                 selectedImageId={selectedImageId}
                 setSelectedImageId={setSelectedImageId || (() => {})}
                 moveImage={moveImage || (() => {})}
                 snapToGrid={snapToGrid}
                 spriteAssets={spriteAssets}
-                placing={!!pendingImage}
+                placing={placingAnything}
                 dragRef={imageDrag}
+              />
+
+              {/* What the entities listen to (picking, dragging, right-click): above the picture handles, so an entity over a picture is the one you get */}
+              <KonvaEntities
+                part="hits"
+                visuals={entityVisuals}
+                entities={entities}
+                selectedEntityId={selectedEntityId}
+                setSelectedEntityId={setSelectedEntityId || (() => {})}
+                moveEntity={moveEntity || (() => {})}
+                activeMap={activeMap}
+                snapToGrid={snapToGrid}
+                snapEntityPos={snapEntityPos}
+                onRightClickEntity={handleRightClickEntity}
+                showEntities={showEntities}
+                entityFolders={entityFolders}
+                spriteAssets={spriteAssets}
+                view={view}
+                onOpenEvent={openEventEditor}
               />
 
               {/* Entity areas, selection, badges and labels stay on top of every layer so they remain readable */}

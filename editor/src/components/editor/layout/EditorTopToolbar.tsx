@@ -17,6 +17,8 @@ import {
   Image as ImageIcon,
   Type,
   Zap,
+  Lock,
+  LockOpen,
 } from 'lucide-react'
 import { useEditorSelector, type EditorContextValue } from './EditorContext'
 import { ShortcutsDialog } from '../dialogs/ShortcutsDialog'
@@ -96,7 +98,7 @@ function ClipToMapIcon() {
   )
 }
 
-const VIEW_TOGGLES: { key: CanvasViewToggle; title: string; icon: React.ReactNode }[] = [
+const VIEW_TOGGLES: { key: Exclude<CanvasViewToggle, 'lockImages'>; title: string; icon: React.ReactNode }[] = [
   { key: 'sprites', title: 'Sprites: draw real graphics (off: placeholder tiles)', icon: <ImageIcon /> },
   { key: 'labels', title: 'Labels: names of all entities when zoomed in', icon: <Type /> },
   { key: 'badges', title: 'Event badges: lightning on entities with an Event', icon: <Zap /> },
@@ -188,6 +190,19 @@ function MapToolbar() {
               {t.icon}
             </ToolButton>
           ))}
+        </ToolGroup>
+
+        <Divider />
+
+        <ToolGroup label="Pictures">
+          <ToolButton
+            title={view.lockImages ? 'Pictures locked to their layer: a picture can only be picked while its own layer is selected. Click to allow picking any picture.' : 'Pictures unlocked: while no layer or a picture layer is selected, any picture can be picked. Click to lock them to their own layer.'}
+            label="Lock pictures to their layer"
+            active={view.lockImages}
+            onClick={() => toggleCanvasView('lockImages')}
+          >
+            {view.lockImages ? <Lock /> : <LockOpen />}
+          </ToolButton>
         </ToolGroup>
       </div>
 

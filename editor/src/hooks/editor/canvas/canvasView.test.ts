@@ -26,6 +26,12 @@ describe('canvas view settings', () => {
     expect(Object.values(shown).every(Boolean)).toBe(true)
   })
 
+  it('locks pictures to their layer by default, and remembers the choice', () => {
+    expect(getCanvasView().lockImages).toBe(true)
+    act(() => toggleCanvasView('lockImages'))
+    expect(JSON.parse(store.get('elementals.canvasView')!).lockImages).toBe(false)
+  })
+
   it('toggles one flag and notifies subscribers', () => {
     const { result } = renderHook(() => useCanvasView())
     expect(result.current.labels).toBe(true)

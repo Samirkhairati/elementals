@@ -9,10 +9,14 @@ import type { ImagePick } from '@/lib/graphicAssets'
 import { setStageCursor } from '../canvasUtils'
 
 const NO_ASSETS: Record<string, SpriteAssetInfo> = {}
+const NO_LAYERS: Layer[] = []
 
 interface KonvaImageItemsProps {
-  /** The active image layer: only its images can be picked and dragged. */
+  /** The active image layer: its images can always be picked and dragged. */
   layer: Layer | null
+  /** Other image layers whose images can be picked too (the toolbar lock is off); picking one makes its layer the active one. */
+  otherLayers?: Layer[]
+  activateLayer?: (layerId: string) => void
   selectedImageId: string | null
   setSelectedImageId: (id: string | null) => void
   moveImage: (layerId: string, imageId: string, x: number, y: number) => void
@@ -24,9 +28,11 @@ interface KonvaImageItemsProps {
   dragRef?: React.MutableRefObject<{ id: string; x: number; y: number } | null>
 }
 
-/** Pick/drag handles and the selection frame for the images of the active image layer. */
+/** Pick/drag handles and the selection frame for the images of the active image layer (and of the other image layers when the toolbar lock is off). */
 export const KonvaImageItems = React.memo(function KonvaImageItems({
   layer,
+  otherLayers = NO_LAYERS,
+  activateLayer,
   selectedImageId,
   setSelectedImageId,
   moveImage,
@@ -35,10 +41,9 @@ export const KonvaImageItems = React.memo(function KonvaImageItems({
   placing = false,
   dragRef,
 }: KonvaImageItemsProps) {
-  const items = useMemo(() => sortedImages(layer?.images), [layer?.images])
-  if (!layer || layer.type !== 'image' || !layer.visible) return null
-
-  const interactive = !layer.locked && !placing
+  // Other layers first (bottom-up), the active layer last: what is on top is picked first, and the active layer wins.
+  const layers = useMemo(() => [...otherLayers.filter((l) => l.type === 'image' && l.visible && !l.locked && l.id !== layer?.id).reverse(), ...(layer && layer.type === 'image' && layer.visible ? [layer] : [])], [otherLayers, layer])
+  if (layers.length === 0) return null
 
   // Snapping puts the picture's edges on the grid, so the item's own size decides where its anchor goes.
   // Pictures may be dragged past the map's edge (scenery that runs off it); only the snap or the rounding applies.
@@ -47,23 +52,73 @@ export const KonvaImageItems = React.memo(function KonvaImageItems({
 
   return (
     <Group>
-      {items.map((item) => (
-        <ImageHandle
-          key={item.id}
-          item={item}
-          layerId={layer.id}
-          assets={spriteAssets}
-          selected={item.id === selectedImageId}
-          interactive={interactive}
-          place={place}
+      {layers.map((l) => (
+        <ImageLayerHandles
+          key={l.id}
+          layer={l}
+          active={l.id === layer?.id}
+          interactive={!l.locked && !placing}
+          selectedImageId={selectedImageId}
+          activateLayer={activateLayer}
           setSelectedImageId={setSelectedImageId}
           moveImage={moveImage}
+          place={place}
+          assets={spriteAssets}
           dragRef={dragRef}
         />
       ))}
     </Group>
   )
 })
+
+function ImageLayerHandles({
+  layer,
+  active,
+  interactive,
+  selectedImageId,
+  activateLayer,
+  setSelectedImageId,
+  moveImage,
+  place,
+  assets,
+  dragRef,
+}: {
+  layer: Layer
+  active: boolean
+  interactive: boolean
+  selectedImageId: string | null
+  activateLayer?: (layerId: string) => void
+  setSelectedImageId: (id: string | null) => void
+  moveImage: (layerId: string, imageId: string, x: number, y: number) => void
+  place: (item: ImageItem, x: number, y: number) => { x: number; y: number }
+  assets: Record<string, SpriteAssetInfo>
+  dragRef?: React.MutableRefObject<{ id: string; x: number; y: number } | null>
+}) {
+  const items = useMemo(() => sortedImages(layer.images), [layer.images])
+  // Picking an image of another layer makes that layer the active one (which clears the selection, so select after).
+  const pick = (id: string) => {
+    if (!active) activateLayer?.(layer.id)
+    setSelectedImageId(id)
+  }
+  return (
+    <Group>
+      {items.map((item) => (
+        <ImageHandle
+          key={item.id}
+          item={item}
+          layerId={layer.id}
+          assets={assets}
+          selected={active && item.id === selectedImageId}
+          interactive={interactive}
+          place={place}
+          pick={pick}
+          moveImage={moveImage}
+          dragRef={dragRef}
+        />
+      ))}
+    </Group>
+  )
+}
 
 function ImageHandle({
   item,
@@ -72,7 +127,7 @@ function ImageHandle({
   selected,
   interactive,
   place,
-  setSelectedImageId,
+  pick,
   moveImage,
   dragRef,
 }: {
@@ -82,7 +137,7 @@ function ImageHandle({
   selected: boolean
   interactive: boolean
   place: (item: ImageItem, x: number, y: number) => { x: number; y: number }
-  setSelectedImageId: (id: string | null) => void
+  pick: (id: string) => void
   moveImage: (layerId: string, imageId: string, x: number, y: number) => void
   dragRef?: React.MutableRefObject<{ id: string; x: number; y: number } | null>
 }) {
@@ -91,19 +146,21 @@ function ImageHandle({
 
   return (
     <Group
+      name="image-handle"
       x={item.x}
       y={item.y}
       listening={interactive}
       draggable={interactive}
       onMouseDown={(e) => {
-        if (e.evt.button === 0) {
+        // Shift + left is the secondary button's gesture (see the canvas): it is left to the canvas.
+        if (e.evt.button === 0 && !e.evt.shiftKey) {
           e.cancelBubble = true
-          setSelectedImageId(item.id)
+          pick(item.id)
         }
       }}
       onDragStart={(e) => {
         e.cancelBubble = true
-        setSelectedImageId(item.id)
+        pick(item.id)
         if (dragRef) dragRef.current = { id: item.id, x: item.x, y: item.y }
         setStageCursor(e.target.getStage(), 'grabbing')
       }}

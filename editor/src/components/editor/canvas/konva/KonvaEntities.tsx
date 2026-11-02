@@ -61,7 +61,12 @@ interface KonvaEntitiesProps {
    * the layers where the Entities row of the layer list is, the editing overlays (areas, selection, badges, labels)
    * go on top of everything so they stay readable. Both parts share `visuals`. Default: everything in one place.
    */
-  part?: 'all' | 'sprites' | 'overlays'
+  /**
+   * Which of the entity layers to render. `sprites` only draws, `hits` is the invisible part that picks, drags and
+   * right-clicks (put above the picture handles so an entity over a picture wins), `overlays` draws areas, selection and labels.
+   * `all` is sprites + hits in one node.
+   */
+  part?: 'all' | 'sprites' | 'hits' | 'overlays'
   visuals?: React.MutableRefObject<Visuals>
 }
 
@@ -115,6 +120,8 @@ export interface Visuals {
 // ── one entity ──────────────────────────────────────────────────────────────────────────────────
 
 interface KonvaEntityNodeProps {
+  /** `draw`: only the sprite (follows a drag through `visuals`); `hit`: only the invisible grab area and its events. */
+  mode: 'both' | 'draw' | 'hit'
   info: EntityInfo
   /** Bumped when a sheet image finished loading so the sprite re-resolves. */
   imagesVersion: number
@@ -133,6 +140,7 @@ interface KonvaEntityNodeProps {
 }
 
 const KonvaEntityNode = React.memo(function KonvaEntityNode({
+  mode,
   info,
   imagesVersion,
   showSprites,
@@ -169,8 +177,8 @@ const KonvaEntityNode = React.memo(function KonvaEntityNode({
     <Group
       x={entity.x}
       y={entity.y}
-      listening={listening}
-      draggable={draggable}
+      listening={listening && mode !== 'draw'}
+      draggable={draggable && mode !== 'draw'}
       onDragStart={(e) => {
         e.cancelBubble = true
         setSelectedEntityId(entity.id)
@@ -240,9 +248,9 @@ const KonvaEntityNode = React.memo(function KonvaEntityNode({
       }}
     >
       {/* grab area: the sprite frame united with the tile */}
-      <Rect x={bounds.x} y={bounds.y} width={bounds.w} height={bounds.h} fill="rgba(0,0,0,0.001)" />
+      {mode !== 'draw' && <Rect x={bounds.x} y={bounds.y} width={bounds.w} height={bounds.h} fill="rgba(0,0,0,0.001)" />}
 
-      <Shape
+      {mode !== 'hit' && <Shape
         name="entity-sprite"
         listening={false}
         perfectDrawEnabled={false}
@@ -251,6 +259,12 @@ const KonvaEntityNode = React.memo(function KonvaEntityNode({
           const ctx = context._context as CanvasRenderingContext2D
           const stage = shape.getStage()
           const parent = shape.getParent()
+          // Drawn apart from its grab area, the sprite follows a drag through the shared visuals.
+          const dragging = mode === 'draw' && visuals.current.dragId === entity.id
+          const dx = dragging ? visuals.current.dragX - entity.x : 0
+          const dy = dragging ? visuals.current.dragY - entity.y : 0
+          ctx.save()
+          if (dragging) ctx.translate(dx, dy)
           if (stage && parent) {
             const s = stage.scaleX() || 1
             const left = (-stage.x()) / s
@@ -259,7 +273,10 @@ const KonvaEntityNode = React.memo(function KonvaEntityNode({
             const bottom = top + stage.height() / s
             const px = parent.x()
             const py = parent.y()
-            if (px + bounds.x + bounds.w < left || px + bounds.x > right || py + bounds.y + bounds.h < top || py + bounds.y > bottom) return
+            if (px + dx + bounds.x + bounds.w < left || px + dx + bounds.x > right || py + dy + bounds.y + bounds.h < top || py + dy + bounds.y > bottom) {
+              ctx.restore()
+              return
+            }
           }
           if (resolved) {
             drawResolvedSprite(ctx, resolved, {
@@ -271,8 +288,9 @@ const KonvaEntityNode = React.memo(function KonvaEntityNode({
           } else {
             drawPlaceholder(ctx, info.icon, tone, dim ? 0.5 : 1)
           }
+          ctx.restore()
         }}
-      />
+      />}
     </Group>
   )
 })
@@ -318,10 +336,10 @@ export const KonvaEntities = React.memo(function KonvaEntities({
   return (
     <Group>
       {part !== 'overlays' && infos.map((info) => {
-        const isSelected = info.id === selectedEntityId
         return (
           <KonvaEntityNode
             key={info.id}
+            mode={part === 'sprites' ? 'draw' : part === 'hits' ? 'hit' : 'both'}
             info={info}
             imagesVersion={imagesVersion}
             showSprites={view.sprites}
@@ -341,7 +359,7 @@ export const KonvaEntities = React.memo(function KonvaEntities({
       })}
 
       {/* Footprints, badges, labels, hover + selection (one shape, zoom-aware, no React state) */}
-      {part !== 'sprites' && <Shape
+      {(part === 'all' || part === 'overlays') && <Shape
         name="entity-overlays"
         listening={false}
         perfectDrawEnabled={false}

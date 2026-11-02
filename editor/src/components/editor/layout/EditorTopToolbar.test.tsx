@@ -62,6 +62,16 @@ describe('EditorTopToolbar', () => {
     expect(getCanvasView().clip).toBe(false)
   })
 
+  it('has a lock that ties pictures to their own layer (on by default) and can be turned off', () => {
+    renderWithEditor(<EditorTopToolbar />, base() as any)
+    const lock = screen.getByRole('button', { name: 'Lock pictures to their layer' })
+    expect(lock).toHaveAttribute('aria-pressed', 'true')
+    expect(getCanvasView().lockImages).toBe(true)
+    fireEvent.click(lock)
+    expect(getCanvasView().lockImages).toBe(false)
+    expect(lock).toHaveAttribute('aria-pressed', 'false')
+  })
+
   it('disables map tools without a map but keeps the View toggles usable', () => {
     renderWithEditor(<EditorTopToolbar />, base({ activeMap: null }) as any)
     expect(screen.getByRole('button', { name: /Brush Tool/ })).toBeDisabled()

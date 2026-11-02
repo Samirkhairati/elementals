@@ -127,6 +127,22 @@ describe('LayersPanel', () => {
     expect(props.selectLayer).toHaveBeenLastCalledWith('col', true)
   })
 
+  it('clicking the selected layer again deselects it', () => {
+    const { props } = renderPanel()
+    fireEvent.click(rowOf('Ground')) // 'ground' is the active layer
+    expect(props.setActiveLayerId).toHaveBeenCalledWith(null)
+    expect(props.selectLayer).not.toHaveBeenCalled()
+  })
+
+  it('Ctrl/Cmd+click on the selected layer and clicks within a multi-selection do not deselect', () => {
+    const { props } = renderPanel({ selectedLayerIds: ['ground', 'col'] })
+    fireEvent.click(rowOf('Ground')) // collapses the multi-selection to this layer
+    expect(props.selectLayer).toHaveBeenLastCalledWith('ground', false)
+    fireEvent.click(rowOf('Ground'), { ctrlKey: true })
+    expect(props.selectLayer).toHaveBeenLastCalledWith('ground', true)
+    expect(props.setActiveLayerId).not.toHaveBeenCalled()
+  })
+
   it('marks the extra selected layers, but not the active one, as multi-selected', () => {
     renderPanel({ selectedLayerIds: ['ground', 'col'] })
     expect(rowOf('Ground').getAttribute('data-selected')).toBe('true')
