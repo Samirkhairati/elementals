@@ -6,7 +6,7 @@ import { gameState } from "@/core/GameState";
 import { bootParams } from "@/core/bootParams";
 import { MapSystem } from "@/world/MapSystem";
 import { ImageLayerRenderer } from "@/world/imageLayers";
-import { followLerp } from "@/world/cameraFollow";
+import { followLerp, snapToScreenPixel } from "@/world/cameraFollow";
 import { InputManager } from "@/components/InputManager";
 import { MAPS } from "@/constants/assets";
 import { resolveMapKey } from "@/data/mapIds";
@@ -54,6 +54,8 @@ export interface GameDebugHandle {
   switchMap(mapId: string, spawn?: { col: number; row: number; facing?: Facing }): void;
 }
 
+const FOLLOW_OFFSET_Y = 24;
+
 export class Game extends Scene {
   private mapSystem!: MapSystem;
   private imageLayers!: ImageLayerRenderer;
@@ -72,6 +74,8 @@ export class Game extends Scene {
   private playerEntity?: Entity;
   /** What the camera follows (the player's sprite). */
   private followSprite: Phaser.GameObjects.Sprite | null = null;
+  /** The eased camera position before it is put on the screen-pixel grid (see updateCameraLag). */
+  private smoothScroll = { x: 0, y: 0 };
   private currentMapKey = "";
   private characters!: CharacterLoader;
   private debugGraphics?: Phaser.GameObjects.Graphics;
@@ -132,6 +136,7 @@ export class Game extends Scene {
 
     // Calculate initial scale before loading map and spawning player
     this.handleResize({ width: this.scale.width, height: this.scale.height });
+    this.installScreenPixelRounding();
 
     // Initial map load (?map=<id> picks another one)
     const requested = bootParams.map && MAPS.some((m) => m.key === bootParams.map) ? bootParams.map : undefined;
@@ -246,9 +251,12 @@ export class Game extends Scene {
     this.followSprite = playerSprite ?? null;
     if (playerSprite) {
       // The camera centres on the player's body (24 px above the feet); update() sets how fast it catches up
-      this.cameras.main.startFollow(playerSprite, settingsStore.display.pixelSnapping, 1, 1, 0, 24);
+      // Without snapping, updateCameraLag moves the camera itself so it can stay on the screen-pixel grid
+      if (settingsStore.display.pixelSnapping) this.cameras.main.startFollow(playerSprite, true, 1, 1, 0, FOLLOW_OFFSET_Y);
+      else this.cameras.main.stopFollow();
       // Warps jump the camera instead of gliding across the new map
-      this.cameras.main.centerOn(spawned.x, spawned.y - 24);
+      this.cameras.main.centerOn(spawned.x, spawned.y - FOLLOW_OFFSET_Y);
+      this.syncSmoothScroll();
     }
 
     // Ensure player position is synced to GameState on spawn
@@ -313,7 +321,8 @@ export class Game extends Scene {
     const tileSize = GAME_CONSTANTS.TILE_SIZE;
     gameState.updatePlayerPosition(x, y, Math.floor(x / tileSize), Math.floor((y - 1) / tileSize), (spawn.facing as Direction | undefined) ?? gameState.playerPosition.direction);
     this.triggerSystem.resetTouchState(this.world);
-    this.cameras.main.centerOn(x, y - 24);
+    this.cameras.main.centerOn(x, y - FOLLOW_OFFSET_Y);
+    this.syncSmoothScroll();
   }
 
   /**
@@ -326,6 +335,10 @@ export class Game extends Scene {
     if (!target) return;
     const lag = settingsStore.camera.followLag;
     const dt = Math.min(delta, 100) / 1000;
+    if (!settingsStore.display.pixelSnapping) {
+      this.followOnScreenGrid(target, dt, lag);
+      return;
+    }
     // Where Phaser's follow wants the scroll to be (see Camera.preRender), to know how far the camera still has to go.
     const wantX = target.x - cam.followOffset.x - cam.width * cam.originX;
     const wantY = target.y - cam.followOffset.y - cam.height * cam.originY;
@@ -333,6 +346,48 @@ export class Game extends Scene {
       followLerp(Math.abs(wantX - cam.scrollX), dt, lag, cam.zoom),
       followLerp(Math.abs(wantY - cam.scrollY), dt, lag, cam.zoom)
     );
+  }
+
+  /**
+   * Smooth follow for the default (no snapping) mode. At a zoom that is not a whole number, a camera at any position
+   * draws source pixels at uneven widths that change with every sub-pixel step, so the picture shimmers while it moves.
+   * The eased position is kept apart, and the camera is put on the nearest screen pixel, so every frame is a whole-pixel
+   * shift of the last one.
+   */
+  private followOnScreenGrid(target: Phaser.GameObjects.Sprite, dt: number, lag: number) {
+    const cam = this.cameras.main;
+    let wantX = target.x - cam.width * cam.originX;
+    let wantY = target.y - FOLLOW_OFFSET_Y - cam.height * cam.originY;
+    if (cam.useBounds) {
+      wantX = cam.clampX(wantX);
+      wantY = cam.clampY(wantY);
+    }
+    const s = this.smoothScroll;
+    s.x += (wantX - s.x) * followLerp(Math.abs(wantX - s.x), dt, lag, cam.zoom);
+    s.y += (wantY - s.y) * followLerp(Math.abs(wantY - s.y), dt, lag, cam.zoom);
+    cam.setScroll(snapToScreenPixel(s.x, cam.zoom), snapToScreenPixel(s.y, cam.zoom));
+  }
+
+  private syncSmoothScroll() {
+    this.smoothScroll.x = this.cameras.main.scrollX;
+    this.smoothScroll.y = this.cameras.main.scrollY;
+  }
+
+  /**
+   * Phaser floors the camera scroll to whole world pixels whenever `roundPixels` is on, which at a non-whole zoom is a
+   * coarser and uneven grid than the screen's. Without snapping the scroll is left alone while the frame is set up (it is
+   * already on the screen grid, see followOnScreenGrid) and only the drawn corners of tiles and sprites are rounded to
+   * screen pixels afterwards.
+   */
+  private installScreenPixelRounding() {
+    const cam = this.cameras.main;
+    const preRender = cam.preRender.bind(cam);
+    cam.preRender = () => {
+      if (settingsStore.display.pixelSnapping) return preRender();
+      cam.roundPixels = false;
+      preRender();
+      cam.roundPixels = true;
+    };
   }
 
   /** Footprints of event entities (yellow = solid, magenta = walkable trigger, grey = no active state). */

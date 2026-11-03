@@ -22,3 +22,8 @@ export function followLerp(gap: number, dtSeconds: number, lag: number, zoom: nu
 export const SNAP_SCREEN_PX = 0.5;
 /** World pixels per second the camera keeps moving at, however small the remaining gap. */
 export const MIN_SPEED = 30;
+
+/** The nearest camera position (world pixels) that falls on a whole screen pixel at this zoom. */
+export function snapToScreenPixel(scroll: number, zoom: number): number {
+  return Math.round(scroll * zoom) / zoom;
+}

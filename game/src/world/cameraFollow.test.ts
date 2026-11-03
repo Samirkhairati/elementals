@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { followLerp, SNAP_SCREEN_PX } from './cameraFollow';
+import { followLerp, snapToScreenPixel, SNAP_SCREEN_PX } from './cameraFollow';
 
 /** Run the ease for `seconds` toward a fixed target; returns the gap after each frame. */
 function settle(gap0: number, fps: number, lag: number, zoom: number, seconds = 3): number[] {
@@ -46,5 +46,17 @@ describe('followLerp', () => {
   it('is the same ease at 60 and 144 Hz while far from the target', () => {
     const at = (fps: number) => settle(100, fps, 0.08, 1, 0.2).pop() as number;
     expect(Math.abs(at(60) - at(144))).toBeLessThan(0.5);
+  });
+});
+
+describe('snapToScreenPixel', () => {
+  it('lands on a whole screen pixel and moves by at most half of one', () => {
+    for (const zoom of [0.5, 1, 1.3, 2.75]) {
+      for (const scroll of [0, 3.37, 100.5, 811.123]) {
+        const snapped = snapToScreenPixel(scroll, zoom);
+        expect(Math.abs(snapped * zoom - Math.round(snapped * zoom))).toBeLessThan(1e-9);
+        expect(Math.abs(snapped - scroll) * zoom).toBeLessThanOrEqual(0.5 + 1e-9);
+      }
+    }
   });
 });
