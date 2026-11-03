@@ -72,6 +72,11 @@ describe('Database shell', () => {
     expect(within(within(nav).getByRole('button', { name: /Sprites/ })).getByText('1 ✕')).toBeInTheDocument() // the broken one
   })
 
+  it('opens Graphics when no table is named', async () => {
+    renderAt('/database')
+    expect(await screen.findByRole('region', { name: 'Graphics' })).toBeInTheDocument()
+  })
+
   it('opens the table named in the URL and selects the deep-linked record', async () => {
     renderAt('/database?table=characters&id=objects/chest')
     const detail = await screen.findByTestId('character-detail')
@@ -188,6 +193,19 @@ describe('Graphics', () => {
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByText('props/orphan.png')).toBeInTheDocument()
     expect(calls.some((c) => c[0] === 'deleteGraphic')).toBe(false)
+  })
+
+  it('after the right-click menu closes, focus stays on the dialog\'s Delete button so Enter deletes', async () => {
+    renderAt('/database?table=graphics')
+    const pane = await screen.findByTestId('list-pane')
+    const row = (await within(pane).findAllByText('orphan.png'))[0].closest('button') as HTMLElement
+    fireEvent.contextMenu(row)
+    fireEvent.click(await screen.findByText('Delete…'))
+    const dialog = await screen.findByRole('dialog')
+    const del = within(dialog).getByRole('button', { name: /Delete/ })
+    await waitFor(() => expect(del).toHaveFocus())
+    await new Promise((r) => setTimeout(r, 50)) // the menu's own focus hand-back happens as it unmounts
+    expect(del).toHaveFocus()
   })
 
   it('views the picture in a zoom pane with a slider, steps, fit and 1:1', async () => {

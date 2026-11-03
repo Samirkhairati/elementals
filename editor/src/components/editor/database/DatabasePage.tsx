@@ -66,8 +66,8 @@ export function DatabasePage() {
   const search = useSearch({ strict: false }) as DatabaseSearch
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
-  const [mode, setMode] = useViewMode(search.table ?? 'characters')
-  const table = getTable(search.table) ?? getTable('characters')!
+  const [mode, setMode] = useViewMode(search.table ?? 'graphics')
+  const table = getTable(search.table) ?? getTable('graphics')!
   const view = VIEWS[table.id]
   const selected = search.id ?? ''
   const go = (next: DatabaseSearch) => void navigate({ to: '/database', search: next as never })

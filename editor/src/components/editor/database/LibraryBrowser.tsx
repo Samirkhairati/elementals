@@ -61,6 +61,7 @@ export function LibraryBrowser({ items, folders, query, mode, selected, onSelect
   // dataTransfer there. The state only drives the highlight, and is set after the drag has started (changing the DOM
   // inside dragstart makes Chromium cancel the drag).
   const dragRef = useRef<DragPayload | null>(null)
+  const chosen = useRef(false)
   const [dragging, setDragging] = useState<DragPayload | null>(null)
   const [dropTarget, setDropTarget] = useState<string | null>(null)
   const toggle = (path: string) => setClosed((s) => { const n = new Set(s); if (n.has(path)) n.delete(path); else n.add(path); return n })
@@ -139,8 +140,9 @@ export function LibraryBrowser({ items, folders, query, mode, selected, onSelect
     onDeleteItem ? (
       <ContextMenu key={item.key}>
         <ContextMenuTrigger asChild onContextMenu={() => onSelect(item.key)}>{child}</ContextMenuTrigger>
-        <ContextMenuContent className="w-44">
-          <ContextMenuItem className="text-red-400 focus:text-red-400 focus:bg-red-500/10" onClick={() => onDeleteItem(item.key)}>
+        {/* Delete… opens its dialog once the menu has closed: opened earlier, the menu's focus trap pulls focus back from the dialog. */}
+        <ContextMenuContent className="w-44" onCloseAutoFocus={(e) => { if (chosen.current) { e.preventDefault(); chosen.current = false; onDeleteItem(item.key) } }}>
+          <ContextMenuItem className="text-red-400 focus:text-red-400 focus:bg-red-500/10" onClick={() => { chosen.current = true }}>
             <Trash2 className="mr-2 h-3.5 w-3.5" />
             Delete…
           </ContextMenuItem>
