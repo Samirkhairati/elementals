@@ -84,6 +84,8 @@ export const imageSpriteIds = (raw: unknown): string[] => [...new Set(readImageO
 
 export const pictureTextureKey = (id: string): string => `picture:${id}`;
 export const pictureUrl = (id: string): string => `graphics/${id.split("/").map(encodeURIComponent).join("/")}`;
+/** Phaser's frame for the whole picture. */
+export const WHOLE_PICTURE_FRAME = "__BASE";
 export const cropFrameName = (c: { x: number; y: number; w: number; h: number }): string => `crop:${c.x},${c.y},${c.w},${c.h}`;
 
 /** Size on screen: whole pixels, never below 1. */
@@ -166,7 +168,9 @@ export class ImageLayerRenderer {
       return null;
     }
     const texture = this.scene.textures.get(key);
-    let frame: string | undefined;
+    // Always name the frame: adding a crop frame makes it the texture's default one, so an unnamed frame would show
+    // a crop on the next visit to a map (Phaser's whole-picture frame is `__BASE`).
+    let frame = WHOLE_PICTURE_FRAME;
     if (def.crop) {
       const source = texture.getSourceImage();
       const c = def.crop;

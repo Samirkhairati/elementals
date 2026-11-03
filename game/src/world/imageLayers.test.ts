@@ -143,7 +143,7 @@ describe("ImageLayerRenderer", () => {
     const r = new ImageLayerRenderer(scene, realSprites);
     r.show(exported([{ id: "a", graphicId: "images/sky.png", x: 40, y: 64, flipX: true, opacity: 0.5 }]));
     expect(added).toHaveLength(1);
-    expect(added[0]).toMatchObject({ x: 40, y: 64, texture: key, frame: undefined, origin: [0.5, 1], depth: 5, alpha: 0.5, flip: [true, false], display: null });
+    expect(added[0]).toMatchObject({ x: 40, y: 64, texture: key, frame: "__BASE", origin: [0.5, 1], depth: 5, alpha: 0.5, flip: [true, false], display: null });
   });
 
   it("crops are frames of the one picture texture: each distinct crop is added once, never a copy of the picture", () => {
@@ -159,6 +159,18 @@ describe("ImageLayerRenderer", () => {
     expect(added.map((i) => i.frame)).toEqual(["crop:0,0,16,16", "crop:0,0,16,16", "crop:16,0,16,16"]);
   });
 
+  it("a whole picture always names its own frame, so a crop added earlier (Phaser makes it the default) never replaces it", () => {
+    const { scene, added } = fakeScene({ [key]: sky });
+    const r = new ImageLayerRenderer(scene, realSprites);
+    const raw = exported([
+      { id: "a", graphicId: "images/sky.png", x: 0, y: 0, crop: { x: 0, y: 0, w: 16, h: 16 } },
+      { id: "b", graphicId: "images/sky.png", x: 20, y: 0 },
+    ]);
+    r.show(raw);
+    r.show(raw);
+    expect(added.map((i) => i.frame)).toEqual(["crop:0,0,16,16", "__BASE", "crop:0,0,16,16", "__BASE"]);
+  });
+
   it("scales to whole pixels", () => {
     const { scene, added } = fakeScene({ [key]: { width: 15, height: 15 } });
     new ImageLayerRenderer(scene, realSprites).show(exported([{ id: "a", graphicId: "images/sky.png", x: 0, y: 0, scale: 1.5 }]));
@@ -172,7 +184,7 @@ describe("ImageLayerRenderer", () => {
       { id: "a", graphicId: "images/sky.png", x: 0, y: 0, crop: { x: 60, y: 0, w: 16, h: 16 } },
       { id: "b", graphicId: "images/gone.png", x: 0, y: 0 },
     ]));
-    expect(added.map((i) => i.frame)).toEqual([undefined]);
+    expect(added.map((i) => i.frame)).toEqual(["__BASE"]);
     expect(warn).toHaveBeenCalledTimes(2);
     expect(warn.mock.calls[0][0]).toMatch(/outside/);
     expect(warn.mock.calls[1][0]).toMatch(/not loaded/);
