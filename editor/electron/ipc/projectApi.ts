@@ -126,9 +126,9 @@ export function createProjectChannels(
         for (const w of result.warnings) console.warn(`[characters] ${w.file}: ${w.error}`);
         return result;
       }),
-    'save-character': (id: string, def: unknown) => toResult(() => characterStore.saveCharacter(roots, imageCache, id, def)),
-    'rename-character': (id: string, newId: string) => toResult(() => characterStore.renameCharacter(roots, id, newId)),
-    'delete-character': (id: string) => toResult(() => characterStore.deleteCharacter(roots, id)),
+    'save-character': async (id: string, def: unknown) => withAssetSync(toResult(() => characterStore.saveCharacter(roots, imageCache, id, def))),
+    'rename-character': async (id: string, newId: string) => withAssetSync(toResult(() => characterStore.renameCharacter(roots, id, newId))),
+    'delete-character': async (id: string) => withAssetSync(toResult(() => characterStore.deleteCharacter(roots, id))),
     'import-graphic': async (sourcePath: string, graphicId: string) =>
       withAssetSync(toResult(() => characterStore.importGraphic(graphicsDir, imageCache, sourcePath, graphicId))),
     // The new picture reaches the game's copy right away, like an import.
@@ -148,9 +148,9 @@ export function createProjectChannels(
       toResult(() => characterStore.moveCharacterFolder(charactersDir, folderId, newParentId ?? null)),
     'delete-character-folder': (folderId: string) => toResult(() => characterStore.deleteCharacterFolder(charactersDir, folderId)),
 
-    // ── database ──
+    // ── database (saving also refreshes the game's copies of characters, switches/variables and common events) ──
     'get-database': () => toResult(() => databaseStore.getDatabase(root)),
-    'save-database': (database: unknown) => toResult(() => databaseStore.saveDatabase(root, database)),
+    'save-database': async (database: unknown) => withAssetSync(toResult(() => databaseStore.saveDatabase(root, database))),
 
     // ── game settings (project/game-settings.json; saving also writes game/public/data/settings.json) ──
     'get-game-settings': () => toResult(() => gameSettingsStore.getGameSettings(root)),
@@ -163,8 +163,8 @@ export function createProjectChannels(
         for (const w of result.warnings) console.warn(`[common] ${w.file}: ${w.error}`);
         return result;
       }),
-    'save-common-event': (event: unknown) => toResult(() => commonStore.saveCommonEvent(root, event)),
-    'delete-common-event': (id: string) => toResult(() => commonStore.deleteCommonEvent(root, id)),
+    'save-common-event': async (event: unknown) => withAssetSync(toResult(() => commonStore.saveCommonEvent(root, event))),
+    'delete-common-event': async (id: string) => withAssetSync(toResult(() => commonStore.deleteCommonEvent(root, id))),
   };
 }
 

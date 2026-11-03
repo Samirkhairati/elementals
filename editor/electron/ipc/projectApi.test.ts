@@ -183,12 +183,12 @@ describe('channels end to end (real temp project)', () => {
       clips: {}, bindings: {}, still: { sheet: 'sheet', frame: 0 },
     };
     expect(await call('save-character', 'objects/ball', def)).toMatchObject({ success: true, character: { id: 'objects/ball' } });
-    expect(await call('rename-character', 'objects/ball', 'objects/orb')).toEqual({ success: true, id: 'objects/orb' });
+    expect(await call('rename-character', 'objects/ball', 'objects/orb')).toMatchObject({ success: true, id: 'objects/orb' });
     const listed = (await call('get-characters')) as { characters: { id: string; images: Record<string, string> }[]; graphics: { id: string }[] };
     expect(listed.characters.map((c) => c.id)).toEqual(['objects/orb']);
     expect(Object.keys(listed.characters[0].images)).toEqual(['props/ball.png']);
     expect(listed.graphics.map((g) => g.id)).toEqual(['props/ball.png']);
-    expect(await call('delete-character', 'objects/orb')).toEqual({ success: true });
+    expect(await call('delete-character', 'objects/orb')).toMatchObject({ success: true });
     expect(((await call('get-characters')) as { characters: unknown[] }).characters).toHaveLength(0);
   });
 
