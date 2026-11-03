@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
-import { execFile } from 'child_process';
+import os from 'os';
+import { execFile, execFileSync } from 'child_process';
 import { pathToFileURL } from 'url';
 import { errorMessage } from './result.js';
 
@@ -19,10 +20,48 @@ const RUNNER = `const m = await import(process.argv[1]);
 const r = m.syncAssets(JSON.parse(process.argv[2]));
 process.stdout.write('${MARK}' + JSON.stringify({ errors: r.plan.errors, applied: r.applied.length }));`;
 
+const MIN_NODE_MAJOR = 24;
+
+function nodeMajor(bin: string): number {
+  try {
+    const out = execFileSync(bin, ['--version'], { timeout: 5_000, encoding: 'utf8' });
+    return Number(/^v(\d+)/.exec(out.trim())?.[1] ?? 0);
+  } catch {
+    return 0;
+  }
+}
+
+let nodeBin: string | undefined;
+
+/**
+ * A GUI-launched editor often has an older `node` first on its PATH (or none), so look for one that can run the script:
+ * the PATH's own if it is new enough, else an nvm / Homebrew install of at least Node 24.
+ */
+function findNode(): string {
+  if (nodeBin) return nodeBin;
+  const candidates = ['node'];
+  const nvmDir = path.join(process.env.NVM_DIR ?? path.join(os.homedir(), '.nvm'), 'versions', 'node');
+  try {
+    for (const v of fs.readdirSync(nvmDir)) candidates.push(path.join(nvmDir, v, 'bin', 'node'));
+  } catch {
+    /* no nvm */
+  }
+  candidates.push('/opt/homebrew/bin/node', '/usr/local/bin/node');
+  let best = { bin: 'node', major: 0 };
+  for (const bin of candidates) {
+    const major = nodeMajor(bin);
+    if (major >= MIN_NODE_MAJOR && (best.major < MIN_NODE_MAJOR || bin === 'node')) {
+      best = { bin, major };
+      if (bin === 'node') break;
+    }
+  }
+  return (nodeBin = best.bin);
+}
+
 function runSync(script: string, options: { projectDir: string; publicDir: string; write: boolean }): Promise<{ errors: string[]; applied: number }> {
   return new Promise((resolve, reject) => {
     execFile(
-      'node',
+      findNode(),
       ['--no-warnings', '--input-type=module', '-e', RUNNER, pathToFileURL(script).href, JSON.stringify(options)],
       { timeout: 60_000, maxBuffer: 8 * 1024 * 1024, cwd: path.dirname(script) },
       (error, stdout, stderr) => {
