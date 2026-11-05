@@ -2,8 +2,8 @@
 // name and z stay in the Properties panel on the left; everything about its pictures lives here: the list (reorder,
 // duplicate, rename, delete), a zoomable preview of the picked item with the Crop button, and its properties.
 
-import React, { useMemo, useState } from 'react'
-import { ArrowDown, ArrowUp, Copy, CopyPlus, Crop, Pencil, Plus, Stamp, Trash2, X } from 'lucide-react'
+import React, { useMemo, useRef, useState } from 'react'
+import { ArrowDown, ArrowUp, Copy, CopyPlus, Crop, Scaling, Pencil, Plus, Stamp, Trash2, X } from 'lucide-react'
 import type { ImageItem } from '@/types/editor'
 import { imagePickLabel, imagePickName } from '@/lib/graphicAssets'
 import { flippedItemBounds, itemSourceSize } from '@/lib/imageItems'
@@ -18,6 +18,8 @@ import { ScaleField } from './ScaleField'
 import { scaledSize } from '@/lib/imageScale'
 import { PicturePicker } from '../dialogs/PicturePicker'
 import { CropImageDialog } from '../dialogs/CropImageDialog'
+import { ResizeImageDialog } from '../dialogs/ResizeImageDialog'
+import { useShortcuts } from '@/hooks/useShortcuts'
 import { useEditorSelector, type EditorContextValue } from '../layout/EditorContext'
 
 const selectImages = (c: EditorContextValue) => ({
@@ -53,6 +55,13 @@ export function ImagesPanel() {
   const layer = ctx.layers.find((l) => l.id === ctx.activeLayerId && l.type === 'image') ?? null
   const [pickerOpen, setPickerOpen] = useState(false)
   const [cropOpen, setCropOpen] = useState(false)
+  const [resizeOpen, setResizeOpen] = useState(false)
+  // The shortcuts act on whatever the panel can do right now (set below, once the picked item is known).
+  const actions = useRef<{ crop?: () => void; resize?: () => void }>({})
+  useShortcuts({
+    'image.crop': (e) => { if (actions.current.crop) { e.preventDefault(); actions.current.crop() } },
+    'image.resize': (e) => { if (actions.current.resize) { e.preventDefault(); actions.current.resize() } },
+  })
   const [renaming, setRenaming] = useState<string | null>(null)
   // Dragging a row changes the draw order: the row being dragged and where it would land.
   const [dragId, setDragId] = useState<string | null>(null)
@@ -66,7 +75,10 @@ export function ImagesPanel() {
   const rows = useMemo(() => sortedImages(layer?.images).reverse(), [layer?.images])
   const selected = images.find((img) => img.id === ctx.selectedImageId) ?? null
   const picked = ctx.pickedImageIds
-  const placeKeys = describeBindings('image.placeMultiple', useBindings())
+  const bindings = useBindings()
+  const placeKeys = describeBindings('image.placeMultiple', bindings)
+  const cropKeys = describeBindings('image.crop', bindings)
+  const resizeKeys = describeBindings('image.resize', bindings)
   // Row buttons act on the whole picked set when the row belongs to it, otherwise on that row alone.
   const targetsOf = (id: string) => (picked.length > 1 && picked.includes(id) ? picked : [id])
 
@@ -80,6 +92,15 @@ export function ImagesPanel() {
   const whole = selected?.graphicId && selected.crop ? { graphicId: selected.graphicId } : null
   const sourceSize = selected ? itemSourceSize(whole ?? selected, assets) : null
   const previewSize = sourceSize && scaledSize(sourceSize, previewScale)
+  const canCrop = !!selected && !locked && !!graphic && !!ctx.graphicImages[graphic.id]
+  const itemSize = selected ? itemSourceSize(selected, assets) : null
+  const canResize = !!selected && !locked && !!itemSize
+  actions.current = {
+    crop: canCrop && !cropOpen && !resizeOpen ? () => setCropOpen(true) : undefined,
+    resize: canResize && !cropOpen && !resizeOpen ? () => setResizeOpen(true) : undefined,
+  }
+  // After a crop, the preview centres on (and fits) the cropped part of the whole picture.
+  const cropFocus = whole && selected?.crop ? { x: selected.crop.x * previewScale, y: selected.crop.y * previewScale, w: selected.crop.w * previewScale, h: selected.crop.h * previewScale } : null
 
   return (
     <div className="flex w-full flex-col gap-3 text-left" data-testid="images-panel">
@@ -212,18 +233,30 @@ export function ImagesPanel() {
             <EdButton
               size="sm"
               aria-label="Crop image"
-              title={selected.graphicId ? 'Choose which part of the picture this item shows' : 'Only pictures can be cropped, sprites have their own frames'}
-              disabled={locked || !graphic || !ctx.graphicImages[graphic.id]}
+              title={`${selected.graphicId ? 'Choose which part of the picture this item shows' : 'Only pictures can be cropped, sprites have their own frames'}${cropKeys ? ` (${cropKeys})` : ''}`}
+              aria-keyshortcuts={cropKeys || undefined}
+              disabled={!canCrop}
               onClick={() => setCropOpen(true)}
             >
               <Crop />
               Crop…
             </EdButton>
+            <EdButton
+              size="sm"
+              aria-label="Resize image"
+              title={`Make the picture bigger or smaller, pixels stay sharp${resizeKeys ? ` (${resizeKeys})` : ''}`}
+              aria-keyshortcuts={resizeKeys || undefined}
+              disabled={!canResize}
+              onClick={() => setResizeOpen(true)}
+            >
+              <Scaling />
+              Resize…
+            </EdButton>
             <IconButton
-              title="Place more of this one (same picture and crop)"
+              title={`Place more of this one: same picture, crop, scale and flips${placeKeys ? ` (${placeKeys})` : ''}`}
               aria-label="Place more of this image"
               disabled={locked}
-              onClick={() => ctx.startImagePlacement({ assetId: selected.assetId, graphicId: selected.graphicId, crop: selected.crop })}
+              onClick={() => ctx.placeMultiple(layer.id, selected.id)}
             >
               <Stamp />
             </IconButton>
@@ -231,7 +264,7 @@ export function ImagesPanel() {
           <div className="ed-card-body">
             {previewSize && (
               <div className="flex h-60 min-h-0 flex-col" data-testid="image-preview">
-                <ZoomPane key={`${selected.id}`} width={previewSize.w} height={previewSize.h} maxFit={8} hint={false} compact>
+                <ZoomPane key={`${selected.id}`} width={previewSize.w} height={previewSize.h} maxFit={8} hint={false} compact focus={cropFocus}>
                   {(zoom) => (
                     <div className="relative" style={{ width: Math.round(previewSize.w * zoom), height: Math.round(previewSize.h * zoom) }}>
                       <ImageItemView item={whole ?? selected} assets={assets} zoom={zoom} itemScale={previewScale} />
@@ -298,6 +331,17 @@ export function ImagesPanel() {
               <Toggle checked={!!selected.flipY} onChange={(flipY) => ctx.updateImage(layer.id, selected.id, { flipY })} disabled={locked} aria-label="Flip image vertically" />
             </Field>
           </div>
+          {itemSize && (
+            <ResizeImageDialog
+              open={resizeOpen}
+              item={selected}
+              assets={assets}
+              size={itemSize}
+              scale={selected.scale ?? 1}
+              onApply={(scale) => ctx.updateImage(layer.id, selected.id, { scale })}
+              onClose={() => setResizeOpen(false)}
+            />
+          )}
           {graphic && (
             <CropImageDialog
               open={cropOpen}

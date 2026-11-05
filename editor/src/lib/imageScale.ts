@@ -17,3 +17,12 @@ export function scaledSize(size: { w: number; h: number }, scale: number): { w: 
   const exact = (n: number) => Math.round(n * scale * 100) / 100
   return { w: exact(size.w), h: exact(size.h) }
 }
+
+/** The scale that gives a picture `source` px a width (or height) of `target` px, as close as the scale's precision allows. */
+export function scaleForSize(source: number, target: number): number | null {
+  if (!(source > 0) || !Number.isFinite(target) || target <= 0) return null
+  return parseScale(String(target / source))
+}
+
+/** Scales the Resize dialog offers as quick picks. */
+export const SCALE_PRESETS = [0.25, 0.5, 1, 2, 3, 4, 8] as const

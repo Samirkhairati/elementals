@@ -28,6 +28,8 @@ export const SHORTCUT_ACTIONS: ShortcutAction[] = [
   { id: 'edit.paste', label: 'Paste', group: 'Edit', defaults: ['Mod+V'] },
   { id: 'edit.duplicate', label: 'Duplicate selection', group: 'Edit', defaults: ['Mod+D'] },
   { id: 'image.placeMultiple', label: 'Place multiple copies of the picked picture', group: 'Pictures', defaults: ['Mod+Shift+D'] },
+  { id: 'image.crop', label: 'Crop the picked picture', group: 'Pictures', defaults: ['C'] },
+  { id: 'image.resize', label: 'Resize the picked picture', group: 'Pictures', defaults: ['Mod+T'] },
   { id: 'tool.brush', label: 'Brush tool', group: 'Tools', defaults: ['B'] },
   { id: 'tool.eraser', label: 'Eraser tool', group: 'Tools', defaults: ['E'] },
   { id: 'tool.rectangle', label: 'Rectangle tool', group: 'Tools', defaults: ['M'] },

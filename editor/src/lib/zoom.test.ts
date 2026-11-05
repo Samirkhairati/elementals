@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_ZOOM, MIN_ZOOM, fitScale, sliderToZoom, stepZoom, zoomLabel, zoomToSlider } from './zoom'
+import { MAX_ZOOM, MIN_ZOOM, fitScale, focusView, sliderToZoom, stepZoom, zoomLabel, zoomToSlider } from './zoom'
 
 describe('zoom maths', () => {
   it('steps along the ladder from anywhere, and stops at the ends', () => {
@@ -26,5 +26,21 @@ describe('zoom maths', () => {
     expect(zoomLabel(1)).toBe('100%')
     expect(zoomLabel(2.5)).toBe('250%')
     expect(zoomLabel(0.125)).toBe('12.5%')
+  })
+})
+
+describe('focusView', () => {
+  it('fits the rectangle and centres it, whatever the picture around it', () => {
+    const v = focusView(400, 300, { x: 100, y: 50, w: 40, h: 30 })
+    expect(v.zoom).toBe(8) // capped by maxFit (a small rectangle is not blown up beyond it)
+    expect(v.scrollLeft).toBe((100 + 20) * 8 - 200)
+    expect(v.scrollTop).toBe((50 + 15) * 8 - 150)
+  })
+
+  it('a large rectangle fits the box, and never scrolls to a negative position', () => {
+    const v = focusView(200, 200, { x: 0, y: 0, w: 800, h: 400 })
+    expect(v.zoom).toBe(0.25)
+    expect(v.scrollLeft).toBe(Math.max(0, 400 * 0.25 - 100))
+    expect(focusView(400, 300, { x: 0, y: 0, w: 40, h: 30 }, 4).scrollLeft).toBe(0)
   })
 })
