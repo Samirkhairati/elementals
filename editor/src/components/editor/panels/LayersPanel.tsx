@@ -14,6 +14,7 @@ import {
   Copy,
   Plus,
   Image as ImageIcon,
+  Images as ImagesIcon,
   Users,
   Folder as FolderIcon,
   FolderOpen,
@@ -413,13 +414,22 @@ export function LayersPanel({
                     )}
 
                     {isFolderRow ? (
-                      <span className="ed-badge" title="Layers in this folder" data-testid="folder-count">
+                      <span className="ed-badge" data-tone="count" title="Layers in this folder" data-testid="folder-count">
+                        <LayersIcon />
                         {layers.filter((l) => l.folderId === layer.id).length}
                       </span>
                     ) : (
-                      <span className="ed-badge" title="Z-index: draw order, higher draws on top" data-testid="layer-z">
-                        z {layer.z ?? 0}
-                      </span>
+                      <>
+                        {layer.type === 'image' && (
+                          <span className="ed-badge" data-tone="count" title={`${layer.images?.length ?? 0} pictures in this layer`} data-testid="item-count">
+                            <ImagesIcon />
+                            {layer.images?.length ?? 0}
+                          </span>
+                        )}
+                        <span className="ed-badge" data-tone="z" title="z-index, the layer's draw order in the game: higher draws on top" data-testid="layer-z">
+                          z {layer.z ?? 0}
+                        </span>
+                      </>
                     )}
 
                     {/* Compact status & inline visibility toggle */}

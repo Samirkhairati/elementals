@@ -117,6 +117,21 @@ describe('LayersPanel', () => {
     expect(within(rowOf('Collision')).getByTestId('layer-z').textContent).toMatch(/z\s*0/)
   })
 
+  it('tells the z-index apart from the item count: outlined "z N" versus a filled count with an icon, each with its own tooltip', () => {
+    renderPanel()
+    const z = within(rowOf('Trees')).getByTestId('layer-z')
+    expect(z).toHaveAttribute('data-tone', 'z')
+    expect(z.title).toMatch(/z-index/i)
+    expect(within(rowOf('Trees')).queryByTestId('item-count')).toBeTruthy() // an image layer counts its pictures
+    const count = within(rowOf('Trees')).getByTestId('item-count')
+    expect(count).toHaveAttribute('data-tone', 'count')
+    expect(count.textContent).toBe('0')
+    expect(count.title).toBe('0 pictures in this layer')
+    expect(count.querySelector('svg')).toBeTruthy()
+    // tile layers hold no countable items, so only their z badge shows
+    expect(within(rowOf('Ground')).queryByTestId('item-count')).toBeNull()
+  })
+
   it('a plain click selects one layer, Ctrl or Cmd+click adds to the selection', () => {
     const { props } = renderPanel()
     fireEvent.click(rowOf('Trees'))
@@ -169,6 +184,7 @@ describe('LayersPanel', () => {
       renderPanel({ layers: folderLayers() })
       const row = screen.getByTestId('folder-row')
       expect(within(row).getByTestId('folder-count').textContent).toBe('2')
+      expect(within(row).getByTestId('folder-count')).toHaveAttribute('data-tone', 'count')
       expect(within(row).queryByTestId('layer-z')).toBeNull()
       expect(screen.getByText('Ground')).toBeInTheDocument()
     })
