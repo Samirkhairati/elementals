@@ -1,3 +1,4 @@
+import type { SelectMode } from '@/lib/imageSelection'
 import React, { useCallback, useMemo, useRef } from 'react'
 import type { ImagePick } from '@/lib/graphicAssets'
 import { Stage, Layer as KonvaLayer, Rect, Group } from 'react-konva'
@@ -79,6 +80,8 @@ interface MapCanvasProps {
   cancelImagePlacement?: () => void
   selectedImageId?: string | null
   setSelectedImageId?: (id: string | null) => void
+  pickedImageIds?: readonly string[]
+  selectImage?: (layerId: string, imageId: string, mode: SelectMode) => void
   /** Picking an image of another layer (toolbar lock off) makes that layer the active one. */
   activateLayer?: (layerId: string) => void
   moveImage?: (layerId: string, imageId: string, x: number, y: number) => void
@@ -126,6 +129,8 @@ export function MapCanvas({
   cancelImagePlacement,
   selectedImageId = null,
   setSelectedImageId,
+  pickedImageIds,
+  selectImage,
   activateLayer,
   moveImage,
 }: MapCanvasProps) {
@@ -342,6 +347,8 @@ export function MapCanvas({
                 activateLayer={activateLayer}
                 selectedImageId={selectedImageId}
                 setSelectedImageId={setSelectedImageId || (() => {})}
+                pickedImageIds={pickedImageIds}
+                selectImage={selectImage}
                 moveImage={moveImage || (() => {})}
                 snapToGrid={snapToGrid}
                 spriteAssets={spriteAssets}

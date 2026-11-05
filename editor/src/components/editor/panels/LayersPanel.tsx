@@ -147,7 +147,7 @@ interface LayersPanelProps {
   /** `null` = no layer selected (clicking the selected layer again). */
   setActiveLayerId: (id: string | null) => void
   /** Plain click selects one layer; Ctrl/Cmd+click adds it to the multi-selection. Falls back to `setActiveLayerId`. */
-  selectLayer?: (id: string, additive?: boolean) => void
+  selectLayer?: (id: string, additive?: boolean | 'range') => void
   /** Layers picked in addition to the active one. */
   selectedLayerIds?: readonly string[]
   /** The entities of the map are not a layer: one row that toggles their visibility and can be dragged among the layers. */
@@ -364,7 +364,7 @@ export function LayersPanel({
                         toggleFolderCollapsed?.(layer.id)
                         return
                       }
-                      const additive = e.metaKey || e.ctrlKey
+                      const additive = e.shiftKey ? 'range' : e.metaKey || e.ctrlKey
                       // Clicking the selected layer again deselects it (a multi-selection collapses to this one layer first).
                       if (!additive && isSelected && selectedLayerIds.length === 0) setActiveLayerId(null)
                       else if (selectLayer) selectLayer(layer.id, additive)

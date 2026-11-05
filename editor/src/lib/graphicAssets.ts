@@ -19,8 +19,14 @@ export const graphicAssetKey = (graphicId: string): string => `graphic:${graphic
 /** Key of the item's picture in the canvas' asset map ('' when it points at nothing). Crops of one picture share its key. */
 export const imagePickKey = (pick: ImagePick): string => (pick.graphicId ? graphicAssetKey(pick.graphicId) : pick.assetId ?? '')
 
-/** Readable name of what an item shows (the sprite id or the graphic id). */
+/** Readable id of what an item shows (the sprite id or the graphic id, with its folders). */
 export const imagePickLabel = (pick: ImagePick): string => pick.graphicId || pick.assetId || ''
+
+/** The default name of an item: the picture's own name, not where it is (`images/city/dam-wall.png` -> `dam-wall`). */
+export const imagePickName = (pick: ImagePick): string => {
+  const id = imagePickLabel(pick)
+  return id.slice(id.lastIndexOf('/') + 1).replace(/\.png$/i, '')
+}
 
 /** A picture as one still frame (the whole image) anchored bottom-centre. */
 export function graphicAsset(graphic: GraphicInfo, url: string): SpriteAssetInfo {

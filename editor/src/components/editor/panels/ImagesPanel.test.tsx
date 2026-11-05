@@ -16,6 +16,9 @@ function setup(images: any[], extra: Record<string, unknown> = {}, layerOver: Re
     startImagePlacement: vi.fn(),
     cancelImagePlacement: vi.fn(),
     setSelectedImageId: vi.fn(),
+    selectImage: vi.fn(),
+    deleteImages: vi.fn(),
+    duplicateImages: vi.fn(),
     updateImage: vi.fn(),
     deleteImage: vi.fn(),
     duplicateImage: vi.fn(),
@@ -33,6 +36,7 @@ function setup(images: any[], extra: Record<string, unknown> = {}, layerOver: Re
     snapEntityPos: (x: number, y: number) => ({ x, y }),
     pendingImage: null,
     selectedImageId: null,
+    pickedImageIds: (extra.selectedImageId ? [extra.selectedImageId] : []) as string[],
     ...fns,
     ...extra,
   } as any)
@@ -55,8 +59,8 @@ describe('ImagesPanel', () => {
 
   it('lists the items front first, by name (or picture id), and marks cropped ones', () => {
     setup(items)
-    const rows = within(screen.getByTestId('image-list')).getAllByText(/Cloud|sky\/sheet\.png/)
-    expect(rows.map((r) => r.textContent)).toEqual(['sky/sheet.png', 'Cloud'])
+    const rows = within(screen.getByTestId('image-list')).getAllByText(/Cloud|sheet/)
+    expect(rows.map((r) => r.textContent)).toEqual(['sheet', 'Cloud'])
     expect(screen.getAllByText('crop')).toHaveLength(1)
   })
 
@@ -70,13 +74,13 @@ describe('ImagesPanel', () => {
     const f = setup(items)
     const row = within(screen.getByTestId('image-list')).getByText('Cloud').closest('.ed-row') as HTMLElement
     fireEvent.click(within(row).getByRole('button', { name: 'Duplicate image' }))
-    expect(f.duplicateImage).toHaveBeenCalledWith('i1', 'a')
+    expect(f.duplicateImages).toHaveBeenCalledWith('i1', ['a'])
     fireEvent.click(within(row).getByRole('button', { name: 'Bring forward' }))
     expect(f.reorderImage).toHaveBeenCalledWith('i1', 'a', 1)
     fireEvent.click(within(row).getByRole('button', { name: 'Delete image' }))
-    expect(f.deleteImage).toHaveBeenCalledWith('i1', 'a')
+    expect(f.deleteImages).toHaveBeenCalledWith('i1', ['a'])
     // the front item cannot go further forward, the back one cannot go further back
-    const front = within(screen.getByTestId('image-list')).getByText('sky/sheet.png').closest('.ed-row') as HTMLElement
+    const front = within(screen.getByTestId('image-list')).getByText('sheet').closest('.ed-row') as HTMLElement
     expect(within(front).getByRole('button', { name: 'Bring forward' })).toBeDisabled()
     expect(within(row).getByRole('button', { name: 'Send backward' })).toBeDisabled()
   })
@@ -214,5 +218,42 @@ describe('ImagesPanel', () => {
   it('asks for an image layer when the active layer is another kind', () => {
     renderWithEditor(<ImagesPanel />, { layers: [{ id: 't', name: 'Ground', type: 'tile', visible: true, locked: false }], activeLayerId: 't' } as any)
     expect(screen.getByText(/Select an image layer/)).toBeInTheDocument()
+  })
+
+  describe('several images', () => {
+    const rowOf = (name: string) => within(screen.getByTestId('image-list')).getByText(name).closest('.ed-row') as HTMLElement
+
+    it('click replaces the selection, Ctrl/Cmd+click toggles, Shift+click extends', () => {
+      const f = setup(items)
+      fireEvent.click(rowOf('Cloud'))
+      expect(f.selectImage).toHaveBeenLastCalledWith('i1', 'a', 'replace')
+      fireEvent.click(rowOf('Cloud'), { ctrlKey: true })
+      expect(f.selectImage).toHaveBeenLastCalledWith('i1', 'a', 'toggle')
+      fireEvent.click(rowOf('Cloud'), { metaKey: true })
+      expect(f.selectImage).toHaveBeenLastCalledWith('i1', 'a', 'toggle')
+      fireEvent.click(rowOf('Cloud'), { shiftKey: true })
+      expect(f.selectImage).toHaveBeenLastCalledWith('i1', 'a', 'range')
+    })
+
+    it('marks every picked row and says how many are selected', () => {
+      setup(items, { pickedImageIds: ['a', 'b'], selectedImageId: 'a' })
+      expect(rowOf('Cloud').dataset.selected).toBe('true')
+      expect(rowOf('sheet').dataset.selected).toBe('true')
+      expect(screen.getByText('2 selected')).toBeTruthy()
+    })
+
+    it('Delete and Duplicate on a picked row act on the whole picked set; on another row, on that row only', () => {
+      const f = setup(items, { pickedImageIds: ['a', 'b'], selectedImageId: 'a' })
+      fireEvent.click(within(rowOf('Cloud')).getByRole('button', { name: 'Delete image' }))
+      expect(f.deleteImages).toHaveBeenLastCalledWith('i1', ['a', 'b'])
+      fireEvent.click(within(rowOf('sheet')).getByRole('button', { name: 'Duplicate image' }))
+      expect(f.duplicateImages).toHaveBeenLastCalledWith('i1', ['a', 'b'])
+    })
+
+    it('a row outside the picked set is acted on alone', () => {
+      const f = setup(items, { pickedImageIds: ['b'], selectedImageId: 'b' })
+      fireEvent.click(within(rowOf('Cloud')).getByRole('button', { name: 'Delete image' }))
+      expect(f.deleteImages).toHaveBeenLastCalledWith('i1', ['a'])
+    })
   })
 })

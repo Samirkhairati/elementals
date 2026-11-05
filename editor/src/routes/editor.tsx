@@ -6,6 +6,7 @@ import { mapSaveQueue } from '@/lib/saveQueue'
 
 // Hooks
 import { useHistory } from '@/hooks/useHistory'
+import { snapshot, useEditorClipboard } from '@/store/editorClipboard'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { usePaintTools } from '@/hooks/usePaintTools'
 import { useMapAutosave } from '@/hooks/useMapAutosave'
@@ -191,8 +192,8 @@ export function EditorPage() {
 
     // A picked image on an image layer goes first (undoable, so no confirmation).
     const imageLayerId = layerManager.activeLayerId
-    if (layerManager.selectedImageId && imageLayerId && !entityManager.selectedEntityId) {
-      layerManager.deleteImage(imageLayerId, layerManager.selectedImageId)
+    if (layerManager.pickedImageIds.length > 0 && imageLayerId && !entityManager.selectedEntityId) {
+      layerManager.deleteImages(imageLayerId, layerManager.pickedImageIds)
       return
     }
 
@@ -208,7 +209,15 @@ export function EditorPage() {
       }
     } else if (isLayersDomain && layerManager.activeLayerId) {
       const layer = layerManager.layers.find(l => l.id === layerManager.activeLayerId)
-      if (layer) {
+      const ids = [layerManager.activeLayerId, ...layerManager.selectedLayerIds.filter(id => id !== layerManager.activeLayerId)]
+      if (layer && ids.length > 1) {
+        dialogs.setConfirmDialog({
+          open: true,
+          title: 'Delete Layers',
+          description: `Are you sure you want to delete these ${ids.length} layers?`,
+          action: () => layerManager.handleDeleteLayers(ids),
+        })
+      } else if (layer) {
         dialogs.setConfirmDialog({
           open: true,
           title: 'Delete Layer',
@@ -221,12 +230,50 @@ export function EditorPage() {
     }
   })
 
+  // What Ctrl/Cmd+C, +V and +D act on: picked pictures of the active image layer, else the picked entity, else the layers.
+  const selectionTarget = (): 'images' | 'entities' | 'layers' | null => {
+    if (layerManager.pickedImageIds.length > 0 && layerManager.activeLayerId && !entityManager.selectedEntityId) return 'images'
+    if (entityManager.selectedEntityId && (focusedDomain === 'entities' || !focusedDomain)) return 'entities'
+    if (layerManager.activeLayerId) return 'layers'
+    return null
+  }
+  const layerWorkingSet = () => (layerManager.activeLayerId ? [layerManager.activeLayerId, ...layerManager.selectedLayerIds.filter(id => id !== layerManager.activeLayerId)] : [])
+
+  const handleCopySelected = useStableCallback(() => {
+    const target = selectionTarget()
+    if (target === 'images' && layerManager.activeLayerId) layerManager.copyImages(layerManager.activeLayerId, layerManager.pickedImageIds)
+    else if (target === 'entities') {
+      const entity = entityManager.entities.find(e => e.id === entityManager.selectedEntityId)
+      if (entity) useEditorClipboard.getState().set({ kind: 'entities', entities: snapshot([entity]) })
+    } else if (target === 'layers') layerManager.copyLayers(layerWorkingSet())
+  })
+
+  const handlePasteSelected = useStableCallback(() => {
+    const content = useEditorClipboard.getState().content
+    if (!content) return
+    if (content.kind === 'images') {
+      const layer = layerManager.layers.find(l => l.id === layerManager.activeLayerId)
+      if (layer?.type === 'image') layerManager.pasteImages(layer.id, null)
+    } else if (content.kind === 'entities') entityManager.pasteEntities(content.entities)
+    else layerManager.pasteLayers(layerManager.activeLayerId)
+  })
+
+  const handleDuplicateSelected = useStableCallback(() => {
+    const target = selectionTarget()
+    if (target === 'images' && layerManager.activeLayerId) layerManager.duplicateImages(layerManager.activeLayerId, layerManager.pickedImageIds)
+    else if (target === 'entities' && entityManager.selectedEntityId) entityManager.duplicateEntity(entityManager.selectedEntityId)
+    else if (target === 'layers') layerManager.duplicateLayers(layerWorkingSet())
+  })
+
   // ── Keyboard Shortcuts ───────────────────────────────────────────────────
   useKeyboardShortcuts({
     handleUndo: boundHandleUndo,
     handleRedo: boundHandleRedo,
     setActiveTool: layerManager.setActiveTool,
     handleDelete: handleDeleteSelected,
+    handleCopy: handleCopySelected,
+    handlePaste: handlePasteSelected,
+    handleDuplicate: handleDuplicateSelected,
   })
 
   // ── Paint Tools Hook ─────────────────────────────────────────────────────
@@ -256,7 +303,7 @@ export function EditorPage() {
   )
 
   const handleSelectLayerExtended = useCallback(
-    (layerId: string, additive = false) => {
+    (layerId: string, additive: boolean | 'range' = false) => {
       layerManager.selectLayer(layerId, additive)
       entityManager.setSelectedEntityId(null)
       setFocusedDomain('layers')
@@ -398,6 +445,12 @@ export function EditorPage() {
     cancelImagePlacement: layerManager.cancelImagePlacement,
     selectedImageId: layerManager.selectedImageId,
     setSelectedImageId: layerManager.setSelectedImageId,
+    pickedImageIds: layerManager.pickedImageIds,
+    selectImage: layerManager.selectImage,
+    deleteImages: layerManager.deleteImages,
+    duplicateImages: layerManager.duplicateImages,
+    copyImages: layerManager.copyImages,
+    pasteImages: layerManager.pasteImages,
     addImage: layerManager.addImage,
     updateImage: layerManager.updateImage,
     deleteImage: layerManager.deleteImage,
@@ -578,6 +631,7 @@ export function EditorPage() {
     layerManager.selectedLayerIds, layerManager.pinSelection, layerManager.setPinSelection,
     layerManager.pendingImage, layerManager.startImagePlacement, layerManager.cancelImagePlacement,
     layerManager.selectedImageId, layerManager.setSelectedImageId,
+    layerManager.pickedImageIds, layerManager.selectImage, layerManager.deleteImages, layerManager.duplicateImages, layerManager.copyImages, layerManager.pasteImages,
     layerManager.addImage, layerManager.updateImage, layerManager.deleteImage, layerManager.duplicateImage, layerManager.reorderImage, layerManager.moveImageTo,
     layerManager.toggleLayerLock, layerManager.handleDeleteLayer,
     layerManager.handleReorderLayers, layerManager.toggleFolderCollapsed, layerManager.handleCreateLayer,

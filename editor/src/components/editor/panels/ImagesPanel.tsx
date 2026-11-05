@@ -5,7 +5,7 @@
 import React, { useMemo, useState } from 'react'
 import { ArrowDown, ArrowUp, Copy, Crop, Pencil, Plus, Stamp, Trash2, X } from 'lucide-react'
 import type { ImageItem } from '@/types/editor'
-import { imagePickLabel } from '@/lib/graphicAssets'
+import { imagePickLabel, imagePickName } from '@/lib/graphicAssets'
 import { flippedItemBounds, itemSourceSize, snapImageAnchor } from '@/lib/imageItems'
 import { sortedImages } from '@/lib/layerOrder'
 import { Badge, EdButton, Field, IconButton, InfoTip, NumberField, TextField, Toggle } from '../ui/controls'
@@ -30,6 +30,10 @@ const selectImages = (c: EditorContextValue) => ({
   cancelImagePlacement: c.cancelImagePlacement,
   selectedImageId: c.selectedImageId,
   setSelectedImageId: c.setSelectedImageId,
+  pickedImageIds: c.pickedImageIds,
+  selectImage: c.selectImage,
+  deleteImages: c.deleteImages,
+  duplicateImages: c.duplicateImages,
   updateImage: c.updateImage,
   deleteImage: c.deleteImage,
   duplicateImage: c.duplicateImage,
@@ -38,7 +42,7 @@ const selectImages = (c: EditorContextValue) => ({
 })
 
 const NO_ASSETS = {}
-const nameOf = (img: ImageItem) => img.name || imagePickLabel(img)
+const nameOf = (img: ImageItem) => img.name || imagePickName(img)
 
 export function ImagesPanel() {
   const ctx = useEditorSelector(selectImages)
@@ -57,6 +61,9 @@ export function ImagesPanel() {
   // Front first, like the layer list: the top row draws over the ones below it.
   const rows = useMemo(() => sortedImages(layer?.images).reverse(), [layer?.images])
   const selected = images.find((img) => img.id === ctx.selectedImageId) ?? null
+  const picked = ctx.pickedImageIds
+  // Row buttons act on the whole picked set when the row belongs to it, otherwise on that row alone.
+  const targetsOf = (id: string) => (picked.length > 1 && picked.includes(id) ? picked : [id])
 
   if (!layer) return <div className="ed-empty select-none">Select an image layer to place pictures.</div>
 
@@ -74,7 +81,8 @@ export function ImagesPanel() {
       <section className="ed-card" data-testid="image-layer-section">
         <div className="ed-card-head">
           <span className="ed-section-title flex-1">Images · {layer.name}</span>
-          <InfoTip>Images snap to the grid while the magnet in the top toolbar is on, and move freely when it is off.</InfoTip>
+          <InfoTip>Images snap to the grid while the magnet in the top toolbar is on, and move freely when it is off. Ctrl/Cmd+click adds or removes an image from the selection and Shift+click picks a range; Delete, Duplicate, Ctrl/Cmd+C and Ctrl/Cmd+V work on all of them.</InfoTip>
+          {picked.length > 1 && <Badge>{picked.length} selected</Badge>}
           <Badge>{images.length}</Badge>
           <button type="button" className="ed-btn" data-size="sm" data-variant="primary" aria-label="Add image" disabled={locked} onClick={() => setPickerOpen(true)}>
             <Plus />
@@ -107,10 +115,10 @@ export function ImagesPanel() {
                 <div
                   key={img.id}
                   className="ed-row group"
-                  data-selected={img.id === ctx.selectedImageId ? 'true' : undefined}
+                  data-selected={picked.includes(img.id) ? 'true' : undefined}
                   data-dim={dragId === img.id ? 'true' : undefined}
                   draggable={!locked && renaming !== img.id}
-                  onClick={() => ctx.setSelectedImageId(img.id)}
+                  onClick={(e) => ctx.selectImage(layer.id, img.id, e.shiftKey ? 'range' : e.metaKey || e.ctrlKey ? 'toggle' : 'replace')}
                   onDragStart={(e) => {
                     setDragId(img.id)
                     e.dataTransfer.effectAllowed = 'move'
@@ -175,10 +183,10 @@ export function ImagesPanel() {
                     <IconButton title="Rename" aria-label="Rename image" disabled={locked} onClick={(e) => { e.stopPropagation(); ctx.setSelectedImageId(img.id); setRenaming(img.id) }}>
                       <Pencil />
                     </IconButton>
-                    <IconButton title="Duplicate" aria-label="Duplicate image" disabled={locked} onClick={(e) => { e.stopPropagation(); ctx.duplicateImage(layer.id, img.id) }}>
+                    <IconButton title="Duplicate" aria-label="Duplicate image" disabled={locked} onClick={(e) => { e.stopPropagation(); ctx.duplicateImages(layer.id, targetsOf(img.id)) }}>
                       <Copy />
                     </IconButton>
-                    <IconButton title="Delete" aria-label="Delete image" tone="danger" disabled={locked} onClick={(e) => { e.stopPropagation(); ctx.deleteImage(layer.id, img.id) }}>
+                    <IconButton title="Delete" aria-label="Delete image" tone="danger" disabled={locked} onClick={(e) => { e.stopPropagation(); ctx.deleteImages(layer.id, targetsOf(img.id)) }}>
                       <Trash2 />
                     </IconButton>
                   </span>
