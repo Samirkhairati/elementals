@@ -9,6 +9,7 @@ import { createDefaultEventState } from '../../../../../shared/engine/components
 import { TRIGGER_LABELS } from '../../../../../shared/engine/constants'
 import { GRAPH_END, GRAPH_JUNCTION, GRAPH_START, getNode, updateNodeParams } from '../../../../../shared/engine/graph'
 import { cn } from '@/lib/utils'
+import { InfoTip } from '../ui/controls'
 import { useEventEnv } from './eventEnv'
 import {
   EVENT_TEMPLATES,
@@ -284,9 +285,11 @@ export function EventEditor({ states: statesProp, onChange, className, common = 
                   <div className="flex items-center gap-1.5">
                     <h3 className="text-sm font-semibold">{structural?.label ?? def?.label ?? 'Unknown command'}</h3>
                     {def?.status === 'planned' && <PlannedBadge />}
+                    <InfoTip label={`About ${structural?.label ?? def?.label ?? 'this command'}`}>
+                      <p>{structural?.description ?? def?.description ?? `“${selected.type}” is not in the command catalog.`}</p>
+                      {def?.status === 'planned' && <p className="mt-1 text-muted-foreground">Planned: you can place it now; the game skips it until that system exists.</p>}
+                    </InfoTip>
                   </div>
-                  <p className="text-[11px] text-muted-foreground">{structural?.description ?? def?.description ?? `“${selected.type}” is not in the command catalog.`}</p>
-                  {def?.status === 'planned' && <p className="mt-0.5 text-[10px] text-muted-foreground/80">Planned: you can place it now; the game skips it until that system exists.</p>}
                 </div>
               </div>
               {selectedIssues.length > 0 && (

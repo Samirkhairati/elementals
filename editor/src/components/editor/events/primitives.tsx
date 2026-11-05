@@ -2,6 +2,7 @@
 // not create one undo step per keystroke), a portal-aware popover, field rows and icon buttons.
 
 import { Checkbox } from '../ui/fields'
+import { InfoTip } from '../ui/controls'
 import { PortalContainerContext, PortalContainerProvider } from '../../ui/portal-container'
 import React, { useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -313,7 +314,8 @@ export const DraftNumber = React.forwardRef<HTMLInputElement, DraftNumberProps>(
 
 interface FieldRowProps {
   label: string
-  help?: string
+  /** An explanation, opened by the little "i" beside the label (never a paragraph in the layout). */
+  help?: React.ReactNode
   required?: boolean
   unit?: string
   children: (id: string) => React.ReactNode
@@ -327,18 +329,20 @@ export function FieldRow({ label, help, required, unit, children, inline, classN
   return (
     <div className={cn('py-1', className)} data-field={label}>
       <div className={cn(inline ? 'flex items-center justify-between gap-2' : 'space-y-1')}>
-        <label id={`${id}-label`} htmlFor={id} className="block shrink-0 select-none text-ed-label font-medium text-muted-foreground">
-          {label}
-          {required && (
-            <span className="ml-0.5 text-amber-400" aria-hidden title="Required">
-              *
-            </span>
-          )}
-          {unit && <span className="ml-1 text-muted-foreground/60">({unit})</span>}
-        </label>
+        <div className="flex shrink-0 items-center gap-1">
+          <label id={`${id}-label`} htmlFor={id} className="block select-none text-ed-label font-medium text-muted-foreground">
+            {label}
+            {required && (
+              <span className="ml-0.5 text-amber-400" aria-hidden title="Required">
+                *
+              </span>
+            )}
+            {unit && <span className="ml-1 text-muted-foreground/60">({unit})</span>}
+          </label>
+          {help && <InfoTip label={`About ${label}`}>{help}</InfoTip>}
+        </div>
         <div className={cn(inline && 'min-w-0 flex-1 flex justify-end')}>{children(id)}</div>
       </div>
-      {help && <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground/80">{help}</p>}
     </div>
   )
 }
@@ -402,26 +406,28 @@ export function SectionTitle({ children, right }: { children: React.ReactNode; r
   )
 }
 
-/** A themed checkbox with its label and an optional help line. */
-export function CheckRow({ checked, onChange, label, help, disabled }: { checked: boolean; onChange: (v: boolean) => void; label: string; help?: string; disabled?: boolean }) {
+/** A themed checkbox with its label and an optional explanation behind an "i". */
+export function CheckRow({ checked, onChange, label, help, disabled }: { checked: boolean; onChange: (v: boolean) => void; label: string; help?: React.ReactNode; disabled?: boolean }) {
   return (
-    <div className="py-0.5">
+    <div className="flex items-center gap-1 py-0.5">
       <Checkbox checked={checked} disabled={disabled} onChange={onChange} label={label} />
-      {help && <p className="ml-6 text-[10px] leading-snug text-muted-foreground/80">{help}</p>}
+      {help && <InfoTip label={`About ${label}`}>{help}</InfoTip>}
     </div>
   )
 }
 
 /** A titled block of related fields: the unit a settings panel is built from. */
-export function Group({ title, hint, right, children, className }: { title: string; hint?: string; right?: React.ReactNode; children: React.ReactNode; className?: string }) {
+export function Group({ title, hint, right, children, className }: { title: string; /** An explanation of the whole block, behind an "i" beside the title. */ hint?: React.ReactNode; right?: React.ReactNode; children: React.ReactNode; className?: string }) {
   return (
     <section className={cn('rounded-md border border-border/70 bg-card/40', className)} aria-label={title}>
       <header className="flex items-center justify-between gap-2 border-b border-border/60 px-3 py-1.5">
-        <h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{title}</h3>
+        <h3 className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          {title}
+          {hint && <InfoTip label={`About ${title}`}>{hint}</InfoTip>}
+        </h3>
         {right}
       </header>
       <div className="space-y-1 px-3 py-2">{children}</div>
-      {hint && <p className="border-t border-border/50 px-3 py-1.5 text-[10px] leading-snug text-muted-foreground/80">{hint}</p>}
     </section>
   )
 }

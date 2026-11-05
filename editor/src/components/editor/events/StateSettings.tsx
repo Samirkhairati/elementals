@@ -9,6 +9,7 @@ import { ConditionsEditor } from './ConditionsEditor'
 import { FacingPicker, SpritePicker } from './pickers'
 import { CheckRow, DraftNumber, DraftText, FieldRow, Group } from './primitives'
 import { useEventEnv } from './eventEnv'
+import { InfoTip } from '../ui/controls'
 
 export const TRIGGER_HELP: Record<EventTrigger, string> = {
   action: 'Runs when the player presses the action button while facing this entity. Best for NPCs, signs and chests.',
@@ -16,6 +17,21 @@ export const TRIGGER_HELP: Record<EventTrigger, string> = {
   eventTouch: 'Runs when another entity (an NPC, for example) touches this one.',
   autorun: 'Starts by itself as soon as the state is active and blocks the player until it finishes. It repeats, so end it with a switch or self switch or the game will lock up.',
   parallel: 'Runs in the background over and over without stopping the player. Use it for ambient effects and use sparingly.',
+}
+
+/** What each trigger does, with the chosen one first and in bold. */
+function TriggerHelp({ current }: { current: EventTrigger }) {
+  const order = [current, ...EVENT_TRIGGERS.filter((t) => t !== current)]
+  return (
+    <div className="space-y-1.5">
+      <p>What makes this state's commands start.</p>
+      {order.map((t) => (
+        <p key={t} className={t === current ? 'text-foreground' : 'text-muted-foreground'}>
+          <strong>{TRIGGER_LABELS[t]}</strong>: {TRIGGER_HELP[t]}
+        </p>
+      ))}
+    </div>
+  )
 }
 
 function OverrideRow({ label, active, onToggle, children }: { label: string; active: boolean; onToggle: (on: boolean) => void; children: React.ReactNode }) {
@@ -40,7 +56,6 @@ function AppearanceEditor({ appearance, onChange }: { appearance: StateAppearanc
   const animations = info?.meta.animations ? Object.keys(info.meta.animations) : []
   return (
     <div className="space-y-0.5" data-testid="appearance-editor">
-      <p className="text-[10px] text-muted-foreground">While this state is active, these replace the entity’s own Sprite settings. Anything not overridden stays as it is.</p>
       <OverrideRow label="Visibility" active={ap.visible !== undefined} onToggle={(on) => set('visible', on ? true : undefined)}>
         <Select aria-label="Visibility while active" value={ap.visible === false ? 'hidden' : 'visible'} options={[{ value: 'visible', label: 'Visible' }, { value: 'hidden', label: 'Hidden' }]} onChange={(v) => set('visible', v === 'visible')} />
       </OverrideRow>
@@ -73,7 +88,7 @@ export function StateSettings({ state, onChange }: { state: EventState; onChange
     <div className="grid gap-3 p-3 md:grid-cols-2 2xl:grid-cols-3" data-testid="state-settings">
       <Group title="When it runs">
         <FieldRow label="State name">{(id) => <DraftText id={id} value={state.name} placeholder="e.g. After the quest" onCommit={(name) => onChange({ name })} />}</FieldRow>
-        <FieldRow label="Trigger" help={TRIGGER_HELP[state.trigger]}>
+        <FieldRow label="Trigger" help={<TriggerHelp current={state.trigger} />}>
           {(id) => (
             <Select id={id} value={state.trigger} options={EVENT_TRIGGERS.map((t) => ({ value: t, label: TRIGGER_LABELS[t] }))} onChange={(v) => onChange({ trigger: v as EventTrigger })} />
           )}
@@ -93,6 +108,7 @@ export function StateSettings({ state, onChange }: { state: EventState; onChange
           )}
         </FieldRow>
         <div className="border-t border-border/50 pt-1.5">
+          <div className="flex items-center gap-1">
           <button
             type="button"
             aria-expanded={appearanceOpen}
@@ -102,6 +118,8 @@ export function StateSettings({ state, onChange }: { state: EventState; onChange
             {appearanceOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
             Appearance override{overrides > 0 && <span className="rounded bg-primary/20 px-1 text-primary">{overrides}</span>}
           </button>
+          <InfoTip label="How appearance overrides work">While this state is active, these replace the entity’s own Sprite settings. Anything not overridden stays as it is.</InfoTip>
+          </div>
           {appearanceOpen && (
             <div className="mt-1">
               <AppearanceEditor appearance={state.appearance} onChange={(appearance) => onChange({ appearance })} />

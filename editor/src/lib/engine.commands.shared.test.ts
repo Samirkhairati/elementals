@@ -335,3 +335,22 @@ describe('animation names and waiting (unknown-clip, wait-on-looping-clip)', () 
   })
 })
 
+
+describe('every command explains itself (the editor shows this behind an "i" and in the palette)', () => {
+  it('has a label, a one-sentence description and a field label for each parameter', () => {
+    for (const [type, def] of Object.entries(COMMAND_CATALOG)) {
+      expect(def.label.trim(), `${type} label`).not.toBe('')
+      expect(def.description.trim().length, `${type} description`).toBeGreaterThanOrEqual(15)
+      expect(def.description.trim(), `${type} description should be a sentence`).toMatch(/[.!?]$/)
+      for (const field of def.params) expect(field.label.trim(), `${type}.${field.key} label`).not.toBe('')
+    }
+  })
+
+  it('has no two commands with the same description', () => {
+    const seen = new Map<string, string>()
+    for (const [type, def] of Object.entries(COMMAND_CATALOG)) {
+      expect(seen.get(def.description), `${type} repeats the description of ${seen.get(def.description)}`).toBeUndefined()
+      seen.set(def.description, type)
+    }
+  })
+})
