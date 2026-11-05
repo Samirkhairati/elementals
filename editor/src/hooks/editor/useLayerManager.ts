@@ -581,7 +581,6 @@ export function useLayerManager(options: UseLayerManagerOptions) {
   )
 
   // Arrow keys move the picked image (see lib/imageNudge). Not while typing, in a dialog, or while placing a new image.
-  const repeatsRef = useRef(0)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const delta = ARROW_DELTAS[e.key]
@@ -592,19 +591,11 @@ export function useLayerManager(options: UseLayerManagerOptions) {
       const item = layer?.type === 'image' && !layer.locked ? layer.images?.find(i => i.id === selectedImageId) : undefined
       if (!layer || !item) return
       e.preventDefault()
-      repeatsRef.current = e.repeat ? repeatsRef.current + 1 : 0
-      const step = nudgeStep(e.shiftKey, repeatsRef.current)
+      const step = nudgeStep(e.shiftKey)
       updateImage(layer.id, item.id, { x: item.x + delta.dx * step, y: item.y + delta.dy * step })
     }
-    const onUp = () => {
-      repeatsRef.current = 0
-    }
     window.addEventListener('keydown', onKey)
-    window.addEventListener('keyup', onUp)
-    return () => {
-      window.removeEventListener('keydown', onKey)
-      window.removeEventListener('keyup', onUp)
-    }
+    return () => window.removeEventListener('keydown', onKey)
   }, [activeLayerId, selectedImageId, pendingImage, layersRef, updateImage])
 
   /** One step toward the front (+1) or back (-1) in the layer's draw order. */

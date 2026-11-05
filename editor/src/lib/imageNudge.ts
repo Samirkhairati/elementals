@@ -1,14 +1,12 @@
-// Moving the picked image with the arrow keys. A plain arrow is one pixel; with Shift the step starts at 8 px and
-// doubles for every repeat while the key is held, so a long press crosses the map quickly (capped).
+// Moving the picked image with the arrow keys. A plain arrow is one pixel and Shift+arrow is 8 px, each press (or
+// auto-repeat while the key is held) moving the same amount: a steady speed you can stop on.
 
 export const NUDGE_FINE = 1
 export const NUDGE_FAST = 8
-export const NUDGE_MAX = 512
 
-/** Pixels moved by a key press: `repeats` = how many auto-repeats of the held key came before this one. */
-export function nudgeStep(shift: boolean, repeats: number): number {
-  if (!shift) return NUDGE_FINE
-  return Math.min(NUDGE_MAX, NUDGE_FAST * 2 ** Math.max(0, repeats))
+/** Pixels moved by one key press (or one auto-repeat of a held key). */
+export function nudgeStep(shift: boolean): number {
+  return shift ? NUDGE_FAST : NUDGE_FINE
 }
 
 export const ARROW_DELTAS: Record<string, { dx: number; dy: number }> = {
