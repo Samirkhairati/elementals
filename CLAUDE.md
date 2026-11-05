@@ -131,4 +131,4 @@ editor  --writes-->  project/maps/*.json (editor map format, tile index keyed)
 
 `docs/engine-design.md` (components, migration, sprites) · `docs/game-runtime.md` (boot, events, animation, loading) · `docs/event-graph-spec.md` (graph events) ·
 `docs/database-and-characters-spec.md` (database + characters v2) · `docs/maps.md` (formats, export, image layers) · `docs/future-issues.md` (known scaling/cleanup items to look at later; **add to it whenever you notice one**) · `docs/editor-harness.md` (browser harness) ·
-`roadmaps/event-editor.md` · `game/refactor_game.md` (ECS migration plan) · `README.md` (quick start, worktree launcher).
+`docs/event-triggers-proposal.md` (proposal awaiting a decision) · `roadmaps/event-editor.md` · `game/refactor_game.md` (ECS migration plan) · `README.md` (quick start, worktree launcher).
