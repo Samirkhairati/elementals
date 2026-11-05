@@ -55,7 +55,7 @@ export function useLayerManager(options: UseLayerManagerOptions) {
       setSelectedLayerIds([])
       setSelectedImageId(null)
     }
-  }, [])
+  }, [setSelectedImageId])
 
   /** Plain click: only this layer. Ctrl/Cmd+click: add it to (or remove it from) the multi-selection. Shift+click ('range'): everything from the active layer to it. */
   const selectLayer = useCallback(
@@ -86,7 +86,7 @@ export function useLayerManager(options: UseLayerManagerOptions) {
       })
       setActiveLayerIdRaw(id)
     },
-    [activeLayerId, setActiveLayerId, layersRef]
+    [activeLayerId, setActiveLayerId, setSelectedImageId, layersRef]
   )
 
   /** Latest layers, readable synchronously (e.g. for history snapshots / paint ops). */
@@ -514,7 +514,7 @@ export function useLayerManager(options: UseLayerManagerOptions) {
       )
       return createdId
     },
-    [commitNewLayers]
+    [commitNewLayers, setSelectedImageId]
   )
 
   const updateImage = useCallback(
@@ -560,7 +560,7 @@ export function useLayerManager(options: UseLayerManagerOptions) {
       )
       return createdId
     },
-    [commitNewLayers]
+    [commitNewLayers, setSelectedImageId]
   )
 
   /** Dropped in front of (`top`) or behind (`bottom`) another image: the whole move is one undo step. */
@@ -639,7 +639,7 @@ export function useLayerManager(options: UseLayerManagerOptions) {
         () => setSelectedImageId(current => (current === imageId ? null : current))
       )
     },
-    [commitNewLayers]
+    [commitNewLayers, setSelectedImageId]
   )
 
   /** Click on a picture of an image layer: replace the picked set, toggle it in (Ctrl/Cmd), or extend to it (Shift). */
