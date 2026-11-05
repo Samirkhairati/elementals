@@ -6,7 +6,8 @@ import React, { useMemo, useState } from 'react'
 import { ArrowDown, ArrowUp, Copy, Crop, Pencil, Plus, Stamp, Trash2, X } from 'lucide-react'
 import type { ImageItem } from '@/types/editor'
 import { imagePickLabel, imagePickName } from '@/lib/graphicAssets'
-import { flippedItemBounds, itemSourceSize, snapImageAnchor } from '@/lib/imageItems'
+import { flippedItemBounds, itemSourceSize } from '@/lib/imageItems'
+import { snapPicture } from '@/lib/imageSnap'
 import { sortedImages } from '@/lib/layerOrder'
 import { Badge, EdButton, Field, IconButton, InfoTip, NumberField, TextField, Toggle } from '../ui/controls'
 import { ZoomPane } from '../ui/ZoomPane'
@@ -260,7 +261,7 @@ export function ImagesPanel() {
                 size="sm"
                 disabled={locked}
                 onClick={() => {
-                  const p = snapImageAnchor(flippedItemBounds(selected, assets), selected.x, selected.y)
+                  const p = snapPicture(flippedItemBounds(selected, assets, true), selected.x, selected.y)
                   ctx.updateImage(layer.id, selected.id, { x: p.x, y: p.y })
                 }}
               >

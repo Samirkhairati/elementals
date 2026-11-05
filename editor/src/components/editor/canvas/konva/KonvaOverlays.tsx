@@ -2,6 +2,8 @@ import React from 'react'
 import { Group, Rect, Shape } from 'react-konva'
 import { ActiveTool, TileSelection, Pos, MapData } from '@/types/editor'
 import { getBoundingBox } from '../canvasUtils'
+import { isDefaultGrid } from '@/lib/grid'
+import { useGridStore } from '@/store/gridStore'
 
 interface KonvaOverlaysProps {
   activeMap: MapData
@@ -32,6 +34,7 @@ export const KonvaOverlays = React.memo(function KonvaOverlays({
   const copyBox = getBoundingBox(canvasCopyStart, canvasCopyCurrent)
   const rectBox = !copyBox && activeTool === 'rectangle' ? getBoundingBox(rectStart, rectCurrent) : null
 
+  const pictureGrid = useGridStore((s) => s.grid)
   const mapWidthPx = activeMap.width * 32
   const mapHeightPx = activeMap.height * 32
 
@@ -83,6 +86,45 @@ export const KonvaOverlays = React.memo(function KonvaOverlays({
           ctx.stroke()
         }}
       />
+      )}
+
+      {/* The picture grid, when it is not the tile grid: pictures snap to these lines (right-click the grid snapping button). */}
+      {showGrid && !isDefaultGrid(pictureGrid) && (
+        <Shape
+          listening={false}
+          perfectDrawEnabled={false}
+          shadowForStrokeEnabled={false}
+          sceneFunc={(context, shape) => {
+            const ctx = context._context as CanvasRenderingContext2D
+            ctx.strokeStyle = 'rgba(250, 204, 21, 0.55)'
+            ctx.lineWidth = 1
+            ctx.setLineDash([4, 3])
+            ctx.beginPath()
+            const stage = shape.getStage()
+            let left = 0
+            let right = mapWidthPx
+            let top = 0
+            let bottom = mapHeightPx
+            if (stage) {
+              const scale = stage.scaleX() || 1
+              left = Math.max(0, -stage.x() / scale)
+              right = Math.min(mapWidthPx, (-stage.x() + stage.width()) / scale)
+              top = Math.max(0, -stage.y() / scale)
+              bottom = Math.min(mapHeightPx, (-stage.y() + stage.height()) / scale)
+            }
+            const { sizeX, sizeY, offsetX, offsetY } = pictureGrid
+            for (let x = Math.ceil((left - offsetX) / sizeX) * sizeX + offsetX; x <= right; x += sizeX) {
+              ctx.moveTo(x + 0.5, top)
+              ctx.lineTo(x + 0.5, bottom)
+            }
+            for (let y = Math.ceil((top - offsetY) / sizeY) * sizeY + offsetY; y <= bottom; y += sizeY) {
+              ctx.moveTo(left, y + 0.5)
+              ctx.lineTo(right, y + 0.5)
+            }
+            ctx.stroke()
+            ctx.setLineDash([])
+          }}
+        />
       )}
 
       {/* Brush hover highlight */}

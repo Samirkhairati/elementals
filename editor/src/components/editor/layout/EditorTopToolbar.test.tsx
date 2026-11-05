@@ -5,8 +5,12 @@ import { fireEvent, screen } from '@testing-library/react'
 import { EditorTopToolbar } from './EditorTopToolbar'
 import { renderWithEditor } from '@/test/editorContext'
 import { getCanvasView, resetCanvasView } from '@/hooks/editor/canvas/canvasView'
+import { useGridStore } from '@/store/gridStore'
 
-afterEach(() => resetCanvasView())
+afterEach(() => {
+  resetCanvasView()
+  useGridStore.getState().resetGrid()
+})
 
 const base = (over: Record<string, any> = {}) => ({
   activeMap: { name: 'Town', fileName: 'town.json', width: 30, height: 20 },
@@ -77,5 +81,49 @@ describe('EditorTopToolbar', () => {
     expect(screen.getByRole('button', { name: /Brush Tool/ })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'View sprites' })).toBeEnabled()
     expect(screen.getByText('No map focused')).toBeInTheDocument()
+  })
+
+  describe('picture grid settings', () => {
+    const open = () => {
+      renderWithEditor(<EditorTopToolbar />, base() as any)
+      fireEvent.contextMenu(screen.getByRole('button', { name: 'Grid snapping' }))
+    }
+
+    it('right-click on the grid snapping button opens the settings, a plain click still toggles snapping', () => {
+      const toggleSnapToGrid = vi.fn()
+      renderWithEditor(<EditorTopToolbar />, base({ toggleSnapToGrid }) as any)
+      fireEvent.click(screen.getByRole('button', { name: 'Grid snapping' }))
+      expect(toggleSnapToGrid).toHaveBeenCalledTimes(1)
+      expect(screen.queryByRole('dialog', { name: 'Picture grid settings' })).toBeNull()
+      fireEvent.contextMenu(screen.getByRole('button', { name: 'Grid snapping' }))
+      expect(screen.getByRole('dialog', { name: 'Picture grid settings' })).toBeTruthy()
+      expect(toggleSnapToGrid).toHaveBeenCalledTimes(1)
+    })
+
+    it('edits size and offset, which are stored for every map, and resets them', () => {
+      open()
+      const field = (label: string, value: string) => {
+        const input = screen.getByLabelText(label) as HTMLInputElement
+        fireEvent.change(input, { target: { value } })
+        fireEvent.blur(input)
+      }
+      field('Grid size X', '16')
+      field('Grid size Y', '24')
+      field('Grid offset X', '4')
+      field('Grid offset Y', '6')
+      expect(useGridStore.getState().grid).toEqual({ sizeX: 16, sizeY: 24, offsetX: 4, offsetY: 6 })
+      fireEvent.click(screen.getByRole('button', { name: 'Reset the picture grid' }))
+      expect(useGridStore.getState().grid).toEqual({ sizeX: 32, sizeY: 32, offsetX: 0, offsetY: 0 })
+    })
+
+    it('keeps an offset inside one cell and closes on Esc', () => {
+      open()
+      const input = screen.getByLabelText('Grid offset X') as HTMLInputElement
+      fireEvent.change(input, { target: { value: '40' } })
+      fireEvent.blur(input)
+      expect(useGridStore.getState().grid.offsetX).toBe(8)
+      fireEvent.keyDown(window, { key: 'Escape' })
+      expect(screen.queryByRole('dialog', { name: 'Picture grid settings' })).toBeNull()
+    })
   })
 })

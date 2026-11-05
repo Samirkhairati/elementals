@@ -6,10 +6,18 @@ import type { SpriteAssetInfo } from '../../../shared/engine/types'
 import type { ImageItem } from '@/types/editor'
 import { imagePickKey } from './graphicAssets'
 import { effectiveCrop } from './cropRect'
+import { DEFAULT_GRID, nearestLine, type GridSpec } from './grid'
 import type { Rect } from './entityVisuals'
 import { getSpriteImage, resolveSprite, spriteBoundsFromMeta, type ResolvedSprite } from './spriteImages'
 
 type ItemLike = Pick<ImageItem, 'assetId' | 'graphicId' | 'crop' | 'scale'>
+
+/**
+ * Size the game shows a picture at: whole pixels, never below 1 (`displaySize` in the game's imageLayers). The editor draws
+ * the exact size, but snaps with this one, so the edges that land on the grid land there in the game too.
+ */
+const shownSize = (w: number, h: number, scale: number): { w: number; h: number } =>
+  scale === 1 ? { w, h } : { w: Math.max(1, Math.round(w * scale)), h: Math.max(1, Math.round(h * scale)) }
 
 /** The tile-sized box used while an item's picture is missing or loading, so it can still be picked. */
 const FALLBACK: Rect = { x: -16, y: -32, w: 32, h: 32 }
@@ -25,33 +33,46 @@ export function itemSourceSize(item: ItemLike, assets: Record<string, SpriteAsse
 }
 
 /** Rectangle of the item relative to its anchor (bottom-centre), unflipped; known before the picture has loaded. */
-export function itemBounds(item: ItemLike, assets: Record<string, SpriteAssetInfo>): Rect {
+export function itemBounds(item: ItemLike, assets: Record<string, SpriteAssetInfo>, gameSize = false): Rect {
   const asset = assets[imagePickKey(item)]
   if (!asset) return FALLBACK
   const scale = item.scale ?? 1
   if (croppedPicture(item)) {
-    const w = item.crop!.w * scale
-    const h = item.crop!.h * scale
+    const { w, h } = gameSize ? shownSize(item.crop!.w, item.crop!.h, scale) : { w: item.crop!.w * scale, h: item.crop!.h * scale }
+    return { x: -w / 2, y: -h, w, h }
+  }
+  if (gameSize && item.graphicId) {
+    const { w, h } = shownSize(asset.meta.frameWidth, asset.meta.frameHeight, scale)
     return { x: -w / 2, y: -h, w, h }
   }
   return spriteBoundsFromMeta(asset.meta, { scale })
 }
 
 /** Where the item stands once flips are applied (a flip mirrors the frame around the anchor). */
-export function flippedItemBounds(item: ItemLike & { flipX?: boolean; flipY?: boolean }, assets: Record<string, SpriteAssetInfo>): Rect {
-  const b = itemBounds(item, assets)
+export function flippedItemBounds(item: ItemLike & { flipX?: boolean; flipY?: boolean }, assets: Record<string, SpriteAssetInfo>, gameSize = false): Rect {
+  const b = itemBounds(item, assets, gameSize)
   return { ...b, x: item.flipX ? -(b.x + b.w) : b.x, y: item.flipY ? -(b.y + b.h) : b.y }
 }
 
 /**
- * Snaps an anchor so the item's edges, not its anchor, land on the tile grid: the left edge on a vertical grid line and the bottom edge
- * on a horizontal one. A one-tile picture ends up exactly where the entity snap puts it, but a picture two tiles wide no longer
- * sits half a tile off (its anchor is its bottom-centre, which is a tile line only for even widths).
+ * Snaps an anchor so one of the item's edges, not its anchor, lands on a grid line: on each axis the edge (left or right,
+ * top or bottom) that is nearest to a line moves onto it, so a picture sticks by whichever corner you bring close to the
+ * grid. A tie prefers the left and the bottom edge, which is where a one-tile picture ends up exactly like an entity.
+ * `grid` is a size in px (square, no offset) or a full grid.
  */
-export function snapImageAnchor(bounds: Rect, rawX: number, rawY: number, tile = 32): { x: number; y: number } {
-  const left = Math.round((rawX + bounds.x) / tile) * tile
-  const bottom = Math.round((rawY + bounds.y + bounds.h) / tile) * tile
-  return { x: left - bounds.x, y: bottom - (bounds.y + bounds.h) }
+export function snapImageAnchor(bounds: Rect, rawX: number, rawY: number, grid: number | GridSpec = DEFAULT_GRID): { x: number; y: number } {
+  const g: GridSpec = typeof grid === 'number' ? { ...DEFAULT_GRID, sizeX: grid, sizeY: grid } : grid
+  const left = rawX + bounds.x
+  const right = left + bounds.w
+  const top = rawY + bounds.y
+  const bottom = top + bounds.h
+  const lineL = nearestLine(left, g.sizeX, g.offsetX)
+  const lineR = nearestLine(right, g.sizeX, g.offsetX)
+  const lineT = nearestLine(top, g.sizeY, g.offsetY)
+  const lineB = nearestLine(bottom, g.sizeY, g.offsetY)
+  const dx = Math.abs(lineL - left) <= Math.abs(lineR - right) ? lineL - left : lineR - right
+  const dy = Math.abs(lineB - bottom) <= Math.abs(lineT - top) ? lineB - bottom : lineT - top
+  return { x: rawX + dx, y: rawY + dy }
 }
 
 /** What to draw for an item right now, or null while its picture loads. */

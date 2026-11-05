@@ -3,7 +3,8 @@ import { Group, Rect, Shape } from 'react-konva'
 import type { ImageItem, Layer } from '@/types/editor'
 import type { SpriteAssetInfo } from '../../../../../../shared/engine/types'
 import { drawResolvedSprite, useSpriteImagesVersion } from '@/lib/spriteImages'
-import { flippedItemBounds, resolveImageItem, snapImageAnchor } from '@/lib/imageItems'
+import { flippedItemBounds, resolveImageItem } from '@/lib/imageItems'
+import { snapPicture } from '@/lib/imageSnap'
 import { sortedImages } from '@/lib/layerOrder'
 import type { ImagePick } from '@/lib/graphicAssets'
 import type { SelectMode } from '@/lib/imageSelection'
@@ -54,7 +55,7 @@ export const KonvaImageItems = React.memo(function KonvaImageItems({
   // Snapping puts the picture's edges on the grid, so the item's own size decides where its anchor goes.
   // Pictures may be dragged past the map's edge (scenery that runs off it); only the snap or the rounding applies.
   const place = (item: ImageItem, x: number, y: number) =>
-    snapToGrid ? snapImageAnchor(flippedItemBounds(item, spriteAssets), x, y) : { x: Math.round(x), y: Math.round(y) }
+    snapToGrid ? snapPicture(flippedItemBounds(item, spriteAssets, true), x, y) : { x: Math.round(x), y: Math.round(y) }
 
   return (
     <Group>
@@ -236,7 +237,7 @@ export const KonvaGhostImage = React.memo(function KonvaGhostImage({
 }: KonvaGhostImageProps) {
   const version = useSpriteImagesVersion()
   if (!pending || !pointerPos) return null
-  const at = snapToGrid ? snapImageAnchor(flippedItemBounds(pending, spriteAssets), pointerPos.x, pointerPos.y) : { x: Math.round(pointerPos.x), y: Math.round(pointerPos.y) }
+  const at = snapToGrid ? snapPicture(flippedItemBounds(pending, spriteAssets, true), pointerPos.x, pointerPos.y) : { x: Math.round(pointerPos.x), y: Math.round(pointerPos.y) }
   const resolved = resolveImageItem(pending, spriteAssets)
   return (
     <Shape

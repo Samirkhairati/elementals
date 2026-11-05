@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import type { ImagePick } from '@/lib/graphicAssets'
-import { flippedItemBounds, snapImageAnchor } from '@/lib/imageItems'
+import { flippedItemBounds } from '@/lib/imageItems'
+import { snapPicture } from '@/lib/imageSnap'
 import type { SpriteAssetInfo } from '../../../../../shared/engine/types'
 import Konva from 'konva'
 import {
@@ -373,7 +374,7 @@ export function useCanvasInteraction({
             const stage = stageRef?.current
             const scale = stage?.scaleX() || 1
             const world = p && stage ? { x: (p.x - stage.x()) / scale, y: (p.y - stage.y()) / scale } : { x: coords.rawX * 32 + 16, y: coords.rawY * 32 + 32 }
-            const at = snapToGrid ? snapImageAnchor(flippedItemBounds(pendingImage, spriteAssets ?? {}), world.x, world.y) : { x: Math.round(world.x), y: Math.round(world.y) }
+            const at = snapToGrid ? snapPicture(flippedItemBounds(pendingImage, spriteAssets ?? {}, true), world.x, world.y) : { x: Math.round(world.x), y: Math.round(world.y) }
             commitImagePlacement?.(at.x, at.y)
           } else {
             clearImageSelection?.()
