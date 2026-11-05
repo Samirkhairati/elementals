@@ -253,7 +253,7 @@ export function GraphicsToolbar({ data, library }: { data: DatabaseData; onSelec
     <LibraryToolbar
       library={library}
       info="Import copies PNGs into the project: pick several, drag them from your computer onto the list or onto a folder, or paste a copied picture or screenshot (Ctrl/Cmd+V). Each one gets a naming step first. They go into the folder you clicked last. Rename and rearrange afterwards from here and every sprite and map follows."
-      newFolder={(onClose) => <NewFolder parent="" actions={actions} onDone={() => undefined} onClose={onClose} />}
+      newFolder={(onClose, parent) => <NewFolder parent={parent} actions={actions} onDone={() => undefined} onClose={onClose} />}
     />
   )
 }
