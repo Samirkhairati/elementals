@@ -227,7 +227,6 @@ export function EditorPage() {
     handleRedo: boundHandleRedo,
     setActiveTool: layerManager.setActiveTool,
     handleDelete: handleDeleteSelected,
-    deps: [boundHandleUndo, boundHandleRedo, handleDeleteSelected, layerManager.setActiveTool],
   })
 
   // ── Paint Tools Hook ─────────────────────────────────────────────────────
