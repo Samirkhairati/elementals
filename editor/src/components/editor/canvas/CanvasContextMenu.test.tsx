@@ -24,3 +24,29 @@ describe('CanvasContextMenu on an entity', () => {
     expect(screen.queryByText('Resize Collider')).toBeNull()
   })
 })
+
+describe('CanvasContextMenu over a picture', () => {
+  const menu = (target: object, extra: object = {}) => (
+    <CanvasContextMenu
+      menuState={{ isOpen: true, x: 10, y: 10, target: { type: 'tile', tileX: 1, tileY: 2, ...target } }}
+      onClose={vi.fn()}
+      onCreateEntity={vi.fn()}
+      {...extra}
+    />
+  )
+
+  it('offers Place multiple for that picture, with its shortcut, and closes', () => {
+    const onPlaceMultiple = vi.fn()
+    render(menu({ pictureId: 'pic-1' }, { onPlaceMultiple, placeMultipleKeys: 'Ctrl+Shift+D' }))
+    expect(screen.getByText('Ctrl+Shift+D')).toBeTruthy()
+    fireEvent.click(screen.getByText('Place multiple'))
+    expect(onPlaceMultiple).toHaveBeenCalledWith('pic-1')
+    // the normal tile menu is still there
+    expect(screen.getByText('Sample Tile Here')).toBeTruthy()
+  })
+
+  it('has no such entry when the click was not on a picture', () => {
+    render(menu({}, { onPlaceMultiple: vi.fn() }))
+    expect(screen.queryByText('Place multiple')).toBeNull()
+  })
+})

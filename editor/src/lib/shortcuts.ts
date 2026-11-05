@@ -27,6 +27,7 @@ export const SHORTCUT_ACTIONS: ShortcutAction[] = [
   { id: 'edit.copy', label: 'Copy selection', group: 'Edit', defaults: ['Mod+C'] },
   { id: 'edit.paste', label: 'Paste', group: 'Edit', defaults: ['Mod+V'] },
   { id: 'edit.duplicate', label: 'Duplicate selection', group: 'Edit', defaults: ['Mod+D'] },
+  { id: 'image.placeMultiple', label: 'Place multiple copies of the picked picture', group: 'Pictures', defaults: ['Mod+Shift+D'] },
   { id: 'tool.brush', label: 'Brush tool', group: 'Tools', defaults: ['B'] },
   { id: 'tool.eraser', label: 'Eraser tool', group: 'Tools', defaults: ['E'] },
   { id: 'tool.rectangle', label: 'Rectangle tool', group: 'Tools', defaults: ['M'] },

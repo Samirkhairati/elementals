@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu'
-import { Plus, Sparkles, Copy, Trash2, Pipette, Palette } from 'lucide-react'
+import { Plus, Sparkles, Copy, CopyPlus, Trash2, Pipette, Palette } from 'lucide-react'
 import { OVERLAY_COLORS } from '@/hooks/editor/canvas/canvasView'
 import { PRESET_PREFABS } from '@/lib/componentRegistry'
 import { EntityData, ComponentType } from '@/types/editor'
@@ -20,6 +20,8 @@ export interface CanvasContextMenuTarget {
   tileX?: number
   tileY?: number
   entity?: EntityData
+  /** A tile menu opened over a picture of the active image layer. */
+  pictureId?: string
 }
 
 export interface CanvasContextMenuState {
@@ -43,6 +45,10 @@ interface CanvasContextMenuProps {
   /** Sets the tint of an entity's area outline ('' = white). */
   onSetAreaColor?: (id: string, color: string) => void
   onSampleTile?: (tileX: number, tileY: number) => void
+  /** "Place multiple" on the picture that was right-clicked. */
+  onPlaceMultiple?: (imageId: string) => void
+  /** Shown next to the entry (the shortcut, if any). */
+  placeMultipleKeys?: string
 }
 
 export function CanvasContextMenu({
@@ -53,6 +59,8 @@ export function CanvasContextMenu({
   onDeleteEntity,
   onSetAreaColor,
   onSampleTile,
+  onPlaceMultiple,
+  placeMultipleKeys,
 }: CanvasContextMenuProps) {
   const { isOpen, x, y, target } = menuState
   const tileX = target?.tileX ?? 0
@@ -145,7 +153,21 @@ export function CanvasContextMenu({
             <DropdownMenuLabel className="text-muted-foreground font-normal text-[10px]">
               Tile ({tileX}, {tileY})
             </DropdownMenuLabel>
-            <DropdownMenuSeparator />
+            {target?.pictureId && onPlaceMultiple && (
+              <>
+                <DropdownMenuItem
+                  onClick={() => {
+                    onPlaceMultiple(target.pictureId!)
+                    onClose()
+                  }}
+                >
+                  <CopyPlus className="w-3.5 h-3.5 mr-2 text-primary" />
+                  Place multiple
+                  {placeMultipleKeys && <span className="ml-auto pl-3 text-muted-foreground">{placeMultipleKeys}</span>}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>
+            )}
             <DropdownMenuItem
               onClick={() => {
                 // Center entity on tile: x = tileX * 32 + 16, y = tileY * 32 + 32

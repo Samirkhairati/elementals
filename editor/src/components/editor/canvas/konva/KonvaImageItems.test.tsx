@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- tests record react-konva nodes */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render } from '@testing-library/react'
+import { act, render } from '@testing-library/react'
 
 // react-konva needs a real canvas; here its nodes are recorded and rendered as plain elements.
 const recorded: { kind: string; props: Record<string, any> }[] = []
@@ -10,7 +10,7 @@ vi.mock('react-konva', () => {
       recorded.push({ kind, props })
       return <div data-kind={kind}>{children}</div>
     }
-  return { Group: make('Group'), Rect: make('Rect'), Shape: make('Shape') }
+  return { Group: make('Group'), Rect: make('Rect'), Shape: make('Shape'), Line: make('Line') }
 })
 
 import { KonvaImageItems } from './KonvaImageItems'
@@ -84,5 +84,47 @@ describe('KonvaImageItems', () => {
 
     renderItems({ layer: imageLayer('A'), otherLayers: [], placing: true })
     expect(handles()[0].props.listening).toBe(false)
+  })
+
+  describe('Shift locks a drag to one axis', () => {
+    const target = (x: number, y: number) => ({ _x: x, _y: y, x(v?: number) { if (v !== undefined) this._x = v; return this._x }, y(v?: number) { if (v !== undefined) this._y = v; return this._y }, getStage: () => null })
+    const move = (handle: { props: Record<string, any> }, t: ReturnType<typeof target>, at: [number, number], shiftKey: boolean) => {
+      t.x(at[0])
+      t.y(at[1])
+      act(() => handle.props.onDragMove({ cancelBubble: false, target: t, evt: { shiftKey } }))
+    }
+    const start = () => {
+      const props = renderItems({ layer: imageLayer('A'), otherLayers: [], snapToGrid: false })
+      const handle = handles()[0]
+      const t = target(32, 32)
+      act(() => handle.props.onDragStart({ cancelBubble: false, target: t, evt: { shiftKey: false } }))
+      return { props, handle, t }
+    }
+
+    it('keeps the other coordinate where Shift went down, and shows two guide lines along the edges', () => {
+      const { handle, t } = start()
+      move(handle, t, [100, 100], true)
+      expect([t.x(), t.y()]).toEqual([100, 100])
+      move(handle, t, [160, 108], true)
+      expect([t.x(), t.y()]).toEqual([160, 100])
+      move(handle, t, [20, 300], true)
+      expect([t.x(), t.y()]).toEqual([20, 100])
+      const lines = recorded.filter((r) => r.kind === 'Line')
+      expect(lines.length).toBeGreaterThanOrEqual(2)
+      const last = lines.slice(-2).map((l) => l.props.points)
+      // horizontal lines (same y at both ends), one per top / bottom edge of the picture
+      expect(last.every((p: number[]) => p[1] === p[3])).toBe(true)
+      expect(last[0][1]).not.toBe(last[1][1])
+    })
+
+    it('lets go of the lock when Shift is released, and the drop lands where the last move put it', () => {
+      const { props, handle, t } = start()
+      move(handle, t, [100, 100], true)
+      move(handle, t, [160, 108], true)
+      move(handle, t, [170, 140], false)
+      expect([t.x(), t.y()]).toEqual([170, 140])
+      act(() => handle.props.onDragEnd({ cancelBubble: false, target: t, evt: {} }))
+      expect(props.moveImage).toHaveBeenCalledWith('A', 'A-1', 170, 140)
+    })
   })
 })

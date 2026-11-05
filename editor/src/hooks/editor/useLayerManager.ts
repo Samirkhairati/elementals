@@ -700,6 +700,18 @@ export function useLayerManager(options: UseLayerManagerOptions) {
     [layersRef]
   )
 
+  /** Start placing copies of a picture on the layer: it comes back as the placement preview with its crop, scale, flips and opacity, and each click adds one (Esc or a right-click ends it). */
+  const placeMultiple = useCallback(
+    (layerId: string, imageId: string) => {
+      const item = imagesById(layerId, [imageId])[0]
+      if (!item) return
+      const { assetId, graphicId, crop, scale, flipX, flipY, opacity } = item
+      const pick: ImagePick = { assetId, graphicId, crop: crop && { ...crop }, scale, flipX, flipY, opacity }
+      setPendingImage(Object.fromEntries(Object.entries(pick).filter(([, v]) => v !== undefined)) as ImagePick)
+    },
+    [imagesById]
+  )
+
   const duplicateImages = useCallback(
     (layerId: string, ids: readonly string[]) => addImageCopies(layerId, imagesById(layerId, ids), null),
     [addImageCopies, imagesById]
@@ -747,6 +759,7 @@ export function useLayerManager(options: UseLayerManagerOptions) {
     selectImage,
     deleteImages,
     duplicateImages,
+    placeMultiple,
     copyImages,
     pasteImages,
     addImage,

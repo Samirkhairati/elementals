@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import type { ImagePick } from '@/lib/graphicAssets'
 import { flippedItemBounds } from '@/lib/imageItems'
 import { snapPicture } from '@/lib/imageSnap'
+import { applyAxisLock, type Axis, type AxisLock } from '@/lib/axisLock'
 import type { SpriteAssetInfo } from '../../../../../shared/engine/types'
 import Konva from 'konva'
 import {
@@ -63,10 +64,21 @@ interface UseCanvasInteractionProps {
 }
 
 /** True for the pick/drag handle of a picture on an image layer (see KonvaImageItems). */
-type NodeLike = { name(): string; getParent(): NodeLike | null }
+type NodeLike = { name(): string; getParent(): NodeLike | null; getAttr?(name: string): unknown }
 export function isPictureHandle(node: NodeLike | null): boolean {
   for (let n: NodeLike | null = node; n; n = n.getParent()) if (n.name() === 'image-handle') return true
   return false
+}
+
+/** The id of the picture whose handle this node is (or is drawn inside), if any. */
+export function pictureHandleId(node: NodeLike | null): string | null {
+  for (let n: NodeLike | null = node; n; n = n.getParent()) {
+    if (n.name() === 'image-handle') {
+      const id = n.getAttr?.('imageId')
+      return typeof id === 'string' ? id : null
+    }
+  }
+  return null
 }
 
 export function useCanvasInteraction({
@@ -113,6 +125,9 @@ export function useCanvasInteraction({
   const [isSpaceDown, setIsSpaceDown] = useState(false)
   const [isPanning, setIsPanning] = useState(false)
   const [stagePointerPos, setStagePointerPos] = useState<{ x: number; y: number } | null>(null)
+  /** Placing a picture with Shift held: where Shift went down and which axis the pointer chose (see lib/axisLock). */
+  const placementLockRef = useRef<AxisLock | null>(null)
+  const [placementAxis, setPlacementAxis] = useState<Axis | null>(null)
   const [contextMenuState, setContextMenuState] = useState<CanvasContextMenuState>({
     isOpen: false,
     x: 0,
@@ -128,6 +143,8 @@ export function useCanvasInteraction({
     tileY: number
     isEntity: boolean
     entity?: EntityData
+    /** The picture under the pointer when the right button went down (its menu offers "Place multiple"). */
+    pictureId?: string
   } | null>(null)
   const isRightDraggingRef = useRef(false)
   // The current press is Shift + left button standing in for the right button.
@@ -280,8 +297,9 @@ export function useCanvasInteraction({
   // ── Stage Mouse Down ─────────────────────────────────────────────────────
   const handleStageMouseDown = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
-      // Shift + left button is the same gesture as the right button (sampling, context menu, cancel)
-      const secondary = e.evt.button === 2 || (e.evt.button === 0 && e.evt.shiftKey)
+      // Shift + left button is the same gesture as the right button (sampling, context menu, cancel), except while a picture
+      // is being placed: there Shift locks it to one axis, and the click places it.
+      const secondary = e.evt.button === 2 || (e.evt.button === 0 && e.evt.shiftKey && !pendingImage)
       shiftSecondaryRef.current = secondary && e.evt.button === 0
       const button = secondary ? 2 : e.evt.button
 
@@ -357,6 +375,7 @@ export function useCanvasInteraction({
           tileX: coords.x,
           tileY: coords.y,
           isEntity: false,
+          pictureId: pictureHandleId(e.target) ?? undefined,
         }
         isRightDraggingRef.current = false
         setCanvasCopyStart({ x: coords.x, y: coords.y })
@@ -373,7 +392,8 @@ export function useCanvasInteraction({
             const p = stageRef?.current?.getPointerPosition()
             const stage = stageRef?.current
             const scale = stage?.scaleX() || 1
-            const world = p && stage ? { x: (p.x - stage.x()) / scale, y: (p.y - stage.y()) / scale } : { x: coords.rawX * 32 + 16, y: coords.rawY * 32 + 32 }
+            const raw = p && stage ? { x: (p.x - stage.x()) / scale, y: (p.y - stage.y()) / scale } : { x: coords.rawX * 32 + 16, y: coords.rawY * 32 + 32 }
+            const world = e.evt.shiftKey ? applyAxisLock(placementLockRef.current, true, raw.x, raw.y) : raw
             const at = snapToGrid ? snapPicture(flippedItemBounds(pendingImage, spriteAssets ?? {}, true), world.x, world.y) : { x: Math.round(world.x), y: Math.round(world.y) }
             commitImagePlacement?.(at.x, at.y)
           } else {
@@ -443,10 +463,17 @@ export function useCanvasInteraction({
         const p = stageRef.current.getPointerPosition()
         if (p) {
           const scale = stageRef.current.scaleX() || 1
-          setStagePointerPos({
-            x: (p.x - stageRef.current.x()) / scale,
-            y: (p.y - stageRef.current.y()) / scale,
-          })
+          let world = { x: (p.x - stageRef.current.x()) / scale, y: (p.y - stageRef.current.y()) / scale }
+          if (pendingImage) {
+            const locked = applyAxisLock(placementLockRef.current, e.evt.shiftKey, world.x, world.y)
+            placementLockRef.current = locked.lock
+            setPlacementAxis(locked.lock?.axis ?? null)
+            world = { x: locked.x, y: locked.y }
+          } else if (placementLockRef.current) {
+            placementLockRef.current = null
+            setPlacementAxis(null)
+          }
+          setStagePointerPos(world)
         }
       }
 
@@ -548,7 +575,7 @@ export function useCanvasInteraction({
                 isOpen: true,
                 x: e.clientX,
                 y: e.clientY,
-                target: { type: 'tile', tileX: rightClickRef.current.tileX, tileY: rightClickRef.current.tileY },
+                target: { type: 'tile', tileX: rightClickRef.current.tileX, tileY: rightClickRef.current.tileY, pictureId: rightClickRef.current.pictureId },
               })
             }
           }
@@ -591,6 +618,7 @@ export function useCanvasInteraction({
     isSpaceDown,
     isPanning,
     stagePointerPos,
+    placementAxis,
     contextMenuState,
     setContextMenuState,
     closeContextMenu,

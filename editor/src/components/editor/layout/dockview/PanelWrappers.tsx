@@ -1,3 +1,5 @@
+import { describeBindings } from '@/lib/shortcuts';
+import { useBindings } from '@/store/shortcutStore';
 import React, { useMemo, useCallback } from 'react';
 import { IDockviewPanelProps } from 'dockview-react';
 import { useEditorSelector, type EditorContextValue } from '../EditorContext';
@@ -298,6 +300,7 @@ const selectCanvas = (c: EditorContextValue) => ({
   setSelectedImageId: c.setSelectedImageId,
   pickedImageIds: c.pickedImageIds,
   selectImage: c.selectImage,
+  placeMultiple: c.placeMultiple,
   setActiveLayerId: c.setActiveLayerId,
   addImage: c.addImage,
   updateImage: c.updateImage,
@@ -327,6 +330,7 @@ export function CanvasWrapper(props: IDockviewPanelProps) {
   const currentEntities = isActive ? ctx.entities : targetMap?.entities || [];
 
   const { addImage, updateImage, activeLayerId, pendingImage } = ctx;
+  const placeKeys = describeBindings('image.placeMultiple', useBindings());
   // Placement keeps going (Esc or a right-click ends it) so a row of trees is a row of clicks.
   const commitImagePlacement = useCallback(
     (x: number, y: number) => {
@@ -396,6 +400,8 @@ export function CanvasWrapper(props: IDockviewPanelProps) {
         setSelectedImageId={isActive ? ctx.setSelectedImageId : noop}
         pickedImageIds={isActive ? ctx.pickedImageIds : undefined}
         selectImage={isActive ? ctx.selectImage : noop}
+        onPlaceMultiple={isActive ? (imageId: string) => ctx.activeLayerId && ctx.placeMultiple(ctx.activeLayerId, imageId) : undefined}
+        placeMultipleKeys={placeKeys}
         activateLayer={isActive ? ctx.setActiveLayerId : noop}
         moveImage={isActive ? moveImage : noop}
       />

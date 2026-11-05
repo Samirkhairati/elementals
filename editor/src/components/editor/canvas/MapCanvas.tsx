@@ -82,6 +82,9 @@ interface MapCanvasProps {
   setSelectedImageId?: (id: string | null) => void
   pickedImageIds?: readonly string[]
   selectImage?: (layerId: string, imageId: string, mode: SelectMode) => void
+  /** "Place multiple" from the menu of a right-clicked picture, and the keys to show beside it. */
+  onPlaceMultiple?: (imageId: string) => void
+  placeMultipleKeys?: string
   /** Picking an image of another layer (toolbar lock off) makes that layer the active one. */
   activateLayer?: (layerId: string) => void
   moveImage?: (layerId: string, imageId: string, x: number, y: number) => void
@@ -131,6 +134,8 @@ export function MapCanvas({
   setSelectedImageId,
   pickedImageIds,
   selectImage,
+  onPlaceMultiple,
+  placeMultipleKeys,
   activateLayer,
   moveImage,
 }: MapCanvasProps) {
@@ -172,6 +177,7 @@ export function MapCanvas({
     isSpaceDown,
     isPanning,
     stagePointerPos,
+    placementAxis,
     contextMenuState,
     closeContextMenu,
     sampleSingleTile,
@@ -398,6 +404,7 @@ export function MapCanvas({
                 pointerPos={stagePointerPos}
                 snapToGrid={snapToGrid}
                 spriteAssets={spriteAssets}
+                axis={placementAxis}
               />
 
               {/* Ghost entity preview during placement mode */}
@@ -440,6 +447,8 @@ export function MapCanvas({
           handleUpdateTag(id, hasTag ? { color } : { tag: 'entity', color })
         }}
         onSampleTile={sampleSingleTile}
+        onPlaceMultiple={onPlaceMultiple}
+        placeMultipleKeys={placeMultipleKeys}
       />
     </>
   )
