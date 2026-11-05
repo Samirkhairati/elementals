@@ -215,4 +215,48 @@ describe('LayersPanel', () => {
       expect(vi.mocked(props.reorderLayers).mock.calls[0][0].find((l) => l.id === 'c')?.folderId).toBe('F')
     })
   })
+
+  describe('creating layers and folders', () => {
+    it('right-click on a layer offers New Folder (with its shortcut) and a New Layer submenu', () => {
+      const { props } = renderPanel({ newFolderKeys: 'Ctrl+Shift+N', newLayerKeys: 'Ctrl+N' })
+      fireEvent.contextMenu(screen.getByText('Ground'))
+      const item = screen.getByRole('menuitem', { name: /New Folder/ })
+      expect(item.textContent).toContain('Ctrl+Shift+N')
+      expect(screen.getByRole('menuitem', { name: /New Layer/ }).textContent).toContain('Ctrl+N')
+      fireEvent.click(item)
+      expect(props.createLayerOfType).toHaveBeenCalledWith('folder')
+    })
+
+    it('right-click on the empty list offers it too', () => {
+      const { props } = renderPanel({ layers: [] })
+      fireEvent.contextMenu(screen.getByText('No layers yet.'))
+      fireEvent.click(screen.getByRole('menuitem', { name: /New Folder/ }))
+      expect(props.createLayerOfType).toHaveBeenCalledWith('folder')
+    })
+
+    it('a layer made from the menu of a layer inside a folder goes into that folder', () => {
+      const layers = [makeLayer('f', { type: 'folder', name: 'Scenery' }), makeLayer('in', { name: 'Inside', folderId: 'f' })]
+      const { props } = renderPanel({ layers })
+      fireEvent.contextMenu(screen.getByText('Inside'))
+      fireEvent.click(screen.getByRole('menuitem', { name: /New Layer/ }))
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Tile Layer' }))
+      expect(props.createLayerOfType).toHaveBeenCalledWith('tile', 'f')
+    })
+
+    it('a layer or folder that was just created opens its name for typing, once per creation', () => {
+      const { rerender, props } = renderPanel()
+      expect(screen.queryByRole('textbox')).toBeNull()
+      const made = makeLayer('new', { type: 'folder', name: 'Folder' })
+      const withNew = { ...props, layers: [made, ...props.layers], justCreatedLayer: { id: 'new', n: 1 } }
+      rerender(<LayersPanel {...withNew} />)
+      const input = screen.getByRole('textbox') as HTMLInputElement
+      expect(input.value).toBe('Folder')
+      fireEvent.change(input, { target: { value: 'Scenery' } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+      expect(props.renameLayer).toHaveBeenCalledWith('new', 'Scenery')
+      // the same creation does not reopen the field on the next render
+      rerender(<LayersPanel {...withNew} />)
+      expect(screen.queryByRole('textbox')).toBeNull()
+    })
+  })
 })

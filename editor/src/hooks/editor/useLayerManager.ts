@@ -30,6 +30,8 @@ export function useLayerManager(options: UseLayerManagerOptions) {
   const [selectedImageId, setSelectedImageIdRaw] = useState<string | null>(null)
   /** Pictures picked besides `selectedImageId` (Ctrl/Cmd or Shift+click). Together they are the picked set. */
   const [extraImageIds, setExtraImageIds] = useState<string[]>([])
+  /** The layer the last "new layer / folder" made (and how many were made), so the list can open its name for typing. */
+  const [justCreatedLayer, setJustCreatedLayer] = useState<{ id: string; n: number } | null>(null)
   /** Picks only this picture (or none) and drops the rest of the picked set. */
   const setSelectedImageId = useCallback((next: React.SetStateAction<string | null>) => {
     setSelectedImageIdRaw(next)
@@ -283,7 +285,11 @@ export function useLayerManager(options: UseLayerManagerOptions) {
           return next
         },
         () => {
-          if (createdId) setActiveLayerId(createdId)
+          if (createdId) {
+            setActiveLayerId(createdId)
+            const id = createdId
+            setJustCreatedLayer(prev => ({ id, n: (prev?.n ?? 0) + 1 }))
+          }
           if (insertedAt >= 0) shiftEntitiesIndex(k => entitiesIndexAfterInsert(k, insertedAt, countBefore))
         }
       )
@@ -786,6 +792,7 @@ export function useLayerManager(options: UseLayerManagerOptions) {
     toggleLayerVisibility,
     toggleLayerLock,
     toggleFolderCollapsed,
+    justCreatedLayer,
     handleCreateLayer,
     handleCreateLayerOfType,
     handleRenameLayer,

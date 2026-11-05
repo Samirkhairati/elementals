@@ -280,6 +280,8 @@ export function EditorPage() {
     handlePaste: handlePasteSelected,
     handleDuplicate: handleDuplicateSelected,
     handlePlaceMultiple,
+    handleNewLayer: () => mapManager.activeMap && handleCreateLayerOfType('tile'),
+    handleNewFolder: () => mapManager.activeMap && handleCreateLayerOfType('folder'),
   })
 
   // ── Paint Tools Hook ─────────────────────────────────────────────────────
@@ -444,6 +446,7 @@ export function EditorPage() {
     setActiveLayerId: handleSelectLayer,
     selectLayer: handleSelectLayerExtended,
     selectedLayerIds: layerManager.selectedLayerIds,
+    justCreatedLayer: layerManager.justCreatedLayer,
     pinSelection: layerManager.pinSelection,
     setPinSelection: layerManager.setPinSelection,
     pendingImage: layerManager.pendingImage,
@@ -635,7 +638,7 @@ export function EditorPage() {
     // Layers
     layerManager.layers, layerManager.activeLayerId, layerManager.activeLayerType,
     handleSelectLayer, handleSelectLayerExtended, layerManager.toggleLayerVisibility,
-    layerManager.selectedLayerIds, layerManager.pinSelection, layerManager.setPinSelection,
+    layerManager.selectedLayerIds, layerManager.justCreatedLayer, layerManager.pinSelection, layerManager.setPinSelection,
     layerManager.pendingImage, layerManager.startImagePlacement, layerManager.cancelImagePlacement,
     layerManager.selectedImageId, layerManager.setSelectedImageId,
     layerManager.pickedImageIds, layerManager.selectImage, layerManager.deleteImages, layerManager.duplicateImages, layerManager.placeMultiple, layerManager.copyImages, layerManager.pasteImages,

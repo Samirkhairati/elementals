@@ -72,6 +72,7 @@ export interface EditorBaseContextValue
       | 'tileSelection'
       | 'setTileSelection'
       | 'selectedLayerIds'
+      | 'justCreatedLayer'
       | 'pinSelection'
       | 'setPinSelection'
       | 'pendingImage'

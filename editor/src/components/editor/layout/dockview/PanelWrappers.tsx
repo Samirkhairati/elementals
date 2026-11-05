@@ -86,6 +86,7 @@ const selectLayers = (c: EditorContextValue) => ({
   setActiveLayerId: c.setActiveLayerId,
   selectLayer: c.selectLayer,
   selectedLayerIds: c.selectedLayerIds,
+  justCreatedLayer: c.justCreatedLayer,
   showEntities: c.showEntities,
   toggleShowEntities: c.toggleShowEntities,
   entitiesIndex: c.activeMap?.entitiesIndex ?? 0,
@@ -104,6 +105,7 @@ const selectLayers = (c: EditorContextValue) => ({
 
 export function LayersWrapper(_props: IDockviewPanelProps) {
   const ctx = useEditorSelector(selectLayers);
+  const bindings = useBindings();
   return (
     <div
       onClick={() => ctx.setFocusedDomain('layers')}
@@ -116,6 +118,9 @@ export function LayersWrapper(_props: IDockviewPanelProps) {
         setActiveLayerId={ctx.setActiveLayerId}
         selectLayer={ctx.selectLayer}
         selectedLayerIds={ctx.selectedLayerIds}
+        justCreatedLayer={ctx.justCreatedLayer}
+        newLayerKeys={describeBindings('layer.new', bindings)}
+        newFolderKeys={describeBindings('layer.newFolder', bindings)}
         showEntities={ctx.showEntities}
         toggleShowEntities={ctx.toggleShowEntities}
         entitiesIndex={ctx.entitiesIndex}

@@ -27,6 +27,8 @@ export const SHORTCUT_ACTIONS: ShortcutAction[] = [
   { id: 'edit.copy', label: 'Copy selection', group: 'Edit', defaults: ['Mod+C'] },
   { id: 'edit.paste', label: 'Paste', group: 'Edit', defaults: ['Mod+V'] },
   { id: 'edit.duplicate', label: 'Duplicate selection', group: 'Edit', defaults: ['Mod+D'] },
+  { id: 'layer.new', label: 'New layer', group: 'Layers', defaults: ['Mod+N'] },
+  { id: 'layer.newFolder', label: 'New layer folder', group: 'Layers', defaults: ['Mod+Shift+N'] },
   { id: 'image.placeMultiple', label: 'Place multiple copies of the picked picture', group: 'Pictures', defaults: ['Mod+Shift+D'] },
   { id: 'image.crop', label: 'Crop the picked picture', group: 'Pictures', defaults: ['C'] },
   { id: 'image.resize', label: 'Resize the picked picture', group: 'Pictures', defaults: ['Mod+T'] },
