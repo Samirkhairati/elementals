@@ -152,3 +152,148 @@ describe('place multiple', () => {
     expect(result.current.pendingImage).toBeNull()
   })
 })
+
+describe('groups of pictures', () => {
+  const four = () => imageLayer([img('a', 0), img('b', 10), img('c', 20), img('d', 30)])
+  const layerOf = (r: { current: ReturnType<typeof useLayerManager> }, id = 'I1') => r.current.layers.find(l => l.id === id)!
+  const groupedFirstTwo = () => {
+    const hook = setup([four()])
+    act(() => hook.result.current.selectImage('I1', 'a', 'replace'))
+    act(() => hook.result.current.selectImage('I1', 'b', 'toggle'))
+    act(() => hook.result.current.groupPickedImages('I1'))
+    return hook
+  }
+
+  it('groups the picked pictures in one history step, selects the group row, and needs at least two', () => {
+    const { result, onCommitHistory } = setup([four()])
+    act(() => result.current.selectImage('I1', 'a', 'replace'))
+    onCommitHistory.mockClear()
+    act(() => result.current.groupPickedImages('I1'))
+    expect(layerOf(result).groups).toBeUndefined()
+    expect(onCommitHistory).not.toHaveBeenCalled()
+    act(() => result.current.selectImage('I1', 'b', 'toggle'))
+    act(() => result.current.groupPickedImages('I1'))
+    const layer = layerOf(result)
+    expect(layer.groups).toHaveLength(1)
+    expect(layer.images!.filter(i => i.groupId === layer.groups![0].id).map(i => i.id).sort()).toEqual(['a', 'b'])
+    expect(onCommitHistory).toHaveBeenCalledTimes(1)
+    expect(result.current.openImageGroupId).toBe(layer.groups![0].id)
+  })
+
+  it('a locked group is picked as a whole by a click on any member; unlocked ones are not', () => {
+    const { result } = groupedFirstTwo()
+    const gid = layerOf(result).groups![0].id
+    act(() => result.current.setSelectedImageId(null))
+    act(() => result.current.selectImage('I1', 'a', 'replace'))
+    expect(result.current.pickedImageIds).toEqual(['a'])
+    act(() => result.current.setImageGroupLocked('I1', gid, true))
+    expect(layerOf(result).groups![0].locked).toBe(true)
+    act(() => result.current.setSelectedImageId(null))
+    act(() => result.current.selectImage('I1', 'a', 'replace'))
+    expect([...result.current.pickedImageIds].sort()).toEqual(['a', 'b'])
+    expect(result.current.selectedImageId).toBe('a')
+  })
+
+  it('selecting the group row opens it: then one member can be picked on its own, until another picture is clicked', () => {
+    const { result } = groupedFirstTwo()
+    const gid = layerOf(result).groups![0].id
+    act(() => result.current.setImageGroupLocked('I1', gid, true))
+    act(() => result.current.setSelectedImageId(null))
+    act(() => result.current.selectImageGroup('I1', gid))
+    expect([...result.current.pickedImageIds].sort()).toEqual(['a', 'b'])
+    expect(result.current.openImageGroupId).toBe(gid)
+    act(() => result.current.selectImage('I1', 'b', 'replace'))
+    expect(result.current.pickedImageIds).toEqual(['b'])
+    expect(result.current.openImageGroupId).toBe(gid)
+    act(() => result.current.selectImage('I1', 'c', 'replace'))
+    expect(result.current.openImageGroupId).toBeNull()
+    act(() => result.current.selectImage('I1', 'a', 'replace'))
+    expect([...result.current.pickedImageIds].sort()).toEqual(['a', 'b'])
+  })
+
+  it('Ctrl/Cmd+click on a locked group toggles all of it in or out', () => {
+    const { result } = groupedFirstTwo()
+    const gid = layerOf(result).groups![0].id
+    act(() => result.current.setImageGroupLocked('I1', gid, true))
+    act(() => result.current.setSelectedImageId(null))
+    act(() => result.current.selectImage('I1', 'c', 'replace'))
+    act(() => result.current.selectImage('I1', 'a', 'toggle'))
+    expect([...result.current.pickedImageIds].sort()).toEqual(['a', 'b', 'c'])
+    act(() => result.current.selectImage('I1', 'b', 'toggle'))
+    expect(result.current.pickedImageIds).toEqual(['c'])
+  })
+
+  it('ungroup keeps the pictures and drops the group', () => {
+    const { result } = groupedFirstTwo()
+    const gid = layerOf(result).groups![0].id
+    act(() => result.current.ungroupImageGroup('I1', gid))
+    const layer = layerOf(result)
+    expect(layer.groups).toBeUndefined()
+    expect(layer.images).toHaveLength(4)
+    expect(layer.images!.every(i => i.groupId === undefined)).toBe(true)
+    expect(result.current.openImageGroupId).toBeNull()
+  })
+
+  it('renames a group, ignoring an empty name', () => {
+    const { result } = groupedFirstTwo()
+    const gid = layerOf(result).groups![0].id
+    act(() => result.current.renameImageGroup('I1', gid, '  Dam wall '))
+    expect(layerOf(result).groups![0].name).toBe('Dam wall')
+    act(() => result.current.renameImageGroup('I1', gid, '   '))
+    expect(layerOf(result).groups![0].name).toBe('Dam wall')
+  })
+
+  it('moveImages moves several pictures by one amount in one history step', () => {
+    const { result, onCommitHistory } = groupedFirstTwo()
+    onCommitHistory.mockClear()
+    act(() => result.current.moveImages('I1', ['a', 'b'], 5, -3))
+    const xs = Object.fromEntries(layerOf(result).images!.map(i => [i.id, [i.x, i.y]]))
+    expect(xs.a).toEqual([5, 61])
+    expect(xs.b).toEqual([15, 61])
+    expect(xs.c).toEqual([20, 64])
+    expect(onCommitHistory).toHaveBeenCalledTimes(1)
+  })
+
+  it('duplicating a whole group makes a new group of copies ("copy" name, same lock); the original is untouched', () => {
+    const { result } = groupedFirstTwo()
+    const gid = layerOf(result).groups![0].id
+    act(() => result.current.setImageGroupLocked('I1', gid, true))
+    act(() => result.current.duplicateImages('I1', ['a', 'b']))
+    const layer = layerOf(result)
+    expect(layer.groups).toHaveLength(2)
+    expect(layer.groups![1]).toMatchObject({ name: 'Group copy', locked: true })
+    expect(layer.groups![1].id).not.toBe(gid)
+    expect(layer.images!.filter(i => i.groupId === gid)).toHaveLength(2)
+    expect(layer.images!.filter(i => i.groupId === layer.groups![1].id)).toHaveLength(2)
+  })
+
+  it('deleting every member removes the group; deleting some keeps it', () => {
+    const { result } = groupedFirstTwo()
+    act(() => result.current.deleteImages('I1', ['a']))
+    expect(layerOf(result).groups).toHaveLength(1)
+    act(() => result.current.deleteImages('I1', ['b']))
+    expect(layerOf(result).groups).toBeUndefined()
+  })
+
+  it('copy and paste into another image layer brings the group along as a new one', () => {
+    const hook = setup([four(), imageLayer([], 'I2')])
+    act(() => hook.result.current.selectImage('I1', 'a', 'replace'))
+    act(() => hook.result.current.selectImage('I1', 'b', 'toggle'))
+    act(() => hook.result.current.groupPickedImages('I1'))
+    act(() => hook.result.current.copyImages('I1', ['a', 'b']))
+    act(() => hook.result.current.pasteImages('I2', null))
+    const target = layerOf(hook.result, 'I2')
+    expect(target.groups).toHaveLength(1)
+    expect(target.groups![0].name).toBe('Group copy')
+    expect(target.images!.every(i => i.groupId === target.groups![0].id)).toBe(true)
+  })
+
+  it('a locked layer refuses group changes', () => {
+    const locked = makeLayer('I1', { type: 'image', name: 'Images', images: [img('a', 0), img('b', 1)], locked: true })
+    const { result } = setup([locked])
+    act(() => result.current.selectImage('I1', 'a', 'replace'))
+    act(() => result.current.selectImage('I1', 'b', 'toggle'))
+    act(() => result.current.groupPickedImages('I1'))
+    expect(layerOf(result).groups).toBeUndefined()
+  })
+})

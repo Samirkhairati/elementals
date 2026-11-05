@@ -305,6 +305,7 @@ const selectCanvas = (c: EditorContextValue) => ({
   setSelectedImageId: c.setSelectedImageId,
   pickedImageIds: c.pickedImageIds,
   selectImage: c.selectImage,
+  moveImages: c.moveImages,
   placeMultiple: c.placeMultiple,
   setActiveLayerId: c.setActiveLayerId,
   addImage: c.addImage,
@@ -405,6 +406,7 @@ export function CanvasWrapper(props: IDockviewPanelProps) {
         setSelectedImageId={isActive ? ctx.setSelectedImageId : noop}
         pickedImageIds={isActive ? ctx.pickedImageIds : undefined}
         selectImage={isActive ? ctx.selectImage : noop}
+        moveImages={isActive ? ctx.moveImages : noop}
         onPlaceMultiple={isActive ? (imageId: string) => ctx.activeLayerId && ctx.placeMultiple(ctx.activeLayerId, imageId) : undefined}
         placeMultipleKeys={placeKeys}
         activateLayer={isActive ? ctx.setActiveLayerId : noop}

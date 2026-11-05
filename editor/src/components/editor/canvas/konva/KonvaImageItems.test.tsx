@@ -127,4 +127,39 @@ describe('KonvaImageItems', () => {
       expect(props.moveImage).toHaveBeenCalledWith('A', 'A-1', 170, 140)
     })
   })
+
+  describe('dragging a picked set (a group)', () => {
+    const target = (x: number, y: number) => ({ _x: x, _y: y, x(v?: number) { if (v !== undefined) this._x = v; return this._x }, y(v?: number) { if (v !== undefined) this._y = v; return this._y }, getStage: () => null })
+    const layer = () => imageLayer('A', { images: [{ id: 'g1', x: 32, y: 32, z: 0 }, { id: 'g2', x: 96, y: 64, z: 1 }, { id: 'solo', x: 200, y: 200, z: 2 }] })
+
+    it('dragging a picked picture moves every picked one by the same amount, as one move, while the rest of the group follows in the preview', () => {
+      const dragRef = { current: null as any }
+      const moveImages = vi.fn()
+      const props = renderItems({ layer: layer(), otherLayers: [], snapToGrid: false, pickedImageIds: ['g1', 'g2'], selectedImageId: 'g1', moveImages, dragRef })
+      const handle = handles().find((h) => h.props.x === 32)!
+      const t = target(32, 32)
+      act(() => handle.props.onDragStart({ cancelBubble: false, target: t, evt: {} }))
+      t.x(50)
+      t.y(40)
+      act(() => handle.props.onDragMove({ cancelBubble: false, target: t, evt: { shiftKey: false } }))
+      expect(dragRef.current).toMatchObject({ id: 'g1', x: 50, y: 40, along: { ids: ['g1', 'g2'], dx: 18, dy: 8 } })
+      act(() => handle.props.onDragEnd({ cancelBubble: false, target: t, evt: {} }))
+      expect(moveImages).toHaveBeenCalledWith('A', ['g1', 'g2'], 18, 8)
+      expect(props.moveImage).not.toHaveBeenCalled()
+      expect(dragRef.current).toBeNull()
+    })
+
+    it('a picture outside the picked set, or a single pick, moves alone', () => {
+      const moveImages = vi.fn()
+      const props = renderItems({ layer: layer(), otherLayers: [], snapToGrid: false, pickedImageIds: ['g1', 'g2'], selectedImageId: 'g1', moveImages })
+      const solo = handles().find((h) => h.props.x === 200)!
+      const t = target(200, 200)
+      act(() => solo.props.onDragStart({ cancelBubble: false, target: t, evt: {} }))
+      t.x(210)
+      act(() => solo.props.onDragMove({ cancelBubble: false, target: t, evt: { shiftKey: false } }))
+      act(() => solo.props.onDragEnd({ cancelBubble: false, target: t, evt: {} }))
+      expect(props.moveImage).toHaveBeenCalledWith('A', 'solo', 210, 200)
+      expect(moveImages).not.toHaveBeenCalled()
+    })
+  })
 })

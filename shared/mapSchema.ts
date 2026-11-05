@@ -70,7 +70,30 @@ export interface ValidateEditorMapOptions {
 /** Entity-level problems already reported by the raw structural checks in validateEditorMap. */
 const RAW_COVERED_CODES = new Set(['bad-entity', 'bad-id', 'bad-name', 'bad-position', 'bad-components', 'missing-transform', 'unknown-component', 'duplicate-id'])
 
-function validateImages(images: unknown, label: string, errors: string[], warnings: string[]) {
+/** The ids of a layer's `groups`, reporting what is malformed about them. */
+function validateGroups(groups: unknown, label: string, errors: string[]): Set<string> {
+  const ids = new Set<string>()
+  if (groups === undefined) return ids
+  if (!Array.isArray(groups)) {
+    errors.push(`${label}: groups must be an array`)
+    return ids
+  }
+  groups.forEach((group: unknown, i: number) => {
+    const gp = `${label}: groups[${i}]`
+    if (!isRecord(group)) {
+      errors.push(`${gp} is not an object`)
+      return
+    }
+    if (typeof group.id !== 'string' || group.id.length === 0) errors.push(`${gp}: id must be a non-empty string`)
+    else if (ids.has(group.id)) errors.push(`${gp}: duplicate group id "${group.id}"`)
+    else ids.add(group.id)
+    if (typeof group.name !== 'string') errors.push(`${gp}: name must be a string`)
+    if (group.locked !== undefined && typeof group.locked !== 'boolean') errors.push(`${gp}: locked must be true or false`)
+  })
+  return ids
+}
+
+function validateImages(images: unknown, label: string, errors: string[], warnings: string[], groupIds: ReadonlySet<string> = new Set()) {
   if (!Array.isArray(images)) {
     errors.push(`${label}: images must be an array`)
     return
@@ -98,6 +121,8 @@ function validateImages(images: unknown, label: string, errors: string[], warnin
         errors.push(`${ip}: crop must be whole numbers x, y >= 0 and w, h >= 1`)
       }
     }
+    if (item.groupId !== undefined && typeof item.groupId !== 'string') errors.push(`${ip}: groupId must be a string`)
+    else if (typeof item.groupId === 'string' && !groupIds.has(item.groupId)) warnings.push(`${ip}: groupId ${JSON.stringify(item.groupId)} is not one of the layer's groups; it is ignored`)
     if (item.z !== undefined && !isFiniteNumber(item.z)) errors.push(`${ip}: z must be a finite number`)
     if (item.scale !== undefined && (!isFiniteNumber(item.scale) || item.scale <= 0)) errors.push(`${ip}: scale must be a positive number`)
     if (item.opacity !== undefined && (!isFiniteNumber(item.opacity) || item.opacity < 0 || item.opacity > 1)) {
@@ -167,7 +192,9 @@ export function validateEditorMap(data: unknown, options: ValidateEditorMapOptio
 
       if (layer.images !== undefined) {
         if (layer.type !== 'image') warnings.push(`${label}: only image layers keep "images"; they are dropped on export`)
-        validateImages(layer.images, label, errors, warnings)
+        validateImages(layer.images, label, errors, warnings, validateGroups(layer.groups, label, errors))
+      } else if (layer.groups !== undefined) {
+        validateGroups(layer.groups, label, errors)
       }
 
       if (layer.data === undefined) return

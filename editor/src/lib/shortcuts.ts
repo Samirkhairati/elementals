@@ -30,6 +30,8 @@ export const SHORTCUT_ACTIONS: ShortcutAction[] = [
   { id: 'layer.new', label: 'New layer', group: 'Layers', defaults: ['Mod+N'] },
   { id: 'layer.newFolder', label: 'New layer folder', group: 'Layers', defaults: ['Mod+Shift+N'] },
   { id: 'image.placeMultiple', label: 'Place multiple copies of the picked picture', group: 'Pictures', defaults: ['Mod+Shift+D'] },
+  { id: 'image.group', label: 'Group the picked pictures', group: 'Pictures', defaults: ['Mod+G'] },
+  { id: 'image.ungroup', label: 'Ungroup the picked group', group: 'Pictures', defaults: ['Mod+Shift+G'] },
   { id: 'image.crop', label: 'Crop the picked picture', group: 'Pictures', defaults: ['C'] },
   { id: 'image.resize', label: 'Resize the picked picture', group: 'Pictures', defaults: ['Mod+T'] },
   { id: 'tool.brush', label: 'Brush tool', group: 'Tools', defaults: ['B'] },

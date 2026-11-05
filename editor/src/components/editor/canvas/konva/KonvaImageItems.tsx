@@ -8,6 +8,7 @@ import { snapPicture } from '@/lib/imageSnap'
 import { sortedImages } from '@/lib/layerOrder'
 import type { ImagePick } from '@/lib/graphicAssets'
 import type { SelectMode } from '@/lib/imageSelection'
+import type { ImageDrag } from './imageDrag'
 import { applyAxisLock, guideLines, type Axis, type AxisLock } from '@/lib/axisLock'
 import { setStageCursor } from '../canvasUtils'
 
@@ -39,13 +40,15 @@ interface KonvaImageItemsProps {
   /** Everything picked (Ctrl/Cmd+click adds or removes a picture); falls back to `selectedImageId` alone. */
   pickedImageIds?: readonly string[]
   selectImage?: (layerId: string, imageId: string, mode: SelectMode) => void
+  /** A dragged picked set (a group) moves as a whole. */
+  moveImages?: (layerId: string, imageIds: readonly string[], dx: number, dy: number) => void
   moveImage: (layerId: string, imageId: string, x: number, y: number) => void
   snapToGrid: boolean
   spriteAssets?: Record<string, SpriteAssetInfo>
   /** While an image waits to be placed the items stay out of the way so a click lands on the map. */
   placing?: boolean
   /** Written while an image is dragged so the layer that draws it can follow the mouse (see KonvaTilemapLayer). */
-  dragRef?: React.MutableRefObject<{ id: string; x: number; y: number } | null>
+  dragRef?: React.MutableRefObject<ImageDrag | null>
 }
 
 /** Pick/drag handles and the selection frame for the images of the active image layer (and of the other image layers when the toolbar lock is off). */
@@ -57,6 +60,7 @@ export const KonvaImageItems = React.memo(function KonvaImageItems({
   setSelectedImageId,
   pickedImageIds,
   selectImage,
+  moveImages,
   moveImage,
   snapToGrid,
   spriteAssets = NO_ASSETS,
@@ -83,6 +87,7 @@ export const KonvaImageItems = React.memo(function KonvaImageItems({
           selectedImageId={selectedImageId}
           pickedImageIds={pickedImageIds}
           selectImage={selectImage}
+          moveImages={moveImages}
           activateLayer={activateLayer}
           setSelectedImageId={setSelectedImageId}
           moveImage={moveImage}
@@ -102,6 +107,7 @@ function ImageLayerHandles({
   selectedImageId,
   pickedImageIds,
   selectImage,
+  moveImages,
   activateLayer,
   setSelectedImageId,
   moveImage,
@@ -115,12 +121,13 @@ function ImageLayerHandles({
   selectedImageId: string | null
   pickedImageIds?: readonly string[]
   selectImage?: (layerId: string, imageId: string, mode: SelectMode) => void
+  moveImages?: (layerId: string, imageIds: readonly string[], dx: number, dy: number) => void
   activateLayer?: (layerId: string) => void
   setSelectedImageId: (id: string | null) => void
   moveImage: (layerId: string, imageId: string, x: number, y: number) => void
   place: (item: ImageItem, x: number, y: number) => { x: number; y: number }
   assets: Record<string, SpriteAssetInfo>
-  dragRef?: React.MutableRefObject<{ id: string; x: number; y: number } | null>
+  dragRef?: React.MutableRefObject<ImageDrag | null>
 }) {
   const items = useMemo(() => sortedImages(layer.images), [layer.images])
   // Picking an image of another layer makes that layer the active one (which clears the selection, so select after).
@@ -140,6 +147,8 @@ function ImageLayerHandles({
           layerId={layer.id}
           assets={assets}
           selected={active && picked.includes(item.id)}
+          together={active && picked.length > 1 && picked.includes(item.id) ? picked : null}
+          moveTogether={moveImages}
           interactive={interactive}
           place={place}
           pick={pick}
@@ -156,6 +165,8 @@ function ImageHandle({
   layerId,
   assets,
   selected,
+  together,
+  moveTogether,
   interactive,
   place,
   pick,
@@ -166,11 +177,14 @@ function ImageHandle({
   layerId: string
   assets: Record<string, SpriteAssetInfo>
   selected: boolean
+  /** The picked set this picture is part of (a group, a multi-selection): dragging it moves them all. */
+  together: readonly string[] | null
+  moveTogether?: (layerId: string, imageIds: readonly string[], dx: number, dy: number) => void
   interactive: boolean
   place: (item: ImageItem, x: number, y: number) => { x: number; y: number }
   pick: (id: string, mode?: SelectMode) => void
   moveImage: (layerId: string, imageId: string, x: number, y: number) => void
-  dragRef?: React.MutableRefObject<{ id: string; x: number; y: number } | null>
+  dragRef?: React.MutableRefObject<ImageDrag | null>
 }) {
   // Without the picture (deleted or still loading) itemBounds falls back to a tile-sized box so the item can still be picked.
   const bounds = flippedItemBounds(item, assets)
@@ -210,7 +224,7 @@ function ImageHandle({
         e.target.x(p.x)
         e.target.y(p.y)
         // The picture is drawn by its layer: tell it where the mouse has the image (Konva redraws while dragging).
-        if (dragRef) dragRef.current = { id: item.id, x: p.x, y: p.y }
+        if (dragRef) dragRef.current = { id: item.id, x: p.x, y: p.y, ...(together ? { along: { ids: together, dx: p.x - item.x, dy: p.y - item.y } } : {}) }
       }}
       onDragEnd={(e) => {
         e.cancelBubble = true
@@ -218,7 +232,8 @@ function ImageHandle({
         e.target.x(p.x)
         e.target.y(p.y)
         setStageCursor(e.target.getStage(), 'move')
-        moveImage(layerId, item.id, p.x, p.y)
+        if (together && moveTogether) moveTogether(layerId, together, p.x - item.x, p.y - item.y)
+        else moveImage(layerId, item.id, p.x, p.y)
         lockRef.current = null
         setAxis(null)
         if (dragRef) dragRef.current = null
