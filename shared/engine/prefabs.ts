@@ -24,7 +24,8 @@ function builder(prefabId: string) {
     id: idFn(),
     name,
     conditions: extra.conditions ?? [],
-    trigger: extra.trigger ?? 'action',
+    trigger: extra.trigger ?? 'interact',
+    blocks: true,
     graph: commandsToGraph(commands, idFn),
     faceOnInteract: true,
     solid: extra.solid ?? null,
@@ -103,7 +104,7 @@ function buildDoor(): Prefab {
     components: {
       Transform: createDefaultComponent('Transform', { depth: 5 }),
       Collider: createDefaultComponent('Collider', { isSolid: false }),
-      Event: { states: [state('State 1', [cmd('warp')], { trigger: 'playerTouch' })] },
+      Event: { states: [state('State 1', [cmd('warp')], { trigger: 'playerEnter' })] },
       Tag: createDefaultComponent('Tag', { tag: 'warp' }),
     },
   };
@@ -119,7 +120,7 @@ function buildTrigger(): Prefab {
     components: {
       Transform: createDefaultComponent('Transform', { depth: 5 }),
       Collider: createDefaultComponent('Collider', { isSolid: false }),
-      Event: { states: [state('State 1', [], { trigger: 'playerTouch' })] },
+      Event: { states: [state('State 1', [], { trigger: 'playerEnter' })] },
       Tag: createDefaultComponent('Tag', { tag: 'trigger' }),
     },
   };

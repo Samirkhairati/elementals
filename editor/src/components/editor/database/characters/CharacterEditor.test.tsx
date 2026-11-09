@@ -309,7 +309,7 @@ describe('Setup tab', () => {
 
 const node = (id: string, type: string, params: Record<string, unknown>) => ({ id, type, params, out: {}, x: 0, y: 0 })
 const townMap = () => ({
-  name: 'Town', fileName: 'town.json', folderPath: null, width: 6, height: 6, schemaVersion: 4, layers: [],
+  name: 'Town', fileName: 'town.json', folderPath: null, width: 6, height: 6, schemaVersion: 5, layers: [],
   entities: [
     { id: 'npc', name: 'Old man', x: 0, y: 0, components: {
       Sprite: { asset: 'characters/hero', animation: '' },

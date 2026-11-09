@@ -38,14 +38,14 @@ describe('EventEditor: state tabs', () => {
   it('lists states with trigger and node count and marks the start state', () => {
     setup([
       state('p1', [cmd('a', 'wait')], { name: 'Intro' }),
-      state('p2', [], { name: 'Later', trigger: 'playerTouch', conditions: [{ kind: 'switch', id: 'met', value: true }] }),
+      state('p2', [], { name: 'Later', trigger: 'playerEnter', conditions: [{ kind: 'switch', id: 'met', value: true }] }),
     ])
     const first = tab(/Intro/)
-    expect(within(first).getByText('Action button')).toBeInTheDocument()
+    expect(within(first).getByText('Player presses Action')).toBeInTheDocument()
     expect(within(first).getByText('1 node')).toBeInTheDocument()
     expect(first.querySelector('[data-start-dot]')).toBeTruthy()
     const second = tab(/Later/)
-    expect(within(second).getByText('Player touch')).toBeInTheDocument()
+    expect(within(second).getByText('Player steps onto it')).toBeInTheDocument()
     expect(within(second).getByText('0 nodes')).toBeInTheDocument()
     expect(within(second).getByText('1 cond')).toBeInTheDocument()
     expect(second.querySelector('[data-start-dot]')).toBeFalsy()
@@ -148,27 +148,82 @@ describe('EventEditor: state tabs', () => {
 })
 
 describe('EventEditor: state header', () => {
-  it('changes the trigger and explains it in plain language', () => {
+  it('changes the start kind and explains it in plain language', () => {
     const { onChange, last } = setup([state('p1')])
-    const trigger = screen.getByRole('combobox', { name: 'Trigger' })
-    fireEvent.click(trigger)
-    expect(within(screen.getByRole('listbox')).getAllByRole('option').map((o) => o.textContent)).toEqual(['Action button', 'Player touch', 'Event touch', 'Autorun', 'Parallel'])
-    fireEvent.click(trigger)
-    // the explanation sits behind the "i" beside the label, and covers every trigger with the chosen one first
-    expect(screen.queryByText(/presses the action button while facing this entity/)).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'About Trigger' }))
-    expect(screen.getByRole('tooltip')).toHaveTextContent(/Action button: Runs when the player presses the action button while facing this entity/)
-    expect(screen.getByRole('tooltip')).toHaveTextContent(/Autorun: Starts by itself/)
-    chooseOption(trigger, 'autorun')
+    const when = screen.getByRole('combobox', { name: 'When' })
+    fireEvent.click(when)
+    expect(within(screen.getByRole('listbox')).getAllByRole('option').map((o) => o.textContent)).toEqual([
+      'Player presses Action',
+      'Player steps onto it',
+      'Player steps off it',
+      'Player comes near',
+      'Character steps onto it',
+      'Character steps off it',
+      'State becomes active',
+      'Every few seconds',
+      'Map is entered',
+      'Map is left',
+    ])
+    fireEvent.click(when)
+    // the explanation sits behind the "i" beside the label, and covers every start kind with the chosen one first
+    expect(screen.queryByText(/presses the action button next to this entity/)).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'About When' }))
+    expect(screen.getByRole('tooltip')).toHaveTextContent(/Player presses Action: Runs when the player presses the action button next to this entity/)
+    expect(screen.getByRole('tooltip')).toHaveTextContent(/Map is left: Runs once just before the player leaves the map/)
+    chooseOption(when, 'onActive')
     expect(onChange).toHaveBeenCalledTimes(1)
-    expect(last()[0].trigger).toBe('autorun')
-    expect(screen.getByText(/blocks the player until it finishes/)).toBeInTheDocument()
-    chooseOption(trigger, 'playerTouch')
-    expect(screen.getByText(/walks onto or into this entity/)).toBeInTheDocument()
-    chooseOption(trigger, 'eventTouch')
-    expect(screen.getByText(/another entity/)).toBeInTheDocument()
-    chooseOption(trigger, 'parallel')
-    expect(screen.getByText(/in the background/)).toBeInTheDocument()
+    expect(last()[0].trigger).toBe('onActive')
+    expect(screen.getByText(/wire the last node back/)).toBeInTheDocument()
+    chooseOption(when, 'playerLeave')
+    expect(screen.getByText(/doors that close behind the player/)).toBeInTheDocument()
+    chooseOption(when, 'mapEnter')
+    expect(screen.getByText(/intro scenes/)).toBeInTheDocument()
+  })
+
+  it('shows the settings that belong to the chosen start kind', () => {
+    const { last } = setup([state('p1')])
+    const when = screen.getByRole('combobox', { name: 'When' })
+    expect(screen.getByLabelText('Reach (tiles)')).toBeInTheDocument()
+    expect(screen.getByLabelText('Only when facing it')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Every (seconds)')).toBeNull()
+
+    chooseOption(when, 'timer')
+    expect(screen.getByLabelText('Every (seconds)')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Reach (tiles)')).toBeNull()
+    expect(last()[0]).toMatchObject({ trigger: 'timer', blocks: false }) // a timer runs in the background unless told otherwise
+    expect(screen.getByLabelText('Blocks the player')).not.toBeChecked()
+
+    chooseOption(when, 'playerNear')
+    expect(screen.getByLabelText('Distance (tiles)')).toBeInTheDocument()
+    expect(screen.getByLabelText('Needs a line of sight')).toBeInTheDocument()
+
+    chooseOption(when, 'mapLeave')
+    expect(screen.queryByLabelText('Blocks the player')).toBeNull() // the warp always waits for it
+  })
+
+  it('edits blocking, reach, facing, interval and priority', () => {
+    const { last } = setup([state('p1')])
+    fireEvent.click(screen.getByLabelText('Blocks the player'))
+    expect(last()[0].blocks).toBe(false)
+    fireEvent.click(screen.getByLabelText('Only when facing it'))
+    expect(last()[0].mustFace).toBe(true)
+    const reach = screen.getByLabelText('Reach (tiles)')
+    fireEvent.change(reach, { target: { value: '3' } })
+    fireEvent.blur(reach)
+    expect(last()[0].range).toBe(3)
+    const priority = screen.getByLabelText('Priority')
+    fireEvent.change(priority, { target: { value: '2' } })
+    fireEvent.blur(priority)
+    expect(last()[0].priority).toBe(2)
+  })
+
+  it('offers "starts again when finished" only on a state that carries it from the old Autorun / Parallel', () => {
+    const { last } = setup([state('p1', [], { repeat: true })])
+    const box = screen.getByLabelText('Starts again when finished')
+    expect(box).toBeChecked()
+    fireEvent.click(box)
+    expect(last()[0].repeat).toBeUndefined()
+    expect(screen.queryByLabelText('Starts again when finished')).toBeNull()
   })
 
   it('edits the state name on blur', () => {
@@ -449,9 +504,9 @@ describe('EventEditor: robustness', () => {
   it('consecutive edits in one tick compose instead of overwriting each other', () => {
     const { last } = setup([state('p1', [], { name: 'One' })])
     const solid = screen.getByRole('combobox', { name: 'Solid' })
-    const trigger = screen.getByRole('combobox', { name: 'Trigger' })
+    const when = screen.getByRole('combobox', { name: 'When' })
     chooseOption(solid, 'solid')
-    chooseOption(trigger, 'parallel')
-    expect(last()[0]).toMatchObject({ solid: true, trigger: 'parallel' })
+    chooseOption(when, 'timer')
+    expect(last()[0]).toMatchObject({ solid: true, trigger: 'timer' })
   })
 })

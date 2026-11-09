@@ -52,7 +52,7 @@ load. Rules:
 |---|---|
 | `SpriteView` + `CharacterAnimation` | `Sprite`. `asset`: `characterKey` -> `characters/<key>`; else texture `<key>-walk` / `<key>-run` -> `characters/<key>`; any other texture -> `objects/<texture>`. `facing` = `CharacterAnimation.direction` (else Grid/FreeMovement direction, else `down`). `frame`, `flipX`, `visible` kept; `alpha` -> `opacity`; numeric `tint` -> `#rrggbb` (white = none). `originX/Y` and `movementType` are dropped. |
 | `GridMovement`, `FreeMovement`, `PlayerControl`, `AIWander` | `Movement`. `controller`: PlayerControl -> `player`, else AIWander -> `wander`, else `none`. `speed`: AIWander's own speed for `wander`, else Grid/FreeMovement speed (default 100). Wander radius/interval come from AIWander. `isMovementLocked` is dropped. |
-| `Interactable` | `Event` with one state. `on_step` -> trigger `playerTouch`, anything else -> `action`. Commands, in this order and only when set: `message` -> `showText`; `targetMap` -> `warp` (`targetX/targetY` are tile coordinates, a trailing `.json` is removed from the map id); `eventKey` -> `emit`. |
+| `Interactable` | `Event` with one state. `on_step` -> trigger `playerEnter`, anything else -> `interact`. Commands, in this order and only when set: `message` -> `showText`; `targetMap` -> `warp` (`targetX/targetY` are tile coordinates, a trailing `.json` is removed from the map id); `eventKey` -> `emit`. |
 | `Transform`, `Collider`, `Tag`, unknown components | kept untouched. A missing `Transform` is created from `entity.x/y`; if both exist the Transform position wins and `entity.x/y` follow it. |
 
 Generated ids (state, commands) are deterministic (`deterministicId(entityId/...)`), so exporting the same legacy map
@@ -95,7 +95,11 @@ An **Event** component holds **states** (RPG Maker calls them pages). The active
 conditions all hold. A state has: conditions, a trigger, optional appearance override, and a **node graph**
 (`graph`) that runs when it is triggered.
 
-* Triggers: `action`, `playerTouch`, `eventTouch`, `autorun`, `parallel`.
+* Start kinds (`trigger`, schemaVersion 5, see event-triggers-proposal.md): `interact`, `playerEnter`, `playerLeave`, `playerNear`,
+  `eventEnter`, `eventLeave`, `onActive`, `timer`, `mapEnter`, `mapLeave`. Settings on the state: `blocks` (cutscene or background; each
+  kind has a default), `range`, `mustFace`, `lineOfSight`, `interval`, `priority`. Old names are upgraded on load by `upgradeLegacyTrigger`
+  (`shared/engine/triggers.ts`): `action` -> `interact`, `playerTouch` -> `playerEnter`, `eventTouch` -> `eventEnter`, `autorun` -> `onActive`
+  (blocks, `repeat`), `parallel` -> `onActive` (background, `repeat`). `repeat` exists only for those migrated states; new ones loop in the graph.
 * Conditions: `switch`, `variable`, `stage`, `selfSwitch`, `hasItem`. A `stage` condition compares the stage's current value with
   another value of the same stage by the ORDER of the stage's values (`>=` "Found" holds from Found onwards).
 * Targets (`CommandTarget`): `'self'`, `'player'` or `{ entity: <editor id> }`.
@@ -176,10 +180,10 @@ Game implementation notes (where the runtime is more specific than the catalog; 
 * `warp`: same map = teleport (no reload); other map = load it, which cancels every running event (commands after the warp do not run). A fade
   is faded back in on the new map. Unknown maps are skipped with a warning.
 * An event with no active state is hidden and not solid. State overrides are applied when the active state changes, so a `changeSprite` lasts until then.
-* Trigger rules (`action` lookup order, `playerTouch` on step end/bump, `autorun` restarts, `parallel` cancellation) are listed in game-runtime.md.
+* Trigger rules (`interact` lookup order and range, enter/leave on step end/bump, `onActive` / `timer` / `playerNear`, map enter/leave) are listed in game-runtime.md.
 
 Defaults for convenience (prefabs, `shared/engine/prefabs.ts`): NPC (wanders optionally, one action state with `showText`), Sign,
-Chest (two states + self switch A), Door/Warp (`playerTouch` + `warp`), Trigger Zone (non-solid `playerTouch`),
+Chest (two states + self switch A), Door/Warp (`playerEnter` + `warp`), Trigger Zone (non-solid `playerEnter`),
 Item Ball (`giveItem`, then hidden by state 2), Trainer (placeholder `startBattle`). Prefabs use the sprite assets
 `characters/player`, `objects/sign`, `objects/chest` (frame 1 = open) and `objects/item-ball`; without those assets the
 entity simply has no graphic until one is picked. `instantiatePrefab(prefab, { x, y })` gives fresh entity/state/command ids.

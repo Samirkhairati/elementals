@@ -84,7 +84,7 @@ describe('export always carries canonical entities', () => {
   it('migrates legacy maps and the result validates and re-exports identically', () => {
     const legacy = map([entity({ SpriteView: { texture: 'player-walk' }, Interactable: { type: 'on_step', targetMap: 'city.json', targetX: 3, targetY: 4 } })])
     const first = convertEditorMapToTiled(legacy, [])
-    expect(first.schemaVersion).toBe(4)
+    expect(first.schemaVersion).toBe(5)
     expect(Object.keys(first.entities[0].components)).toEqual(['Transform', 'Sprite', 'Event'])
     expect(validateEditorMap({ ...legacy, entities: first.entities }).warnings).toEqual([])
     expect(serializeTiledMap(convertEditorMapToTiled({ ...legacy, entities: first.entities } as any, []))).toBe(serializeTiledMap(first))
@@ -102,6 +102,6 @@ describe('plain Node (no bundler)', () => {
       console.log(JSON.stringify({ v: t.schemaVersion, c: Object.keys(t.entities[0].components), ok: validateEditorMap(m).ok, p: PREFABS.length, issues: validateEntity(t.entities[0]).length, changed: migrateMap(m).changed }));
     `
     const out = execFileSync(process.execPath, ['--input-type=module', '-e', script], { cwd: REPO, encoding: 'utf8' })
-    expect(JSON.parse(out.trim())).toEqual({ v: 4, c: ['Transform', 'Event'], ok: true, p: 7, issues: 0, changed: true })
+    expect(JSON.parse(out.trim())).toEqual({ v: 5, c: ['Transform', 'Event'], ok: true, p: 7, issues: 0, changed: true })
   })
 })

@@ -13,13 +13,15 @@
 //     controller: PlayerControl -> player; else AIWander -> wander; else none
 //     speed: AIWander.speed for wander, else Grid/FreeMovement.speed; wanderRadius/Interval from AIWander
 //   Interactable -> Event with ONE state
-//     type on_step -> trigger playerTouch, anything else -> action
+//     type on_step -> trigger playerEnter, anything else -> interact
 //     commands (in this order, only the ones that are set): message -> showText,
 //     targetMap -> warp (targetX/targetY are TILE coordinates; a trailing ".json" is removed from the map),
 //     eventKey -> emit
 //   Transform is kept (created from entity.x/y when missing); Transform x/y win over entity.x/y.
 //   Collider, Tag and unknown components are kept untouched. Maps get schemaVersion 3.
 //   schemaVersion 3: the Event component's `pages` list is called `states` (renamed on load).
+//   schemaVersion 5: the trigger names action / playerTouch / eventTouch / autorun / parallel become a start kind
+//   plus `blocks` (autorun and parallel also `repeat`); see triggers.ts.
 
 import type { Command, EngineEntity, EventState, LegacyComponentType } from './types.ts';
 import { SCHEMA_VERSION } from './types.ts';
@@ -28,6 +30,7 @@ import { commandsToGraph } from './graph.ts';
 import { normalizeProps } from './components.ts';
 import { isFacing } from './constants.ts';
 import { deterministicId } from './ids.ts';
+import { upgradeLegacyTrigger } from './triggers.ts';
 import { deepEqual, isRecord } from './util.ts';
 
 export const LEGACY_COMPONENT_TYPES = [
@@ -162,7 +165,8 @@ function migrateInteractable(entityId: string, inter: Record<string, unknown>) {
     id: deterministicId(`${entityId}/Event/page-1`),
     name: 'State 1',
     conditions: [],
-    trigger: inter.type === 'on_step' ? 'playerTouch' : 'action',
+    trigger: inter.type === 'on_step' ? 'playerEnter' : 'interact',
+    blocks: true,
     graph: commandsToGraph(commands, seed('start')),
     faceOnInteract: true,
     solid: null,
@@ -185,6 +189,9 @@ function migrateEventProps(event: unknown): unknown {
   }
   if (Array.isArray(out.states) && out.states.some(needsGraph)) {
     out = { ...out, states: out.states.map((s: unknown) => (needsGraph(s) ? withGraph(s) : s)) };
+  }
+  if (Array.isArray(out.states) && out.states.some((s: unknown) => upgradeLegacyTrigger(s) !== s)) {
+    out = { ...out, states: out.states.map((s: unknown) => upgradeLegacyTrigger(s)) };
   }
   return out;
 }

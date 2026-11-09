@@ -1,6 +1,11 @@
 # Event triggers: review and proposal
 
-Status: **proposal, needs a decision** (issue #38). Nothing in this note is implemented.
+Status: **implemented** (issue #38, schemaVersion 5). Decisions taken: the trigger is split into a start kind plus `blocks`; all
+the start kinds below were built (`playerLeave`, `playerNear`, `timer`, `eventLeave`, and `mapEnter` / `mapLeave` on top); there is **no
+"repeats" switch**: an author repeats by wiring the last node back in the graph (autorun / parallel states keep their old behaviour through a
+migrated-only `repeat` flag); priority is built. The text below is the proposal as written; where the build differs: `onActive` runs once
+(blocking by default), `interact` has `range` and `mustFace`, `timer` has `interval`, and only `onActive` / `timer` background runs are
+cancelled when their state ends. See docs/game-runtime.md and docs/engine-design.md for how it works.
 
 ## What exists today
 

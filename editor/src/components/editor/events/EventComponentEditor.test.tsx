@@ -47,13 +47,13 @@ describe('EventComponentEditor card', () => {
               cmd('5', 'wait'),
               cmd('6', 'wait'),
             ],
-            { trigger: 'playerTouch' },
+            { trigger: 'playerEnter' },
           ),
         ]}
       />,
     )
     expect(screen.getByTestId('event-state-count')).toHaveTextContent('1 state')
-    expect(screen.getByText('Player touch')).toBeInTheDocument()
+    expect(screen.getByText('Player steps onto it')).toBeInTheDocument()
     const lines = screen.getByTestId('event-summary-lines')
     expect(within(lines).getAllByRole('listitem')).toHaveLength(5) // 4 commands + "more"
     expect(within(lines).getByText('Switch "Met the guard" = ON')).toBeInTheDocument()
@@ -108,12 +108,12 @@ describe('opening the editor dialog', () => {
     const dialog = screen.getByRole('dialog', { name: /Event editor · Old man/ })
     expect(dialog.className).toContain('w-[90vw]')
     expect(dialog.className).toContain('h-[85vh]')
-    chooseOption(within(dialog).getByRole('combobox', { name: 'Trigger' }), 'playerTouch')
+    chooseOption(within(dialog).getByRole('combobox', { name: 'When' }), 'playerEnter')
     expect(onChange).toHaveBeenCalledTimes(1)
     expect(onChange.mock.calls[0][0]).toBe('states')
-    expect((onChange.mock.calls[0][1] as EventState[])[0].trigger).toBe('playerTouch')
+    expect((onChange.mock.calls[0][1] as EventState[])[0].trigger).toBe('playerEnter')
     // the card behind the dialog follows
-    expect(screen.getAllByText('Player touch').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Player steps onto it').length).toBeGreaterThan(0)
   })
 
   it('closes with Escape', () => {

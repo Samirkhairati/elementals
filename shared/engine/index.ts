@@ -7,6 +7,7 @@ export * from './commands.ts';
 export * from './graph.ts';
 export * from './components.ts';
 export * from './migrate.ts';
+export * from './triggers.ts';
 export * from './validate.ts';
 export * from './sprites.ts';
 export * from './database.ts';

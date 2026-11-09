@@ -45,7 +45,7 @@ describe('PREFABS', () => {
     expect(e.components.Movement).toMatchObject({ controller: 'none' })
     expect(e.components.Collider).toMatchObject({ width: 32, height: 32, isSolid: true })
     expect(e.components.Event!.states).toHaveLength(1)
-    expect(e.components.Event!.states[0].trigger).toBe('action')
+    expect(e.components.Event!.states[0].trigger).toBe('interact')
     expect(commandTypes(e)).toEqual(['showText'])
     expect(e.components.Tag).toEqual({ tag: 'npc', icon: '', color: '' })
   })
@@ -70,7 +70,7 @@ describe('PREFABS', () => {
   it('Door / Warp: non-solid, playerTouch, warp', () => {
     const e = instantiatePrefab(getPrefab('door')!, { x: 16, y: 32 })
     expect(e.components.Collider!.isSolid).toBe(false)
-    expect(e.components.Event!.states[0].trigger).toBe('playerTouch')
+    expect(e.components.Event!.states[0].trigger).toBe('playerEnter')
     expect(commandTypes(e)).toEqual(['warp'])
     expect(e.components.Sprite).toBeUndefined()
     expect(e.components.Transform!.depth).toBe(5)
@@ -80,7 +80,7 @@ describe('PREFABS', () => {
     const e = instantiatePrefab(getPrefab('trigger')!, { x: 16, y: 32 })
     expect(e.components.Sprite).toBeUndefined()
     expect(e.components.Collider!.isSolid).toBe(false)
-    expect(e.components.Event!.states[0]).toMatchObject({ trigger: 'playerTouch' })
+    expect(e.components.Event!.states[0]).toMatchObject({ trigger: 'playerEnter' })
     expect(commandNodes(e.components.Event!.states[0].graph)).toEqual([])
   })
 

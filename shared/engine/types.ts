@@ -24,7 +24,7 @@ export type LegacyComponentType =
   | 'Interactable';
 
 /** Version written to `map.schemaVersion`. Maps without it are legacy (1). */
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 // ── Component props ─────────────────────────────────────────────────────────────────────────────
 // Positions are pixels in map space. A tile is 32px. The Transform position is the entity's
@@ -99,12 +99,24 @@ export interface TagProps {
 
 // ── Events (RPG-Maker style states + a command tree that maps 1:1 onto an event graph) ───────────
 
+/**
+ * What starts a state's graph (see docs/event-triggers-proposal.md). Whether it blocks the player is the
+ * state's `blocks`; repeating is done in the graph (wire the last node back).
+ */
 export type EventTrigger =
-  | 'action' // player presses the action key facing/over the event
-  | 'playerTouch' // player steps onto / into it
-  | 'eventTouch' // another entity touches it
-  | 'autorun' // runs repeatedly, blocks the player until finished
-  | 'parallel'; // runs in the background without blocking
+  | 'interact' // the player presses the action key next to it (see `range`, `mustFace`)
+  | 'playerEnter' // the player steps onto / into it
+  | 'playerLeave' // the player steps off it
+  | 'playerNear' // the player comes within `range` tiles (optionally with a line of sight)
+  | 'eventEnter' // another character steps onto it
+  | 'eventLeave' // another character steps off it
+  | 'onActive' // as soon as the state becomes active
+  | 'timer' // every `interval` seconds while the state is active
+  | 'mapEnter' // once, when the map it is on has been loaded
+  | 'mapLeave'; // once, before the player leaves its map by a warp
+
+/** The trigger names of schemaVersion 4 and earlier; migrated on load (see `upgradeLegacyTrigger`). */
+export type LegacyEventTrigger = 'action' | 'playerTouch' | 'eventTouch' | 'autorun' | 'parallel';
 
 export type ComparisonOp = '==' | '!=' | '>' | '>=' | '<' | '<=';
 /**
@@ -207,10 +219,27 @@ export interface EventState {
   name: string;
   conditions: Condition[];
   trigger: EventTrigger;
+  /** True: input is locked while it runs and only one such event runs at a time (a cutscene). False: it runs in the background. */
+  blocks: boolean;
   /** What runs when the state is triggered: a graph of nodes wired from its `start` node. */
   graph: EventGraph;
-  /** Turn to face the player when triggered by `action`. Default true. */
+  /** Turn to face the player when triggered by `interact`. Default true. */
   faceOnInteract: boolean;
+  /** Tiles: how far the player can press Action from (`interact`, default 1) or how close the player must come (`playerNear`, default 4). */
+  range?: number;
+  /** `interact`: only from the tile the player is facing (or standing on), not from the other neighbours. */
+  mustFace?: boolean;
+  /** `playerNear`: solid things between the player and the event hide the player from it. */
+  lineOfSight?: boolean;
+  /** `timer`: seconds between two runs (default 1). */
+  interval?: number;
+  /** When several events could start from the same input the highest wins, then the nearest, then entity order. Default 0. */
+  priority?: number;
+  /**
+   * Only set by migrating an old `autorun` / `parallel` state: it starts again whenever it has finished, for as
+   * long as it stays active. New states repeat by wiring the last node back in the graph instead.
+   */
+  repeat?: boolean;
   /** null = keep the Collider's isSolid. */
   solid: boolean | null;
   appearance: StateAppearance;

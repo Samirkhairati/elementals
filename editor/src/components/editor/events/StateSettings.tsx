@@ -4,7 +4,8 @@ import { Select } from '../ui/fields'
 import React, { useState } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import type { EventState, EventTrigger, StateAppearance } from '../../../../../shared/engine/types'
-import { EVENT_TRIGGERS, TRIGGER_LABELS } from '../../../../../shared/engine/constants'
+import { EVENT_TRIGGERS, MAX_TRIGGER_RANGE, TRIGGER_GROUPS, TRIGGER_LABELS } from '../../../../../shared/engine/constants'
+import { defaultBlocks, normalizeRange, stateInterval, statePriority, stateRange } from '../../../../../shared/engine/triggers'
 import { ConditionsEditor } from './ConditionsEditor'
 import { FacingPicker, SpritePicker } from './pickers'
 import { CheckRow, DraftNumber, DraftText, FieldRow, Group } from './primitives'
@@ -12,14 +13,19 @@ import { useEventEnv } from './eventEnv'
 import { InfoTip } from '../ui/controls'
 
 export const TRIGGER_HELP: Record<EventTrigger, string> = {
-  action: 'Runs when the player presses the action button while facing this entity. Best for NPCs, signs and chests.',
-  playerTouch: 'Runs when the player walks onto or into this entity. Best for doors, warps and trigger zones.',
-  eventTouch: 'Runs when another entity (an NPC, for example) touches this one.',
-  autorun: 'Starts by itself as soon as the state is active and blocks the player until it finishes. It repeats, so end it with a switch or self switch or the game will lock up.',
-  parallel: 'Runs in the background over and over without stopping the player. Use it for ambient effects and use sparingly.',
+  interact: 'Runs when the player presses the action button next to this entity (or on it). Best for NPCs, signs and chests. Range lets it be used from further away.',
+  playerEnter: 'Runs when the player steps onto this entity or walks into it. Best for doors, warps and trigger zones.',
+  playerLeave: 'Runs when the player steps off this entity. For doors that close behind the player, or an area you leave.',
+  playerNear: 'Runs once each time the player comes within a number of tiles. For a guard who notices the player, with an optional line of sight.',
+  eventEnter: 'Runs when another character (an NPC, for example) steps onto this entity.',
+  eventLeave: 'Runs when another character steps off this entity.',
+  onActive: 'Runs once as soon as this state becomes active, for example when a switch turns on. To repeat it, wire the last node back to an earlier one.',
+  timer: 'Runs every few seconds for as long as this state is active. The count starts again whenever the state changes.',
+  mapEnter: 'Runs once when the map has been loaded and the player has arrived. For intro scenes and for setting up the map.',
+  mapLeave: 'Runs once just before the player leaves the map through a warp, and the warp waits until it has finished. For saving progress or a goodbye.',
 }
 
-/** What each trigger does, with the chosen one first and in bold. */
+/** What each start kind does, with the chosen one first and in bold. */
 function TriggerHelp({ current }: { current: EventTrigger }) {
   const order = [current, ...EVENT_TRIGGERS.filter((t) => t !== current)]
   return (
@@ -31,6 +37,68 @@ function TriggerHelp({ current }: { current: EventTrigger }) {
         </p>
       ))}
     </div>
+  )
+}
+
+const WHEN_OPTIONS = TRIGGER_GROUPS.flatMap((g) => g.triggers.map((t) => ({ value: t, label: TRIGGER_LABELS[t], group: g.label })))
+
+/** The "When" picker and the settings of the chosen start kind: range, facing, line of sight, interval, blocking, priority. */
+function WhenFields({ state, onChange }: { state: EventState; onChange: (patch: Partial<EventState>) => void }) {
+  const t = state.trigger
+  return (
+    <>
+      <FieldRow label="When" help={<TriggerHelp current={t} />}>
+        {(id) => <Select id={id} value={t} options={WHEN_OPTIONS} onChange={(v) => onChange({ trigger: v as EventTrigger, blocks: defaultBlocks(v as EventTrigger) })} />}
+      </FieldRow>
+      {(t === 'interact' || t === 'playerNear') && (
+        <FieldRow
+          label={t === 'interact' ? 'Reach (tiles)' : 'Distance (tiles)'}
+          help={t === 'interact' ? 'How far away the player can be, straight ahead, and still use it. 1 = right next to it.' : 'How many tiles from the entity the player must come. It counts a square around the entity.'}
+        >
+          {(id) => <DraftNumber id={id} min={1} max={MAX_TRIGGER_RANGE} step={1} value={stateRange(state)} onCommit={(v) => onChange({ range: normalizeRange(v, stateRange(state)) })} />}
+        </FieldRow>
+      )}
+      {t === 'interact' && (
+        <CheckRow
+          checked={state.mustFace === true}
+          onChange={(mustFace) => onChange({ mustFace })}
+          label="Only when facing it"
+          help="Off: the player can also use it from a side tile without facing it. On: only from the tile in front of the player."
+        />
+      )}
+      {t === 'playerNear' && (
+        <CheckRow
+          checked={state.lineOfSight === true}
+          onChange={(lineOfSight) => onChange({ lineOfSight })}
+          label="Needs a line of sight"
+          help="Solid things (walls, other characters) between the player and this entity hide the player from it."
+        />
+      )}
+      {t === 'timer' && (
+        <FieldRow label="Every (seconds)" help="Time between two runs. A run that is still going when the time is up makes the next one wait.">
+          {(id) => <DraftNumber id={id} min={0.1} step={0.5} value={stateInterval(state)} onCommit={(v) => onChange({ interval: Math.max(0.1, v) })} />}
+        </FieldRow>
+      )}
+      {t !== 'mapLeave' && (
+        <CheckRow
+          checked={state.blocks}
+          onChange={(blocks) => onChange({ blocks })}
+          label="Blocks the player"
+          help="On: the player cannot move while it runs, and only one blocking event runs at a time (a cutscene). Off: it runs in the background and the player keeps playing."
+        />
+      )}
+      {state.repeat === true && (
+        <CheckRow
+          checked
+          onChange={(on) => onChange({ repeat: on ? true : undefined })}
+          label="Starts again when finished"
+          help="Carried over from an old Autorun or Parallel state: it restarts for as long as the state is active. Untick it and loop in the graph instead (wire the last node back), or end it with a switch."
+        />
+      )}
+      <FieldRow label="Priority" help="When several events could start from the same press or step, the highest number goes first; the nearest comes next, then the order of the entities. Leave at 0 unless two events clash.">
+        {(id) => <DraftNumber id={id} step={1} value={statePriority(state)} onCommit={(v) => onChange({ priority: Math.round(v) === 0 ? undefined : Math.round(v) })} />}
+      </FieldRow>
+    </>
   )
 }
 
@@ -86,13 +154,9 @@ export function StateSettings({ state, onChange }: { state: EventState; onChange
   const overrides = Object.keys(state.appearance ?? {}).length
   return (
     <div className="grid gap-3 p-3 md:grid-cols-2 2xl:grid-cols-3" data-testid="state-settings">
-      <Group title="When it runs">
+      <Group title="When it starts">
         <FieldRow label="State name">{(id) => <DraftText id={id} value={state.name} placeholder="e.g. After the quest" onCommit={(name) => onChange({ name })} />}</FieldRow>
-        <FieldRow label="Trigger" help={<TriggerHelp current={state.trigger} />}>
-          {(id) => (
-            <Select id={id} value={state.trigger} options={EVENT_TRIGGERS.map((t) => ({ value: t, label: TRIGGER_LABELS[t] }))} onChange={(v) => onChange({ trigger: v as EventTrigger })} />
-          )}
-        </FieldRow>
+        <WhenFields state={state} onChange={onChange} />
       </Group>
 
       <Group title="Behaviour">
@@ -100,7 +164,7 @@ export function StateSettings({ state, onChange }: { state: EventState; onChange
           checked={state.faceOnInteract}
           onChange={(faceOnInteract) => onChange({ faceOnInteract })}
           label="Face player when triggered"
-          help="The entity turns towards the player before its commands run."
+          help="The entity turns towards the player before its commands run, when the player presses Action on it."
         />
         <FieldRow label="Solid" help="Solid entities block the player. “Inherit” keeps the Collider’s setting.">
           {(id) => (

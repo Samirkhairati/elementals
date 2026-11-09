@@ -127,7 +127,7 @@ describe('expandEntity', () => {
     });
     const ev = find(EventComponent)!;
     expect(ev.states).toHaveLength(1);
-    expect(ev.states[0].trigger).toBe('playerTouch');
+    expect(ev.states[0].trigger).toBe('playerEnter');
     expect(ev.baseSprite?.asset).toBe('objects/chest');
     expect(ev.baseSolid).toBe(false);
     expect(ev.activeState).toBe(-1);
