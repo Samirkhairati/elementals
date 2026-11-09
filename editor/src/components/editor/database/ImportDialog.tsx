@@ -52,7 +52,7 @@ function ImportBody({ candidates, importer, folder: startFolder, onClose, onImpo
 
   const submit = async () => {
     setBusy(true)
-    const result = await importer.run(rows.map((r) => ({ path: r.c.path, dir: r.c.dir ?? '', name: r.name })), folder)
+    const result = await importer.run(rows.map((r) => ({ path: r.c.path, dir: r.c.dir ?? '', ext: r.c.ext ?? 'png', name: r.name })), folder)
     setBusy(false)
     if (result.failed.length === 0) {
       onImported(result, folder)
@@ -98,7 +98,7 @@ function ImportBody({ candidates, importer, folder: startFolder, onClose, onImpo
                     value={r.name}
                     onChange={(e) => { const name = e.target.value; setRows((cur) => cur.map((x) => (x.c.key === r.c.key ? { ...x, name } : x))); setFailures((f) => ({ ...f, [r.c.key]: '' })) }}
                   />
-                  <span className="ed-hint shrink-0">.png</span>
+                  <span className="ed-hint shrink-0">.{r.c.ext ?? 'png'}</span>
                 </div>
                 {error ? <p role="alert" className="text-destructive">{error}</p> : <p className="ed-hint truncate" title={r.c.fileName}>from {r.c.fileName}</p>}
               </div>

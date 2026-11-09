@@ -18,6 +18,7 @@ import {
   type ImageCache,
 } from './characterStore';
 import { TilesetCache } from './tilesetCache';
+import { encodeGif } from '../../../shared/fixtures/gifEncode';
 
 const tmp = makeTempDirTracker();
 let roots: { charactersDir: string; graphicsDir: string };
@@ -40,12 +41,13 @@ const def = (image = 'sprites/hero/walk.png', over: object = {}) => ({
 });
 
 describe('ids', () => {
-  it('accepts slash-separated slugs and .png graphic paths only', () => {
+  it('accepts slash-separated slugs and .png or .gif graphic paths only', () => {
     expect(isValidCharacterId('characters/hero')).toBe(true);
     expect(isValidCharacterId('../x')).toBe(false);
     expect(isValidCharacterId('a//b')).toBe(false);
     expect(isValidGraphicId('sprites/hero/walk.png')).toBe(true);
-    expect(isValidGraphicId('walk.gif')).toBe(false);
+    expect(isValidGraphicId('walk.gif')).toBe(true);
+    expect(isValidGraphicId('walk.webp')).toBe(false);
     expect(isValidGraphicId('../walk.png')).toBe(false);
   });
 });
@@ -60,6 +62,59 @@ describe('graphics', () => {
     expect(() => importGraphic(roots.graphicsDir, cache, path.join(roots.graphicsDir, 'nope.png'), 'x.png')).toThrow();
     expect(listGraphics(roots.graphicsDir).map((g) => g.id)).toEqual(['sprites/hero/walk.png']);
     expect(listDir(roots.graphicsDir).filter((f) => f.endsWith('.tmp'))).toEqual([]);
+  });
+});
+
+describe('GIF graphics', () => {
+  const gifBytes = () =>
+    Buffer.from(
+      encodeGif({
+        width: 4,
+        height: 3,
+        palette: [[255, 0, 0], [0, 255, 0], [0, 0, 255], [255, 255, 255]],
+        frames: [0, 1, 2].map((i) => ({ indices: new Array(12).fill(i), delayCs: 5 })),
+      })
+    );
+  let gif: string;
+  beforeEach(() => {
+    gif = path.join(path.dirname(source), 'boss.gif');
+    fs.writeFileSync(gif, gifBytes());
+  });
+
+  it('imports a GIF as a graphic: the file is kept, its size is the sheet of its frames, the picture is that sheet as a PNG', () => {
+    const { graphic, image } = importGraphic(roots.graphicsDir, cache, gif, 'sprites/boss/idle.gif');
+    expect(graphic).toMatchObject({ id: 'sprites/boss/idle.gif', width: 12, height: 3, gif: { frames: 3, frameWidth: 4, frameHeight: 3, delaysMs: [50, 50, 50] } });
+    expect(image).toMatch(/^data:image\/png;base64,/);
+    expect(fs.readFileSync(path.join(roots.graphicsDir, 'sprites/boss/idle.gif'))).toEqual(gifBytes());
+    expect(listGraphics(roots.graphicsDir, [], cache)).toEqual([expect.objectContaining({ id: 'sprites/boss/idle.gif', width: 12, gif: expect.objectContaining({ frames: 3 }) })]);
+  });
+
+  it('only a GIF can be a .gif graphic and only a PNG a .png one; a broken GIF is refused', () => {
+    expect(() => importGraphic(roots.graphicsDir, cache, source, 'a.gif')).toThrow(/\.gif/);
+    expect(() => importGraphic(roots.graphicsDir, cache, gif, 'a.png')).toThrow(/\.png/);
+    const broken = path.join(path.dirname(source), 'broken.gif');
+    fs.writeFileSync(broken, gifBytes().subarray(0, 40));
+    expect(() => importGraphic(roots.graphicsDir, cache, broken, 'b.gif')).toThrow(/Not a usable GIF/);
+    expect(fs.existsSync(path.join(roots.graphicsDir, 'b.gif'))).toBe(false);
+  });
+
+  it('a GIF that cannot be read becomes a listing warning, and the cache decodes once per change', () => {
+    importGraphic(roots.graphicsDir, cache, gif, 'ok.gif');
+    fs.writeFileSync(path.join(roots.graphicsDir, 'bad.gif'), 'nope');
+    const warnings: { file: string; error: string }[] = [];
+    expect(listGraphics(roots.graphicsDir, warnings, cache).map((g) => g.id)).toEqual(['ok.gif']);
+    expect(warnings.map((w) => w.file)).toEqual(['bad.gif']);
+    const a = cache.getGifSheet(path.join(roots.graphicsDir, 'ok.gif'));
+    expect(cache.getGifSheet(path.join(roots.graphicsDir, 'ok.gif'))).toBe(a);
+    cache.invalidate(path.join(roots.graphicsDir, 'ok.gif'));
+    expect(cache.getGifSheet(path.join(roots.graphicsDir, 'ok.gif'))).not.toBe(a);
+  });
+
+  it('a character sheet can name a GIF, and its picture is the sheet', () => {
+    importGraphic(roots.graphicsDir, cache, gif, 'sprites/boss/idle.gif');
+    const saved = saveCharacter(roots, cache, 'boss', def('sprites/boss/idle.gif'));
+    expect(Object.keys(saved.character.images)).toEqual(['sprites/boss/idle.gif']);
+    expect(saved.character.images['sprites/boss/idle.gif']).toMatch(/^data:image\/png;base64,/);
   });
 });
 

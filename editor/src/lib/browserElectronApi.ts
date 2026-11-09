@@ -59,16 +59,16 @@ function pickPngs(): Promise<Result> {
     const input = document.createElement('input')
     input.type = 'file'
     input.multiple = true
-    input.accept = '.png,image/png'
+    input.accept = '.png,.gif,image/png,image/gif'
     input.addEventListener('cancel', () => resolve({ success: false, canceled: true }))
     input.addEventListener('change', async () => {
       const chosen = Array.from(input.files ?? [])
       if (chosen.length === 0) return resolve({ success: false, canceled: true })
-      const files: { sourcePath: string; defaultName: string; previewUrl: string }[] = []
+      const files: { sourcePath: string; defaultName: string; ext: 'png' | 'gif'; previewUrl: string }[] = []
       for (const file of chosen) {
         const staged = await stageUpload(file.name, new Uint8Array(await file.arrayBuffer()))
         if (!staged.success || typeof staged.sourcePath !== 'string') return resolve({ success: false, error: String(staged.error ?? `Could not read ${file.name}`) })
-        files.push({ sourcePath: staged.sourcePath, defaultName: file.name.replace(/\.[^.]+$/, ''), previewUrl: URL.createObjectURL(file) })
+        files.push({ sourcePath: staged.sourcePath, defaultName: file.name.replace(/\.[^.]+$/, ''), ext: /\.gif$/i.test(file.name) ? 'gif' : 'png', previewUrl: URL.createObjectURL(file) })
       }
       resolve({ success: true, files })
     })
@@ -85,15 +85,15 @@ function pickPngFolder(): Promise<Result> {
     input.addEventListener('cancel', () => resolve({ success: false, canceled: true }))
     input.addEventListener('change', async () => {
       const all = Array.from(input.files ?? [])
-      const chosen = all.filter((f) => /\.png$/i.test(f.name) && !/(^|\/)\./.test(f.webkitRelativePath))
+      const chosen = all.filter((f) => /\.(png|gif)$/i.test(f.name) && !/(^|\/)\./.test(f.webkitRelativePath))
       if (all.length === 0) return resolve({ success: false, canceled: true })
-      if (chosen.length === 0) return resolve({ success: false, error: 'That folder has no PNG images in it.' })
-      const files: { sourcePath: string; dir: string; defaultName: string; previewUrl: string }[] = []
+      if (chosen.length === 0) return resolve({ success: false, error: 'That folder has no PNG or GIF images in it.' })
+      const files: { sourcePath: string; dir: string; defaultName: string; ext: 'png' | 'gif'; previewUrl: string }[] = []
       for (const file of chosen) {
         const staged = await stageUpload(file.name, new Uint8Array(await file.arrayBuffer()))
         if (!staged.success || typeof staged.sourcePath !== 'string') return resolve({ success: false, error: String(staged.error ?? `Could not read ${file.name}`) })
         const relative = file.webkitRelativePath || file.name
-        files.push({ sourcePath: staged.sourcePath, dir: relative.includes('/') ? relative.slice(0, relative.lastIndexOf('/')) : '', defaultName: file.name.replace(/\.[^.]+$/, ''), previewUrl: URL.createObjectURL(file) })
+        files.push({ sourcePath: staged.sourcePath, dir: relative.includes('/') ? relative.slice(0, relative.lastIndexOf('/')) : '', defaultName: file.name.replace(/\.[^.]+$/, ''), ext: /\.gif$/i.test(file.name) ? 'gif' : 'png', previewUrl: URL.createObjectURL(file) })
       }
       resolve({ success: true, files, skipped: all.length - chosen.length, truncated: false })
     })

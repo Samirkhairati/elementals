@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 import { thumbFrame } from '@/lib/characterThumb'
 import type { CharacterDef } from '../../../../../shared/engine/characters'
 import { sheetFrameRect } from '../../../../../shared/engine/characters'
+import type { GraphicInfo } from '../../../../../shared/engine/graphics'
 import { IconButton } from '../ui/controls'
 
 export type ViewMode = 'list' | 'tiles'
@@ -48,6 +49,19 @@ export function ImageThumb({ url, size, className }: { url?: string; size: numbe
   return (
     <span className={cn('ed-checker flex shrink-0 items-center justify-center overflow-hidden rounded-sm', className)} style={{ width: size, height: size }} aria-hidden>
       {url && <img src={url} alt="" draggable={false} className="max-h-full max-w-full object-contain" style={{ imageRendering: 'pixelated' }} />}
+    </span>
+  )
+}
+
+/** A graphic's picture in a square box: a GIF shows its first frame (the library holds it as a sheet of frames), anything else scaled to fit. */
+export function GraphicThumb({ graphic, url, size }: { graphic?: GraphicInfo; url?: string; size: number }) {
+  if (!graphic?.gif || !url) return <ImageThumb url={url} size={size} />
+  const { frameWidth: w, frameHeight: h } = graphic.gif
+  const fit = Math.min((size - 4) / w, (size - 4) / h)
+  const zoom = fit >= 1 ? Math.floor(fit) : fit
+  return (
+    <span className="ed-checker flex shrink-0 items-center justify-center overflow-hidden rounded-sm" style={{ width: size, height: size }} aria-hidden data-testid="gif-thumb">
+      <span style={{ width: w * zoom, height: h * zoom, backgroundImage: `url(${url})`, backgroundSize: `${graphic.width * zoom}px ${graphic.height * zoom}px`, backgroundPosition: '0 0', imageRendering: 'pixelated' }} />
     </span>
   )
 }

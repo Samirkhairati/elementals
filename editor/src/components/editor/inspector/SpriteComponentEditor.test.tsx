@@ -220,3 +220,37 @@ describe('SpriteComponentEditor: animations of a v2 character', () => {
   })
 })
 
+
+describe('SpriteComponentEditor: a GIF sprite', () => {
+  // an animated asset (not four-facing) with an idle binding, like a character made from a GIF
+  const gifAsset = makeAsset('animated/walker', objectMeta({ kind: 'animated', animations: { idle: { frames: [0, 1, 2], fps: 10, loop: true } } }))
+  const gifDef = { version: 2, name: 'Walker', tags: [], facing: 'none', pivot: { x: 0.5, y: 1 }, sheets: {}, clips: { idle: {} }, bindings: { idle: 'idle' } }
+  const still = { ...gifDef, bindings: {} }
+
+  function setupGif(value: Record<string, any>, def: object) {
+    const onChange = vi.fn()
+    renderWithEditor(
+      <SpriteComponentEditor entityId="e1" value={value} components={{ Sprite: value }} onChange={onChange} onChangeMany={vi.fn()} />,
+      { spriteAssets: assetMap(gifAsset), spriteList: [gifAsset], getCharacter: (id: string) => (id === 'animated/walker' ? ({ id, def, images: {} } as any) : undefined) } as any,
+    )
+    return { onChange }
+  }
+
+  it('plays its idle animation by default, as the game does, and says so', () => {
+    setupGif(spriteValue({ asset: 'animated/walker' }), gifDef)
+    expect(screen.getByRole('combobox', { name: 'Animation' })).toHaveTextContent('Automatic (idle)')
+    expect(screen.queryByLabelText('Frame')).toBeNull() // it is not a static frame
+    expect(screen.getByRole('button', { name: 'Pause preview' })).toBeInTheDocument()
+  })
+
+  it('a sprite without an idle binding stays a static frame until an animation is picked', () => {
+    setupGif(spriteValue({ asset: 'animated/walker' }), still)
+    expect(screen.getByRole('combobox', { name: 'Animation' })).toHaveTextContent('Static frame')
+    expect(screen.getByLabelText('Frame')).toBeInTheDocument()
+  })
+
+  it('an explicit animation is kept', () => {
+    setupGif(spriteValue({ asset: 'animated/walker', animation: 'idle' }), gifDef)
+    expect(screen.getByRole('combobox', { name: 'Animation' })).toHaveTextContent('idle')
+  })
+})

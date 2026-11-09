@@ -3,6 +3,8 @@
 // from game/public:
 //
 //   graphics/<graphicId>                copies of every graphic some character refers to (project/graphics/<graphicId>)
+//   graphics/<graphicId>.png            for a GIF graphic ("sprites/boss/idle.gif"): the PNG sheet of its frames (shared/gifSheet.ts),
+//                                       which is what the game loads; the game never decodes GIFs
 //   graphics/<graphicId>                (also) every picture an image layer of a project map places, copied once
 //   graphics/tilesets/<name>.png        project tilesets the game does not have yet (never overwritten, see --force)
 //   data/characters.json                CharacterManifest (shared/engine/graphics.ts): every character + web-relative sheet URLs
@@ -19,7 +21,9 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { parseArgs } from 'node:util'
 import { fileURLToPath } from 'node:url'
+import { deflateSync } from 'node:zlib'
 import { readPngSize } from '../../shared/png.ts'
+import { gifSheetFile } from '../../shared/gifSheet.ts'
 import { normalizeGameSettings } from '../../shared/gameSettings.ts'
 import {
   buildCharacterManifest,
@@ -27,6 +31,8 @@ import {
   buildDatabaseManifest,
   characterGraphics,
   findCommonCycles,
+  graphicUrl,
+  isGifGraphicId,
   isValidCharacterId,
   isValidGraphicId,
   validateCharacterSet,
@@ -57,6 +63,9 @@ export function defaultPaths() {
 const posix = (p) => p.split(path.sep).join('/')
 const byName = (a, b) => (a < b ? -1 : a > b ? 1 : 0)
 const toJson = (value) => JSON.stringify(value, null, 2) + '\n'
+
+/** Where a graphic lands below graphics/: the file itself, or for a GIF the sheet generated from it. */
+export const graphicOutputName = (id) => (isGifGraphicId(id) ? `${id}.png` : id)
 
 /** Recursive sorted listing of files below `dir` (absolute paths); missing dir -> []. Dot entries are skipped. */
 export function listFilesDeep(dir, filter = () => true) {
@@ -105,6 +114,10 @@ export function loadMapPictures(projectDir) {
         if (typeof id !== 'string' || pictures[id] !== undefined) continue
         if (!isValidGraphicId(id)) {
           warnings.push(`${rel}: image "${id}" is not a valid graphic id`)
+          continue
+        }
+        if (isGifGraphicId(id)) {
+          warnings.push(`${rel}: picture "${id}" is a GIF animation; image layers place still pictures (an entity can play it through a sprite)`)
           continue
         }
         try {
@@ -161,7 +174,9 @@ export function loadCharacters(projectDir) {
       const image = sheet && typeof sheet === 'object' ? sheet.image : undefined
       if (typeof image !== 'string' || graphics[image] !== undefined || !isValidGraphicId(image)) continue
       try {
-        const bytes = fs.readFileSync(path.join(graphicsDir, image))
+        let bytes = fs.readFileSync(path.join(graphicsDir, image))
+        // A GIF reaches the game as the PNG sheet of its frames; sheets are checked against the size of that sheet.
+        if (isGifGraphicId(image)) bytes = Buffer.from(gifSheetFile(bytes, deflateSync).png)
         sizes[image] = readPngSize(bytes)
         graphics[image] = bytes
       } catch (e) {
@@ -226,7 +241,7 @@ export function planSync({ projectDir, publicDir, force = false }) {
   if (fs.existsSync(path.join(projectDir, 'sprites')) && listFilesDeep(path.join(projectDir, 'sprites'), (f) => f.endsWith('sprite.json')).length > 0) {
     errors.push('project/sprites still holds v1 sprite assets; run `npm run assets:migrate`')
   }
-  for (const [id, bytes] of Object.entries(chars.graphics)) add(`${GRAPHICS_OUT}/${id}`, 'graphic', bytes)
+  for (const [id, bytes] of Object.entries(chars.graphics)) add(`${GRAPHICS_OUT}/${graphicOutputName(id)}`, 'graphic', bytes)
   // pictures on image layers (the game draws them from one copy each)
   const placed = loadMapPictures(projectDir)
   warnings.push(...placed.warnings)
@@ -394,6 +409,7 @@ export const HELP = `Usage: node scripts/sync-assets.mjs [--check | --write] [op
 
 Generates what the game loads from the authored project data:
   game/public/graphics/<graphicId>          the graphics characters use (copies of project/graphics/<graphicId>)
+  game/public/graphics/<gifId>.png          for a GIF graphic: the PNG sheet of its frames (the game plays sheets, not GIFs)
   game/public/graphics/tilesets/*.png       project tilesets the game lacks (existing files are kept)
   game/public/data/characters.json          character manifest (ids, definitions, sheet URLs)
   game/public/data/database.json            global switches and variables

@@ -2,6 +2,7 @@
 // name and z stay in the Properties panel on the left; everything about its pictures lives here: the list (reorder,
 // duplicate, rename, delete), a zoomable preview of the picked item with the Crop button, and its properties.
 
+import { stillGraphics } from '@/lib/characterEdit'
 import React, { useMemo, useRef, useState } from 'react'
 import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Copy, CopyPlus, Crop, Folder as FolderIcon, Group as GroupIcon, Lock, Scaling, Ungroup, Unlock, Pencil, Plus, Stamp, Trash2, X } from 'lucide-react'
 import type { ImageItem } from '@/types/editor'
@@ -240,7 +241,7 @@ export function ImagesPanel() {
             onOpenChange={setPickerOpen}
             title="Add an image: pick a sprite or a picture"
             sprites={ctx.spriteList}
-            graphics={ctx.graphics}
+            graphics={stillGraphics(ctx.graphics)}
             images={ctx.graphicImages}
             onPick={ctx.startImagePlacement}
           />

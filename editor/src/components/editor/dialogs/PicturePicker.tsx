@@ -5,7 +5,7 @@ import type { GraphicInfo } from '../../../../../shared/engine/graphics'
 import type { SpriteAssetInfo } from '../../../../../shared/engine/types'
 import type { ImagePick } from '@/lib/graphicAssets'
 import { Segmented } from '../ui/controls'
-import { ImageThumb, Tile, TileGroups, groupByFolder } from '../database/browse'
+import { GraphicThumb, Tile, TileGroups, groupByFolder } from '../database/browse'
 import { groupAssets, splitAssetId } from '../inspector/SpritePicker'
 import { SpriteThumb } from '../sprites/SpriteThumb'
 
@@ -85,7 +85,7 @@ export function PicturePicker({ open, onOpenChange, tabs = ['sprites', 'graphics
             <>
               {graphicGroups.length === 0 && <div className="ed-empty py-8">{graphics.length === 0 ? 'No pictures yet. Import one in Database › Graphics.' : `No picture matches “${query}”.`}</div>}
               <TileGroups groups={graphicGroups}>
-                {(g) => <Tile key={g.id} selected={value?.graphicId === g.id} name={g.id.slice(g.id.lastIndexOf('/') + 1).replace(/\.png$/i, '')} title={g.id} hint={`${g.width}×${g.height}`} thumb={<ImageThumb url={images[g.id]} size={56} />} onClick={() => pick({ graphicId: g.id })} />}
+                {(g) => <Tile key={g.id} selected={value?.graphicId === g.id} name={g.id.slice(g.id.lastIndexOf('/') + 1).replace(/\.(png|gif)$/i, '')} title={g.id} hint={g.gif ? `GIF · ${g.gif.frames} fr` : `${g.width}×${g.height}`} thumb={<GraphicThumb graphic={g} url={images[g.id]} size={56} />} onClick={() => pick({ graphicId: g.id })} />}
               </TileGroups>
             </>
           )}

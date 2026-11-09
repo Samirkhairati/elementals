@@ -3,7 +3,7 @@
 // copy a file in.
 
 import { folderOfId, joinDirs, joinId, leafOfId } from '@/lib/assetOps'
-import { onlyPngs, pathOfDroppedFile, type DroppedItem } from '@/lib/droppedFiles'
+import { imageKindOf, onlyImages, pathOfDroppedFile, type DroppedItem } from '@/lib/droppedFiles'
 import { sanitizeDir, sanitizeStem } from '@/lib/importNames'
 import type { DatabaseData } from './useDatabaseData'
 
@@ -14,6 +14,8 @@ export interface Candidate {
   path: string
   /** What the file is called on disk now. */
   fileName: string
+  /** PNG (the default) or GIF: a GIF is an animation and can only go into the Graphics library. */
+  ext?: 'png' | 'gif'
   /** Something an <img> can show ('' = none). */
   preview: string
   /** Folder below the destination it goes into, when it came out of an imported folder (`Trees/oak`, library-safe; '' = the destination itself). */
@@ -22,8 +24,12 @@ export interface Candidate {
   pasted?: boolean
 }
 
+export type ImageKind = 'png' | 'gif'
+
 export interface ImportRow {
   path: string
+  /** The extension the file keeps in the library. */
+  ext: ImageKind
   /** Folder below the destination ('' = the destination itself). */
   dir: string
   /** The name to file it under, without the extension. */
@@ -40,6 +46,8 @@ export interface ImportResult {
 export interface Importer {
   /** "picture" / "tileset", for the dialog's wording. */
   noun: string
+  /** Kinds of image this library takes (tilesets: PNG only). */
+  accepts: readonly ImageKind[]
   /** Folders to import into ('' = the top level is always offered by the dialog). */
   folders: string[]
   /** Names (lower-cased) that cannot be used in `folder`. */
@@ -57,7 +65,7 @@ export async function pickCandidates(): Promise<{ ok: true; candidates: Candidat
   try {
     const r = await window.electronAPI?.pickImageFiles()
     if (!r) return { ok: false, error: 'The editor API is not available' }
-    if (r.success) return { ok: true, candidates: r.files.map((f) => ({ key: nextKey(), path: f.sourcePath, fileName: `${f.defaultName}.png`, preview: f.previewUrl })) }
+    if (r.success) return { ok: true, candidates: r.files.map((f) => ({ key: nextKey(), path: f.sourcePath, fileName: `${f.defaultName}.${f.ext ?? 'png'}`, ext: f.ext ?? 'png', preview: f.previewUrl })) }
     if (r.canceled) return { ok: false, error: '', canceled: true }
     return { ok: false, error: r.error }
   } catch (e) {
@@ -74,7 +82,7 @@ export async function pickFolderCandidates(): Promise<FolderPick> {
     const r = await window.electronAPI?.pickImageFolder()
     if (!r) return { ok: false, error: 'The editor API is not available' }
     if (r.success) {
-      const candidates = r.files.map((f) => ({ key: nextKey(), path: f.sourcePath, fileName: `${f.defaultName}.png`, preview: f.previewUrl, dir: sanitizeDir(f.dir) }))
+      const candidates = r.files.map((f) => ({ key: nextKey(), path: f.sourcePath, fileName: `${f.defaultName}.${f.ext ?? 'png'}`, ext: f.ext ?? 'png', preview: f.previewUrl, dir: sanitizeDir(f.dir) }))
       return { ok: true, candidates, skipped: r.skipped, truncated: r.truncated }
     }
     if (r.canceled) return { ok: false, error: '', canceled: true }
@@ -85,17 +93,22 @@ export async function pickFolderCandidates(): Promise<FolderPick> {
 }
 
 /** Candidates from files dropped in from the OS (anything that is not a PNG is left out and counted). */
-export async function dropCandidates(items: DroppedItem[], options: { pasted?: boolean } = {}): Promise<{ ok: true; candidates: Candidate[]; skipped: number } | { ok: false; error: string }> {
+export async function dropCandidates(items: DroppedItem[], options: { pasted?: boolean; accept?: readonly ImageKind[] } = {}): Promise<{ ok: true; candidates: Candidate[]; skipped: number } | { ok: false; error: string }> {
+  const accept = options.accept ?? ['png']
   const dirs = new Map(items.map((i) => [i.file, sanitizeDir(i.dir)]))
   const files = items.map((i) => i.file)
-  const pngs = onlyPngs(files)
-  if (pngs.length === 0) return { ok: false, error: files.length > 0 ? 'Only PNG images can be imported.' : '' }
+  const pngs = onlyImages(files, accept)
+  if (pngs.length === 0) {
+    const onlyGifs = files.length > 0 && !accept.includes('gif') && files.every((f) => imageKindOf(f) === 'gif')
+    return { ok: false, error: files.length === 0 ? '' : onlyGifs ? 'GIF animations can only be imported into Graphics.' : accept.includes('gif') ? 'Only PNG and GIF images can be imported.' : 'Only PNG images can be imported.' }
+  }
   try {
     const candidates = await Promise.all(
       pngs.map(async (file) => ({
         key: nextKey(),
         path: await pathOfDroppedFile(file),
         dir: dirs.get(file) ?? '',
+        ext: imageKindOf(file) ?? ('png' as ImageKind),
         // Screenshots and copied images arrive as "image.png"; call them "pasted" instead.
         fileName: options.pasted && /^(image)?\.?(png)?$/i.test(file.name) ? 'pasted.png' : file.name,
         preview: typeof URL.createObjectURL === 'function' ? URL.createObjectURL(file) : '',
@@ -110,6 +123,12 @@ export async function dropCandidates(items: DroppedItem[], options: { pasted?: b
 
 /** Dropped files with no folder of their own (a plain drop, or a paste). */
 export const looseFiles = (files: File[]): DroppedItem[] => files.map((file) => ({ file, dir: '' }))
+
+/** The candidates this library takes, and how many were left out (a GIF offered to the tilesets). */
+export function acceptable(candidates: Candidate[], accepts: readonly ImageKind[]): { candidates: Candidate[]; left: number } {
+  const kept = candidates.filter((c) => accepts.includes(c.ext ?? 'png'))
+  return { candidates: kept, left: candidates.length - kept.length }
+}
 
 export const defaultRowName = (c: Candidate, fallback: string) => sanitizeStem(c.fileName, fallback)
 
@@ -140,12 +159,13 @@ export function graphicImporter(data: DatabaseData): Importer {
   const ids = graphics.map((g) => g.id)
   return {
     noun: 'picture',
+    accepts: ['png', 'gif'],
     folders: [...new Set([...graphicFolders, ...ids.map(folderOfId).filter(Boolean)])].sort(),
-    taken: (folder) => new Set(ids.filter((id) => folderOfId(id) === folder).map((id) => leafOfId(id).replace(/\.png$/i, '').toLowerCase())),
+    taken: (folder) => new Set(ids.filter((id) => folderOfId(id) === folder).map((id) => leafOfId(id).replace(/\.(png|gif)$/i, '').toLowerCase())),
     run: async (rows, folder) => {
       const result: ImportResult = { imported: [], failed: [] }
       for (const row of rows) {
-        const id = joinId(joinDirs(folder, row.dir), `${row.name}.png`)
+        const id = joinId(joinDirs(folder, row.dir), `${row.name}.${row.ext}`)
         const r = await data.sprites.importGraphic(row.path, id)
         if (r.ok) result.imported.push(id)
         else result.failed.push(failure(row.path, r.error))
@@ -159,6 +179,7 @@ export function tilesetImporter(data: DatabaseData): Importer {
   const { tilesets, tilesetFolders } = data
   return {
     noun: 'tileset',
+    accepts: ['png'],
     folders: [...new Set(tilesetFolders)].sort(),
     // Maps find a tileset by its file name alone, so a name is taken whatever folder holds it.
     taken: () => new Set(tilesets.map((t) => t.fileName.replace(/\.png$/i, '').toLowerCase())),

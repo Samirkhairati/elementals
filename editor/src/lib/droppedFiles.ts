@@ -7,6 +7,15 @@ export function pngFilesOf(dt: DataTransfer | null): File[] {
 
 export const onlyPngs = (files: File[]): File[] => files.filter((f) => /\.png$/i.test(f.name) || f.type === 'image/png')
 
+/** Which kind of picture a file is (by its name or type): a GIF is an animation, anything else that is accepted a PNG. */
+export const imageKindOf = (file: File): 'png' | 'gif' | null => (/\.gif$/i.test(file.name) || file.type === 'image/gif' ? 'gif' : /\.png$/i.test(file.name) || file.type === 'image/png' ? 'png' : null)
+
+/** The files of the kinds in `accept` (PNGs only by default). */
+export const onlyImages = (files: File[], accept: readonly ('png' | 'gif')[] = ['png']): File[] => files.filter((f) => {
+  const kind = imageKindOf(f)
+  return kind !== null && accept.includes(kind)
+})
+
 /** A dropped file and the folder it sat in inside a dropped folder (`Trees/oak`, starting with the dropped folder's name; '' = dropped on its own). */
 export interface DroppedItem {
   file: File

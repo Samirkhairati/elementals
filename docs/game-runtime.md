@@ -94,6 +94,11 @@ Every sprite has a character (`SpriteRegistry` holds v2 `CharacterDef`s; the v1 
 * `RenderBridgeSystem` plays the key (restart when `revision` changes), applies `anims.timeScale`, XORs the mirror flip with `Sprite.flipX`, and
   reports Phaser's `animationcomplete` to `completeClip` (`sprites/animatorOps.ts`), which resolves a waiting `playAnimation` and applies `then`.
 * Animations are registered once at the authored fps (`buildClipRegistrations`); speed changes never re-register.
+* **GIFs** are played as sheets. The game has no GIF decoder: `assets:sync` turns a GIF graphic into a PNG sheet of its frames
+  (`graphics/<gifId>.png`, see docs/database-and-characters-spec.md §4) and the character manifest's `files` point at it, so a clip over a GIF sheet is registered,
+  sped up (`animSpeed`, `followSpeed`, `setAnimationSpeed`) and played like any other. An entity's Sprite can name such a character as its asset; with no
+  `Sprite.animation` it plays the character's `idle` binding (`newGifCharacter` binds it), so a GIF entity just animates. State appearances
+  (`appearance.asset` / `appearance.animation`), `changeSprite` and `playAnimation` use its clips by name. Image layers draw still pictures only (a GIF picture is skipped with a warning).
 * Nodes: `playAnimation` {animation, speed, wait, then: auto|hold|loop} (a node saved without `then` holds the last frame, as before),
   `stopAnimation`, `setAnimationSpeed` {value, mode: scale|fps, clip?}, `setMoveSpeed` {speed}, `changeSprite` {…, persist: state|map|forever}.
 

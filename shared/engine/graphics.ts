@@ -2,6 +2,12 @@
 // A Graphic is an image under project/graphics, identified by its path with the extension
 // ("sprites/characters/player/walk.png"). A Character references Graphics by id; the game loads them from
 // `graphics/<id>` (the sync copies only the ones some character uses).
+//
+// A graphic can also be a GIF ("sprites/boss/idle.gif"). A GIF is an animation, so it can only be the picture of a
+// character sheet: the editor decodes it, the sync lays its frames out as a PNG sheet (shared/gifSheet.ts) that the game
+// loads from `graphics/<id>.png` ("graphics/sprites/boss/idle.gif.png"), and a sheet that names the GIF is cut from that
+// grid: frameWidth x frameHeight = the GIF's size, margin 0, spacing 0, frames 0..n-1 in the GIF's order. Everywhere
+// else a graphic's `width`/`height` is the size of the picture the game loads, so for a GIF it is the size of that sheet.
 
 import type { SpriteAssetMeta } from './types.ts';
 import { validateCharacter, type CharacterDef, type CharacterIssue } from './characters.ts';
@@ -11,9 +17,9 @@ import { cloneJson } from './util.ts';
 export const GRAPHICS_URL_ROOT = 'graphics';
 
 const SEGMENT = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
-const FILE = /^[a-zA-Z0-9][a-zA-Z0-9_-]*\.png$/i;
+const FILE = /^[a-zA-Z0-9][a-zA-Z0-9_-]*\.(png|gif)$/i;
 
-/** "/"-separated path of letters, digits, "_" and "-" ending in a .png file name. */
+/** "/"-separated path of letters, digits, "_" and "-" ending in a .png or .gif file name. */
 export function isValidGraphicId(id: unknown): id is string {
   if (typeof id !== 'string' || id === '') return false;
   const parts = id.split('/');
@@ -26,8 +32,14 @@ export function isValidCharacterId(id: unknown): id is string {
   return typeof id === 'string' && id !== '' && id.split('/').every((p) => SEGMENT.test(p));
 }
 
+/** A GIF graphic (an animation, see the top of this file). */
+export function isGifGraphicId(graphicId: string): boolean {
+  return /\.gif$/i.test(graphicId);
+}
+
+/** What the game loads for a graphic, relative to its web root: the file itself, or for a GIF the sheet generated from it. */
 export function graphicUrl(graphicId: string): string {
-  return `${GRAPHICS_URL_ROOT}/${graphicId}`;
+  return isGifGraphicId(graphicId) ? `${GRAPHICS_URL_ROOT}/${graphicId}.png` : `${GRAPHICS_URL_ROOT}/${graphicId}`;
 }
 
 /** Distinct graphic ids a character uses, in sheet order. */
@@ -88,7 +100,7 @@ export function validateCharacterSet(
     if (sheets && typeof sheets === 'object') {
       for (const [key, sheet] of Object.entries(sheets)) {
         if (sheet && typeof sheet.image === 'string' && !isValidGraphicId(sheet.image)) {
-          issues.push({ id, severity: 'error', message: `sheet "${key}": "${sheet.image}" is not a valid graphic id (path of letters, digits, - and _ ending in .png)` });
+          issues.push({ id, severity: 'error', message: `sheet "${key}": "${sheet.image}" is not a valid graphic id (path of letters, digits, - and _ ending in .png or .gif)` });
         }
       }
     }
@@ -156,12 +168,25 @@ export interface CharacterInfo {
   images: Record<string, string>;
 }
 
+export interface GifGraphicInfo {
+  /** Number of frames. */
+  frames: number;
+  /** Size of one frame (the GIF's own size). */
+  frameWidth: number;
+  frameHeight: number;
+  /** Delay of every frame in ms, as stored in the file. */
+  delaysMs: number[];
+}
+
 export interface GraphicInfo {
   id: string;
+  /** Size of the picture the game loads: the file's own size, or for a GIF its sheet (frames laid out in a grid). */
   width: number;
   height: number;
   bytes: number;
   mtimeMs: number;
+  /** Set for a GIF graphic. */
+  gif?: GifGraphicInfo;
 }
 
 /** `SpriteAssetInfo`-shaped view (pickers, canvas) of a character. */

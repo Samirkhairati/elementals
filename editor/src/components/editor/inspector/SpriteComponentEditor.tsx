@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Grid3X3, ImageOff, Pause, Play, RotateCcw, S
 import type { Facing } from '../../../../../shared/engine/types'
 import { FACINGS } from '../../../../../shared/engine/constants'
 import { sheetGrid } from '../../../../../shared/engine/sprites'
+import { DEFAULT_MODE, resolveClip } from '../../../../../shared/engine/characters'
 import { normalizeCollider } from '@/lib/entityVisuals'
 import { getSpriteImageSize, useSpriteImagesVersion } from '@/lib/spriteImages'
 import { useEditorSelector, type EditorContextValue } from '../layout/EditorContext'
@@ -42,7 +43,13 @@ export function SpriteComponentEditor({ value, components, onChange, onChangeMan
   const animationNames = useMemo(() => Object.keys(meta?.animations ?? {}), [meta])
   // Every animation of the character (v2), for the clip dropdown and the animation speed.
   const clipNames = useMemo(() => Object.keys(getCharacter?.(assetId)?.def.clips ?? {}), [getCharacter, assetId])
-  const hasAnimation = !isCharacter && !!animation && animationNames.includes(animation)
+  // An asset that is not a character plays its idle binding when no animation is chosen (a GIF sprite does): the game does the same.
+  const automatic = useMemo(() => {
+    const def = getCharacter?.(assetId)?.def
+    return !isCharacter && def ? resolveClip(def, DEFAULT_MODE, 'idle') : null
+  }, [getCharacter, assetId, isCharacter])
+  const playedAnimation = !isCharacter ? (animationNames.includes(animation) ? animation : automatic ?? '') : ''
+  const hasAnimation = !isCharacter && playedAnimation !== '' && animationNames.includes(playedAnimation)
   const imagesVersion = useSpriteImagesVersion()
   const frameCount = useMemo(() => {
     void imagesVersion
@@ -62,7 +69,7 @@ export function SpriteComponentEditor({ value, components, onChange, onChangeMan
   const previewSprite = useMemo(
     () => ({
       facing,
-      animation: isCharacter ? (phase === 'idle' ? '' : phase) : animation,
+      animation: isCharacter ? (phase === 'idle' ? '' : phase) : playedAnimation,
       frame: Number(value.frame) || 0,
       offsetX: Number(value.offsetX) || 0,
       offsetY: Number(value.offsetY) || 0,
@@ -71,7 +78,7 @@ export function SpriteComponentEditor({ value, components, onChange, onChangeMan
       tint: typeof value.tint === 'string' ? value.tint : '',
       opacity: typeof value.opacity === 'number' ? value.opacity : 1,
     }),
-    [facing, isCharacter, phase, animation, value.frame, value.offsetX, value.offsetY, value.scale, value.flipX, value.tint, value.opacity],
+    [facing, isCharacter, phase, playedAnimation, value.frame, value.offsetX, value.offsetY, value.scale, value.flipX, value.tint, value.opacity],
   )
 
   const collider = useMemo(() => (components.Collider && showCollider ? normalizeCollider(components.Collider) : null), [components.Collider, showCollider])
@@ -208,8 +215,8 @@ export function SpriteComponentEditor({ value, components, onChange, onChangeMan
 
             {!isCharacter && (
               <div className="flex flex-col gap-2">
-                <Field label="Animation">
-                  <Select aria-label="Animation" value={hasAnimation ? animation : ''} options={[{ value: '', label: 'Static frame' }, ...animationNames.map((n) => ({ value: n }))]} onChange={(v) => onChange('animation', v)} />
+                <Field label="Animation" info={automatic ? 'Automatic plays the sprite’s idle animation, like a GIF sprite; pick another animation to play it instead.' : undefined}>
+                  <Select aria-label="Animation" value={animationNames.includes(animation) ? animation : ''} options={[{ value: '', label: automatic ? `Automatic (${automatic})` : 'Static frame' }, ...animationNames.map((n) => ({ value: n }))]} onChange={(v) => onChange('animation', v)} />
                   {hasAnimation && (
                     <IconButton title={playing ? 'Pause' : 'Play'} aria-label={playing ? 'Pause preview' : 'Play preview'} onClick={() => setPlaying((p) => !p)}>
                       {playing ? <Pause /> : <Play />}

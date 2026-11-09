@@ -82,7 +82,9 @@ function readBody(req: IncomingMessage, limit: number): Promise<Buffer> {
 function safeUploadName(name: unknown): string {
   const base = typeof name === 'string' ? path.basename(name.replace(/\\/g, '/')) : '';
   const clean = base.replace(/[^A-Za-z0-9._ -]/g, '_').replace(/^\.+/, '');
-  return clean.toLowerCase().endsWith('.png') && clean.length > 4 ? clean.slice(0, 120) : 'upload.png';
+  const lower = clean.toLowerCase();
+  if (lower.endsWith('.gif') && clean.length > 4) return clean.slice(0, 120);
+  return lower.endsWith('.png') && clean.length > 4 ? clean.slice(0, 120) : 'upload.png';
 }
 
 export function createApiHandler(options: ApiHandlerOptions): ApiHandler {

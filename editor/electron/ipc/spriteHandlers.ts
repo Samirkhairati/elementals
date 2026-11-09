@@ -31,7 +31,7 @@ export function registerSpriteHandlers(): void {
 
     const { canceled, filePaths } = await dialog.showOpenDialog(window, {
       title: 'Select Images',
-      filters: [{ name: 'Images', extensions: ['png'] }],
+      filters: [{ name: 'Images', extensions: ['png', 'gif'] }],
       properties: ['openFile', 'multiSelections'],
     });
     if (canceled || filePaths.length === 0) return { success: false, canceled: true };
@@ -39,6 +39,7 @@ export function registerSpriteHandlers(): void {
     const files = filePaths.map((sourcePath) => ({
       sourcePath,
       defaultName: path.parse(sourcePath).name,
+      ext: path.extname(sourcePath).toLowerCase() === '.gif' ? ('gif' as const) : ('png' as const),
       previewUrl: previewOf(sourcePath),
     }));
     return { success: true, files };
@@ -53,7 +54,7 @@ export function registerSpriteHandlers(): void {
     if (canceled || filePaths.length === 0) return { success: false, canceled: true };
 
     const scan = scanImageFolder(filePaths[0]);
-    if (scan.files.length === 0) return { success: false, error: 'That folder has no PNG images in it.' };
+    if (scan.files.length === 0) return { success: false, error: 'That folder has no PNG or GIF images in it.' };
     let budget = PREVIEW_BUDGET;
     const files = scan.files.map((f) => {
       const previewUrl = previewOf(f.sourcePath, budget);
@@ -78,10 +79,11 @@ export function registerSpriteHandlers(): void {
   });
 }
 
-/** A safe `<stem>.png` for whatever name the page sent. */
+/** A safe `<stem>.png` (or `.gif`, when the page sent a GIF) for whatever name the page sent. */
 export function stagedName(name: unknown): string {
   const stem = (typeof name === 'string' ? path.parse(name).name : '').replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '');
-  return `${stem || 'pasted'}.png`;
+  const ext = typeof name === 'string' && path.extname(name).toLowerCase() === '.gif' ? 'gif' : 'png';
+  return `${stem || 'pasted'}.${ext}`;
 }
 
 /** What a folder import may spend on inline previews in all (the rest show a blank thumbnail). */
@@ -92,7 +94,9 @@ function previewOf(file: string, budget = Infinity): string {
   try {
     const size = fs.statSync(file).size;
     if (size > 16 * 1024 * 1024 || size * 1.4 > budget) return '';
-    return `data:image/png;base64,${fs.readFileSync(file).toString('base64')}`;
+    // a GIF previews as itself (it animates); the data URL's type has to match
+    const mime = path.extname(file).toLowerCase() === '.gif' ? 'image/gif' : 'image/png';
+    return `data:${mime};base64,${fs.readFileSync(file).toString('base64')}`;
   } catch {
     return '';
   }

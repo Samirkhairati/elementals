@@ -135,11 +135,28 @@ project/
 * **Character ids stay exactly as today** (`characters/player`, `objects/flower`) so no map, prefab or event changes. Their
   files therefore land at `project/database/characters/characters/player.json`; the folders are just organisation and carry no
   meaning. (An optional later cleanup — shorter ids — is a rename-with-rewrite, §11.4.)
-* **Graphic ids** are the path under `project/graphics` including extension: `sprites/player/walk.png`.
+* **Graphic ids** are the path under `project/graphics` including extension: `sprites/player/walk.png`. The extension is `.png` or `.gif`
+  (see *GIF animations* below).
 * Id rules unchanged: `^[a-z0-9][a-z0-9_-]*(/[a-z0-9][a-z0-9_-]*)*$` for characters (`isValidSpriteId`); graphics may also contain
   `.` before the extension.
 * A Character references Graphics, never copies them. Two characters may point at the same Graphic with different cuts
   (recolours, a shared 'effects' sheet).
+* **GIF animations.** A GIF graphic (`sprites/boss/idle.gif`) is an animation, so it can only be the picture of a character sheet
+  (tilesets and image-layer pictures are still PNGs; a GIF placed on an image layer is reported and skipped by the sync). The `.gif` file is kept in
+  `project/graphics` as authored. Everywhere else the library reports a graphic's `width`/`height` as the size of the picture *the game
+  loads*, which for a GIF is its **sheet**: the frames laid out left to right, then top to bottom, in a grid at most 4096 px wide
+  (`shared/gifSheet.ts`; a GIF that would need more than 8192 px of height is refused with a message). `GraphicInfo.gif` adds
+  `{ frames, frameWidth, frameHeight, delaysMs }`. A character sheet that names the GIF is cut from that grid like any other
+  (`frameWidth × frameHeight` = the GIF's size, margin 0, spacing 0), so clips, `still`, frame validation, previews and the animator need
+  no GIF code: a GIF clip is an ordinary non-directional clip over frames `0..n-1`. The **fps** is the clip's `fps` (default: from the GIF's average frame
+  delay, `suggestedGifFps`: whole fps 1-60, delays under 20 ms count as 100 ms like browsers do; the author can change it, and *Use the GIF's speed*
+  puts it back). Per-frame delays are not kept: a clip plays at one fps. Nothing in the character format changed (`version` stays 2, existing
+  data is untouched): "this sheet is a GIF" is just a `.gif` image id.
+* **Who decodes.** `shared/gif.ts` decodes GIFs (all frames composited with disposal methods, transparency, local palettes, interlacing; no dependencies)
+  and `shared/gifSheet.ts` + `shared/pngEncode.ts` build the sheet PNG (zlib injected). The editor's main process cannot import `shared/`, so
+  `editor/electron/ipc/{gif,pngEncode,gifSheet}.ts` are verbatim copies pinned by `gifSheet.test.ts`; its stores (and the browser harness) serve a
+  GIF graphic's picture as that sheet PNG. The game never decodes a GIF: `assets:sync` writes the sheet to `game/public/graphics/<gifId>.png`
+  (`graphics/sprites/boss/idle.gif.png`), `graphicUrl(gifId)` and the manifest's `files` point there, and the GIF itself is not copied.
 * `assets:sync` copies only Graphics that some Character or Tileset references, and emits `data/characters.json`
   (replacing `sprites.json`; see §12).
 
@@ -475,6 +492,10 @@ refers to it. The disk change goes first, then the rewrites; anything that could
    For presets, the clips are generated from the cut: *Person* with `N` columns and 4 rows → `idle/walk/run` with rows
    assigned down, left, right, up (editable afterwards); *Animated object* → one looping clip over all frames.
 
+*GIF animation* (preset `gif`): pick a GIF from Graphics (only GIFs are offered; a picture of frames is not). Nothing is cut: the character is
+one looping clip `idle` over every frame at the GIF's speed, bound to `idle` so an entity that uses it plays it with nothing else to set
+(`newGifCharacter`).
+
 Finish → the new character opens on the **Animations** tab. Cancel creates nothing.
 
 ### 8.4 Animations tab
@@ -536,6 +557,11 @@ Cut     Columns [4] × Rows [4]   = 16 frames of 32 × 48 px           (✓ fits
 
 * The grid overlay preview is inline. Changing columns/rows recomputes frame size; changing frame size recomputes
   columns/rows. A mismatch is shown inline (`130px does not divide by 4`).
+* **Source** (Spritesheet | GIF), per sheet. *Spritesheet* is the cut above. *GIF* picks a GIF graphic: the cut controls give way to
+  "N frames of W×H px, made to play at about X fps"; the frames are shown side by side with their numbers, and the animations on the sheet play every frame
+  at the GIF's speed (`setSheetGif`; switching back picks a picture and suggests a cut again, `setSheetPicture`). **+ Add GIF…** adds a GIF sheet and an
+  animation that plays it. In **Animations**, an animation on a GIF sheet shows no frame picker or direction controls: only *Playback* (fps, loop, follow speed)
+  and *Use the GIF's speed*.
 * **Used by clips**: chips of the clips that use this sheet. Deleting a sheet used by clips is blocked with that list.
 * **+ Add sheet** (choose from Graphics / import).
 
@@ -603,7 +629,8 @@ the game*. Initial copy (Appendix A has the full list):
   summary (columns × rows, frame size, margin, spacing), a warning when the frames do not fill the picture, and a link to edit the cut.
 * **Used by**: character sheets and map image layers that use the picture (with *Open* links), and **Ends up in**: the maps that show a
   sprite cut from it. `unused` badge otherwise.
-* Toolbar: *Import…* (pick several PNGs), *New folder…*. The folder you clicked last is highlighted and is where imports go; files dragged in from the OS onto the list (or onto a folder) open the same *Import N pictures* dialog: a preview per file and its name (the file name by default, editable; clashes inside the batch or with the library block the button), plus the destination folder. Per picture: *Rename / move…*, *Delete*. Per folder (hover): new folder inside, rename / move, delete.
+* A GIF graphic shows as its first frame in lists and pickers; its detail has an animated preview at its own speed (play / pause), "GIF · N frames of W×H px · about X fps", and the sheet of frames in the viewer.
+* Toolbar: *Import…* (pick several PNGs or GIFs), *Import folder…* (every PNG and GIF below a picked folder, nested folders kept; a folder dragged in from the OS does the same; the folder's own name and its sub-folders are created under the destination, and clashes are checked per folder), *New folder…*. The folder you clicked last is highlighted and is where imports go; files dragged in from the OS onto the list (or onto a folder) open the same *Import N pictures* dialog: a preview per file and its name (the file name by default, editable; clashes inside the batch or with the library block the button), plus the destination folder. Per picture: *Rename / move…*, *Delete*. Per folder (hover): new folder inside, rename / move, delete.
 
 ### 9.2 Tilesets
 
@@ -754,7 +781,7 @@ Every list row and header shows a count from `index.counts`. Clip rows show per-
 
 ## 12. Pipeline changes (`scripts/lib/assets.mjs`, `sync-assets.mjs`)
 
-* Reads `project/database/characters/**/*.json` + referenced Graphics.
+* Reads `project/database/characters/**/*.json` + referenced Graphics (a `.gif` is decoded and written as its PNG sheet; a GIF that cannot be decoded is an error naming the graphic).
 * Emits `game/public/data/characters.json` = `{ version: 2, characters: [{ id, def, files: { <sheetKey>: <url> } }] }` (sorted,
   deterministic) and copies only referenced images to `game/public/graphics/…`. `sprites.json` is emitted too for one release
   (derived v1 view) so a half-migrated checkout still boots; remove afterwards.

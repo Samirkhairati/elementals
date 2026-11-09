@@ -75,7 +75,7 @@ editor  --writes-->  project/maps/*.json (editor map format, tile index keyed)
   (`Transform.free: true`: any pixel, any collider size; nothing snaps); helpers in `shared/engine/placement.ts`, see docs/engine-design.md.
 * Events are state machines (states with conditions) whose body is a **node graph** (`shared/engine/graph.ts`, `docs/event-graph-spec.md`). New interpreter command:
   catalog entry in `shared/engine/commands.ts`, handler in `game/src/events/commands/*.ts`, test with `makeRig()`.
-* Characters (sprites) are v2 `CharacterDef`s in `project/database/characters/`; ids look like `characters/player`, `objects/chest`.
+* Characters (sprites) are v2 `CharacterDef`s in `project/database/characters/`; ids look like `characters/player`, `objects/chest`. A sheet's picture can be a **GIF** graphic (`x.gif`): the editor decodes it (`shared/gif.ts`), the sync writes its frames as a PNG sheet `graphics/x.gif.png` that the game plays like any sheet, the fps is the clip's; see docs/database-and-characters-spec.md §4. `editor/electron/ipc/{gif,pngEncode,gifSheet}.ts` are pinned copies of the `shared/` files (the main process cannot import `shared/`).
 * Global switches / variables / stages live in `project/database.json`.
 
 ## Game (`game/src`, see docs/game-runtime.md)

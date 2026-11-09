@@ -7,11 +7,13 @@ export interface FolderImage {
   dir: string;
   /** File name without its extension. */
   defaultName: string;
+  /** Which kind of picture it is. */
+  ext: 'png' | 'gif';
 }
 
 export interface FolderScan {
   files: FolderImage[];
-  /** Files that were left out because they are not PNGs. */
+  /** Files that were left out because they are not PNG or GIF images. */
   skipped: number;
   /** Stopped early because the folder held more than `maxFiles` pictures or went deeper than `maxDepth`. */
   truncated: boolean;
@@ -21,7 +23,7 @@ export const MAX_FOLDER_IMAGES = 5000;
 export const MAX_FOLDER_DEPTH = 12;
 
 /**
- * Every PNG below `root`, nested folders included, in a stable order (by name).
+ * Every PNG and GIF below `root`, nested folders included, in a stable order (by name).
  * Hidden entries and symbolic links are ignored, so a scan can neither leave the folder nor loop.
  */
 export function scanImageFolder(root: string, maxFiles = MAX_FOLDER_IMAGES, maxDepth = MAX_FOLDER_DEPTH): FolderScan {
@@ -42,9 +44,9 @@ export function scanImageFolder(root: string, maxFiles = MAX_FOLDER_IMAGES, maxD
         if (depth >= maxDepth) result.truncated = true;
         else walk(full, `${relative}/${entry.name}`, depth + 1);
       } else if (entry.isFile()) {
-        if (!/\.png$/i.test(entry.name)) result.skipped++;
+        if (!/\.(png|gif)$/i.test(entry.name)) result.skipped++;
         else if (result.files.length >= maxFiles) result.truncated = true;
-        else result.files.push({ sourcePath: full, dir: relative, defaultName: path.parse(entry.name).name });
+        else result.files.push({ sourcePath: full, dir: relative, defaultName: path.parse(entry.name).name, ext: entry.name.toLowerCase().endsWith('.gif') ? 'gif' : 'png' });
       }
     }
   };

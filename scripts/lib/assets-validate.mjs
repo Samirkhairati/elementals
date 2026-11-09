@@ -2,11 +2,11 @@
 // Characters are checked with the shared contract (shared/engine/characters.ts + graphics.ts), the same code
 // the editor and the game use; the sync copies images by graphic id, so ids are validated strictly.
 
-import { buildCharacterManifest, validateCharacterSet, isValidCharacterId, isValidGraphicId, characterGraphics } from '../../shared/engine/graphics.ts'
+import { buildCharacterManifest, validateCharacterSet, isValidCharacterId, isValidGraphicId, isGifGraphicId, graphicUrl, characterGraphics } from '../../shared/engine/graphics.ts'
 import { buildDatabaseManifest, validateDatabase as sharedValidateDatabase } from '../../shared/engine/database.ts'
 import { buildCommonManifest, findCommonCycles } from '../../shared/engine/common.ts'
 
-export { buildCommonManifest, findCommonCycles, buildDatabaseManifest, buildCharacterManifest, validateCharacterSet, isValidCharacterId, isValidGraphicId, characterGraphics }
+export { buildCommonManifest, findCommonCycles, buildDatabaseManifest, buildCharacterManifest, validateCharacterSet, isValidCharacterId, isValidGraphicId, isGifGraphicId, graphicUrl, characterGraphics }
 
 const unique = (list) => [...new Set(list)]
 const isObject = (v) => typeof v === 'object' && v !== null && !Array.isArray(v)

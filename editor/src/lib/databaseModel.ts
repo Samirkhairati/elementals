@@ -202,6 +202,6 @@ export function unusedGraphics(graphics: readonly GraphicInfo[], characters: Rec
 /** A graphic id to import under: `sprites/<characterId>/<file>` style default from a character id and a file name. */
 export function defaultGraphicId(characterId: string, fileName: string): string | null {
   const stem = fileName.replace(/\.[^.]+$/, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'image'
-  const id = `sprites/${characterId}/${stem}.png`
+  const id = `sprites/${characterId}/${stem}.${/\.gif$/i.test(fileName) ? 'gif' : 'png'}`
   return isValidGraphicId(id) ? id : null
 }

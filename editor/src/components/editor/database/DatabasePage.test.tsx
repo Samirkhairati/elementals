@@ -448,12 +448,12 @@ describe('Graphics', () => {
       expect(screen.getByTestId('import-target')).toHaveTextContent('Importing into props')
     })
 
-    it('reports files that are not PNGs instead of opening an empty import', async () => {
+    it('reports files that are not PNG or GIF images instead of opening an empty import', async () => {
       install({ getPathForFile: (f: File) => `/dropped/${f.name}` })
       renderAt('/database?table=graphics')
       const target = (await screen.findByRole('button', { name: /^props/ })).closest('section, li') as HTMLElement
       fireEvent.drop(target, { dataTransfer: { types: ['Files'], files: [new File(['x'], 'notes.txt', { type: 'text/plain' })] } })
-      expect(await screen.findByText('Only PNG images can be imported.')).toBeInTheDocument()
+      expect(await screen.findByText('Only PNG and GIF images can be imported.')).toBeInTheDocument()
       expect(screen.queryByRole('dialog')).toBeNull()
     })
 
@@ -502,6 +502,65 @@ describe('Graphics', () => {
       fireEvent.paste(document.body, clip([new File(['x'], 'notes.txt', { type: 'text/plain' })]))
       await new Promise((r) => setTimeout(r, 20))
       expect(screen.queryByRole('dialog')).toBeNull()
+    })
+
+    describe('GIF animations', () => {
+      const gifPick = () => Promise.resolve({ success: true, files: [{ sourcePath: '/tmp/boss.gif', defaultName: 'boss', ext: 'gif', previewUrl: PNG }, { sourcePath: '/tmp/rock.png', defaultName: 'rock', ext: 'png', previewUrl: PNG }] })
+
+      it('Graphics takes a GIF next to PNGs and keeps its extension in the id', async () => {
+        const imported: [string, string][] = []
+        install({
+          pickImageFiles: gifPick,
+          importGraphic: (src: string, id: string) => { imported.push([src, id]); return Promise.resolve({ success: true, graphic: graphic(id), image: PNG }) },
+        })
+        renderAt('/database?table=graphics')
+        fireEvent.click(await screen.findByRole('button', { name: /Import…/ }))
+        const dialog = await screen.findByRole('dialog')
+        expect(within(dialog).getByRole('heading', { name: 'Import 2 pictures' })).toBeInTheDocument()
+        expect(within(dialog).getByLabelText('Name for boss.gif')).toHaveValue('boss')
+        expect(within(dialog).getByText('.gif')).toBeInTheDocument()
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Import 2 pictures' }))
+        await waitFor(() => expect(imported).toEqual([['/tmp/boss.gif', 'boss.gif'], ['/tmp/rock.png', 'rock.png']]))
+      })
+
+      it('a GIF dropped from the OS is accepted by Graphics', async () => {
+        install({ getPathForFile: (f: File) => `/dropped/${f.name}` })
+        renderAt('/database?table=graphics')
+        const target = (await screen.findByRole('button', { name: /^props/ })).closest('section, li') as HTMLElement
+        fireEvent.drop(target, { dataTransfer: { types: ['Files'], files: [new File(['x'], 'flame.gif', { type: 'image/gif' })] } })
+        const dialog = await screen.findByRole('dialog')
+        expect(within(dialog).getByLabelText('Name for flame.gif')).toHaveValue('flame')
+      })
+
+      it('Tilesets leave GIFs out and say why', async () => {
+        install({ pickImageFiles: gifPick })
+        renderAt('/database?table=tilesets')
+        fireEvent.click(await screen.findByRole('button', { name: /Import…/ }))
+        const dialog = await screen.findByRole('dialog')
+        expect(within(dialog).getByRole('heading', { name: 'Import 1 tileset' })).toBeInTheDocument()
+        expect(within(dialog).queryByLabelText('Name for boss.gif')).toBeNull()
+        expect(await screen.findByText('1 GIF animation left out: they can only be imported into Graphics.')).toBeInTheDocument()
+      })
+
+      it('a GIF dropped on Tilesets is refused with the reason', async () => {
+        install({ getPathForFile: (f: File) => `/dropped/${f.name}` })
+        renderAt('/database?table=tilesets')
+        const root = await screen.findByTestId('import-target')
+        const zone = root.closest('div')!.parentElement!.querySelector('[class*="min-h-[50vh]"]') as HTMLElement
+        fireEvent.drop(zone, { dataTransfer: { types: ['Files'], files: [new File(['x'], 'flame.gif', { type: 'image/gif' })] } })
+        expect(await screen.findByText('GIF animations can only be imported into Graphics.')).toBeInTheDocument()
+        expect(screen.queryByRole('dialog')).toBeNull()
+      })
+
+      it('the detail of a GIF graphic shows its frames, its speed and a preview', async () => {
+        install({
+          getCharacters: () => Promise.resolve({ success: true, characters: [], images: { 'props/boss.gif': PNG }, folders: [], graphicFolders: ['props'], warnings: [], graphics: [{ ...graphic('props/boss.gif', 48, 24), gif: { frames: 3, frameWidth: 16, frameHeight: 24, delaysMs: [50, 50, 50] } }] }),
+        })
+        renderAt('/database?table=graphics&id=props/boss.gif')
+        const detail = await screen.findByTestId('graphic-detail')
+        expect(detail).toHaveTextContent('GIF · 3 frames of 16×24 px · about 20 fps')
+        expect(within(detail).getByTestId('gif-preview')).toBeInTheDocument()
+      })
     })
 
     describe('a whole folder', () => {

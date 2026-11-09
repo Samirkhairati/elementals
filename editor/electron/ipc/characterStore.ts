@@ -4,6 +4,7 @@ import { atomicWriteJsonSync } from './atomicWrite.js';
 import { createFolder, deleteFolder, pathExists, renameFolder, walkTree, type ListWarning } from './folderOps.js';
 import { resolveInside, resolveStrictlyInside } from './pathSafety.js';
 import { assertPngFile, readPngSizeFromFile } from './pngHeader.js';
+import { decodeGif } from './gif.js';
 import { TilesetCache } from './tilesetCache.js';
 
 /**
@@ -19,7 +20,7 @@ import { TilesetCache } from './tilesetCache.js';
 export type ImageCache = TilesetCache;
 
 const SEGMENT = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
-const FILE = /^[a-zA-Z0-9][a-zA-Z0-9_-]*\.png$/i;
+const FILE = /^[a-zA-Z0-9][a-zA-Z0-9_-]*\.(png|gif)$/i;
 
 export function isValidCharacterId(id: unknown): id is string {
   return typeof id === 'string' && id !== '' && id.split('/').every((p) => SEGMENT.test(p));
@@ -45,10 +46,46 @@ export interface CharacterInfo {
 
 export interface GraphicInfo {
   id: string;
+  /** Size of the picture the game loads: the file's own size, or for a GIF the sheet of its frames (shared/gifSheet.ts). */
   width: number;
   height: number;
   bytes: number;
   mtimeMs: number;
+  /** Set for a GIF graphic. */
+  gif?: { frames: number; frameWidth: number; frameHeight: number; delaysMs: number[] };
+}
+
+/** Everything the listing and the import answers say about one graphic file (a GIF is decoded once per change, see TilesetCache). */
+export function graphicInfo(file: string, id: string, cache: ImageCache): GraphicInfo {
+  const stat = fs.statSync(file);
+  if (/\.gif$/i.test(id)) {
+    const sheet = cache.getGifSheet(file);
+    return {
+      id,
+      width: sheet.width,
+      height: sheet.height,
+      bytes: stat.size,
+      mtimeMs: stat.mtimeMs,
+      gif: { frames: sheet.frames, frameWidth: sheet.frameWidth, frameHeight: sheet.frameHeight, delaysMs: sheet.delaysMs },
+    };
+  }
+  const { width, height } = readPngSizeFromFile(file);
+  return { id, width, height, bytes: stat.size, mtimeMs: stat.mtimeMs };
+}
+
+/**
+ * Makes sure `sourcePath` is an absolute path to a picture of the kind the graphic `id` is (.png for a PNG, .gif for a
+ * GIF) that can be read: a PNG by its header, a GIF by decoding it (so a broken or oversized one is refused up front).
+ */
+export function assertGraphicSource(sourcePath: unknown, id: string, what: string): void {
+  if (/\.gif$/i.test(id)) {
+    if (typeof sourcePath !== 'string' || sourcePath.includes('\0') || !path.isAbsolute(sourcePath)) throw new Error(`${what} source must be an absolute file path`);
+    if (path.extname(sourcePath).toLowerCase() !== '.gif') throw new Error(`${what} source must be a .gif file`);
+    if (!fs.statSync(sourcePath).isFile()) throw new Error(`${what} source is not a regular file`);
+    decodeGif(fs.readFileSync(sourcePath));
+    return;
+  }
+  assertPngFile(sourcePath, what);
 }
 
 export interface CharacterListing {
@@ -105,20 +142,23 @@ export function listGraphicFolders(graphicsDir: string): string[] {
 }
 
 /** Lists graphics (id, size) below project/graphics. */
-export function listGraphics(graphicsDir: string, warnings: ListWarning[] = []): GraphicInfo[] {
+export function listGraphics(graphicsDir: string, warnings: ListWarning[] = [], cache: ImageCache = new TilesetCache()): GraphicInfo[] {
   const graphics: GraphicInfo[] = [];
   walkTree(
     graphicsDir,
     ({ name, fullPath, folderPath }) => {
-      if (!name.toLowerCase().endsWith('.png')) return;
+      if (!/\.(png|gif)$/i.test(name)) return;
       const id = toId(folderPath ? path.join(folderPath, name) : name);
       if (!isValidGraphicId(id)) {
-        warnings.push({ file: id, error: `"${id}" is not a valid graphic id (letters, digits, "_" and "-", ending in .png)` });
+        warnings.push({ file: id, error: `"${id}" is not a valid graphic id (letters, digits, "_" and "-", ending in .png or .gif)` });
         return;
       }
-      const stat = fs.statSync(fullPath);
-      const { width, height } = readPngSizeFromFile(fullPath);
-      graphics.push({ id, width, height, bytes: stat.size, mtimeMs: stat.mtimeMs });
+      try {
+        graphics.push(graphicInfo(fullPath, id, cache));
+      } catch (e) {
+        // an unreadable GIF is reported, not fatal: the rest of the library still lists
+        warnings.push({ file: id, error: e instanceof Error ? e.message : String(e) });
+      }
     },
     warnings,
   );
@@ -146,7 +186,7 @@ export function listCharacters(roots: CharacterRoots, cache: ImageCache): Charac
     warnings,
   );
   characters.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-  const graphics = listGraphics(roots.graphicsDir, warnings);
+  const graphics = listGraphics(roots.graphicsDir, warnings, cache);
   // keep cached images of unused graphics too (the Graphics table shows them); only forget deleted files
   const images: Record<string, string> = {};
   for (const g of graphics) {
@@ -197,17 +237,13 @@ export function renameCharacter(roots: CharacterRoots, id: string, newId: string
 
 /** Copies an image into the library under `graphicId`. Refuses to overwrite. */
 export function importGraphic(graphicsDir: string, cache: ImageCache, sourcePath: string, graphicId: string): { graphic: GraphicInfo; image: string } {
-  if (!isValidGraphicId(graphicId)) throw new Error('Graphic id must be a "/"-separated path of letters, digits, "_" and "-" ending in .png');
-  const size = assertPngFile(sourcePath, 'Graphic');
+  if (!isValidGraphicId(graphicId)) throw new Error('Graphic id must be a "/"-separated path of letters, digits, "_" and "-" ending in .png or .gif');
+  assertGraphicSource(sourcePath, graphicId, 'Graphic');
   const target = resolveStrictlyInside(graphicsDir, [graphicId]);
   if (pathExists(target)) throw new Error(`A graphic with id "${graphicId}" already exists`);
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.copyFileSync(sourcePath, target, fs.constants.COPYFILE_EXCL);
-  const stat = fs.statSync(target);
-  return {
-    graphic: { id: graphicId, width: size.width, height: size.height, bytes: stat.size, mtimeMs: stat.mtimeMs },
-    image: cache.getDataUrl(target),
-  };
+  return { graphic: graphicInfo(target, graphicId, cache), image: cache.getDataUrl(target) };
 }
 
 // ── folders (directories below project/database/characters) ─────────────────────────────────────

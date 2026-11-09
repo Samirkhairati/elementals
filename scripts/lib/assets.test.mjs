@@ -16,6 +16,8 @@ import {
 } from './assets.mjs'
 import { buildCharacterManifest } from './assets-validate.mjs'
 import { makePng, makeTmpDir, snapshot, writeJson } from './test-helpers.mjs'
+import { encodeGif } from '../../shared/fixtures/gifEncode.ts'
+import { readPngSize } from '../../shared/png.ts'
 
 const SCRIPT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'sync-assets.mjs')
 
@@ -516,5 +518,82 @@ describe('common events', () => {
     assert.match(text, /common\/x\.json: id "y" does not match/)
     assert.match(text, /common\/p\.json: .*loop/)
     assert.match(text, /common\/q\.json: .*loop/)
+  })
+})
+
+describe('GIF graphics', () => {
+  const PALETTE = [[255, 0, 0], [0, 255, 0], [0, 0, 255], [255, 255, 255]]
+  /** A GIF of `n` frames of 4x3 px. */
+  const gifOf = (n) => Buffer.from(encodeGif({ width: 4, height: 3, palette: PALETTE, frames: Array.from({ length: n }, (_, i) => ({ indices: new Array(12).fill(i % 4), delayCs: 5 })) }))
+  const bossDef = (over = {}) => ({
+    version: 2, name: 'Boss', tags: [], facing: 'none', pivot: { x: 0.5, y: 1 },
+    sheets: { idle: cut('sprites/boss/idle.gif', 4, 3) },
+    clips: { idle: { sheet: 'idle', fps: 10, loop: true, directional: false, frames: [0, 1, 2] } },
+    bindings: { idle: 'idle' },
+    still: { sheet: 'idle', frame: 0 },
+    ...over,
+  })
+  function bossProject() {
+    const sb = sandbox()
+    sb.character('boss', bossDef())
+    const file = path.join(sb.projectDir, 'graphics', 'sprites/boss/idle.gif')
+    fs.mkdirSync(path.dirname(file), { recursive: true })
+    fs.writeFileSync(file, gifOf(3))
+    return sb
+  }
+
+  test('a character that uses a GIF gets the PNG sheet of its frames, and the manifest points at it', () => {
+    const sb = bossProject()
+    const result = sb.sync()
+    assert.deepEqual(result.plan.errors, [])
+    const sheet = fs.readFileSync(path.join(sb.publicDir, 'graphics/sprites/boss/idle.gif.png'))
+    assert.deepEqual(readPngSize(sheet), { width: 12, height: 3 })
+    assert.equal(fs.existsSync(path.join(sb.publicDir, 'graphics/sprites/boss/idle.gif')), false) // the game never gets the GIF
+    const manifest = sb.json('data/characters.json')
+    assert.equal(manifest.characters[0].files.idle, 'graphics/sprites/boss/idle.gif.png')
+    assert.equal(manifest.characters[0].def.sheets.idle.image, 'sprites/boss/idle.gif')
+  })
+
+  test('is stable: a second run changes nothing, and the sheet follows the GIF', () => {
+    const sb = bossProject()
+    sb.sync()
+    assert.equal(syncAssets({ projectDir: sb.projectDir, publicDir: sb.publicDir }).drift.length, 0)
+    fs.writeFileSync(path.join(sb.projectDir, 'graphics', 'sprites/boss/idle.gif'), gifOf(2))
+    sb.character('boss', bossDef({ clips: { idle: { sheet: 'idle', fps: 10, loop: true, directional: false, frames: [0, 1] } } }))
+    const again = sb.sync()
+    assert.deepEqual(again.plan.errors, [])
+    assert.deepEqual(readPngSize(fs.readFileSync(path.join(sb.publicDir, 'graphics/sprites/boss/idle.gif.png'))), { width: 8, height: 3 })
+  })
+
+  test('frames are checked against the sheet: a clip past the last frame of the GIF is a warning', () => {
+    const sb = bossProject()
+    sb.character('boss', bossDef({ clips: { idle: { sheet: 'idle', fps: 10, loop: true, directional: false, frames: [0, 1, 2, 3] } } }))
+    const result = sb.sync()
+    assert.deepEqual(result.plan.errors, [])
+    assert.ok(result.plan.warnings.some((w) => /frame 3 but "idle" has 3 frames/.test(w)), result.plan.warnings.join('\n'))
+  })
+
+  test('a GIF that cannot be decoded is an error that names the graphic', () => {
+    const sb = bossProject()
+    fs.writeFileSync(path.join(sb.projectDir, 'graphics', 'sprites/boss/idle.gif'), 'GIF89a nope')
+    const result = syncAssets({ projectDir: sb.projectDir, publicDir: sb.publicDir })
+    assert.ok(result.plan.errors.some((e) => e.includes('sprites/boss/idle.gif')), result.plan.errors.join('\n'))
+  })
+
+  test('removing the character removes the generated sheet', () => {
+    const sb = bossProject()
+    sb.sync()
+    fs.rmSync(path.join(sb.projectDir, 'database', 'characters', 'boss.json'))
+    const result = sb.sync()
+    assert.ok(result.applied.some((a) => a.status === STATUS.STALE && a.rel === 'graphics/sprites/boss/idle.gif.png'))
+    assert.equal(fs.existsSync(path.join(sb.publicDir, 'graphics/sprites/boss/idle.gif.png')), false)
+  })
+
+  test('a GIF placed as a picture on an image layer is reported and not copied', () => {
+    const sb = bossProject()
+    writeJson(path.join(sb.projectDir, 'maps', 'm.json'), { name: 'm', width: 2, height: 2, layers: [{ id: 'i', type: 'image', images: [{ id: 'p', graphicId: 'sprites/boss/idle.gif', x: 0, y: 0 }] }] })
+    const { pictures, warnings } = loadMapPictures(sb.projectDir)
+    assert.deepEqual(pictures, {})
+    assert.match(warnings[0], /GIF animation/)
   })
 })
