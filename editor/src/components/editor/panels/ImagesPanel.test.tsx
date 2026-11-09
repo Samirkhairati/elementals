@@ -30,6 +30,10 @@ function setup(images: any[], extra: Record<string, unknown> = {}, layerOver: Re
     duplicateImage: vi.fn(),
     reorderImage: vi.fn(),
     moveImageTo: vi.fn(),
+    setResizingImageId: vi.fn(),
+    createImageGroup: vi.fn(() => 'new-group'),
+    setImagesGroup: vi.fn(),
+    deleteImageGroup: vi.fn(),
   }
   const layer = { id: 'i1', name: 'Sky', type: 'image', visible: true, locked: false, images, ...layerOver }
   renderWithEditor(<ImagesPanel />, {
@@ -281,19 +285,29 @@ describe('ImagesPanel', () => {
       expect(screen.getByRole('button', { name: 'Crop image' }).getAttribute('title')).toMatch(/\(C\)/)
     })
 
-    it('Resize applies a new scale to that picture only', () => {
+    it('Resize turns the handles on the map on for that picture (no dialog); pressed again it turns them off', () => {
       const f = setup(items, { selectedImageId: 'a' })
       fireEvent.click(screen.getByRole('button', { name: 'Resize image' }))
-      const dialog = screen.getByRole('dialog')
-      fireEvent.click(within(dialog).getByRole('button', { name: 'Scale ×2' }))
-      fireEvent.click(within(dialog).getByRole('button', { name: /Resize/ }))
-      expect(f.updateImage).toHaveBeenCalledWith('i1', 'a', { scale: 2 })
+      expect(f.setResizingImageId).toHaveBeenLastCalledWith('a')
+      expect(screen.queryByRole('dialog')).toBeNull()
     })
 
-    it('Ctrl+T opens Resize and C opens Crop for the picked picture', () => {
-      setup(items, { selectedImageId: 'a' })
+    it('while resizing the button reads Done, and Done, Enter or Esc ends it', () => {
+      const f = setup(items, { selectedImageId: 'a', resizingImageId: 'a' })
+      const button = screen.getByRole('button', { name: 'Resize image' })
+      expect(button).toHaveAttribute('aria-pressed', 'true')
+      expect(button.textContent).toContain('Done')
+      fireEvent.click(button)
+      expect(f.setResizingImageId).toHaveBeenLastCalledWith(null)
+      f.setResizingImageId.mockClear()
+      key('Escape')
+      expect(f.setResizingImageId).toHaveBeenCalledWith(null)
+    })
+
+    it('Ctrl+T turns the resize handles on for the picked picture', () => {
+      const f = setup(items, { selectedImageId: 'a' })
       key('t', { ctrlKey: true })
-      expect(screen.getByRole('dialog', { name: 'Resize picture' })).toBeTruthy()
+      expect(f.setResizingImageId).toHaveBeenCalledWith('a')
     })
 
     it('C opens the crop dialog', () => {
@@ -303,18 +317,20 @@ describe('ImagesPanel', () => {
     })
 
     it('the shortcuts and buttons are off on a locked layer, without a picked picture, and while typing', () => {
-      setup(items, { selectedImageId: 'a' }, { locked: true })
+      const f = setup(items, { selectedImageId: 'a' }, { locked: true })
       expect(screen.getByRole('button', { name: 'Resize image' })).toBeDisabled()
       key('t', { ctrlKey: true })
       key('c')
       expect(screen.queryByRole('dialog')).toBeNull()
+      expect(f.setResizingImageId).not.toHaveBeenCalled()
     })
 
     it('nothing happens with no picked picture', () => {
-      setup(items)
+      const f = setup(items)
       key('t', { ctrlKey: true })
       key('c')
       expect(screen.queryByRole('dialog')).toBeNull()
+      expect(f.setResizingImageId).not.toHaveBeenCalled()
     })
   })
 
@@ -367,49 +383,80 @@ describe('ImagesPanel', () => {
       expect(f.setImageGroupLocked).toHaveBeenCalledWith('i1', 'g1', false)
     })
 
-    it('rename, duplicate, ungroup and delete act on the group', () => {
+    const menuItem = (name: RegExp | string) => screen.getByRole('menuitem', { name })
+
+    it('rename, duplicate and delete act on the group from its row; Ungroup is in its right-click menu', () => {
       const f = withGroup()
       const row = groupRow()
+      expect(within(row).queryByRole('button', { name: 'Ungroup Dam wall' })).toBeNull()
       fireEvent.click(within(row).getByRole('button', { name: 'Duplicate Dam wall' }))
       expect(f.duplicateImages).toHaveBeenCalledWith('i1', ['b', 'a'])
-      fireEvent.click(within(row).getByRole('button', { name: 'Ungroup Dam wall' }))
-      expect(f.ungroupImageGroup).toHaveBeenCalledWith('i1', 'g1')
       fireEvent.click(within(row).getByRole('button', { name: 'Delete Dam wall' }))
-      expect(f.deleteImages).toHaveBeenCalledWith('i1', ['b', 'a'])
-      fireEvent.click(within(row).getByRole('button', { name: 'Rename Dam wall' }))
+      expect(f.deleteImageGroup).toHaveBeenCalledWith('i1', 'g1')
+      fireEvent.contextMenu(row)
+      fireEvent.click(menuItem(/^Ungroup/))
+      expect(f.ungroupImageGroup).toHaveBeenCalledWith('i1', 'g1')
+      fireEvent.click(within(groupRow()).getByRole('button', { name: 'Rename Dam wall' }))
       const input = screen.getByLabelText('Group name') as HTMLInputElement
       fireEvent.change(input, { target: { value: 'Wall' } })
       fireEvent.keyDown(input, { key: 'Enter' })
       expect(f.renameImageGroup).toHaveBeenCalledWith('i1', 'g1', 'Wall')
     })
 
-    it('Group needs two picked pictures; Ungroup needs a group to act on', () => {
-      const none = withGroup()
-      expect(screen.getByRole('button', { name: 'Group pictures' })).toBeDisabled()
-      expect(screen.getByRole('button', { name: 'Ungroup pictures' })).toBeDisabled()
-      expect(none.groupPickedImages).not.toHaveBeenCalled()
+    it('there are no Group / Ungroup buttons in the header', () => {
+      withGroup()
+      expect(screen.queryByRole('button', { name: 'Group pictures' })).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Ungroup pictures' })).toBeNull()
     })
 
-    it('with two pictures picked, the Group button and Ctrl+G group them; Ctrl+Shift+G ungroups the picked picture\'s group', () => {
-      const f = setup(items, { pickedImageIds: ['a', 'b'], selectedImageId: 'a' })
-      fireEvent.click(screen.getByRole('button', { name: 'Group pictures' }))
-      expect(f.groupPickedImages).toHaveBeenCalledWith('i1')
+    it('right-clicking the list makes a new empty group and opens its name', () => {
+      const f = setup(items)
+      fireEvent.contextMenu(screen.getByTestId('image-list-area'))
+      fireEvent.click(menuItem('New group'))
+      expect(f.createImageGroup).toHaveBeenCalledWith('i1', [])
+    })
+
+    it('an empty group is listed, says so, and takes a picture dragged onto it', () => {
+      const f = setup(grouped, {}, { groups: [{ id: 'g1', name: 'Dam wall' }, { id: 'e', name: 'Empty one' }] })
+      expect(screen.getByTestId('empty-group')).toBeTruthy()
+      const empty = screen.getByText('Empty one').closest('.ed-row') as HTMLElement
+      const loose = screen.getByText('Loose').closest('.ed-row') as HTMLElement
+      const dataTransfer = { setData: vi.fn(), effectAllowed: '', dropEffect: '' }
+      fireEvent.dragStart(loose, { dataTransfer })
+      fireEvent.dragOver(empty, { dataTransfer })
+      fireEvent.drop(empty, { dataTransfer })
+      expect(f.setImagesGroup).toHaveBeenCalledWith('i1', ['c'], 'e')
+    })
+
+    it('a picture row\'s menu groups it, moves it to another group, or takes it out of its group', () => {
+      const f = setup(grouped, {}, { groups: [{ id: 'g1', name: 'Dam wall' }, { id: 'g2', name: 'Roof' }] })
+      const left = () => screen.getByText('Left').closest('.ed-row') as HTMLElement
+      fireEvent.contextMenu(left())
+      fireEvent.click(menuItem(/Take out of group/))
+      expect(f.setImagesGroup).toHaveBeenCalledWith('i1', ['a'], null)
+      fireEvent.contextMenu(left())
+      fireEvent.click(menuItem(/Group this picture/))
+      expect(f.createImageGroup).toHaveBeenCalledWith('i1', ['a'])
+      fireEvent.contextMenu(screen.getByText('Loose').closest('.ed-row') as HTMLElement)
+      expect(screen.queryByRole('menuitem', { name: /Take out of group/ })).toBeNull()
+      expect(menuItem(/Move to group/)).toBeTruthy()
+    })
+
+    it('Ctrl+G groups the picked pictures (one is enough); Ctrl+Shift+G ungroups the picked picture\'s group', () => {
+      const f = withGroup({ selectedImageId: 'c', pickedImageIds: ['c'] })
       fireEvent.keyDown(window, { key: 'g', ctrlKey: true })
-      expect(f.groupPickedImages).toHaveBeenCalledTimes(2)
-    })
-
-    it('Ungroup acts on the open group, or the group of the picked picture', () => {
-      const f = withGroup({ selectedImageId: 'a', pickedImageIds: ['a'] })
-      fireEvent.click(screen.getByRole('button', { name: 'Ungroup pictures' }))
-      expect(f.ungroupImageGroup).toHaveBeenCalledWith('i1', 'g1')
+      expect(f.groupPickedImages).toHaveBeenCalledWith('i1')
+      const g = withGroup({ selectedImageId: 'a', pickedImageIds: ['a'] })
       fireEvent.keyDown(window, { key: 'G', ctrlKey: true, shiftKey: true })
-      expect(f.ungroupImageGroup).toHaveBeenCalledTimes(2)
+      expect(g.ungroupImageGroup).toHaveBeenCalledWith('i1', 'g1')
     })
 
     it('everything about groups is off on a locked layer', () => {
       withGroup({}, {}, { locked: true })
       expect(within(groupRow()).getByRole('button', { name: 'Lock Dam wall' })).toBeDisabled()
-      expect(within(groupRow()).getByRole('button', { name: 'Ungroup Dam wall' })).toBeDisabled()
+      expect(within(groupRow()).getByRole('button', { name: 'Delete Dam wall' })).toBeDisabled()
+      fireEvent.contextMenu(groupRow())
+      expect(menuItem(/^Ungroup/)).toHaveAttribute('data-disabled')
     })
   })
 })

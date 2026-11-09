@@ -79,12 +79,17 @@ export interface EditorBaseContextValue
       | 'startImagePlacement'
       | 'cancelImagePlacement'
       | 'selectedImageId'
+      | 'resizingImageId'
+      | 'setResizingImageId'
       | 'setSelectedImageId'
       | 'pickedImageIds'
       | 'selectImage'
       | 'openImageGroupId'
       | 'selectImageGroup'
       | 'groupPickedImages'
+      | 'createImageGroup'
+      | 'setImagesGroup'
+      | 'deleteImageGroup'
       | 'ungroupImageGroup'
       | 'renameImageGroup'
       | 'setImageGroupLocked'
@@ -173,6 +178,10 @@ export interface EditorBaseContextValue
   selectLayer: (layerId: string, additive?: boolean | 'range') => void
   handleCreateLayerOfType: (type: LayerType, folderId?: string) => void
   handleDuplicateLayer: (id: string) => void
+  /** Copy tile / image layers and folders (with what they hold) to the editor clipboard. */
+  copyLayers: (ids: readonly string[]) => void
+  /** Paste copied layers next to `afterId`, at its depth (in its folder). */
+  pasteLayers: (afterId: string | null) => void
   toggleFolderCollapsed: (id: string) => void
 
   // Entities

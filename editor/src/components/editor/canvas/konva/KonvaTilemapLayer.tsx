@@ -42,9 +42,9 @@ export const KonvaTilemapLayer = React.memo(function KonvaTilemapLayer({
           sceneFunc={(context) => {
             const ctx = context._context as CanvasRenderingContext2D
             for (const item of sortedImages(layer.images)) {
-              const resolved = resolveImageItem(item, spriteAssets)
-              if (!resolved) continue
               const drag = dragRef?.current
+              const resolved = resolveImageItem(drag && drag.id === item.id && drag.scale !== undefined ? { ...item, scale: drag.scale } : item, spriteAssets)
+              if (!resolved) continue
               // The dragged picture is at the mouse, and the rest of a dragged group moves by the same amount.
               const at = drag && drag.id === item.id ? drag : drag?.along?.ids.includes(item.id) ? { x: item.x + drag.along.dx, y: item.y + drag.along.dy } : item
               drawResolvedSprite(ctx, resolved, {

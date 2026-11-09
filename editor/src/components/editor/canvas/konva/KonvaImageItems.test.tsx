@@ -101,14 +101,14 @@ describe('KonvaImageItems', () => {
       return { props, handle, t }
     }
 
-    it('keeps the other coordinate where Shift went down, and shows two guide lines along the edges', () => {
+    it('keeps the picture in the row or column it started from, and shows two guide lines along the edges', () => {
       const { handle, t } = start()
-      move(handle, t, [100, 100], true)
-      expect([t.x(), t.y()]).toEqual([100, 100])
+      move(handle, t, [100, 40], true)
+      expect([t.x(), t.y()]).toEqual([100, 32])
       move(handle, t, [160, 108], true)
-      expect([t.x(), t.y()]).toEqual([160, 100])
+      expect([t.x(), t.y()]).toEqual([160, 32])
       move(handle, t, [20, 300], true)
-      expect([t.x(), t.y()]).toEqual([20, 100])
+      expect([t.x(), t.y()]).toEqual([20, 32])
       const lines = recorded.filter((r) => r.kind === 'Line')
       expect(lines.length).toBeGreaterThanOrEqual(2)
       const last = lines.slice(-2).map((l) => l.props.points)
@@ -119,7 +119,7 @@ describe('KonvaImageItems', () => {
 
     it('lets go of the lock when Shift is released, and the drop lands where the last move put it', () => {
       const { props, handle, t } = start()
-      move(handle, t, [100, 100], true)
+      move(handle, t, [100, 40], true)
       move(handle, t, [160, 108], true)
       move(handle, t, [170, 140], false)
       expect([t.x(), t.y()]).toEqual([170, 140])
@@ -160,6 +160,46 @@ describe('KonvaImageItems', () => {
       act(() => solo.props.onDragEnd({ cancelBubble: false, target: t, evt: {} }))
       expect(props.moveImage).toHaveBeenCalledWith('A', 'solo', 210, 200)
       expect(moveImages).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('resize handles (Images panel › Resize)', () => {
+    const asset = { id: 'graphic:a.png', meta: { version: 1, name: 'a', kind: 'object', frameWidth: 32, frameHeight: 16, margin: 0, spacing: 0, pivotX: 0.5, pivotY: 1 }, sheets: { 'a.png': '' } }
+    const layer = () => imageLayer('A', { images: [{ id: 'A-1', graphicId: 'a.png', x: 100, y: 200, z: 0 }] })
+    const resizeHandles = () => recorded.filter((r) => r.kind === 'Shape' && r.props.name === 'resize-handle').slice(-4)
+
+    it('show only for the picture being resized', () => {
+      renderItems({ layer: layer(), spriteAssets: { 'graphic:a.png': asset }, selectedImageId: 'A-1', resizeImage: vi.fn() })
+      expect(resizeHandles()).toHaveLength(0)
+      renderItems({ layer: layer(), spriteAssets: { 'graphic:a.png': asset }, selectedImageId: 'A-1', resizingImageId: 'A-1', resizeImage: vi.fn() })
+      expect(resizeHandles().map((h) => [h.props.corner, h.props.x, h.props.y])).toEqual([
+        ['nw', 84, 184],
+        ['ne', 116, 184],
+        ['sw', 84, 200],
+        ['se', 116, 200],
+      ])
+    })
+
+    it('dragging a corner scales the picture with the opposite corner fixed, applied once when let go', () => {
+      const dragRef = { current: null as any }
+      const resizeImage = vi.fn()
+      renderItems({ layer: layer(), spriteAssets: { 'graphic:a.png': asset }, selectedImageId: 'A-1', resizingImageId: 'A-1', resizeImage, dragRef })
+      const se = resizeHandles().find((h) => h.props.corner === 'se')!
+      const t = { _x: 148, _y: 216, x() { return this._x }, y() { return this._y }, position(p: { x: number; y: number }) { this._x = p.x; this._y = p.y } }
+      act(() => se.props.onDragStart({ cancelBubble: false, target: t }))
+      act(() => se.props.onDragMove({ cancelBubble: false, target: t }))
+      expect(dragRef.current).toEqual({ id: 'A-1', scale: 2, x: 116, y: 216 })
+      expect(resizeImage).not.toHaveBeenCalled()
+      act(() => se.props.onDragEnd({ cancelBubble: false, target: t }))
+      expect(resizeImage).toHaveBeenCalledWith('A', 'A-1', { scale: 2, x: 116, y: 216 })
+      expect(dragRef.current).toBeNull()
+    })
+
+    it('a mouse-down on a handle does not reach the canvas', () => {
+      renderItems({ layer: layer(), spriteAssets: { 'graphic:a.png': asset }, selectedImageId: 'A-1', resizingImageId: 'A-1', resizeImage: vi.fn() })
+      const e = { cancelBubble: false }
+      resizeHandles()[0].props.onMouseDown(e)
+      expect(e.cancelBubble).toBe(true)
     })
   })
 })

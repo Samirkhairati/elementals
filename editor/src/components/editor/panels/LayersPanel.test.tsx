@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { useEditorClipboard } from '@/store/editorClipboard'
 import { makeLayer } from '@/test/helpers'
 import { LayersPanel } from './LayersPanel'
 
@@ -204,6 +205,32 @@ describe('LayersPanel', () => {
       fireEvent.click(await screen.findByText('New Layer inside'))
       fireEvent.click(await screen.findByText('Image Layer'))
       expect(props.createLayerOfType).toHaveBeenCalledWith('image', 'F')
+    })
+
+    it('a folder can be copied, duplicated and pasted into from its menu', () => {
+      useEditorClipboard.getState().set(null)
+      const { props } = renderPanel({ layers: folderLayers(), copyLayers: vi.fn(), pasteLayers: vi.fn() })
+      fireEvent.contextMenu(screen.getByTestId('folder-row'))
+      expect(screen.getByRole('menuitem', { name: /Paste inside/ })).toHaveAttribute('data-disabled')
+      fireEvent.click(screen.getByRole('menuitem', { name: /^Copy/ }))
+      expect(props.copyLayers).toHaveBeenCalledWith(['F'])
+      act(() => useEditorClipboard.getState().set({ kind: 'layers', layers: [] }))
+      fireEvent.contextMenu(screen.getByTestId('folder-row'))
+      fireEvent.click(screen.getByRole('menuitem', { name: /Paste inside/ }))
+      expect(props.pasteLayers).toHaveBeenCalledWith('F')
+      fireEvent.contextMenu(screen.getByTestId('folder-row'))
+      fireEvent.click(screen.getByRole('menuitem', { name: /Duplicate/ }))
+      expect(props.duplicateLayer).toHaveBeenCalledWith('F')
+    })
+
+    it('Copy on a selected layer copies the whole selection; on another layer just that one', () => {
+      const { props } = renderPanel({ layers: folderLayers(), activeLayerId: 'a', selectedLayerIds: ['c'], copyLayers: vi.fn() })
+      fireEvent.contextMenu(screen.getByText('Loose'))
+      fireEvent.click(screen.getByRole('menuitem', { name: /^Copy/ }))
+      expect(props.copyLayers).toHaveBeenLastCalledWith(['a', 'c'])
+      fireEvent.contextMenu(screen.getByText('Trees'))
+      fireEvent.click(screen.getByRole('menuitem', { name: /^Copy/ }))
+      expect(props.copyLayers).toHaveBeenLastCalledWith(['b'])
     })
 
     it('a loose tile layer can be moved into a folder from its menu', async () => {

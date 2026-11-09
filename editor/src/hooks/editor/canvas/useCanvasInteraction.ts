@@ -81,6 +81,12 @@ export function pictureHandleId(node: NodeLike | null): string | null {
   return null
 }
 
+/** The Shift lock to continue from: the current one, or (Shift just went down) one that starts at the last placed picture, so the next one lines up with it. */
+function lockToContinue(lock: AxisLock | null, lastPlaced: { x: number; y: number } | null, shift: boolean): AxisLock | null {
+  if (!shift || lock || !lastPlaced) return lock
+  return { originX: lastPlaced.x, originY: lastPlaced.y, axis: null }
+}
+
 export function useCanvasInteraction({
   activeMap,
   layers,
@@ -128,6 +134,11 @@ export function useCanvasInteraction({
   /** Placing a picture with Shift held: where Shift went down and which axis the pointer chose (see lib/axisLock). */
   const placementLockRef = useRef<AxisLock | null>(null)
   const [placementAxis, setPlacementAxis] = useState<Axis | null>(null)
+  /** Where the last picture of this placement went: a new Shift lock starts there, so the next one lines up with it. */
+  const lastPlacedRef = useRef<{ x: number; y: number } | null>(null)
+  useEffect(() => {
+    if (!pendingImage) lastPlacedRef.current = null
+  }, [pendingImage])
   const [contextMenuState, setContextMenuState] = useState<CanvasContextMenuState>({
     isOpen: false,
     x: 0,
@@ -407,9 +418,10 @@ export function useCanvasInteraction({
             const stage = stageRef?.current
             const scale = stage?.scaleX() || 1
             const raw = p && stage ? { x: (p.x - stage.x()) / scale, y: (p.y - stage.y()) / scale } : { x: coords.rawX * 32 + 16, y: coords.rawY * 32 + 32 }
-            const world = e.evt.shiftKey ? applyAxisLock(placementLockRef.current, true, raw.x, raw.y) : raw
+            const world = e.evt.shiftKey ? applyAxisLock(lockToContinue(placementLockRef.current, lastPlacedRef.current, true), true, raw.x, raw.y) : raw
             const at = snapToGrid ? snapPicture(flippedItemBounds(pendingImage, spriteAssets ?? {}, true), world.x, world.y) : { x: Math.round(world.x), y: Math.round(world.y) }
             commitImagePlacement?.(at.x, at.y)
+            lastPlacedRef.current = at
           } else {
             clearImageSelection?.()
           }
@@ -479,7 +491,7 @@ export function useCanvasInteraction({
           const scale = stageRef.current.scaleX() || 1
           let world = { x: (p.x - stageRef.current.x()) / scale, y: (p.y - stageRef.current.y()) / scale }
           if (pendingImage) {
-            const locked = applyAxisLock(placementLockRef.current, e.evt.shiftKey, world.x, world.y)
+            const locked = applyAxisLock(lockToContinue(placementLockRef.current, lastPlacedRef.current, e.evt.shiftKey), e.evt.shiftKey, world.x, world.y)
             placementLockRef.current = locked.lock
             setPlacementAxis(locked.lock?.axis ?? null)
             world = { x: locked.x, y: locked.y }

@@ -118,3 +118,58 @@ export function visibleStack(layers: Layer[], entitiesIndex: number | undefined)
 export function setFolderFlag(layers: Layer[], folderId: string, flag: 'visible' | 'locked', value: boolean): Layer[] {
   return layers.map((l) => (l.id === folderId || l.folderId === folderId ? (l[flag] === value ? l : { ...l, [flag]: value }) : l))
 }
+
+/** What copying (or duplicating) `ids` takes, in list order: the tile and image layers picked, and each folder picked with every layer it holds. */
+export function layersToCopy(layers: Layer[], ids: readonly string[]): Layer[] {
+  const picked = new Set(ids)
+  return layers.filter((l) => (picked.has(l.id) && (canHoldInFolder(l) || isFolder(l))) || (l.folderId !== undefined && picked.has(l.folderId) && canHoldInFolder(l)))
+}
+
+/**
+ * Copies of `source` (new ids, "Name Copy", tiles and pictures cloned) put in the list next to `afterId`, at its depth:
+ * - only layers, `afterId` a layer: right below it, in its folder (or at the top level when it has none);
+ * - only layers, `afterId` a folder: inside that folder, at its top;
+ * - folders among them (folders do not nest): below the whole folder of `afterId` (or below `afterId`), at the top level.
+ * A copied folder keeps its copied layers. Without `afterId` the copies go to the bottom of the list.
+ * Returns the new list, where the copies start and how many there are, and the id of the last copy.
+ */
+export function placeLayerCopies(
+  layers: Layer[],
+  source: readonly Layer[],
+  afterId: string | null,
+  newId: () => string
+): { layers: Layer[]; at: number; count: number; lastId: string | null } {
+  if (source.length === 0) return { layers, at: -1, count: 0, lastId: null }
+  const target = afterId ? layers.find((l) => l.id === afterId) : undefined
+  const withFolders = source.some(isFolder)
+  // the folder the copies go into (undefined = top level), and the row they go below
+  let folderId: string | undefined
+  let below = target ? layers.indexOf(target) : layers.length - 1
+  if (target && !withFolders) folderId = isFolder(target) ? target.id : target.folderId
+  else if (target) {
+    const block = isFolder(target) ? target.id : target.folderId
+    if (block !== undefined) below = layers.reduce((at, l, i) => (l.id === block || l.folderId === block ? i : at), below)
+  }
+
+  const ids = new Map(source.map((l) => [l.id, newId()]))
+  const taken = new Set(layers.map((l) => l.name))
+  const copies = source.map((layer) => {
+    let name = `${layer.name} Copy`
+    for (let n = 2; taken.has(name); n++) name = `${layer.name} Copy ${n}`
+    taken.add(name)
+    const { folderId: own, ...rest } = layer
+    const inFolder = own !== undefined && ids.has(own) && !isFolder(layer) ? (ids.get(own) as string) : canHoldInFolder(layer) && !withFolders ? folderId : undefined
+    return {
+      ...rest,
+      id: ids.get(layer.id) as string,
+      name,
+      ...(inFolder !== undefined ? { folderId: inFolder } : {}),
+      data: layer.data ? JSON.parse(JSON.stringify(layer.data)) : undefined,
+      images: layer.images?.map((img) => ({ ...img, id: newId() })),
+    } as Layer
+  })
+  const at = below + 1
+  const next = layers.slice()
+  next.splice(at, 0, ...copies)
+  return { layers: next, at, count: copies.length, lastId: copies[copies.length - 1].id }
+}

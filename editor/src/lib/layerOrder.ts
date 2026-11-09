@@ -85,9 +85,9 @@ export function moveInStack(
 }
 
 /** Entities position after a layer was inserted at list index `at`: layers above the row keep it where it was. */
-export function entitiesIndexAfterInsert(entitiesIndex: number | undefined, at: number, layerCountBefore: number): number {
+export function entitiesIndexAfterInsert(entitiesIndex: number | undefined, at: number, layerCountBefore: number, count = 1): number {
   const k = clampEntitiesIndex(entitiesIndex, layerCountBefore)
-  return at < k ? k + 1 : k
+  return at < k ? k + count : k
 }
 
 /** Entities position after the layer at list index `at` was removed. */

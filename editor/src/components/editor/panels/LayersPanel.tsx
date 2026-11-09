@@ -12,6 +12,8 @@ import {
   Edit2,
   Trash2,
   Copy,
+  CopyPlus,
+  ClipboardPaste,
   Plus,
   Image as ImageIcon,
   Images as ImagesIcon,
@@ -24,7 +26,8 @@ import {
 } from 'lucide-react'
 import { Layer, LayerType } from '@/types/editor'
 import { ENTITIES_ID } from '@/lib/layerOrder'
-import { canHoldInFolder, moveInList, setLayerFolder, visibleStack } from '@/lib/layerFolders'
+import { canHoldInFolder, isFolder, moveInList, setLayerFolder, visibleStack } from '@/lib/layerFolders'
+import { useEditorClipboard } from '@/store/editorClipboard'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -172,6 +175,12 @@ interface LayersPanelProps {
   createLayerOfType: (type: LayerType, folderId?: string) => void
   renameLayer: (id: string, newName: string) => void
   duplicateLayer: (id: string) => void
+  /** Copy layers and folders (a folder with what it holds) to the editor clipboard. */
+  copyLayers?: (ids: readonly string[]) => void
+  /** Paste copied layers next to a layer, in its folder (onto a folder row: inside it). */
+  pasteLayers?: (afterId: string | null) => void
+  /** The shortcuts to show beside Copy / Paste / Duplicate. */
+  editKeys?: { copy?: string; paste?: string; duplicate?: string }
   /** Opens or closes a folder row (a view change, not an undo step). */
   toggleFolderCollapsed?: (id: string) => void
   /** The layer just made by New layer / New folder (a new `n` each time): its name opens for typing. */
@@ -206,6 +215,9 @@ export function LayersPanel({
   createLayerOfType,
   renameLayer,
   duplicateLayer,
+  copyLayers,
+  pasteLayers,
+  editKeys = {},
   toggleFolderCollapsed,
   justCreatedLayer = null,
   newLayerKeys,
@@ -217,6 +229,7 @@ export function LayersPanel({
     id: string
     position: 'top' | 'bottom'
   } | null>(null)
+  const canPasteLayers = useEditorClipboard((s) => s.content?.kind === 'layers')
   const [editingLayerId, setEditingLayerId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -305,6 +318,12 @@ export function LayersPanel({
         action: () => deleteLayer(layer.id),
       })
     }, 0)
+  }
+
+  // Copy from a row that is part of the selection takes the whole selection; any other row is copied alone.
+  const copyFromRow = (layer: Layer) => {
+    const picked = [activeLayerId, ...selectedLayerIds].filter((id): id is string => !!id)
+    copyLayers?.(picked.includes(layer.id) ? picked : [layer.id])
   }
 
   const stack = visibleStack(layers, entitiesIndex)
@@ -519,10 +538,28 @@ export function LayersPanel({
                     New Folder
                     {newFolderKeys && <ContextMenuShortcut>{newFolderKeys}</ContextMenuShortcut>}
                   </ContextMenuItem>
-                  {!isFolderRow && (
-                    <ContextMenuItem onClick={() => duplicateLayer(layer.id)}>
-                      <Copy className="w-3.5 h-3.5 mr-2" />
-                      Duplicate
+                  {(isFolder(layer) || canHoldInFolder(layer)) && (
+                    <>
+                      <ContextMenuSeparator />
+                      {copyLayers && (
+                        <ContextMenuItem onClick={() => copyFromRow(layer)}>
+                          <Copy className="w-3.5 h-3.5 mr-2" />
+                          Copy
+                          {editKeys.copy && <ContextMenuShortcut>{editKeys.copy}</ContextMenuShortcut>}
+                        </ContextMenuItem>
+                      )}
+                      <ContextMenuItem onClick={() => duplicateLayer(layer.id)}>
+                        <CopyPlus className="w-3.5 h-3.5 mr-2" />
+                        Duplicate
+                        {editKeys.duplicate && <ContextMenuShortcut>{editKeys.duplicate}</ContextMenuShortcut>}
+                      </ContextMenuItem>
+                    </>
+                  )}
+                  {pasteLayers && (
+                    <ContextMenuItem disabled={!canPasteLayers} onClick={() => pasteLayers(layer.id)} title={isFolderRow ? 'Pastes into this folder (a copied folder goes below it)' : 'Pastes below this layer, in the same folder'}>
+                      <ClipboardPaste className="w-3.5 h-3.5 mr-2" />
+                      {isFolderRow ? 'Paste inside' : 'Paste'}
+                      {editKeys.paste && <ContextMenuShortcut>{editKeys.paste}</ContextMenuShortcut>}
                     </ContextMenuItem>
                   )}
                   {canHoldInFolder(layer) && (folders.length > 0 || held) && (

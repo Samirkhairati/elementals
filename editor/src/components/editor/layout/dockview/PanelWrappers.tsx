@@ -99,6 +99,8 @@ const selectLayers = (c: EditorContextValue) => ({
   handleCreateLayerOfType: c.handleCreateLayerOfType,
   handleRenameLayer: c.handleRenameLayer,
   handleDuplicateLayer: c.handleDuplicateLayer,
+  copyLayers: c.copyLayers,
+  pasteLayers: c.pasteLayers,
   toggleFolderCollapsed: c.toggleFolderCollapsed,
   setConfirmDialog: c.setConfirmDialog,
 });
@@ -133,6 +135,9 @@ export function LayersWrapper(_props: IDockviewPanelProps) {
         createLayerOfType={ctx.handleCreateLayerOfType}
         renameLayer={ctx.handleRenameLayer}
         duplicateLayer={ctx.handleDuplicateLayer}
+        copyLayers={ctx.copyLayers}
+        pasteLayers={ctx.pasteLayers}
+        editKeys={{ copy: describeBindings('edit.copy', bindings), paste: describeBindings('edit.paste', bindings), duplicate: describeBindings('edit.duplicate', bindings) }}
         toggleFolderCollapsed={ctx.toggleFolderCollapsed}
         setConfirmDialog={ctx.setConfirmDialog}
       />
@@ -308,6 +313,7 @@ const selectCanvas = (c: EditorContextValue) => ({
   pickedImageIds: c.pickedImageIds,
   selectImage: c.selectImage,
   moveImages: c.moveImages,
+  resizingImageId: c.resizingImageId,
   placeMultiple: c.placeMultiple,
   setActiveLayerId: c.setActiveLayerId,
   addImage: c.addImage,
@@ -348,6 +354,10 @@ export function CanvasWrapper(props: IDockviewPanelProps) {
   );
   const moveImage = useCallback(
     (layerId: string, imageId: string, x: number, y: number) => updateImage(layerId, imageId, { x, y }),
+    [updateImage]
+  );
+  const resizeImage = useCallback(
+    (layerId: string, imageId: string, change: { scale: number; x: number; y: number }) => updateImage(layerId, imageId, change),
     [updateImage]
   );
 
@@ -413,6 +423,8 @@ export function CanvasWrapper(props: IDockviewPanelProps) {
         placeMultipleKeys={placeKeys}
         activateLayer={isActive ? ctx.setActiveLayerId : noop}
         moveImage={isActive ? moveImage : noop}
+        resizingImageId={isActive ? ctx.resizingImageId : null}
+        resizeImage={isActive ? resizeImage : noop}
       />
     </div>
   );

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Layer, LayerType } from '@/types/editor'
-import { moveInList, normalizeFolders, setFolderFlag, setLayerFolder, visibleStack, withoutFolders } from './layerFolders'
+import { layersToCopy, moveInList, normalizeFolders, placeLayerCopies, setFolderFlag, setLayerFolder, visibleStack, withoutFolders } from './layerFolders'
 import { ENTITIES_ID } from './layerOrder'
 
 const L = (id: string, type: LayerType = 'tile', extra: Partial<Layer> = {}): Layer => ({ id, name: id, type, visible: true, locked: false, ...extra })
@@ -68,5 +68,55 @@ describe('layerFolders', () => {
     const layers = [L('F', 'folder'), L('x', 'tile', { folderId: 'F' }), L('z')]
     const next = setFolderFlag(layers, 'F', 'visible', false)
     expect(next.map((l) => l.visible)).toEqual([false, false, true])
+  })
+})
+
+describe('copying and pasting layers', () => {
+  const counter = () => {
+    let n = 0
+    return () => `new${++n}`
+  }
+  const list = () => [L('a'), L('F', 'folder'), L('b', 'tile', { folderId: 'F' }), L('c', 'image', { folderId: 'F', images: [{ id: 'p', x: 0, y: 0, z: 0 }] }), L('d'), L('col', 'collision')]
+
+  it('copying a folder takes the layers it holds; gameplay layers are left out', () => {
+    expect(ids(layersToCopy(list(), ['F', 'col']))).toEqual(['F', 'b', 'c'])
+    expect(ids(layersToCopy(list(), ['d', 'b']))).toEqual(['b', 'd'])
+  })
+
+  it('a layer pasted next to a layer of a folder goes right below it, in that folder', () => {
+    const layers = list()
+    const r = placeLayerCopies(layers, [layers[2]], 'b', counter())
+    expect(ids(r.layers)).toEqual(['a', 'F', 'b', 'new1', 'c', 'd', 'col'])
+    expect(r.layers[3]).toMatchObject({ name: 'b Copy', folderId: 'F' })
+    expect(r).toMatchObject({ at: 3, count: 1, lastId: 'new1' })
+  })
+
+  it('a layer pasted next to a loose layer stays loose; pasted on a folder row it goes in at the top', () => {
+    const layers = list()
+    const loose = placeLayerCopies(layers, [layers[2]], 'a', counter())
+    expect(ids(loose.layers)).toEqual(['a', 'new1', 'F', 'b', 'c', 'd', 'col'])
+    expect(loose.layers[1].folderId).toBeUndefined()
+    const inside = placeLayerCopies(layers, [layers[0]], 'F', counter())
+    expect(ids(inside.layers)).toEqual(['a', 'F', 'new1', 'b', 'c', 'd', 'col'])
+    expect(inside.layers[2].folderId).toBe('F')
+  })
+
+  it('a folder is pasted with copies of its layers, below the whole folder it was pasted on', () => {
+    const layers = list()
+    const r = placeLayerCopies(layers, layersToCopy(layers, ['F']), 'b', counter())
+    expect(ids(r.layers)).toEqual(['a', 'F', 'b', 'c', 'new1', 'new2', 'new3', 'd', 'col'])
+    expect(r.layers[4]).toMatchObject({ type: 'folder', name: 'F Copy' })
+    expect(r.layers[4].folderId).toBeUndefined()
+    expect(r.layers[5].folderId).toBe('new1')
+    expect(r.layers[6].folderId).toBe('new1')
+    // pictures get their own ids
+    expect(r.layers[6].images![0].id).not.toBe('p')
+    expect(normalizeFolders(r.layers, 0).layers).toBe(r.layers)
+  })
+
+  it('names do not clash, and without a target the copies go to the bottom', () => {
+    const layers = [L('a'), L('a Copy')]
+    const r = placeLayerCopies(layers, [layers[0]], null, counter())
+    expect(r.layers.map((l) => l.name)).toEqual(['a', 'a Copy', 'a Copy 2'])
   })
 })
