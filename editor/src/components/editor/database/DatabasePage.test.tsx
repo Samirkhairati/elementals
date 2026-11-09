@@ -504,6 +504,68 @@ describe('Graphics', () => {
       expect(screen.queryByRole('dialog')).toBeNull()
     })
 
+    describe('a whole folder', () => {
+      const folderPick = (...files: [string, string][]) => () => Promise.resolve({ success: true, skipped: 0, truncated: false, files: files.map(([dir, name]) => ({ sourcePath: `/pick/${dir}/${name}.png`, dir, defaultName: name, previewUrl: PNG })) })
+
+      it('Import folder… keeps the folders of the chosen one under the folder clicked last', async () => {
+        const imported: string[] = []
+        install({
+          pickImageFolder: folderPick(['Trees', 'oak'], ['Trees/old oak', 'elm'], ['Trees/old oak', 'oak']),
+          importGraphic: (_src: string, id: string) => { imported.push(id); return Promise.resolve({ success: true, graphic: graphic(id), image: PNG }) },
+        })
+        renderAt('/database?table=graphics')
+        fireEvent.click(await screen.findByRole('button', { name: /^props/ }))
+        fireEvent.click(screen.getByRole('button', { name: /Import folder…/ }))
+        const dialog = await screen.findByRole('dialog')
+        expect(within(dialog).getByRole('heading', { name: 'Import 3 pictures' })).toBeInTheDocument()
+        // the same name in two folders is fine; both sit under the destination
+        expect(within(dialog).queryByText('Used twice in this import.')).toBeNull()
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Import 3 pictures' }))
+        await waitFor(() => expect(imported).toEqual(['props/Trees/oak.png', 'props/Trees/old-oak/elm.png', 'props/Trees/old-oak/oak.png']))
+      })
+
+      it('still catches a name that clashes inside one folder, or with a picture already in it', async () => {
+        install({ pickImageFolder: folderPick(['Stuff', 'rock'], ['Stuff', 'Rock'], ['props', 'chest']) })
+        renderAt('/database?table=graphics')
+        fireEvent.click(await screen.findByRole('button', { name: /Import folder…/ }))
+        const dialog = await screen.findByRole('dialog')
+        expect(within(dialog).getAllByText('Used twice in this import.')).toHaveLength(2)
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Leave out Rock.png' }))
+        // Stuff/ is new but props/chest.png exists, so the name has to change
+        expect(within(dialog).getByText('Already exists here.')).toBeInTheDocument()
+        expect(within(dialog).getByRole('button', { name: 'Import 2 pictures' })).toBeDisabled()
+        fireEvent.change(within(dialog).getByLabelText('Name for chest.png'), { target: { value: 'chest-2' } })
+        expect(within(dialog).getByRole('button', { name: 'Import 2 pictures' })).toBeEnabled()
+      })
+
+      it('says when a folder has no pictures', async () => {
+        install({ pickImageFolder: () => Promise.resolve({ success: false, error: 'That folder has no PNG images in it.' }) })
+        renderAt('/database?table=graphics')
+        fireEvent.click(await screen.findByRole('button', { name: /Import folder…/ }))
+        expect(await screen.findByRole('alert')).toHaveTextContent('no PNG images')
+      })
+
+      it('dropping a folder from the OS imports everything in it with its structure', async () => {
+        const imported: string[] = []
+        install({
+          getPathForFile: (f: File) => `/dropped/${f.name}`,
+          importGraphic: (_src: string, id: string) => { imported.push(id); return Promise.resolve({ success: true, graphic: graphic(id), image: PNG }) },
+        })
+        renderAt('/database?table=graphics')
+        const target = (await screen.findByRole('button', { name: /^props/ })).closest('section, li') as HTMLElement
+        const png = (name: string) => new File(['x'], name, { type: name.endsWith('.png') ? 'image/png' : 'text/plain' })
+        const file = (name: string) => ({ name, isFile: true, isDirectory: false, file: (ok: (f: File) => void) => ok(png(name)) })
+        const dir = (name: string, children: unknown[]) => ({ name, isFile: false, isDirectory: true, createReader: () => { let done = false; return { readEntries: (ok: (e: unknown[]) => void) => { const b = done ? [] : children; done = true; ok(b) } } } })
+        const tree = dir('My Rocks', [file('big.png'), dir('small', [file('pebble.png')]), file('readme.txt')])
+        fireEvent.drop(target, { dataTransfer: { files: [], types: ['Files'], items: [{ kind: 'file', webkitGetAsEntry: () => tree }] } })
+        const dialog = await screen.findByRole('dialog')
+        expect(within(dialog).getByRole('heading', { name: 'Import 2 pictures' })).toBeInTheDocument()
+        expect(within(dialog).getByLabelText('Destination folder')).toHaveValue('props')
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Import 2 pictures' }))
+        await waitFor(() => expect(imported).toEqual(['props/My-Rocks/big.png', 'props/My-Rocks/small/pebble.png']))
+      })
+    })
+
     it('keeps the files that failed in the dialog with the reason', async () => {
       install({
         pickImageFiles: picked('a', 'b'),
@@ -550,6 +612,24 @@ describe('Tilesets', () => {
     fireEvent.change(within(dialog).getByLabelText('Name for IMG_1.png'), { target: { value: 'forest' } })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Import 2 tilesets' }))
     await waitFor(() => expect(imported).toEqual([['/tmp/IMG_1.png', 'forest', null, 'forest'], ['/tmp/grass.png', 'grass-2', null, 'grass-2']]))
+  })
+
+  it('Import folder… files tilesets into the same folders, and a name has to be free in every folder', async () => {
+    const imported: unknown[][] = []
+    install({
+      pickImageFolder: () => Promise.resolve({ success: true, skipped: 0, truncated: false, files: [
+        { sourcePath: '/p/a.png', dir: 'Town', defaultName: 'roofs', previewUrl: PNG },
+        { sourcePath: '/p/b.png', dir: 'Town/old', defaultName: 'roofs', previewUrl: PNG },
+      ] }),
+      importTileset: (...args: unknown[]) => { imported.push(args); return Promise.resolve({ success: true, tileset: { name: String(args[1]), fileName: `${String(args[3])}.png`, folderPath: args[2], dataUrl: PNG } }) },
+    })
+    renderAt('/database?table=tilesets')
+    fireEvent.click(await screen.findByRole('button', { name: /Import folder…/ }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getAllByText('Used twice in this import.')).toHaveLength(2)
+    fireEvent.change(within(dialog).getAllByRole('textbox', { name: /^Name for/ })[1], { target: { value: 'roofs-old' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Import 2 tilesets' }))
+    await waitFor(() => expect(imported).toEqual([['/p/a.png', 'roofs', 'Town', 'roofs'], ['/p/b.png', 'roofs-old', 'Town/old', 'roofs-old']]))
   })
 
   it('a tileset shows the maps that paint with it, and the viewer has the tile grid', async () => {

@@ -4,7 +4,8 @@
 import { useMemo, useState } from 'react'
 import { X } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { checkNames } from '@/lib/importNames'
+import { joinDirs } from '@/lib/assetOps'
+import { checkRowNames } from '@/lib/importNames'
 import { EdButton } from '../ui/controls'
 import { ImageThumb } from './browse'
 import { defaultRowNames, type Candidate, type ImportResult, type Importer } from './importFlow'
@@ -32,22 +33,26 @@ export function ImportDialog(props: Props) {
 function ImportBody({ candidates, importer, folder: startFolder, onClose, onImported }: Props) {
   const { noun } = importer
   const [rows, setRows] = useState(() => {
-    const names = defaultRowNames(candidates, noun, importer.taken(startFolder))
+    const names = defaultRowNames(candidates, noun, (dir) => importer.taken(joinDirs(startFolder, dir)), importer.flat)
     return candidates.map((c, i) => ({ c, name: names[i] }))
   })
   const [folder, setFolder] = useState(startFolder)
   const [busy, setBusy] = useState(false)
   const [failures, setFailures] = useState<Record<string, string>>({})
 
-  const taken = useMemo(() => importer.taken(folder), [importer, folder])
-  const problems = checkNames(rows.map((r) => r.name), taken)
+  // Files that came out of an imported folder keep its structure below the destination, so what is taken is per folder.
+  const problems = useMemo(
+    () => checkRowNames(rows.map((r) => ({ dir: r.c.dir ?? '', name: r.name })), (dir) => importer.taken(joinDirs(folder, dir)), importer.flat),
+    [rows, importer, folder]
+  )
+  const nested = rows.filter((r) => r.c.dir).length
   const blocked = rows.length === 0 || problems.some(Boolean) || busy
   const plural = rows.length === 1 ? noun : `${noun}s`
   const folders = ['', ...importer.folders]
 
   const submit = async () => {
     setBusy(true)
-    const result = await importer.run(rows.map((r) => ({ path: r.c.path, name: r.name })), folder)
+    const result = await importer.run(rows.map((r) => ({ path: r.c.path, dir: r.c.dir ?? '', name: r.name })), folder)
     setBusy(false)
     if (result.failed.length === 0) {
       onImported(result, folder)
@@ -66,7 +71,7 @@ function ImportBody({ candidates, importer, folder: startFolder, onClose, onImpo
       <DialogHeader className="text-left">
         <DialogTitle>Import {rows.length} {plural}</DialogTitle>
         <DialogDescription id="import-dialog-desc" className="ed-hint">
-          Each one is filed under the name next to its preview. The file name is used by default; change it if you like.
+          Each one is filed under the name next to its preview. The file name is used by default; change it if you like.{nested > 0 && ' Pictures from a folder keep their folders under the destination.'}
         </DialogDescription>
       </DialogHeader>
 
@@ -85,6 +90,7 @@ function ImportBody({ candidates, importer, folder: startFolder, onClose, onImpo
               <ImageThumb url={r.c.preview} size={48} />
               <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <div className="flex items-center gap-1">
+                  {r.c.dir && <span className="ed-hint max-w-[40%] shrink-0 truncate" title={r.c.dir}>{r.c.dir}/</span>}
                   <input
                     className="ed-input"
                     aria-label={`Name for ${r.c.fileName}`}

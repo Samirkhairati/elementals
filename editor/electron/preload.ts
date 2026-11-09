@@ -31,6 +31,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getCharacters: () => ipcRenderer.invoke('get-characters'),
   pickSpriteFile: () => ipcRenderer.invoke('pick-sprite-file'),
   pickImageFiles: () => ipcRenderer.invoke('pick-image-files'),
+  pickImageFolder: () => ipcRenderer.invoke('pick-image-folder'),
   stageImage: (name: string, bytes: Uint8Array) => ipcRenderer.invoke('stage-image', name, bytes),
   saveCharacter: (id: string, def: unknown) => ipcRenderer.invoke('save-character', id, def),
   renameCharacter: (id: string, newId: string) => ipcRenderer.invoke('rename-character', id, newId),

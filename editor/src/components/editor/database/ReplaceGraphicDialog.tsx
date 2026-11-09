@@ -8,7 +8,7 @@ import { clipboardHasFiles, pastedPngs } from '@/lib/droppedFiles'
 import { EdButton, InfoTip } from '../ui/controls'
 import { ConfirmFooter } from '../dialogs/ConfirmParts'
 import { ImageThumb } from './browse'
-import { dropCandidates, pickCandidates, type Candidate } from './importFlow'
+import { dropCandidates, looseFiles, pickCandidates, type Candidate } from './importFlow'
 
 interface Props {
   id: string
@@ -44,7 +44,7 @@ function ReplaceBody({ id, current, onReplace, onClose }: Props) {
   pickedRef.current = picked
 
   const take = async (files: File[], pasted = false) => {
-    const r = await dropCandidates(files.slice(0, 1), { pasted })
+    const r = await dropCandidates(looseFiles(files.slice(0, 1)), { pasted })
     if (!r.ok) return setError(r.error)
     setError('')
     setSize(null)

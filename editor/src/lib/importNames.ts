@@ -25,3 +25,34 @@ export function checkNames(names: readonly string[], taken: ReadonlySet<string>)
     return ''
   })
 }
+
+/** One folder name of an imported folder made usable: `My Trees (old)` -> `My-Trees-old`; '' when nothing is left. */
+export const sanitizeSegment = (name: string): string => name.replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^[-_]+|-+$/g, '')
+
+/** The folder path of a file inside an imported folder (`Trees/old oak`) as a library path (`Trees/old-oak`); unusable parts are dropped. */
+export const sanitizeDir = (dir: string): string => dir.split('/').map(sanitizeSegment).filter(Boolean).join('/')
+
+export interface NamedRow {
+  /** Folder below the import destination ('' = the destination itself). */
+  dir: string
+  name: string
+}
+
+/**
+ * `checkNames` for a batch that spans folders: a name only clashes with the same name in the same folder
+ * (`takenIn(dir)` is what already exists there). `flat` libraries (tilesets: maps find a tileset by file name alone)
+ * need a name to be free everywhere, so rows are compared across folders.
+ */
+export function checkRowNames(rows: readonly NamedRow[], takenIn: (dir: string) => ReadonlySet<string>, flat = false): string[] {
+  const scope = (r: NamedRow) => (flat ? '' : r.dir)
+  const groups = new Map<string, number[]>()
+  rows.forEach((r, i) => groups.set(scope(r), [...(groups.get(scope(r)) ?? []), i]))
+  const out: string[] = new Array(rows.length).fill('')
+  for (const indexes of groups.values()) {
+    const taken = new Set<string>()
+    for (const i of indexes) takenIn(rows[i].dir).forEach((n) => taken.add(n))
+    const messages = checkNames(indexes.map((i) => rows[i].name), taken)
+    indexes.forEach((i, k) => { out[i] = messages[k] })
+  }
+  return out
+}

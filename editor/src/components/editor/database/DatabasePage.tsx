@@ -12,7 +12,7 @@ import { GraphicDetail, GraphicsBrowser, GraphicsToolbar } from './GraphicsTable
 import { MapDetail, MapsBrowser } from './MapsTable'
 import { TilesetDetail, TilesetsBrowser, TilesetsToolbar } from './TilesetsTable'
 import { ImportDialog } from './ImportDialog'
-import { dropCandidates, graphicImporter, pickCandidates, tilesetImporter, type Candidate, type ImportResult, type Importer } from './importFlow'
+import { dropCandidates, graphicImporter, looseFiles, pickCandidates, pickFolderCandidates, tilesetImporter, type Candidate, type ImportResult, type Importer } from './importFlow'
 import type { LibraryControls, TableProps } from './shared'
 
 const ICONS: Record<string, LucideIcon> = { Image, Grid3x3, PersonStanding, ToggleLeft, Map: MapIcon, MessageSquareText, Bug, Package, Zap }
@@ -93,14 +93,22 @@ export function DatabasePage() {
         if (r.ok) open(r.candidates, folder)
         else if (!r.canceled) setNote({ tableId: table.id, ok: false, text: r.error })
       },
-      dropFiles: async (files, into) => {
-        const r = await dropCandidates(files)
+      pickFolder: async () => {
+        const r = await pickFolderCandidates()
+        if (r.ok) {
+          open(r.candidates, folder)
+          const left = [r.skipped > 0 ? `${r.skipped} file${r.skipped === 1 ? '' : 's'} that are not PNGs were left out` : '', r.truncated ? 'the folder is too big to import in one go, so only the first part is listed' : ''].filter(Boolean)
+          if (left.length > 0) setNote({ tableId: table.id, ok: true, text: `${left.join('; ')}.` })
+        } else if (!r.canceled) setNote({ tableId: table.id, ok: false, text: r.error })
+      },
+      dropFiles: async (dropped, into) => {
+        const r = await dropCandidates(await dropped)
         if (!r.ok) return r.error ? setNote({ tableId: table.id, ok: false, text: r.error }) : undefined
         setFolders((cur) => ({ ...cur, [table.id]: into }))
         open(r.candidates, into)
       },
       pasteFiles: async (files, into) => {
-        const r = await dropCandidates(files, { pasted: true })
+        const r = await dropCandidates(looseFiles(files), { pasted: true })
         if (!r.ok) return r.error ? setNote({ tableId: table.id, ok: false, text: r.error }) : undefined
         open(r.candidates, into)
       },

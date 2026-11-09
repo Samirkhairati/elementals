@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clipboardHasFiles, pastedPngs } from './droppedFiles'
+import { clipboardHasFiles, pastedPngs, readDrop } from './droppedFiles'
 
 const png = (name = 'image.png') => new File(['x'], name, { type: 'image/png' })
 const clip = (files: File[], viaItems = false, types: string[] = ['Files']) =>
@@ -33,5 +33,40 @@ describe('clipboardHasFiles', () => {
     expect(clipboardHasFiles(clip([png()]))).toBe(true)
     expect(clipboardHasFiles(clip([], false, ['text/plain']))).toBe(false)
     expect(clipboardHasFiles(null)).toBe(false)
+  })
+})
+
+describe('readDrop', () => {
+  const file = (name: string) => new File(['x'], name, { type: 'image/png' })
+  const fileEntry = (name: string) => ({ name, isFile: true, isDirectory: false, file: (ok: (f: File) => void) => ok(file(name)) })
+  const dirEntry = (name: string, children: unknown[]) => ({
+    name,
+    isFile: false,
+    isDirectory: true,
+    // readEntries answers once with everything, then with nothing, as a real reader does
+    createReader: () => {
+      let done = false
+      return { readEntries: (ok: (e: unknown[]) => void) => { const batch = done ? [] : children; done = true; ok(batch) } }
+    },
+  })
+  const drop = (entries: unknown[], files: File[] = []) =>
+    ({ files, items: entries.map((e) => ({ kind: 'file', webkitGetAsEntry: () => e })) }) as unknown as DataTransfer
+
+  it('walks a dropped folder and keeps the structure, starting with the folder itself', async () => {
+    const tree = dirEntry('Trees', [fileEntry('oak.png'), dirEntry('autumn', [fileEntry('maple.png'), dirEntry('dark', [fileEntry('elm.png')])]), fileEntry('.DS_Store')])
+    const items = await readDrop(drop([tree]))
+    expect(items.map((i) => [i.dir, i.file.name])).toEqual([['Trees/autumn/dark', 'elm.png'], ['Trees/autumn', 'maple.png'], ['Trees', 'oak.png']])
+  })
+
+  it('keeps plain files as they are, next to folders', async () => {
+    const items = await readDrop(drop([fileEntry('a.png'), dirEntry('Rocks', [fileEntry('b.png')])]))
+    expect(items.map((i) => [i.dir, i.file.name])).toEqual([['', 'a.png'], ['Rocks', 'b.png']])
+  })
+
+  it('falls back to the file list without folder support', async () => {
+    const a = file('a.png')
+    const noEntries = { files: [a], items: [{ kind: 'file' }] } as unknown as DataTransfer
+    expect(await readDrop(noEntries)).toEqual([{ file: a, dir: '' }])
+    expect(await readDrop(null)).toEqual([])
   })
 })

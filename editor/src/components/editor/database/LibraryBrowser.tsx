@@ -6,7 +6,7 @@ import { useMemo, useRef, useState } from 'react'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { ChevronDown, ChevronRight, FolderPlus, Pencil, Trash2 } from 'lucide-react'
 import { canMoveFolder } from '@/lib/assetOps'
-import { isFileDrag } from '@/lib/droppedFiles'
+import { isFileDrag, readDrop } from '@/lib/droppedFiles'
 import { buildLibraryTree, type FolderNode, type LibraryItem } from '@/lib/libraryTree'
 import { Tile } from './browse'
 import type { ViewMode } from './browse'
@@ -90,7 +90,8 @@ export function LibraryBrowser({ items, folders, query, mode, selected, onSelect
       e.stopPropagation()
       setDropTarget(null)
       if (library && isFileDrag(e.dataTransfer)) {
-        library.dropFiles(Array.from(e.dataTransfer.files), target === '' ? library.folder : target)
+        // The entries of a dropped folder can only be read right now; the walk itself continues after the event.
+        library.dropFiles(readDrop(e.dataTransfer), target === '' ? library.folder : target)
         return
       }
       const drag = dragRef.current ?? readDrag(e)

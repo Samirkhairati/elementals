@@ -43,6 +43,8 @@ interface ElectronAPI {
   getCharacters: () => Promise<({ success: true; characters: CharacterInfo[]; graphics: GraphicInfo[]; images: Record<string, string>; folders: string[]; graphicFolders: string[]; warnings: { file: string; error: string }[] }) | IpcFailure>;
   /** Native multi-select picker for PNGs; every file carries a data/blob URL to preview it by (empty when too big). */
   pickImageFiles: () => Promise<({ success: true; files: { sourcePath: string; defaultName: string; previewUrl: string }[] }) | IpcFailure>;
+  /** Native folder picker: every PNG below the chosen folder (nested folders included), each with its folder (`Trees/oak`, starting at the chosen one). */
+  pickImageFolder: () => Promise<({ success: true; files: { sourcePath: string; dir: string; defaultName: string; previewUrl: string }[]; skipped: number; truncated: boolean }) | IpcFailure>;
   /** Writes a picture that only exists in memory (pasted) to a temp file and returns its path, so it can be imported. */
   stageImage: (name: string, bytes: Uint8Array) => Promise<({ success: true; sourcePath: string }) | IpcFailure>;
   pickSpriteFile: () => Promise<({ success: true; sourcePath: string; defaultName: string }) | IpcFailure>;

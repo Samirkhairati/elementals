@@ -2,7 +2,7 @@
 // what the last import did.
 
 import { useState } from 'react'
-import { FolderPlus, Upload, X } from 'lucide-react'
+import { FolderInput, FolderPlus, Upload, X } from 'lucide-react'
 import { EdButton, InfoTip } from '../ui/controls'
 import type { LibraryControls } from './shared'
 
@@ -12,6 +12,7 @@ export function LibraryToolbar({ library, info, newFolder }: { library?: Library
     <div className="flex flex-col gap-1 border-b border-border p-2">
       <div className="flex items-center gap-1">
         <EdButton size="sm" onClick={() => library?.pick()} disabled={!library}><Upload /> Import…</EdButton>
+        <EdButton size="sm" title="Import every picture in a folder, keeping its folders" onClick={() => library?.pickFolder()} disabled={!library}><FolderInput /> Import folder…</EdButton>
         <EdButton size="sm" title={library?.folder ? `Creates the folder inside ${library.folder} (the folder last clicked)` : 'Creates the folder at the top level'} onClick={() => setFolderOpen(true)}><FolderPlus /> New folder…</EdButton>
         <InfoTip>{info}</InfoTip>
       </div>

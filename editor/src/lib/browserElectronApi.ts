@@ -76,6 +76,31 @@ function pickPngs(): Promise<Result> {
   })
 }
 
+/** Stand-in for the native folder picker: a `webkitdirectory` input, then stage every PNG below the chosen folder. */
+function pickPngFolder(): Promise<Result> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.webkitdirectory = true
+    input.addEventListener('cancel', () => resolve({ success: false, canceled: true }))
+    input.addEventListener('change', async () => {
+      const all = Array.from(input.files ?? [])
+      const chosen = all.filter((f) => /\.png$/i.test(f.name) && !/(^|\/)\./.test(f.webkitRelativePath))
+      if (all.length === 0) return resolve({ success: false, canceled: true })
+      if (chosen.length === 0) return resolve({ success: false, error: 'That folder has no PNG images in it.' })
+      const files: { sourcePath: string; dir: string; defaultName: string; previewUrl: string }[] = []
+      for (const file of chosen) {
+        const staged = await stageUpload(file.name, new Uint8Array(await file.arrayBuffer()))
+        if (!staged.success || typeof staged.sourcePath !== 'string') return resolve({ success: false, error: String(staged.error ?? `Could not read ${file.name}`) })
+        const relative = file.webkitRelativePath || file.name
+        files.push({ sourcePath: staged.sourcePath, dir: relative.includes('/') ? relative.slice(0, relative.lastIndexOf('/')) : '', defaultName: file.name.replace(/\.[^.]+$/, ''), previewUrl: URL.createObjectURL(file) })
+      }
+      resolve({ success: true, files, skipped: all.length - chosen.length, truncated: false })
+    })
+    input.click()
+  })
+}
+
 function download(fileName: string, text: string): void {
   const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }))
   const link = document.createElement('a')
@@ -128,6 +153,7 @@ export function createBrowserElectronApi(): ElectronAPI {
     getCharacters: () => c('get-characters'),
     pickSpriteFile: () => pickPng(),
     pickImageFiles: () => pickPngs(),
+    pickImageFolder: () => pickPngFolder(),
     stageImage: (name: string, bytes: Uint8Array) => stageUpload(name, bytes),
     saveCharacter: (id: string, def: unknown) => c('save-character', id, def),
     renameCharacter: (id: string, newId: string) => c('rename-character', id, newId),

@@ -1,3 +1,4 @@
+import type { DroppedItem } from '@/lib/droppedFiles'
 import type { DatabaseData } from './useDatabaseData'
 import type { ViewMode } from './browse'
 
@@ -20,8 +21,10 @@ export interface LibraryControls {
   setFolder: (folder: string) => void
   /** Open the native picker (several files), then the import dialog. */
   pick: () => void
-  /** Files dropped from the OS onto `folder`: the import dialog opens for them. */
-  dropFiles: (files: File[], folder: string) => void
+  /** Open the native folder picker, then the import dialog with everything below the chosen folder (its folders are kept). */
+  pickFolder: () => void
+  /** What was dropped from the OS onto `folder` (files, or folders walked into files with their folders): the import dialog opens for them. */
+  dropFiles: (items: Promise<DroppedItem[]>, folder: string) => void
   /** Pictures pasted from the clipboard into `folder`: the same import dialog opens for them. */
   pasteFiles: (files: File[], folder: string) => void
   /** What the last import did, or why it failed. */
