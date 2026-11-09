@@ -94,6 +94,7 @@ const selectLayers = (c: EditorContextValue) => ({
   setSelectedEntityId: c.setSelectedEntityId,
   toggleLayerVisibility: c.toggleLayerVisibility,
   toggleLayerLock: c.toggleLayerLock,
+  setLayerYSort: c.setLayerYSort,
   handleDeleteLayer: c.handleDeleteLayer,
   handleReorderLayers: c.handleReorderLayers,
   handleCreateLayerOfType: c.handleCreateLayerOfType,
@@ -130,6 +131,7 @@ export function LayersWrapper(_props: IDockviewPanelProps) {
         setSelectedEntityId={ctx.setSelectedEntityId}
         toggleLayerVisibility={ctx.toggleLayerVisibility}
         toggleLayerLock={ctx.toggleLayerLock}
+        setLayerYSort={ctx.setLayerYSort}
         deleteLayer={ctx.handleDeleteLayer}
         reorderLayers={ctx.handleReorderLayers}
         createLayerOfType={ctx.handleCreateLayerOfType}

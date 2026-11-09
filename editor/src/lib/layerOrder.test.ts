@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { makeLayer } from '@/test/helpers'
 import {
   ENTITIES_ID,
+  moveBlockInDrawOrder,
   clampEntitiesIndex,
   entitiesIndexAfterInsert,
   entitiesIndexAfterRemove,
@@ -106,5 +107,35 @@ describe('moveInDrawOrder', () => {
     expect(moveInDrawOrder(images, 'b', 1)).toBe(images)
     expect(moveInDrawOrder(images, 'a', -1)).toBe(images)
     expect(moveInDrawOrder(images, 'zzz', 1)).toBe(images)
+  })
+})
+
+describe('moveBlockInDrawOrder', () => {
+  const img = (id: string, z?: number) => ({ id, ...(z === undefined ? {} : { z }) })
+  const order = (list: { id: string; z?: number }[]) => sortedImages(list).map((i) => i.id)
+
+  it('moves a block in front of a target, keeping its own order', () => {
+    const list = [img('a'), img('b'), img('c'), img('d')]
+    expect(order(moveBlockInDrawOrder(list, ['a', 'b'], ['c'], 'top'))).toEqual(['c', 'a', 'b', 'd'])
+    expect(order(moveBlockInDrawOrder(list, ['c', 'd'], ['a'], 'bottom'))).toEqual(['c', 'd', 'a', 'b'])
+  })
+
+  it('lands next to a whole target group: in front of its frontmost member, or behind its backmost one', () => {
+    const list = [img('a'), img('g1'), img('g2'), img('b')]
+    expect(order(moveBlockInDrawOrder(list, ['b'], ['g1', 'g2'], 'bottom'))).toEqual(['a', 'b', 'g1', 'g2'])
+    expect(order(moveBlockInDrawOrder(list, ['a'], ['g1', 'g2'], 'top'))).toEqual(['g1', 'g2', 'a', 'b'])
+  })
+
+  it('takes the z of the target so explicit z values still give the new order', () => {
+    const list = [img('a', 5), img('b', 1), img('c', 1)]
+    const moved = moveBlockInDrawOrder(list, ['a'], ['b'], 'bottom')
+    expect(order(moved)).toEqual(['a', 'b', 'c'])
+    expect(moved.find((i) => i.id === 'a')?.z).toBe(1)
+  })
+
+  it('returns the same list when nothing moves', () => {
+    const list = [img('a'), img('b')]
+    expect(moveBlockInDrawOrder(list, ['x'], ['a'], 'top')).toBe(list)
+    expect(moveBlockInDrawOrder(list, ['a'], ['a'], 'top')).toBe(list)
   })
 })

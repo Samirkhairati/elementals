@@ -286,4 +286,50 @@ describe('LayersPanel', () => {
       expect(screen.queryByRole('textbox')).toBeNull()
     })
   })
+
+  describe('y-sort', () => {
+    const folderLayers = (folderYSort?: boolean, layerYSort?: boolean) => [
+      makeLayer('f', { type: 'folder', name: 'Town', ...(folderYSort === undefined ? {} : { ySort: folderYSort }) }),
+      makeLayer('img', { type: 'image', name: 'Trees', folderId: 'f', ...(layerYSort === undefined ? {} : { ySort: layerYSort }) }),
+      makeLayer('ground', { name: 'Ground' }),
+    ]
+
+    it('an image layer turns it on from its menu and shows a Y badge', () => {
+      const setLayerYSort = vi.fn()
+      renderPanel({ setLayerYSort })
+      expect(within(rowOf('Trees')).queryByTestId('ysort-badge')).toBeNull()
+      fireEvent.contextMenu(rowOf('Trees'))
+      fireEvent.click(screen.getByRole('menuitem', { name: /Enable Y-sort/ }))
+      expect(setLayerYSort).toHaveBeenCalledWith('img', true)
+    })
+
+    it('a layer inside a y-sorted folder follows it and can turn it off for itself', () => {
+      const setLayerYSort = vi.fn()
+      renderPanel({ setLayerYSort, layers: folderLayers(true) })
+      expect(within(rowOf('Trees')).getByTestId('ysort-badge')).toBeTruthy()
+      fireEvent.contextMenu(rowOf('Trees'))
+      expect(screen.getByRole('menuitem', { name: /Disable Y-sort/ }).textContent).toMatch(/from folder/)
+      fireEvent.click(screen.getByRole('menuitem', { name: /Disable Y-sort/ }))
+      expect(setLayerYSort).toHaveBeenCalledWith('img', false)
+    })
+
+    it('turning an overridden layer back on clears its own setting, so it follows the folder again', () => {
+      const setLayerYSort = vi.fn()
+      renderPanel({ setLayerYSort, layers: folderLayers(true, false) })
+      fireEvent.contextMenu(rowOf('Trees'))
+      fireEvent.click(screen.getByRole('menuitem', { name: /Enable Y-sort/ }))
+      expect(setLayerYSort).toHaveBeenCalledWith('img', undefined)
+    })
+
+    it('tile layers cannot be y-sorted', () => {
+      renderPanel({ setLayerYSort: vi.fn() })
+      fireEvent.contextMenu(rowOf('Ground'))
+      expect(screen.getByRole('menuitem', { name: /Enable Y-sort/ })).toHaveAttribute('data-disabled')
+    })
+  })
+
+  it('an indented layer is narrower by its indent, so its buttons stay inside the panel', () => {
+    renderPanel({ layers: [makeLayer('f', { type: 'folder', name: 'Town' }), makeLayer('img', { type: 'image', name: 'Trees', folderId: 'f' })] })
+    expect(rowOf('Trees').classList.contains('ed-indent')).toBe(true)
+  })
 })

@@ -115,3 +115,25 @@ export function moveInDrawOrder<T extends { id: string; z?: number }>(images: T[
   next[ib] = a
   return next
 }
+
+/**
+ * `images` with the pictures `ids` (a group) moved as one block just in front of (`top`) or behind (`bottom`) the pictures
+ * `targetIds` (one picture, or the members of another group), keeping their own order. The moved pictures take the z of
+ * the target they land next to and sit beside it in the array, so ties (same z) still draw in the new order; nothing
+ * else changes. Returns `images` itself when there is nothing to move.
+ */
+export function moveBlockInDrawOrder<T extends { id: string; z?: number }>(images: T[], ids: readonly string[], targetIds: readonly string[], position: 'top' | 'bottom'): T[] {
+  const moving = new Set(ids)
+  const targets = new Set(targetIds.filter((id) => !moving.has(id)))
+  const sorted = sortedImages(images)
+  const block = sorted.filter((img) => moving.has(img.id))
+  const targetRows = sorted.filter((img) => targets.has(img.id))
+  if (block.length === 0 || targetRows.length === 0) return images
+  // In front of the frontmost target, or behind the backmost one.
+  const anchor = position === 'top' ? targetRows[targetRows.length - 1] : targetRows[0]
+  const z = anchor.z ?? 0
+  const rest = images.filter((img) => !moving.has(img.id))
+  const at = rest.indexOf(anchor) + (position === 'top' ? 1 : 0)
+  const placed = block.map((img) => ((img.z ?? 0) === z ? img : { ...img, z }))
+  return [...rest.slice(0, at), ...placed, ...rest.slice(at)]
+}

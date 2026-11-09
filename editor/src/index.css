@@ -254,6 +254,8 @@
   }
   .ed-indent {
     margin-left: 16px;
+    /* rows are w-full: without this an indented row runs 16px past the panel and its right-hand buttons touch the edge */
+    width: calc(100% - 16px);
   }
 
   /* Icon button: 24x24 hit target inside 28px rows */

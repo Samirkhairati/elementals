@@ -34,6 +34,8 @@ export interface ImageItem {
   opacity?: number
   /** The group of the layer's `groups` this picture belongs to (editor view only, not exported). */
   groupId?: string
+  /** Y-sorted among the characters (shared/ySort.ts); absent = follow the group / layer / folder. */
+  ySort?: boolean
 }
 
 /** A named set of the pictures of one image layer: they are picked, duplicated and moved together (editor view only, not exported). */
@@ -42,6 +44,8 @@ export interface ImageGroup {
   name: string
   /** Locked: clicking any member picks the whole group, until the group itself is the selected one. */
   locked?: boolean
+  /** Y-sort for members without their own setting; absent = follow the layer. */
+  ySort?: boolean
 }
 
 export interface Layer {
@@ -60,6 +64,8 @@ export interface Layer {
   folderId?: string
   /** `folder` layers only: shown closed in the list. */
   collapsed?: boolean
+  /** Image layers and folders: y-sort the pictures; absent = follow the folder, else off. */
+  ySort?: boolean
 }
 
 export interface CopiedTile {

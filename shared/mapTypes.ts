@@ -46,6 +46,8 @@ export interface EditorImageItem {
   opacity?: number
   /** The group of the layer's `groups` this item belongs to (editor view only, not exported). */
   groupId?: string
+  /** Y-sorted among the characters (see shared/ySort.ts); absent = follow the group / layer / folder. */
+  ySort?: boolean
 }
 
 /** A named set of the pictures of one image layer: they are picked, duplicated and moved together (editor view only, not exported). */
@@ -54,6 +56,8 @@ export interface EditorImageGroup {
   name: string
   /** Locked: clicking any member picks the whole group, until the group itself is the selected one. */
   locked?: boolean
+  /** Y-sort for the pictures of the group that have no setting of their own; absent = follow the layer. */
+  ySort?: boolean
 }
 
 export interface EditorLayer {
@@ -72,6 +76,8 @@ export interface EditorLayer {
   folderId?: string
   /** `folder` layers only: the folder is shown closed in the list. */
   collapsed?: boolean
+  /** Image layers and folders: y-sort the pictures (see shared/ySort.ts); absent = follow the folder, else off. */
+  ySort?: boolean
 }
 
 export interface EditorEntity {

@@ -287,3 +287,71 @@ describe('useLayerManager: Entities row position', () => {
     expect(onCommitHistory).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('useLayerManager: groups and y-sort', () => {
+  const grouped = () =>
+    setup([
+      makeLayer('I1', {
+        type: 'image',
+        name: 'Images',
+        images: [
+          { id: 'a', graphicId: 'p.png', x: 0, y: 0, groupId: 'g' },
+          { id: 'b', graphicId: 'p.png', x: 0, y: 0 },
+          { id: 'c', graphicId: 'p.png', x: 0, y: 0 },
+        ],
+        groups: [{ id: 'g', name: 'Group' }, { id: 'e', name: 'Empty' }],
+      }),
+    ])
+  const layer = (r: ReturnType<typeof grouped>['result']) => r.current.manager.layers.find((l) => l.id === 'I1')!
+
+  it('an empty group can be selected, and what is added next goes into the selected group', () => {
+    const { result } = grouped()
+    act(() => result.current.manager.selectImageGroup('I1', 'e'))
+    expect(result.current.manager.openImageGroupId).toBe('e')
+    expect(result.current.manager.pickedImageIds).toEqual([])
+    let id: string | null = null
+    act(() => {
+      id = result.current.manager.addImage('I1', { graphicId: 'p.png', x: 1, y: 2 })
+    })
+    expect(layer(result).images!.find((i) => i.id === id)?.groupId).toBe('e')
+    expect(result.current.manager.openImageGroupId).toBe('e')
+  })
+
+  it('without a selected group a new picture stays loose', () => {
+    const { result } = grouped()
+    let id: string | null = null
+    act(() => {
+      id = result.current.manager.addImage('I1', { graphicId: 'p.png', x: 1, y: 2 })
+    })
+    expect(layer(result).images!.find((i) => i.id === id)?.groupId).toBeUndefined()
+  })
+
+  it('moves a whole group in the draw order in one step', () => {
+    const { result, onCommitHistory } = grouped()
+    onCommitHistory.mockClear()
+    act(() => result.current.manager.moveImageGroupTo('I1', 'g', { kind: 'item', id: 'c' }, 'top'))
+    expect(sortedImages(layer(result).images).map((i) => i.id)).toEqual(['b', 'c', 'a'])
+    expect(onCommitHistory).toHaveBeenCalledTimes(1)
+  })
+
+  it('dropping a picture beside a group row leaves it loose', () => {
+    const { result } = grouped()
+    act(() => result.current.manager.moveImageTo('I1', 'c', 'a', 'bottom', null))
+    expect(layer(result).images!.find((i) => i.id === 'c')?.groupId).toBeUndefined()
+    expect(sortedImages(layer(result).images).map((i) => i.id)).toEqual(['c', 'a', 'b'])
+  })
+
+  it('sets and clears y-sort on layers, groups and pictures', () => {
+    const { result } = grouped()
+    act(() => result.current.manager.setLayerYSort('I1', true))
+    expect(layer(result).ySort).toBe(true)
+    act(() => result.current.manager.setImageGroupYSort('I1', 'g', false))
+    expect(layer(result).groups!.find((g) => g.id === 'g')?.ySort).toBe(false)
+    act(() => result.current.manager.setImagesYSort('I1', ['b', 'c'], false))
+    expect(layer(result).images!.filter((i) => i.ySort === false).map((i) => i.id)).toEqual(['b', 'c'])
+    act(() => result.current.manager.setImagesYSort('I1', ['b'], undefined))
+    expect('ySort' in layer(result).images!.find((i) => i.id === 'b')!).toBe(false)
+    act(() => result.current.manager.setLayerYSort('I1', undefined))
+    expect('ySort' in layer(result)).toBe(false)
+  })
+})

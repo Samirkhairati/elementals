@@ -28,6 +28,8 @@ import { Layer, LayerType } from '@/types/editor'
 import { ENTITIES_ID } from '@/lib/layerOrder'
 import { canHoldInFolder, isFolder, moveInList, setLayerFolder, visibleStack } from '@/lib/layerFolders'
 import { useEditorClipboard } from '@/store/editorClipboard'
+import { inheritedLayerYSort, layerYSort } from '../../../../../shared/ySort'
+import { YSortBadge, YSortMenuItem } from '../ui/YSortMenuItem'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -134,7 +136,7 @@ function EntitiesRow({ visible, onToggle, drag, dropPosition }: EntitiesRowProps
       )}
       <Users className="text-sky-400" />
       <span className="ed-row-label">Entities</span>
-      <div className="ed-row-actions">
+      <div className="ed-row-actions mr-1">
         <button
           type="button"
           onClick={onToggle}
@@ -169,6 +171,8 @@ interface LayersPanelProps {
   setSelectedEntityId?: (id: string | null) => void
   toggleLayerVisibility: (id: string) => void
   toggleLayerLock: (id: string) => void
+  /** Y-sort on / off for an image layer or a folder; undefined = follow the folder. */
+  setLayerYSort?: (id: string, value: boolean | undefined) => void
   deleteLayer: (id: string) => void
   reorderLayers: (newLayers: Layer[]) => void
   /** With a folder id, a tile or image layer is created inside that folder. */
@@ -210,6 +214,7 @@ export function LayersPanel({
   setSelectedEntityId,
   toggleLayerVisibility,
   toggleLayerLock,
+  setLayerYSort,
   deleteLayer,
   reorderLayers,
   createLayerOfType,
@@ -422,8 +427,7 @@ export function LayersPanel({
                     onDoubleClick={() => {
                       if (!layer.locked) startEditing(layer)
                     }}
-                    className="ed-row"
-                    style={held ? { marginLeft: 16 } : undefined}
+                    className={held ? 'ed-row ed-indent' : 'ed-row'}
                     data-testid={isFolderRow ? 'folder-row' : undefined}
                     data-dim={layer.visible ? undefined : 'true'}
                     data-selected={isSelected ? 'true' : undefined}
@@ -460,6 +464,7 @@ export function LayersPanel({
                       <span className="ed-row-label" title={layer.name}>{layer.name}</span>
                     )}
 
+                    {(layer.type === 'image' || isFolderRow) && layerYSort(layer, layers) && <YSortBadge inherited={layer.ySort === undefined} />}
                     {isFolderRow ? (
                       <span className="ed-badge" data-tone="count" title="Layers in this folder" data-testid="folder-count">
                         <LayersIcon />
@@ -481,7 +486,7 @@ export function LayersPanel({
 
                     {/* Compact status & inline visibility toggle */}
                     <div
-                      className="ed-row-actions"
+                      className="ed-row-actions mr-1"
                       onDoubleClick={(e) => e.stopPropagation()}
                     >
                       {layer.locked && (
@@ -610,6 +615,18 @@ export function LayersPanel({
                       </>
                     )}
                   </ContextMenuItem>
+                  {setLayerYSort && (layer.type === 'image' || isFolderRow) && (
+                    <YSortMenuItem
+                      own={layer.ySort}
+                      inherited={inheritedLayerYSort(layer, layers)}
+                      from={held ? 'folder' : undefined}
+                      title={isFolderRow ? 'The image layers inside follow this, unless they say otherwise' : 'Pictures of this layer draw among the characters by how far down they stand'}
+                      onChange={(v) => setLayerYSort(layer.id, v)}
+                    />
+                  )}
+                  {setLayerYSort && layer.type === 'tile' && (
+                    <YSortMenuItem own={false} inherited={false} disabled title="Tile layers draw as one piece; put pictures on an image layer to y-sort them" onChange={() => {}} />
+                  )}
                   <ContextMenuSeparator />
                   <ContextMenuItem
                     onClick={() => confirmDeleteLayer(layer)}

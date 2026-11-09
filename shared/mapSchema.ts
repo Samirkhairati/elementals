@@ -89,6 +89,7 @@ function validateGroups(groups: unknown, label: string, errors: string[]): Set<s
     else ids.add(group.id)
     if (typeof group.name !== 'string') errors.push(`${gp}: name must be a string`)
     if (group.locked !== undefined && typeof group.locked !== 'boolean') errors.push(`${gp}: locked must be true or false`)
+    if (group.ySort !== undefined && typeof group.ySort !== 'boolean') errors.push(`${gp}: ySort must be true or false`)
   })
   return ids
 }
@@ -121,6 +122,7 @@ function validateImages(images: unknown, label: string, errors: string[], warnin
         errors.push(`${ip}: crop must be whole numbers x, y >= 0 and w, h >= 1`)
       }
     }
+    if (item.ySort !== undefined && typeof item.ySort !== 'boolean') errors.push(`${ip}: ySort must be true or false`)
     if (item.groupId !== undefined && typeof item.groupId !== 'string') errors.push(`${ip}: groupId must be a string`)
     else if (typeof item.groupId === 'string' && !groupIds.has(item.groupId)) warnings.push(`${ip}: groupId ${JSON.stringify(item.groupId)} is not one of the layer's groups; it is ignored`)
     if (item.z !== undefined && !isFiniteNumber(item.z)) errors.push(`${ip}: z must be a finite number`)
@@ -177,6 +179,7 @@ export function validateEditorMap(data: unknown, options: ValidateEditorMapOptio
       }
       if (typeof layer.visible !== 'boolean') errors.push(`${label}: visible must be a boolean`)
       if (layer.locked !== undefined && typeof layer.locked !== 'boolean') errors.push(`${label}: locked must be a boolean`)
+      if (layer.ySort !== undefined && typeof layer.ySort !== 'boolean') errors.push(`${label}: ySort must be a boolean`)
       if (layer.z !== undefined && !isFiniteNumber(layer.z)) errors.push(`${label}: z must be a finite number`)
 
       if (typeof layer.name === 'string' && layer.type !== 'folder') {

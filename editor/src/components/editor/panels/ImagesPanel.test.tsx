@@ -31,6 +31,11 @@ function setup(images: any[], extra: Record<string, unknown> = {}, layerOver: Re
     reorderImage: vi.fn(),
     moveImageTo: vi.fn(),
     setResizingImageId: vi.fn(),
+    setImagesYSort: vi.fn(),
+    setImageGroupYSort: vi.fn(),
+    moveImageGroupTo: vi.fn(),
+    copyImages: vi.fn(),
+    pasteImages: vi.fn(),
     createImageGroup: vi.fn(() => 'new-group'),
     setImagesGroup: vi.fn(),
     deleteImageGroup: vi.fn(),
@@ -54,6 +59,9 @@ function setup(images: any[], extra: Record<string, unknown> = {}, layerOver: Re
   return fns
 }
 
+const menuItem = (name: RegExp | string) => screen.getByRole('menuitem', { name })
+const rowMenu = (row: HTMLElement) => fireEvent.contextMenu(row)
+
 const items = [
   { id: 'a', graphicId: 'sky/sheet.png', x: 4, y: 5, name: 'Cloud' },
   { id: 'b', graphicId: 'sky/sheet.png', x: 40, y: 5, crop: { x: 32, y: 0, w: 16, h: 16 } },
@@ -75,25 +83,48 @@ describe('ImagesPanel', () => {
     expect(screen.getAllByText('crop')).toHaveLength(1)
   })
 
-  it('disables Add and the row actions on a locked layer', () => {
+  it('disables Add and the row menu actions on a locked layer', () => {
     setup(items, {}, { locked: true })
-    expect(screen.getAllByRole('button', { name: 'Duplicate image' })[0]).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Add image' })).toBeDisabled()
+    rowMenu(within(screen.getByTestId('image-list')).getByText('Cloud').closest('.ed-row') as HTMLElement)
+    expect(menuItem(/^Duplicate/)).toHaveAttribute('data-disabled')
   })
 
-  it('duplicates, deletes and reorders from the row buttons', () => {
-    const f = setup(items)
+  it('has no buttons on the picture rows: everything is in the right-click menu', () => {
+    setup(items)
     const row = within(screen.getByTestId('image-list')).getByText('Cloud').closest('.ed-row') as HTMLElement
-    fireEvent.click(within(row).getByRole('button', { name: 'Duplicate image' }))
+    expect(within(row).queryAllByRole('button')).toHaveLength(0)
+  })
+
+  it('duplicates, deletes and reorders from the row menu', () => {
+    const f = setup(items)
+    const row = () => within(screen.getByTestId('image-list')).getByText('Cloud').closest('.ed-row') as HTMLElement
+    rowMenu(row())
+    fireEvent.click(menuItem(/^Duplicate/))
     expect(f.duplicateImages).toHaveBeenCalledWith('i1', ['a'])
-    fireEvent.click(within(row).getByRole('button', { name: 'Bring forward' }))
+    rowMenu(row())
+    fireEvent.click(menuItem('Bring forward'))
     expect(f.reorderImage).toHaveBeenCalledWith('i1', 'a', 1)
-    fireEvent.click(within(row).getByRole('button', { name: 'Delete image' }))
+    rowMenu(row())
+    // the back item cannot go further back
+    expect(menuItem('Send backward')).toHaveAttribute('data-disabled')
+    fireEvent.click(menuItem(/^Delete/))
     expect(f.deleteImages).toHaveBeenCalledWith('i1', ['a'])
-    // the front item cannot go further forward, the back one cannot go further back
-    const front = within(screen.getByTestId('image-list')).getByText('sheet').closest('.ed-row') as HTMLElement
-    expect(within(front).getByRole('button', { name: 'Bring forward' })).toBeDisabled()
-    expect(within(row).getByRole('button', { name: 'Send backward' })).toBeDisabled()
+  })
+
+  it('turns y-sorting on for a picture from its menu', () => {
+    const f = setup(items)
+    rowMenu(within(screen.getByTestId('image-list')).getByText('Cloud').closest('.ed-row') as HTMLElement)
+    fireEvent.click(menuItem(/Enable Y-sort/))
+    expect(f.setImagesYSort).toHaveBeenCalledWith('i1', ['a'], true)
+  })
+
+  it('pictures of a y-sorted layer show the badge, and one can be taken out of it', () => {
+    const f = setup(items, {}, { ySort: true })
+    expect(screen.getAllByTestId('ysort-badge')).toHaveLength(2)
+    rowMenu(within(screen.getByTestId('image-list')).getByText('Cloud').closest('.ed-row') as HTMLElement)
+    fireEvent.click(menuItem(/Disable Y-sort/))
+    expect(f.setImagesYSort).toHaveBeenCalledWith('i1', ['a'], false)
   })
 
   it('dragging a row onto another reorders the draw order in one move', () => {
@@ -115,14 +146,15 @@ describe('ImagesPanel', () => {
   it('renames from the row: Enter keeps the new name, Esc keeps the old one', () => {
     const f = setup(items)
     const row = within(screen.getByTestId('image-list')).getByText('Cloud').closest('.ed-row') as HTMLElement
-    fireEvent.click(within(row).getByRole('button', { name: 'Rename image' }))
+    rowMenu(row)
+    fireEvent.click(menuItem('Rename'))
     const input = within(row).getByLabelText('Image name')
     fireEvent.change(input, { target: { value: 'Big cloud' } })
     fireEvent.blur(input)
     expect(f.updateImage).toHaveBeenCalledWith('i1', 'a', { name: 'Big cloud' })
 
     f.updateImage.mockClear()
-    fireEvent.click(within(row).getByRole('button', { name: 'Rename image' }))
+    fireEvent.doubleClick(row)
     const again = within(row).getByLabelText('Image name')
     fireEvent.change(again, { target: { value: 'Nope' } })
     fireEvent.keyDown(again, { key: 'Escape' })
@@ -234,7 +266,8 @@ describe('ImagesPanel', () => {
   it('Place multiple starts placing copies of that picture', () => {
     const f = setup(items)
     const row = within(screen.getByTestId('image-list')).getByText('Cloud').closest('.ed-row') as HTMLElement
-    fireEvent.click(within(row).getByRole('button', { name: 'Place multiple' }))
+    rowMenu(row)
+    fireEvent.click(menuItem(/Place more copies/))
     expect(f.placeMultiple).toHaveBeenCalledWith('i1', 'a')
     expect(f.selectImage).not.toHaveBeenCalled()
   })
@@ -263,15 +296,18 @@ describe('ImagesPanel', () => {
 
     it('Delete and Duplicate on a picked row act on the whole picked set; on another row, on that row only', () => {
       const f = setup(items, { pickedImageIds: ['a', 'b'], selectedImageId: 'a' })
-      fireEvent.click(within(rowOf('Cloud')).getByRole('button', { name: 'Delete image' }))
+      rowMenu(rowOf('Cloud'))
+      fireEvent.click(menuItem(/^Delete/))
       expect(f.deleteImages).toHaveBeenLastCalledWith('i1', ['a', 'b'])
-      fireEvent.click(within(rowOf('sheet')).getByRole('button', { name: 'Duplicate image' }))
+      rowMenu(rowOf('sheet'))
+      fireEvent.click(menuItem(/^Duplicate/))
       expect(f.duplicateImages).toHaveBeenLastCalledWith('i1', ['a', 'b'])
     })
 
     it('a row outside the picked set is acted on alone', () => {
       const f = setup(items, { pickedImageIds: ['b'], selectedImageId: 'b' })
-      fireEvent.click(within(rowOf('Cloud')).getByRole('button', { name: 'Delete image' }))
+      rowMenu(rowOf('Cloud'))
+      fireEvent.click(menuItem(/^Delete/))
       expect(f.deleteImages).toHaveBeenLastCalledWith('i1', ['a'])
     })
   })
@@ -360,43 +396,72 @@ describe('ImagesPanel', () => {
       expect(screen.getByText('Left')).toBeTruthy()
     })
 
-    it('a click on the group row selects the whole group, and it says when it is the open one', () => {
-      const f = withGroup({ openImageGroupId: 'g1', pickedImageIds: ['a', 'b'], selectedImageId: 'a' })
-      expect(groupRow().dataset.current).toBe('true')
+    it('a click on the group row selects the whole group; the open group shows as selected', () => {
+      const f = withGroup({ openImageGroupId: 'g1', pickedImageIds: [], selectedImageId: null })
       expect(groupRow().dataset.selected).toBe('true')
       fireEvent.click(groupRow())
       expect(f.selectImageGroup).toHaveBeenCalledWith('i1', 'g1')
     })
 
-    it('the lock button toggles the group lock without selecting it', () => {
+    it('locks from its menu without selecting it', () => {
       const f = withGroup()
-      fireEvent.click(within(groupRow()).getByRole('button', { name: 'Lock Dam wall' }))
+      fireEvent.contextMenu(groupRow())
+      fireEvent.click(menuItem('Lock Group'))
       expect(f.setImageGroupLocked).toHaveBeenCalledWith('i1', 'g1', true)
       expect(f.selectImageGroup).not.toHaveBeenCalled()
     })
 
-    it('a locked group shows as locked and unlocks again', () => {
+    it('a locked group shows a lock and unlocks again from its menu', () => {
       const f = withGroup({}, { locked: true })
-      const button = within(groupRow()).getByRole('button', { name: 'Unlock Dam wall' })
-      expect(button).toHaveAttribute('aria-pressed', 'true')
-      fireEvent.click(button)
+      expect(groupRow().querySelector('.text-amber-400')).toBeTruthy()
+      fireEvent.contextMenu(groupRow())
+      fireEvent.click(menuItem('Unlock Group'))
       expect(f.setImageGroupLocked).toHaveBeenCalledWith('i1', 'g1', false)
     })
 
-    const menuItem = (name: RegExp | string) => screen.getByRole('menuitem', { name })
+    it('its menu is laid out like a layer folder', () => {
+      withGroup()
+      fireEvent.contextMenu(groupRow())
+      const names = screen.getAllByRole('menuitem').map((m) => (m.textContent ?? '').replace(/(Ctrl|⌘).*$/, '').trim())
+      expect(names).toEqual(['Rename', 'Add picture inside…', 'New group', 'Copy', 'Duplicate', 'Paste inside', 'Lock Group', 'Enable Y-sort', 'Ungroup', 'Delete Group and Pictures'])
+    })
 
-    it('rename, duplicate and delete act on the group from its row; Ungroup is in its right-click menu', () => {
+    it('Add picture inside selects the group and opens the picture browser', () => {
       const f = withGroup()
-      const row = groupRow()
-      expect(within(row).queryByRole('button', { name: 'Ungroup Dam wall' })).toBeNull()
-      fireEvent.click(within(row).getByRole('button', { name: 'Duplicate Dam wall' }))
+      fireEvent.contextMenu(groupRow())
+      fireEvent.click(menuItem(/Add picture inside/))
+      expect(f.selectImageGroup).toHaveBeenCalledWith('i1', 'g1')
+      expect(screen.getByRole('dialog')).toBeTruthy()
+    })
+
+    it('dragging a group onto a loose picture moves the whole group in the draw order', () => {
+      const f = withGroup()
+      const loose = screen.getByText('Loose').closest('.ed-row') as HTMLElement
+      const data: Record<string, string> = {}
+      const dt = { setData: (k: string, v: string) => { data[k] = v }, getData: (k: string) => data[k], effectAllowed: '', dropEffect: '' }
+      fireEvent.dragStart(groupRow(), { dataTransfer: dt })
+      loose.getBoundingClientRect = () => ({ top: 0, height: 20, bottom: 20, left: 0, right: 10, width: 10, x: 0, y: 0, toJSON: () => ({}) })
+      const over = createEvent.dragOver(loose, { dataTransfer: dt })
+      Object.defineProperty(over, 'clientY', { value: 2 })
+      fireEvent(loose, over)
+      fireEvent.drop(loose, { dataTransfer: dt })
+      expect(f.moveImageGroupTo).toHaveBeenCalledWith('i1', 'g1', { kind: 'item', id: 'c' }, 'top')
+    })
+
+    it('duplicate, delete, ungroup and rename act on the group from its menu (the row only has its open/close button)', () => {
+      const f = withGroup()
+      expect(within(groupRow()).queryAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual(['Hide the pictures of Dam wall'])
+      fireEvent.contextMenu(groupRow())
+      fireEvent.click(menuItem(/^Duplicate/))
       expect(f.duplicateImages).toHaveBeenCalledWith('i1', ['b', 'a'])
-      fireEvent.click(within(row).getByRole('button', { name: 'Delete Dam wall' }))
+      fireEvent.contextMenu(groupRow())
+      fireEvent.click(menuItem(/^Delete Group/))
       expect(f.deleteImageGroup).toHaveBeenCalledWith('i1', 'g1')
-      fireEvent.contextMenu(row)
+      fireEvent.contextMenu(groupRow())
       fireEvent.click(menuItem(/^Ungroup/))
       expect(f.ungroupImageGroup).toHaveBeenCalledWith('i1', 'g1')
-      fireEvent.click(within(groupRow()).getByRole('button', { name: 'Rename Dam wall' }))
+      fireEvent.contextMenu(groupRow())
+      fireEvent.click(menuItem('Rename'))
       const input = screen.getByLabelText('Group name') as HTMLInputElement
       fireEvent.change(input, { target: { value: 'Wall' } })
       fireEvent.keyDown(input, { key: 'Enter' })
@@ -453,10 +518,11 @@ describe('ImagesPanel', () => {
 
     it('everything about groups is off on a locked layer', () => {
       withGroup({}, {}, { locked: true })
-      expect(within(groupRow()).getByRole('button', { name: 'Lock Dam wall' })).toBeDisabled()
-      expect(within(groupRow()).getByRole('button', { name: 'Delete Dam wall' })).toBeDisabled()
+      expect(groupRow().getAttribute('draggable')).toBe('false')
       fireEvent.contextMenu(groupRow())
       expect(menuItem(/^Ungroup/)).toHaveAttribute('data-disabled')
+      expect(menuItem('Lock Group')).toHaveAttribute('data-disabled')
+      expect(menuItem(/^Delete Group/)).toHaveAttribute('data-disabled')
     })
   })
 })

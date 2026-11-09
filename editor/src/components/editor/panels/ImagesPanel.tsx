@@ -4,7 +4,10 @@
 
 import { stillGraphics } from '@/lib/characterEdit'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Copy, CopyPlus, Crop, Folder as FolderIcon, FolderInput, FolderMinus, FolderPlus, Group as GroupIcon, Lock, Scaling, Ungroup, Unlock, Pencil, Plus, Stamp, Trash2, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, ClipboardPaste, Copy, CopyPlus, Crop, Edit2, Folder as FolderIcon, FolderInput, FolderMinus, FolderOpen, FolderPlus, Group as GroupIcon, ImagePlus, Images as ImagesIcon, Lock, Scaling, Ungroup, Unlock, Plus, Stamp, Trash2, X } from 'lucide-react'
+import { useEditorClipboard } from '@/store/editorClipboard'
+import { groupYSort, inheritedItemYSort, itemYSort, layerYSort } from '../../../../../shared/ySort'
+import { YSortBadge, YSortMenuItem } from '../ui/YSortMenuItem'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuShortcut, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from '@/components/ui/context-menu'
 import type { ImageItem } from '@/types/editor'
 import { imagePickLabel, imagePickName } from '@/lib/graphicAssets'
@@ -51,6 +54,11 @@ const selectImages = (c: EditorContextValue) => ({
   ungroupImageGroup: c.ungroupImageGroup,
   renameImageGroup: c.renameImageGroup,
   setImageGroupLocked: c.setImageGroupLocked,
+  setImageGroupYSort: c.setImageGroupYSort,
+  setImagesYSort: c.setImagesYSort,
+  moveImageGroupTo: c.moveImageGroupTo,
+  copyImages: c.copyImages,
+  pasteImages: c.pasteImages,
   deleteImages: c.deleteImages,
   duplicateImages: c.duplicateImages,
   placeMultiple: c.placeMultiple,
@@ -93,9 +101,12 @@ export function ImagesPanel() {
   const [renaming, setRenaming] = useState<string | null>(null)
   // The group whose name is open for typing (a new group opens its name straight away).
   const [renamingGroup, setRenamingGroup] = useState<string | null>(null)
-  // Dragging a row changes the draw order: the row being dragged and where it would land.
-  const [dragId, setDragId] = useState<string | null>(null)
-  const [dropAt, setDropAt] = useState<{ id: string; position: 'top' | 'bottom' } | null>(null)
+  // Dragging a row changes the draw order: the row being dragged (a picture or a whole group) and where it would land.
+  const [drag, setDrag] = useState<Drag | null>(null)
+  const [dropAt, setDropAt] = useState<DropAt | null>(null)
+  const dragId = drag?.kind === 'item' ? drag.id : null
+  const endDrag = () => { setDrag(null); setDropAt(null) }
+  const canPasteImages = useEditorClipboard((st) => st.content?.kind === 'images')
   // The scale being typed, shown in the preview before Enter applies it (belongs to one item).
   const [scaleDraft, setScaleDraft] = useState<{ id: string; scale: number } | null>(null)
   const assets = ctx.spriteAssets ?? NO_ASSETS
@@ -111,6 +122,7 @@ export function ImagesPanel() {
   const resizeKeys = describeBindings('image.resize', bindings)
   const groupKeys = describeBindings('image.group', bindings)
   const ungroupKeys = describeBindings('image.ungroup', bindings)
+  const editKeys = { copy: describeBindings('edit.copy', bindings), paste: describeBindings('edit.paste', bindings), duplicate: describeBindings('edit.duplicate', bindings) }
   // Row buttons act on the whole picked set when the row belongs to it, otherwise on that row alone.
   const targetsOf = (id: string) => (picked.length > 1 && picked.includes(id) ? picked : [id])
 
@@ -145,40 +157,82 @@ export function ImagesPanel() {
   // After a crop, the preview centres on (and fits) the cropped part of the whole picture.
   const cropFocus = whole && selected?.crop ? { x: selected.crop.x * previewScale, y: selected.crop.y * previewScale, w: selected.crop.w * previewScale, h: selected.crop.h * previewScale } : null
 
+  const groupOf = (id: string | undefined) => (id ? groups.find((g) => g.id === id) : undefined)
+  /** Members of a group, front first. */
+  const membersFront = (groupId: string) => rows.filter((r) => r.groupId === groupId)
+
+  /** Where a dragged row would land on a picture row (a group lands beside the whole group the picture is in). */
+  const overItem = (e: React.DragEvent, img: ImageItem) => {
+    if (!drag || locked) return
+    if (drag.kind === 'item' && drag.id === img.id) return setDropAt(null)
+    if (drag.kind === 'group' && img.groupId === drag.id) return setDropAt(null)
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    const r = e.currentTarget.getBoundingClientRect()
+    setDropAt({ kind: 'item', id: img.id, position: e.clientY - r.top < r.height / 2 ? 'top' : 'bottom' })
+  }
+  const dropOnItem = (e: React.DragEvent, img: ImageItem) => {
+    e.preventDefault()
+    if (drag && dropAt?.kind === 'item' && dropAt.id === img.id && dropAt.position !== 'into') {
+      if (drag.kind === 'item') ctx.moveImageTo(layer.id, drag.id, img.id, dropAt.position)
+      else if (img.groupId) ctx.moveImageGroupTo(layer.id, drag.id, { kind: 'group', id: img.groupId }, dropAt.position)
+      else ctx.moveImageGroupTo(layer.id, drag.id, { kind: 'item', id: img.id }, dropAt.position)
+    }
+    endDrag()
+  }
+  /** On a group row: a picture goes above / below it (loose) or into it (the middle); a group goes above or below. */
+  const overGroup = (e: React.DragEvent, group: ImageGroup) => {
+    if (!drag || locked || (drag.kind === 'group' && drag.id === group.id)) return setDropAt(null)
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    const r = e.currentTarget.getBoundingClientRect()
+    const f = (e.clientY - r.top) / r.height
+    const empty = membersFront(group.id).length === 0
+    const position: DropAt['position'] = drag.kind === 'item' ? (empty || (f > 0.25 && f < 0.75) ? 'into' : f <= 0.25 ? 'top' : 'bottom') : f < 0.5 ? 'top' : 'bottom'
+    if (drag.kind === 'group' && empty) return setDropAt(null)
+    setDropAt({ kind: 'group', id: group.id, position })
+  }
+  const dropOnGroup = (e: React.DragEvent, group: ImageGroup) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const members = membersFront(group.id)
+    if (drag && dropAt?.kind === 'group' && dropAt.id === group.id) {
+      if (drag.kind === 'group') ctx.moveImageGroupTo(layer.id, drag.id, { kind: 'group', id: group.id }, dropAt.position === 'top' ? 'top' : 'bottom')
+      else if (dropAt.position === 'into') ctx.setImagesGroup(layer.id, [drag.id], group.id)
+      else if (members.length > 0) {
+        const edge = dropAt.position === 'top' ? members[0] : members[members.length - 1]
+        ctx.moveImageTo(layer.id, drag.id, edge.id, dropAt.position, null)
+      }
+    }
+    endDrag()
+  }
+
   const renderRow = (img: ImageItem, indent = false) => {
     const i = rows.findIndex((r) => r.id === img.id)
     const targets = targetsOf(img.id)
+    const ySorted = itemYSort(img, layer, ctx.layers)
     return (
               <ContextMenu key={img.id}>
                 <ContextMenuTrigger asChild>
                   <div
-                    className="ed-row group"
-                    style={indent ? { marginLeft: 16 } : undefined}
+                    className={indent ? 'ed-row ed-indent' : 'ed-row'}
+                    data-testid="image-row"
                     data-selected={picked.includes(img.id) ? 'true' : undefined}
                     data-dim={dragId === img.id ? 'true' : undefined}
                     draggable={!locked && renaming !== img.id}
                     onClick={(e) => ctx.selectImage(layer.id, img.id, e.shiftKey ? 'range' : e.metaKey || e.ctrlKey ? 'toggle' : 'replace')}
+                    onDoubleClick={() => !locked && setRenaming(img.id)}
                     onDragStart={(e) => {
-                      setDragId(img.id)
+                      e.stopPropagation()
+                      setDrag({ kind: 'item', id: img.id })
                       e.dataTransfer.effectAllowed = 'move'
                       e.dataTransfer.setData('text/plain', img.id)
                     }}
-                    onDragOver={(e) => {
-                      if (!dragId) return
-                      e.preventDefault()
-                      e.dataTransfer.dropEffect = 'move'
-                      const r = e.currentTarget.getBoundingClientRect()
-                      setDropAt(dragId === img.id ? null : { id: img.id, position: e.clientY - r.top < r.height / 2 ? 'top' : 'bottom' })
-                    }}
-                    onDragEnd={() => { setDragId(null); setDropAt(null) }}
-                    onDrop={(e) => {
-                      e.preventDefault()
-                      if (dragId && dropAt && dropAt.id === img.id) ctx.moveImageTo(layer.id, dragId, img.id, dropAt.position)
-                      setDragId(null)
-                      setDropAt(null)
-                    }}
+                    onDragOver={(e) => overItem(e, img)}
+                    onDragEnd={endDrag}
+                    onDrop={(e) => dropOnItem(e, img)}
                   >
-                    {dropAt?.id === img.id && dragId !== img.id && (
+                    {dropAt?.kind === 'item' && dropAt.id === img.id && dropAt.position !== 'into' && (
                       <div className={`pointer-events-none absolute left-0 right-0 z-30 h-[2px] rounded-full bg-primary ${dropAt.position === 'top' ? '-top-[2px]' : '-bottom-[2px]'}`} />
                     )}
                     <div className="ed-checker flex h-6 w-6 shrink-0 items-center justify-center rounded-sm">
@@ -199,42 +253,43 @@ export function ImagesPanel() {
                         }}
                         onKeyDown={(e) => {
                           e.stopPropagation()
-                          if (e.key === 'Enter') e.currentTarget.blur()
-                          else if (e.key === 'Escape') {
-                            e.currentTarget.value = nameOf(img)
-                            e.currentTarget.blur()
-                          }
+                          if (e.key === 'Enter') {
+                            const name = e.currentTarget.value.trim()
+                            if (name && name !== nameOf(img)) ctx.updateImage(layer.id, img.id, { name })
+                            setRenaming(null)
+                          } else if (e.key === 'Escape') setRenaming(null)
                         }}
                       />
                     ) : (
-                      <span className="ed-row-label" title={imagePickLabel(img)} onDoubleClick={() => !locked && setRenaming(img.id)}>
+                      <span className="ed-row-label" title={imagePickLabel(img)}>
                         {nameOf(img)}
                       </span>
                     )}
                     {img.crop && <span className="ed-badge" title={`Shows ${img.crop.w}×${img.crop.h} px of the picture, from ${img.crop.x}, ${img.crop.y}`}>crop</span>}
-                    <span className="ed-row-actions hidden group-hover:flex group-focus-within:flex">
-                      <IconButton title="Bring forward" aria-label="Bring forward" disabled={locked || i === 0} onClick={(e) => { e.stopPropagation(); ctx.reorderImage(layer.id, img.id, 1) }}>
-                        <ArrowUp />
-                      </IconButton>
-                      <IconButton title="Send backward" aria-label="Send backward" disabled={locked || i === rows.length - 1} onClick={(e) => { e.stopPropagation(); ctx.reorderImage(layer.id, img.id, -1) }}>
-                        <ArrowDown />
-                      </IconButton>
-                      <IconButton title="Rename" aria-label="Rename image" disabled={locked} onClick={(e) => { e.stopPropagation(); ctx.setSelectedImageId(img.id); setRenaming(img.id) }}>
-                        <Pencil />
-                      </IconButton>
-                      <IconButton title={`Place multiple: click the map to add more copies${placeKeys ? ` (${placeKeys})` : ''}`} aria-label="Place multiple" disabled={locked} onClick={(e) => { e.stopPropagation(); ctx.placeMultiple(layer.id, img.id) }}>
-                        <CopyPlus />
-                      </IconButton>
-                      <IconButton title="Duplicate" aria-label="Duplicate image" disabled={locked} onClick={(e) => { e.stopPropagation(); ctx.duplicateImages(layer.id, targetsOf(img.id)) }}>
-                        <Copy />
-                      </IconButton>
-                      <IconButton title="Delete" aria-label="Delete image" tone="danger" disabled={locked} onClick={(e) => { e.stopPropagation(); ctx.deleteImages(layer.id, targetsOf(img.id)) }}>
-                        <Trash2 />
-                      </IconButton>
-                    </span>
+                    {ySorted && <YSortBadge inherited={img.ySort === undefined} />}
                   </div>
                 </ContextMenuTrigger>
-                <ContextMenuContent className="w-56">
+                {/* Focus stays where the menu put it (Rename opens a name field that must keep it). */}
+                <ContextMenuContent className="w-56" onCloseAutoFocus={(e) => e.preventDefault()}>
+                  <ContextMenuItem disabled={locked} onClick={() => { ctx.setSelectedImageId(img.id); setRenaming(img.id) }}>
+                    <Edit2 className="mr-2 h-3.5 w-3.5" />
+                    Rename
+                  </ContextMenuItem>
+                  <ContextMenuItem disabled={locked} onClick={() => ctx.placeMultiple(layer.id, img.id)} title="Click the map to add more copies: same picture, crop, scale and flips">
+                    <Stamp className="mr-2 h-3.5 w-3.5" />
+                    Place more copies
+                    {placeKeys && <ContextMenuShortcut>{placeKeys}</ContextMenuShortcut>}
+                  </ContextMenuItem>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem disabled={locked || i === 0} onClick={() => ctx.reorderImage(layer.id, img.id, 1)}>
+                    <ArrowUp className="mr-2 h-3.5 w-3.5" />
+                    Bring forward
+                  </ContextMenuItem>
+                  <ContextMenuItem disabled={locked || i === rows.length - 1} onClick={() => ctx.reorderImage(layer.id, img.id, -1)}>
+                    <ArrowDown className="mr-2 h-3.5 w-3.5" />
+                    Send backward
+                  </ContextMenuItem>
+                  <ContextMenuSeparator />
                   <ContextMenuItem disabled={locked} onClick={() => newGroup(targets)}>
                     <GroupIcon className="mr-2 h-3.5 w-3.5" />
                     {targets.length > 1 ? `Group ${targets.length} pictures` : 'Group this picture'}
@@ -266,22 +321,41 @@ export function ImagesPanel() {
                     </ContextMenuItem>
                   )}
                   <ContextMenuSeparator />
-                  <ContextMenuItem disabled={locked} onClick={() => { ctx.setSelectedImageId(img.id); setRenaming(img.id) }}>
-                    <Pencil className="mr-2 h-3.5 w-3.5" />
-                    Rename
+                  <YSortMenuItem
+                    own={img.ySort}
+                    inherited={inheritedItemYSort(img, layer, ctx.layers)}
+                    from={groupOf(img.groupId)?.ySort !== undefined ? 'group' : 'layer'}
+                    disabled={locked}
+                    title="Draw among the characters by how far down the picture stands"
+                    onChange={(v) => ctx.setImagesYSort(layer.id, targets, v)}
+                  />
+                  <ContextMenuSeparator />
+                  <ContextMenuItem onClick={() => ctx.copyImages(layer.id, targets)}>
+                    <Copy className="mr-2 h-3.5 w-3.5" />
+                    Copy
+                    {editKeys.copy && <ContextMenuShortcut>{editKeys.copy}</ContextMenuShortcut>}
                   </ContextMenuItem>
                   <ContextMenuItem disabled={locked} onClick={() => ctx.duplicateImages(layer.id, targets)}>
-                    <Copy className="mr-2 h-3.5 w-3.5" />
+                    <CopyPlus className="mr-2 h-3.5 w-3.5" />
                     Duplicate
+                    {editKeys.duplicate && <ContextMenuShortcut>{editKeys.duplicate}</ContextMenuShortcut>}
                   </ContextMenuItem>
-                  <ContextMenuItem disabled={locked} className="text-destructive" onClick={() => ctx.deleteImages(layer.id, targets)}>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem disabled={locked} className="text-red-400 focus:bg-red-500/10 focus:text-red-400" onClick={() => ctx.deleteImages(layer.id, targets)}>
                     <Trash2 className="mr-2 h-3.5 w-3.5" />
-                    Delete
+                    {targets.length > 1 ? `Delete ${targets.length} pictures` : 'Delete'}
                   </ContextMenuItem>
                 </ContextMenuContent>
               </ContextMenu>
     )
   }
+
+  /** The Add button and the "Add picture inside" entry: with a group open, what is placed joins it. */
+  const openPicker = (groupId?: string) => {
+    if (groupId) ctx.selectImageGroup(layer.id, groupId)
+    setPickerOpen(true)
+  }
+  const openGroup = groups.find((g) => g.id === ctx.openImageGroupId) ?? null
 
   return (
     <div className="flex w-full flex-col gap-3 text-left" data-testid="images-panel">
@@ -291,7 +365,7 @@ export function ImagesPanel() {
           <InfoTip>Images snap to the grid while the magnet in the top toolbar is on, and move freely when it is off. Ctrl/Cmd+click adds or removes an image from the selection and Shift+click picks a range; Delete, Duplicate, Ctrl/Cmd+C and Ctrl/Cmd+V work on all of them.</InfoTip>
           {picked.length > 1 && <Badge>{picked.length} selected</Badge>}
           <Badge>{images.length}</Badge>
-          <button type="button" className="ed-btn" data-size="sm" data-variant="primary" aria-label="Add image" disabled={locked} onClick={() => setPickerOpen(true)}>
+          <button type="button" className="ed-btn" data-size="sm" data-variant="primary" aria-label="Add image" title={openGroup ? `Add a picture to the group ${openGroup.name}` : 'Add a picture to this layer'} disabled={locked} onClick={() => openPicker()}>
             <Plus />
             Add
           </button>
@@ -331,19 +405,28 @@ export function ImagesPanel() {
                     members={row.members}
                     locked={locked}
                     open={ctx.openImageGroupId === row.group.id}
-                    selected={row.members.length > 0 && row.members.every((m) => picked.includes(m.id))}
+                    selected={ctx.openImageGroupId === row.group.id || (row.members.length > 0 && row.members.every((m) => picked.includes(m.id)))}
                     ctx={ctx}
                     renderRow={(m) => renderRow(m, true)}
                     renaming={renamingGroup === row.group.id}
                     setRenaming={(on) => setRenamingGroup(on ? row.group.id : null)}
                     onNewGroup={() => newGroup()}
-                    ungroupKeys={ungroupKeys}
-                    dragId={dragId}
-                    onDropInto={() => {
-                      if (dragId) ctx.setImagesGroup(layer.id, [dragId], row.group.id)
-                      setDragId(null)
-                      setDropAt(null)
+                    onAddInside={() => openPicker(row.group.id)}
+                    ySorted={groupYSort(layer, row.group.id, ctx.layers)}
+                    layerYSorted={layerYSort(layer, ctx.layers)}
+                    canPaste={canPasteImages}
+                    keys={{ ungroup: ungroupKeys, ...editKeys }}
+                    dragging={drag?.kind === 'group' && drag.id === row.group.id}
+                    drop={dropAt?.kind === 'group' && dropAt.id === row.group.id ? dropAt.position : null}
+                    onDragStart={(e) => {
+                      setDrag({ kind: 'group', id: row.group.id })
+                      e.dataTransfer.effectAllowed = 'move'
+                      e.dataTransfer.setData('text/plain', row.group.id)
                     }}
+                    onDragOver={(e) => overGroup(e, row.group)}
+                    onDragEnd={endDrag}
+                    onDragLeave={() => setDropAt((d) => (d?.kind === 'group' && d.id === row.group.id ? null : d))}
+                    onDrop={(e) => dropOnGroup(e, row.group)}
                   />
                 )
               )}
@@ -493,7 +576,14 @@ export function ImagesPanel() {
 
 type PanelCtx = ReturnType<typeof selectImages>
 
-/** A group in the pictures list: its own row (select the group, lock it, rename, duplicate, delete; right-click for the rest) with its members under it. Pictures dragged onto the row join it. */
+type Drag = { kind: 'item' | 'group'; id: string }
+type DropAt = { kind: 'item' | 'group'; id: string; position: 'top' | 'bottom' | 'into' }
+
+/**
+ * A group in the pictures list, drawn like a folder of the layer list: its row (click selects the group, the chevron
+ * opens or closes it, drag it to move all its pictures up or down; right-click for the rest) with its members under it.
+ * Pictures dropped on the middle of the row join it.
+ */
 function ImageGroupBlock({
   layerId,
   group,
@@ -506,9 +596,18 @@ function ImageGroupBlock({
   renaming,
   setRenaming,
   onNewGroup,
-  ungroupKeys,
-  dragId,
-  onDropInto,
+  onAddInside,
+  ySorted,
+  layerYSorted,
+  canPaste,
+  keys,
+  dragging,
+  drop,
+  onDragStart,
+  onDragOver,
+  onDragEnd,
+  onDragLeave,
+  onDrop,
 }: {
   layerId: string
   group: ImageGroup
@@ -521,42 +620,47 @@ function ImageGroupBlock({
   renaming: boolean
   setRenaming: (on: boolean) => void
   onNewGroup: () => void
-  ungroupKeys?: string
-  /** The picture row being dragged in the list, if any: dropping it on this row puts it in the group. */
-  dragId: string | null
-  onDropInto: () => void
+  onAddInside: () => void
+  ySorted: boolean
+  layerYSorted: boolean
+  canPaste: boolean
+  keys: { ungroup?: string; copy?: string; paste?: string; duplicate?: string }
+  dragging: boolean
+  drop: DropAt['position'] | null
+  onDragStart: (e: React.DragEvent) => void
+  onDragOver: (e: React.DragEvent) => void
+  onDragEnd: () => void
+  onDragLeave: () => void
+  onDrop: (e: React.DragEvent) => void
 }) {
   const [collapsed, setCollapsed] = useState(false)
-  const [dropping, setDropping] = useState(false)
   const ids = members.map((m) => m.id)
-  const canTake = !!dragId && !locked && !ids.includes(dragId)
   return (
     <div className="flex flex-col gap-0.5" data-testid="image-group">
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <div
-            className="ed-row group"
+            className="ed-row"
+            data-testid="image-group-row"
             data-selected={selected ? 'true' : undefined}
-            data-current={open ? 'true' : undefined}
-            data-drop={dropping ? 'true' : undefined}
-            title={members.length === 0 ? 'An empty group: drag pictures onto it, or right-click a picture › Move to group' : open ? 'This group is selected: click a picture inside it to pick just that one' : 'Select the whole group'}
+            data-current={open && !selected ? 'true' : undefined}
+            data-drop={drop === 'into' ? 'true' : undefined}
+            data-dim={dragging ? 'true' : undefined}
+            title={members.length === 0 ? 'An empty group: drag pictures onto it, or select it and use Add' : open ? 'This group is selected: what you add goes into it' : 'Select the whole group'}
+            draggable={!locked && !renaming}
             onClick={() => ctx.selectImageGroup(layerId, group.id)}
-            onDragOver={(e) => {
-              if (!canTake) return
-              e.preventDefault()
-              e.dataTransfer.dropEffect = 'move'
-              setDropping(true)
+            onDoubleClick={() => !locked && setRenaming(true)}
+            onDragStart={onDragStart}
+            onDragOver={onDragOver}
+            onDragLeave={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) onDragLeave()
             }}
-            onDragLeave={() => setDropping(false)}
-            onDrop={(e) => {
-              if (!canTake) return
-              e.preventDefault()
-              e.stopPropagation()
-              setDropping(false)
-              onDropInto()
-            }}
+            onDragEnd={onDragEnd}
+            onDrop={onDrop}
           >
-            {dropping && <div className="pointer-events-none absolute inset-0 rounded-md ring-2 ring-primary" />}
+            {drop && drop !== 'into' && (
+              <div className={`pointer-events-none absolute left-0 right-0 z-30 h-[2px] rounded-full bg-primary ${drop === 'top' ? '-top-[2px]' : '-bottom-[2px]'}`} />
+            )}
             <button
               type="button"
               className="ed-iconbtn"
@@ -566,7 +670,7 @@ function ImageGroupBlock({
             >
               {collapsed ? <ChevronRight /> : <ChevronDown />}
             </button>
-            <FolderIcon className="text-yellow-400" />
+            {collapsed ? <FolderIcon className="text-yellow-400" /> : <FolderOpen className="text-yellow-400" />}
             {renaming ? (
               <input
                 className="ed-input min-w-0 flex-1"
@@ -578,63 +682,84 @@ function ImageGroupBlock({
                 onBlur={(e) => { ctx.renameImageGroup(layerId, group.id, e.currentTarget.value); setRenaming(false) }}
                 onKeyDown={(e) => {
                   e.stopPropagation()
-                  if (e.key === 'Enter') e.currentTarget.blur()
-                  else if (e.key === 'Escape') { e.currentTarget.value = group.name; e.currentTarget.blur() }
+                  if (e.key === 'Enter') { ctx.renameImageGroup(layerId, group.id, e.currentTarget.value); setRenaming(false) }
+                  else if (e.key === 'Escape') setRenaming(false)
                 }}
               />
             ) : (
-              <span className="ed-row-label" title={group.name} onDoubleClick={() => !locked && setRenaming(true)}>{group.name}</span>
+              <span className="ed-row-label" title={group.name}>{group.name}</span>
             )}
-            <Badge>{members.length}</Badge>
-            <IconButton
-              title={group.locked ? 'Locked: clicking a picture on the map picks the whole group. Select the group here to pick single pictures. Click to unlock.' : 'Unlocked. Lock it so that clicking any picture on the map picks the whole group.'}
-              aria-label={group.locked ? `Unlock ${group.name}` : `Lock ${group.name}`}
-              aria-pressed={!!group.locked}
-              active={!!group.locked}
-              disabled={locked}
-              onClick={(e) => { e.stopPropagation(); ctx.setImageGroupLocked(layerId, group.id, !group.locked) }}
-            >
-              {group.locked ? <Lock /> : <Unlock />}
-            </IconButton>
-            <span className="ed-row-actions hidden group-hover:flex group-focus-within:flex">
-              <IconButton title="Rename group" aria-label={`Rename ${group.name}`} disabled={locked} onClick={(e) => { e.stopPropagation(); setRenaming(true) }}>
-                <Pencil />
-              </IconButton>
-              <IconButton title="Duplicate the group with all its pictures" aria-label={`Duplicate ${group.name}`} disabled={locked || members.length === 0} onClick={(e) => { e.stopPropagation(); ctx.duplicateImages(layerId, ids) }}>
-                <Copy />
-              </IconButton>
-              <IconButton title="Delete the group and all its pictures" aria-label={`Delete ${group.name}`} tone="danger" disabled={locked} onClick={(e) => { e.stopPropagation(); ctx.deleteImageGroup(layerId, group.id) }}>
-                <Trash2 />
-              </IconButton>
+            {ySorted && <YSortBadge inherited={group.ySort === undefined} />}
+            <span className="ed-badge" data-tone="count" title="Pictures in this group" data-testid="group-count">
+              <ImagesIcon />
+              {members.length}
             </span>
+            {group.locked && (
+              <div className="ed-row-actions mr-1" title="Locked: clicking a picture on the map picks the whole group. Select the group here to pick single pictures.">
+                <Lock className="h-3.5 w-3.5 text-amber-400" />
+              </div>
+            )}
           </div>
         </ContextMenuTrigger>
-        <ContextMenuContent className="w-52">
+        <ContextMenuContent className="w-52" onCloseAutoFocus={(e) => e.preventDefault()}>
           <ContextMenuItem disabled={locked} onClick={() => setRenaming(true)}>
-            <Pencil className="mr-2 h-3.5 w-3.5" />
+            <Edit2 className="mr-2 h-3.5 w-3.5" />
             Rename
+          </ContextMenuItem>
+          <ContextMenuItem disabled={locked} onClick={onAddInside}>
+            <ImagePlus className="mr-2 h-3.5 w-3.5" />
+            Add picture inside…
           </ContextMenuItem>
           <ContextMenuItem disabled={locked} onClick={onNewGroup}>
             <FolderPlus className="mr-2 h-3.5 w-3.5" />
             New group
           </ContextMenuItem>
-          <ContextMenuItem disabled={locked || members.length === 0} onClick={() => ctx.duplicateImages(layerId, ids)}>
+          <ContextMenuSeparator />
+          <ContextMenuItem disabled={members.length === 0} onClick={() => ctx.copyImages(layerId, ids)}>
             <Copy className="mr-2 h-3.5 w-3.5" />
+            Copy
+            {keys.copy && <ContextMenuShortcut>{keys.copy}</ContextMenuShortcut>}
+          </ContextMenuItem>
+          <ContextMenuItem disabled={locked || members.length === 0} onClick={() => ctx.duplicateImages(layerId, ids)} title="A copy of the group with all its pictures">
+            <CopyPlus className="mr-2 h-3.5 w-3.5" />
             Duplicate
+            {keys.duplicate && <ContextMenuShortcut>{keys.duplicate}</ContextMenuShortcut>}
+          </ContextMenuItem>
+          <ContextMenuItem disabled={locked || !canPaste} onClick={() => ctx.pasteImages(layerId, null, group.id)} title="Pastes the copied pictures into this group">
+            <ClipboardPaste className="mr-2 h-3.5 w-3.5" />
+            Paste inside
+            {keys.paste && <ContextMenuShortcut>{keys.paste}</ContextMenuShortcut>}
           </ContextMenuItem>
           <ContextMenuSeparator />
-          <ContextMenuItem disabled={locked} onClick={() => ctx.ungroupImageGroup(layerId, group.id)} title="The pictures stay where they are, as loose pictures at this level">
+          <ContextMenuItem
+            disabled={locked}
+            onClick={() => ctx.setImageGroupLocked(layerId, group.id, !group.locked)}
+            title={group.locked ? 'Clicking a picture on the map picks just that picture again' : 'Clicking any picture of the group on the map picks the whole group'}
+          >
+            {group.locked ? <Unlock className="mr-2 h-3.5 w-3.5" /> : <Lock className="mr-2 h-3.5 w-3.5" />}
+            {group.locked ? 'Unlock Group' : 'Lock Group'}
+          </ContextMenuItem>
+          <YSortMenuItem
+            own={group.ySort}
+            inherited={layerYSorted}
+            from="layer"
+            disabled={locked}
+            title="The pictures of the group follow this, unless they say otherwise"
+            onChange={(v) => ctx.setImageGroupYSort(layerId, group.id, v)}
+          />
+          <ContextMenuItem disabled={locked} onClick={() => ctx.ungroupImageGroup(layerId, group.id)} title="The pictures stay where they are, as loose pictures">
             <Ungroup className="mr-2 h-3.5 w-3.5" />
             Ungroup
-            {ungroupKeys && <ContextMenuShortcut>{ungroupKeys}</ContextMenuShortcut>}
+            {keys.ungroup && <ContextMenuShortcut>{keys.ungroup}</ContextMenuShortcut>}
           </ContextMenuItem>
-          <ContextMenuItem disabled={locked} className="text-destructive" onClick={() => ctx.deleteImageGroup(layerId, group.id)}>
+          <ContextMenuSeparator />
+          <ContextMenuItem disabled={locked} className="text-red-400 focus:bg-red-500/10 focus:text-red-400" onClick={() => ctx.deleteImageGroup(layerId, group.id)}>
             <Trash2 className="mr-2 h-3.5 w-3.5" />
-            {members.length > 0 ? 'Delete group and pictures' : 'Delete group'}
+            {members.length > 0 ? 'Delete Group and Pictures' : 'Delete Group'}
           </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
-      {!collapsed && (members.length > 0 ? members.map((m) => renderRow(m)) : <p className="ed-hint pl-8" data-testid="empty-group">Empty</p>)}
+      {!collapsed && (members.length > 0 ? members.map((m) => renderRow(m)) : <p className="ed-hint ed-indent pl-8" data-testid="empty-group">Empty</p>)}
     </div>
   )
 }

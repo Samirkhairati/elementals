@@ -8,7 +8,7 @@ import { Layer, LayerType, ImageItem, ImageGroup, TileSelection, ActiveTool, Pai
 import { useSyncedState } from '@/hooks/useSyncedState'
 import { ARROW_DELTAS, nudgeStep } from '@/lib/imageNudge'
 import { layersToCopy, placeLayerCopies, setFolderFlag } from '@/lib/layerFolders'
-import { clampEntitiesIndex, entitiesIndexAfterInsert, entitiesIndexAfterRemove, moveInDrawOrder, moveInDrawOrderTo, sortedImages } from '@/lib/layerOrder'
+import { clampEntitiesIndex, entitiesIndexAfterInsert, entitiesIndexAfterRemove, moveBlockInDrawOrder, moveInDrawOrder, moveInDrawOrderTo, sortedImages } from '@/lib/layerOrder'
 
 interface UseLayerManagerOptions {
   /** Functional updates only: the manager never closes over the current map. */
@@ -35,6 +35,8 @@ export function useLayerManager(options: UseLayerManagerOptions) {
   const [justCreatedLayer, setJustCreatedLayer] = useState<{ id: string; n: number } | null>(null)
   /** The group whose row is selected: its members can be picked one by one even if it is locked. */
   const [openImageGroupId, setOpenImageGroupId] = useState<string | null>(null)
+  const openImageGroupIdRef = useRef<string | null>(null)
+  openImageGroupIdRef.current = openImageGroupId
   /** Picks only this picture (or none) and drops the rest of the picked set. */
   const setSelectedImageId = useCallback((next: React.SetStateAction<string | null>) => {
     setSelectedImageIdRaw(next)
@@ -195,6 +197,22 @@ export function useLayerManager(options: UseLayerManagerOptions) {
         const layer = prev.find(l => l.id === id)
         if (layer?.type === 'folder') return setFolderFlag(prev, id, 'locked', !layer.locked)
         return prev.map(l => (l.id === id ? { ...l, locked: !l.locked } : l))
+      })
+    },
+    [commitNewLayers]
+  )
+
+  /** Y-sort on or off for a layer or folder; undefined goes back to following the folder (see shared/ySort.ts). */
+  const setLayerYSort = useCallback(
+    (id: string, value: boolean | undefined) => {
+      commitNewLayers(prev => {
+        const layer = prev.find(l => l.id === id)
+        if (!layer || layer.ySort === value) return prev
+        return prev.map(l => {
+          if (l.id !== id) return l
+          const { ySort: _old, ...rest } = l
+          return value === undefined ? rest : { ...rest, ySort: value }
+        })
       })
     },
     [commitNewLayers]
@@ -462,7 +480,10 @@ export function useLayerManager(options: UseLayerManagerOptions) {
         prev => {
           const index = prev.findIndex(l => l.id === layerId && l.type === 'image')
           if (index === -1) return prev
-          const image: ImageItem = { ...item, id: crypto.randomUUID() }
+          // With a group selected in the Images panel, what is placed goes into that group.
+          const open = openImageGroupIdRef.current
+          const intoGroup = !item.groupId && open && prev[index].groups?.some(g => g.id === open) ? open : undefined
+          const image: ImageItem = { ...item, ...(intoGroup ? { groupId: intoGroup } : {}), id: crypto.randomUUID() }
           createdId = image.id
           const next = [...prev]
           next[index] = { ...prev[index], images: [...(prev[index].images || []), image] }
@@ -528,13 +549,14 @@ export function useLayerManager(options: UseLayerManagerOptions) {
    * group of the one it was dropped on, or leaves its group when that one has none (that is how a picture is dragged out).
    */
   const moveImageTo = useCallback(
-    (layerId: string, imageId: string, targetId: string, position: 'top' | 'bottom') => {
+    (layerId: string, imageId: string, targetId: string, position: 'top' | 'bottom', groupAfter?: string | null) => {
       commitNewLayers(prev => {
         const index = prev.findIndex(l => l.id === layerId && l.type === 'image')
         if (index === -1) return prev
         const images = prev[index].images || []
         const ordered = moveInDrawOrderTo(images, imageId, targetId, position)
-        const targetGroup = images.find(i => i.id === targetId)?.groupId ?? null
+        // `groupAfter` (null = loose) when it was dropped beside a group's row rather than beside a picture.
+        const targetGroup = groupAfter !== undefined ? groupAfter : images.find(i => i.id === targetId)?.groupId ?? null
         const regrouped = setGroupOf({ images: ordered, groups: prev[index].groups ?? [] }, [imageId], targetGroup)
         const moved = regrouped ? regrouped.images : ordered
         if (moved === images) return prev
@@ -600,9 +622,6 @@ export function useLayerManager(options: UseLayerManagerOptions) {
   )
 
   /** Click on a picture of an image layer: replace the picked set, toggle it in (Ctrl/Cmd), or extend to it (Shift). */
-  const openImageGroupIdRef = useRef<string | null>(null)
-  openImageGroupIdRef.current = openImageGroupId
-
   const selectImage = useCallback(
     (layerId: string, imageId: string, mode: SelectMode = 'replace') => {
       const layer = layersRef.current.find(l => l.id === layerId && l.type === 'image')
@@ -638,9 +657,10 @@ export function useLayerManager(options: UseLayerManagerOptions) {
   const selectImageGroup = useCallback(
     (layerId: string, groupId: string) => {
       const layer = layersRef.current.find(l => l.id === layerId && l.type === 'image')
-      const members = sortedImages(layer?.images).reverse().filter(i => i.groupId === groupId)
-      if (members.length === 0) return
-      setSelectedImageIdRaw(members[0].id)
+      if (!layer?.groups?.some(g => g.id === groupId)) return
+      const members = sortedImages(layer.images).reverse().filter(i => i.groupId === groupId)
+      // An empty group can be selected too: what is added next goes into it.
+      setSelectedImageIdRaw(members[0]?.id ?? null)
       setExtraImageIds(members.slice(1).map(i => i.id))
       setOpenImageGroupId(groupId)
     },
@@ -768,6 +788,60 @@ export function useLayerManager(options: UseLayerManagerOptions) {
     [editGroups]
   )
 
+  /** Y-sort on, off or (undefined) following the layer for a picture group. */
+  const setImageGroupYSort = useCallback(
+    (layerId: string, groupId: string, value: boolean | undefined) => {
+      editGroups(layerId, state => {
+        const group = state.groups.find(g => g.id === groupId)
+        if (!group || group.ySort === value) return null
+        return {
+          ...state,
+          groups: state.groups.map(g => {
+            if (g.id !== groupId) return g
+            const { ySort: _old, ...rest } = g
+            return value === undefined ? rest : { ...rest, ySort: value }
+          }),
+        }
+      })
+    },
+    [editGroups]
+  )
+
+  /** Y-sort on, off or (undefined) following the group / layer for some pictures, in one undo step. */
+  const setImagesYSort = useCallback(
+    (layerId: string, ids: readonly string[], value: boolean | undefined) => {
+      const wanted = new Set(ids)
+      editGroups(layerId, state => {
+        if (!state.images.some(i => wanted.has(i.id) && i.ySort !== value)) return null
+        return {
+          ...state,
+          images: state.images.map(i => {
+            if (!wanted.has(i.id) || i.ySort === value) return i
+            const { ySort: _old, ...rest } = i
+            return value === undefined ? rest : { ...rest, ySort: value }
+          }),
+        }
+      })
+    },
+    [editGroups]
+  )
+
+  /**
+   * A whole group dragged in the pictures list: its pictures move as one block in front of (`top`) or behind (`bottom`)
+   * a picture or another group (one undo step). They stay in their group.
+   */
+  const moveImageGroupTo = useCallback(
+    (layerId: string, groupId: string, target: { kind: 'item' | 'group'; id: string }, position: 'top' | 'bottom') => {
+      editGroups(layerId, state => {
+        const ids = state.images.filter(i => i.groupId === groupId).map(i => i.id)
+        const targetIds = target.kind === 'group' ? state.images.filter(i => i.groupId === target.id).map(i => i.id) : [target.id]
+        const images = moveBlockInDrawOrder(state.images, ids, targetIds, position)
+        return images === state.images ? null : { ...state, images }
+      })
+    },
+    [editGroups]
+  )
+
   /** Move several pictures by the same amount in one undo step (a dragged group). */
   const moveImages = useCallback(
     (layerId: string, ids: readonly string[], dx: number, dy: number) => {
@@ -801,7 +875,7 @@ export function useLayerManager(options: UseLayerManagerOptions) {
 
   /** Put copies of `items` on the layer (one undo step) and pick them. `at` is where the first one goes (the cursor). */
   const addImageCopies = useCallback(
-    (layerId: string, items: readonly ImageItem[], at: { x: number; y: number } | null, sourceGroups?: readonly ImageGroup[]) => {
+    (layerId: string, items: readonly ImageItem[], at: { x: number; y: number } | null, sourceGroups?: readonly ImageGroup[], intoGroupId?: string) => {
       let created: ImageItem[] = []
       commitNewLayers(
         prev => {
@@ -810,7 +884,10 @@ export function useLayerManager(options: UseLayerManagerOptions) {
           const existing = prev[index].images || []
           const layerGroups = prev[index].groups ?? []
           // Copies of pictures that shared a group share a new group again; the originals' groups come from the layer or the clipboard.
-          const copied = groupCopies(pasteImageItems(items, existing, at), sourceGroups ?? layerGroups, { images: existing, groups: layerGroups }, () => crypto.randomUUID())
+          const into = intoGroupId && layerGroups.some(g => g.id === intoGroupId) ? intoGroupId : undefined
+          const copied = into
+            ? { items: pasteImageItems(items, existing, at).map(i => ({ ...i, groupId: into })), groups: [] as ImageGroup[] }
+            : groupCopies(pasteImageItems(items, existing, at), sourceGroups ?? layerGroups, { images: existing, groups: layerGroups }, () => crypto.randomUUID())
           created = copied.items
           if (created.length === 0) return prev
           const next = [...prev]
@@ -868,9 +945,9 @@ export function useLayerManager(options: UseLayerManagerOptions) {
 
   /** Paste what was copied (pictures only) into the layer. */
   const pasteImages = useCallback(
-    (layerId: string, at: { x: number; y: number } | null) => {
+    (layerId: string, at: { x: number; y: number } | null, intoGroupId?: string) => {
       const content = useEditorClipboard.getState().content
-      if (content?.kind === 'images') addImageCopies(layerId, content.items, at, content.groups ?? [])
+      if (content?.kind === 'images') addImageCopies(layerId, content.items, at, content.groups ?? [], intoGroupId)
     },
     [addImageCopies]
   )
@@ -908,6 +985,9 @@ export function useLayerManager(options: UseLayerManagerOptions) {
     ungroupImageGroup,
     renameImageGroup,
     setImageGroupLocked,
+    setImageGroupYSort,
+    setImagesYSort,
+    moveImageGroupTo,
     moveImages,
     deleteImages,
     duplicateImages,
@@ -937,6 +1017,7 @@ export function useLayerManager(options: UseLayerManagerOptions) {
     setEntitiesIndex,
     toggleLayerVisibility,
     toggleLayerLock,
+    setLayerYSort,
     toggleFolderCollapsed,
     justCreatedLayer,
     handleCreateLayer,

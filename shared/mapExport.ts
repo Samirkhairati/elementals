@@ -6,6 +6,7 @@ import type { EditorLayer, EditorMap, TilesetInfo, TiledLayer, TiledMap, TiledOb
 import type { EngineEntity } from './engine/types.ts'
 import { SCHEMA_VERSION } from './engine/types.ts'
 import { migrateMap } from './engine/migrate.ts'
+import { itemYSort } from './ySort.ts'
 
 export const TILE_SIZE = 32
 export const COLLISION_TILESET_ID = '__collision__'
@@ -28,7 +29,7 @@ function tiledLayerType(layer: EditorLayer): TiledLayer['type'] {
 }
 
 /** The images of an image layer as Tiled objects (x/y = the sprite anchor); `nextId` hands out map-unique object ids. */
-function imageObjects(layer: EditorLayer, nextId: () => number): TiledObject[] {
+function imageObjects(layer: EditorLayer, nextId: () => number, allLayers: readonly EditorLayer[]): TiledObject[] {
   const items = (layer.images || []).map((item, index) => ({ item, index }))
   // Draw order inside the layer: z first, array order for ties.
   items.sort((a, b) => (a.item.z ?? 0) - (b.item.z ?? 0) || a.index - b.index)
@@ -44,6 +45,8 @@ function imageObjects(layer: EditorLayer, nextId: () => number): TiledObject[] {
     if (item.flipX) properties.push({ name: 'flipX', type: 'bool', value: true })
     if (item.flipY) properties.push({ name: 'flipY', type: 'bool', value: true })
     if (item.opacity !== undefined && item.opacity !== 1) properties.push({ name: 'opacity', type: 'float', value: item.opacity })
+    // Folders and groups are editor-only, so the y-sort they pass down is resolved here, one flag per picture.
+    if (itemYSort(item, layer, allLayers)) properties.push({ name: 'ySort', type: 'bool', value: true })
     return {
       id: nextId(),
       name: item.name || item.graphicId || item.assetId || '',
@@ -126,7 +129,7 @@ export function convertEditorMapToTiled(map: EditorMap, tilesets: TilesetInfo[])
       const imageLayer: TiledLayer = {
         id: index + 1,
         name: layer.name,
-        objects: imageObjects(layer, nextObjectId),
+        objects: imageObjects(layer, nextObjectId, map.layers || []),
         opacity: 1,
         type: 'objectgroup',
         visible: layer.visible,
