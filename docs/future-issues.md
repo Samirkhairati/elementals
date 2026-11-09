@@ -26,3 +26,16 @@ Things that work today but will need attention later. Add an entry whenever you 
 - **What:** `assets:sync` (and so the automatic sync after an import) copies only pictures that characters or image layers use, and removes copies nobody uses.
 - **Fine now:** the game only ever needs the used ones.
 - **Stops being fine:** if something should load a picture by id from an event (e.g. a "show picture" command): it would have to be added to the used set.
+
+## One tile size for every map
+
+- **What:** maps can be any size in pixels, but the tile grid is always 32 px (`TILE_SIZE` in shared/engine/constants.ts and the game's `GAME_CONSTANTS.TILE_SIZE`).
+- **Fine now:** tilesets, collision, tile-based movement and entity anchors all assume 32.
+- **Stops being fine:** if a map should use 16 px or 48 px tiles.
+- **Idea:** a per-map `tileSize` read everywhere `TILE_SIZE` is used today (painting, tileset slicing, export `tilewidth`, collision, movement, anchors), with migration defaulting to 32.
+
+## Tile layers cannot be y-sorted
+
+- **What:** y-sort works on pictures (image layers, folders, groups, single pictures); a tile layer is one Phaser tilemap layer drawn at one depth.
+- **Idea:** draw a y-sorted tile layer as one small tilemap per row (width x 1) at `sortDepth(playerZ, (row + 1) * 32)`, or move tall tile-built objects onto image layers.
+
