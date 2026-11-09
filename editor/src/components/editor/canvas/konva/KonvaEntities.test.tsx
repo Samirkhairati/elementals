@@ -207,7 +207,7 @@ describe('KonvaEntities', () => {
     expect(moveEntity).toHaveBeenCalledWith('a', 144, 96)
   })
 
-  it('a free entity is dropped on the pixel (clamped to the map), never snapped to a tile', () => {
+  it('a free entity is dropped on the pixel (outside the map too), never snapped to a tile', () => {
     const moveEntity = vi.fn()
     renderEntities([entity('f', 50, 61, { Transform: { x: 50, y: 61, depth: 10, free: true } })], { moveEntity, snapEntityPos: (x, y) => ({ x: Math.floor(x / 32) * 32 + 16, y: Math.ceil(y / 32) * 32 }) })
     const drop = (x: number, y: number) => {
@@ -217,7 +217,7 @@ describe('KonvaEntities', () => {
     drop(150.4, 70.6)
     expect(moveEntity).toHaveBeenLastCalledWith('f', 150, 71)
     drop(-30, 99999)
-    expect(moveEntity).toHaveBeenLastCalledWith('f', 0, 640)
+    expect(moveEntity).toHaveBeenLastCalledWith('f', -30, 99999)
   })
 
   it('a free entity without a collider has a small area on its anchor, not a whole tile', () => {

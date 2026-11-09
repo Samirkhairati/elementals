@@ -27,6 +27,8 @@ export interface MapFile {
   name: string;
   width: number;
   height: number;
+  pixelWidth?: number;
+  pixelHeight?: number;
   layers: unknown[];
   entities: unknown[];
 }
@@ -119,11 +121,17 @@ export function createMap(
   name: string,
   width: number,
   height: number,
-  folderPath: string | null = null
+  folderPath: string | null = null,
+  /** A map made by resolution: its size in pixels (the tile grid `width` x `height` covers it). */
+  pixelSize: { width: number; height: number } | null = null
 ): { map: MapFile } {
   if (typeof name !== 'string' || name.trim() === '') throw new Error('Map name must not be empty');
   assertDimension(width, 'width');
   assertDimension(height, 'height');
+  const pixels =
+    pixelSize && (pixelSize.width !== width * 32 || pixelSize.height !== height * 32)
+      ? { pixelWidth: Math.round(assertDimension(pixelSize.width, 'pixel width')), pixelHeight: Math.round(assertDimension(pixelSize.height, 'pixel height')) }
+      : {};
 
   const targetDir = resolveInside(mapsDir, [folderPath]);
   fs.mkdirSync(targetDir, { recursive: true });
@@ -135,7 +143,7 @@ export function createMap(
   }
 
   const layers = defaultLayers();
-  atomicWriteJsonSync(finalDest, { name, width, height, layers, entities: [] });
+  atomicWriteJsonSync(finalDest, { name, width, height, ...pixels, layers, entities: [] });
 
   return {
     map: {
@@ -144,6 +152,7 @@ export function createMap(
       name,
       width,
       height,
+      ...pixels,
       layers,
       entities: [],
     },

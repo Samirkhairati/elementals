@@ -130,7 +130,7 @@ export function createBrowserElectronApi(): ElectronAPI {
     moveTilesetFolder: (folderPath: string, newParent: string | null) => c('move-tileset-folder', folderPath, newParent),
     // maps
     getMaps: () => c('get-maps'),
-    createMap: (name: string, width: number, height: number, folderPath: string | null) => c('create-map', name, width, height, folderPath),
+    createMap: (name: string, width: number, height: number, folderPath: string | null, pixelSize?: { width: number; height: number } | null) => c('create-map', name, width, height, folderPath, pixelSize ?? null),
     saveMap: (folderPath: string | null, fileName: string, mapData: unknown) => c('save-map', folderPath, fileName, mapData),
     deleteMap: (folderPath: string | null, fileName: string) => c('delete-map', folderPath, fileName),
     createMapFolder: (parent: string | null, name: string) => c('create-map-folder', parent, name),

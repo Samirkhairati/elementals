@@ -131,8 +131,6 @@ interface KonvaEntityNodeProps {
   showSprites: boolean
   listening: boolean
   draggable: boolean
-  mapWidthPx: number
-  mapHeightPx: number
   snapEntityPos: (x: number, y: number) => { x: number; y: number }
   visuals: React.MutableRefObject<Visuals>
   setSelectedEntityId: (id: string | null) => void
@@ -148,8 +146,6 @@ const KonvaEntityNode = React.memo(function KonvaEntityNode({
   showSprites,
   listening,
   draggable,
-  mapWidthPx,
-  mapHeightPx,
   snapEntityPos,
   visuals,
   setSelectedEntityId,
@@ -168,11 +164,8 @@ const KonvaEntityNode = React.memo(function KonvaEntityNode({
   const tone = info.hasEvent ? 'event' : info.entity.components.Collider && !info.solid ? 'trigger' : 'default'
   const dim = info.spriteHidden
 
-  const clampSnap = (x: number, y: number) => {
-    const bx = Math.max(0, Math.min(mapWidthPx, x))
-    const by = Math.max(0, Math.min(mapHeightPx, y))
-    return info.free ? { x: Math.round(bx), y: Math.round(by) } : snapEntityPos(bx, by)
-  }
+  // Entities can be dragged past the map's edge too (off-screen spawners, things walking in).
+  const clampSnap = (x: number, y: number) => (info.free ? { x: Math.round(x), y: Math.round(y) } : snapEntityPos(x, y))
 
   return (
     <Group
@@ -345,8 +338,6 @@ export const KonvaEntities = React.memo(function KonvaEntities({
             showSprites={view.sprites}
             listening
             draggable
-            mapWidthPx={mapWidthPx}
-            mapHeightPx={mapHeightPx}
             snapEntityPos={snapEntityPos}
             visuals={visuals}
             setSelectedEntityId={setSelectedEntityId}

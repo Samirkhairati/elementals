@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Maximize, Minus, Plus } from 'lucide-react'
 import type { TilesetData } from '@/types/editor'
 import type { SpriteAssetInfo } from '../../../../../shared/engine/types'
 import { drawResolvedSprite, useSpriteImagesVersion } from '@/lib/spriteImages'
@@ -15,6 +16,7 @@ import {
   toScreenY,
   toWorldX,
   toWorldY,
+  zoomViewAt,
   type Handle,
   type ResizeView,
 } from '@/lib/mapResizeView'
@@ -24,8 +26,13 @@ interface Props {
   tilesets: TilesetData[]
   /** Sprites and pictures, so placed images show as themselves; without them they are blue markers. */
   spriteAssets?: Record<string, SpriteAssetInfo>
+  /** Edges in tiles of the old map (the right / bottom ones can be fractions: pixels / 32). */
   edges: ResizeEdges
   onEdgesChange: (e: ResizeEdges) => void
+  /** The map's real size in tiles (fractions for a map that is not whole tiles); the tile grid by default. */
+  size?: { width: number; height: number }
+  /** What the right and bottom edges snap to, in tiles (1 = whole tiles, 1/32 = pixels). */
+  step?: number
 }
 
 const DEFAULT_SIZE = { w: 640, h: 420 }
@@ -54,12 +61,16 @@ function useTilesetImages(tilesets: TilesetData[], map: ResizableMap) {
 }
 
 /** The stage of the resize dialog: the map drawn small, with a crop rectangle whose edges and corners can be dragged. */
-export function ResizePreview({ map, tilesets, spriteAssets, edges, onEdgesChange }: Props) {
+export function ResizePreview({ map, tilesets, spriteAssets, edges, onEdgesChange, size: realSize, step = 1 }: Props) {
+  const geo = realSize ?? { width: map.width, height: map.height }
   const stageRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [size, setSize] = useState(DEFAULT_SIZE)
   // While a handle is held the view stays put, otherwise the handle would run away from the pointer as the view refits.
   const [frozen, setFrozen] = useState<ResizeView | null>(null)
+  // Zoomed or panned by hand: the view stays where it was put (Fit goes back to following the frame).
+  const [custom, setCustom] = useState<ResizeView | null>(null)
+  const panning = useRef<{ x: number; y: number; view: ResizeView } | null>(null)
   const dragging = useRef<Handle | null>(null)
   const { images, version } = useTilesetImages(tilesets, map)
   const spriteVersion = useSpriteImagesVersion()
@@ -78,8 +89,24 @@ export function ResizePreview({ map, tilesets, spriteAssets, edges, onEdgesChang
     return () => ro.disconnect()
   }, [])
 
-  const view = frozen ?? fitView(map, edges, size.w, size.h)
-  const rect = newRect(map, edges)
+  const view = frozen ?? custom ?? fitView(geo, edges, size.w, size.h)
+  const rect = newRect(geo, edges)
+  const viewRef = useRef(view)
+  viewRef.current = view
+
+  // The wheel zooms around the pointer (a native listener, so the page does not scroll as well).
+  useEffect(() => {
+    const el = stageRef.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault()
+      const r = el.getBoundingClientRect()
+      setCustom(zoomViewAt(viewRef.current, Math.exp(-Math.max(-120, Math.min(120, e.deltaY)) * 0.002), e.clientX - r.left, e.clientY - r.top))
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [])
+  const zoomBy = (factor: number) => setCustom(zoomViewAt(view, factor, size.w / 2, size.h / 2))
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -102,7 +129,7 @@ export function ResizePreview({ map, tilesets, spriteAssets, edges, onEdgesChang
 
     // New ground (what the map becomes) and the old map's backdrop.
     fill(rect.x0, rect.y0, rect.x1, rect.y1, 'rgba(120,120,140,0.14)')
-    fill(0, 0, map.width, map.height, 'rgba(0,0,0,0.35)')
+    fill(0, 0, geo.width, geo.height, 'rgba(0,0,0,0.35)')
 
     // Placed pictures that could not be drawn yet (or have no asset) stay as markers.
     const unresolved: { x: number; y: number }[] = []
@@ -152,27 +179,28 @@ export function ResizePreview({ map, tilesets, spriteAssets, edges, onEdgesChang
       ctx.strokeStyle = 'rgba(255,255,255,0.07)'
       ctx.lineWidth = 1
       ctx.beginPath()
-      for (let x = rect.x0; x <= rect.x1; x++) { ctx.moveTo(Math.round(sx(x)) + 0.5, sy(rect.y0)); ctx.lineTo(Math.round(sx(x)) + 0.5, sy(rect.y1)) }
-      for (let y = rect.y0; y <= rect.y1; y++) { ctx.moveTo(sx(rect.x0), Math.round(sy(y)) + 0.5); ctx.lineTo(sx(rect.x1), Math.round(sy(y)) + 0.5) }
+      for (let x = Math.ceil(rect.x0); x <= rect.x1; x++) { ctx.moveTo(Math.round(sx(x)) + 0.5, sy(rect.y0)); ctx.lineTo(Math.round(sx(x)) + 0.5, sy(rect.y1)) }
+      for (let y = Math.ceil(rect.y0); y <= rect.y1; y++) { ctx.moveTo(sx(rect.x0), Math.round(sy(y)) + 0.5); ctx.lineTo(sx(rect.x1), Math.round(sy(y)) + 0.5) }
       ctx.stroke()
     }
 
     // The part of the old map that is cut off: dimmed, and cells that hold something are tinted red.
     const ix0 = Math.max(0, rect.x0), iy0 = Math.max(0, rect.y0)
-    const ix1 = Math.min(map.width, rect.x1), iy1 = Math.min(map.height, rect.y1)
+    const ix1 = Math.min(geo.width, rect.x1), iy1 = Math.min(geo.height, rect.y1)
     ctx.save()
     ctx.beginPath()
-    ctx.rect(sx(0), sy(0), map.width * s, map.height * s)
+    ctx.rect(sx(0), sy(0), geo.width * s, geo.height * s)
     if (ix1 > ix0 && iy1 > iy0) ctx.rect(sx(ix0), sy(iy0), (ix1 - ix0) * s, (iy1 - iy0) * s)
     ctx.clip('evenodd')
-    fill(0, 0, map.width, map.height, 'rgba(10,10,14,0.68)')
+    fill(0, 0, geo.width, geo.height, 'rgba(10,10,14,0.68)')
     ctx.restore()
     ctx.fillStyle = 'rgba(239,68,68,0.6)'
     for (let i = 0; i < occupied.length; i++) {
       if (!occupied[i]) continue
       const x = i % map.width
       const y = Math.floor(i / map.width)
-      if (x >= rect.x0 && x < rect.x1 && y >= rect.y0 && y < rect.y1) continue
+      // Kept when the new tile grid (whole tiles covering the new frame) still has the cell.
+      if (x >= rect.x0 && x < Math.ceil(rect.x1 - 1e-9) && y >= rect.y0 && y < Math.ceil(rect.y1 - 1e-9)) continue
       ctx.fillRect(sx(x), sy(y), s, s)
     }
 
@@ -180,15 +208,15 @@ export function ResizePreview({ map, tilesets, spriteAssets, edges, onEdgesChang
     ctx.setLineDash([5, 4])
     ctx.strokeStyle = 'rgba(255,255,255,0.45)'
     ctx.lineWidth = 1
-    ctx.strokeRect(sx(0) + 0.5, sy(0) + 0.5, map.width * s, map.height * s)
+    ctx.strokeRect(sx(0) + 0.5, sy(0) + 0.5, geo.width * s, geo.height * s)
     ctx.setLineDash([])
-  }, [map, view, size, rect.x0, rect.y0, rect.x1, rect.y1, occupied, images, version, spriteAssets, spriteVersion])
+  }, [map, geo.width, geo.height, view, size, rect.x0, rect.y0, rect.x1, rect.y1, occupied, images, version, spriteAssets, spriteVersion])
 
   const startDrag = (handle: Handle) => (e: React.PointerEvent) => {
     e.preventDefault()
     e.currentTarget.setPointerCapture(e.pointerId)
     dragging.current = handle
-    setFrozen(fitView(map, edges, size.w, size.h))
+    setFrozen(custom ?? fitView(geo, edges, size.w, size.h))
   }
   const moveDrag = (e: React.PointerEvent) => {
     if (!dragging.current || !frozen || !stageRef.current) return
@@ -197,8 +225,9 @@ export function ResizePreview({ map, tilesets, spriteAssets, edges, onEdgesChang
       dragging.current,
       toWorldX(frozen, e.clientX - r.left),
       toWorldY(frozen, e.clientY - r.top),
-      map,
-      edges
+      geo,
+      edges,
+      step
     )
     if (next.left !== edges.left || next.top !== edges.top || next.right !== edges.right || next.bottom !== edges.bottom) {
       onEdgesChange(next)
@@ -233,9 +262,29 @@ export function ResizePreview({ map, tilesets, spriteAssets, edges, onEdgesChang
     <div
       ref={stageRef}
       data-testid="resize-stage"
-      className="relative h-[420px] w-full select-none overflow-hidden rounded-md border border-border bg-background"
+      className="relative h-[420px] w-full cursor-grab select-none overflow-hidden rounded-md border border-border bg-background"
+      onPointerDown={(e) => {
+        // Dragging the background pans (the handles stop their own pointer events).
+        if (e.button !== 0 && e.button !== 1) return
+        if ((e.target as HTMLElement).closest('[data-handle],[data-zoom]')) return
+        e.currentTarget.setPointerCapture(e.pointerId)
+        panning.current = { x: e.clientX, y: e.clientY, view }
+      }}
+      onPointerMove={(e) => {
+        const p = panning.current
+        if (!p) return
+        setCustom({ ...p.view, originX: p.view.originX + e.clientX - p.x, originY: p.view.originY + e.clientY - p.y })
+      }}
+      onPointerUp={() => { panning.current = null }}
+      onPointerCancel={() => { panning.current = null }}
     >
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" style={{ width: size.w, height: size.h }} />
+      <div className="absolute bottom-2 left-2 z-10 flex items-center gap-0.5 rounded-md border border-border bg-popover/90 p-0.5" data-zoom>
+        <button type="button" className="ed-iconbtn" aria-label="Zoom out" title="Zoom out (or scroll)" onClick={() => zoomBy(1 / 1.25)}><Minus /></button>
+        <span className="min-w-10 text-center text-ed-label tabular-nums" data-testid="resize-zoom">{Math.round((view.scale / TILE_SIZE) * 100)}%</span>
+        <button type="button" className="ed-iconbtn" aria-label="Zoom in" title="Zoom in (or scroll)" onClick={() => zoomBy(1.25)}><Plus /></button>
+        <button type="button" className="ed-iconbtn" aria-label="Fit" title="Fit the old and the new map" onClick={() => setCustom(null)}><Maximize /></button>
+      </div>
       <div
         className="pointer-events-none absolute border-2 border-primary"
         style={{ left, top, width, height }}

@@ -7,6 +7,7 @@ import type { EngineEntity } from './engine/types.ts'
 import { SCHEMA_VERSION } from './engine/types.ts'
 import { migrateMap } from './engine/migrate.ts'
 import { itemYSort } from './ySort.ts'
+import { mapPixelSize } from './mapSize.ts'
 
 export const TILE_SIZE = 32
 export const COLLISION_TILESET_ID = '__collision__'
@@ -182,7 +183,17 @@ export function convertEditorMapToTiled(map: EditorMap, tilesets: TilesetInfo[])
     return exportLayer
   })
 
+  // The real size of a map that is not a whole number of tiles, and the map settings the game reads.
+  const mapProps: TiledProperty[] = []
+  const px = mapPixelSize(map)
+  if (px.width !== map.width * TILE_SIZE || px.height !== map.height * TILE_SIZE) {
+    mapProps.push({ name: 'pixelWidth', type: 'int', value: px.width }, { name: 'pixelHeight', type: 'int', value: px.height })
+  }
+  const playerZ = map.settings?.playerZ
+  if (typeof playerZ === 'number' && Number.isFinite(playerZ)) mapProps.push({ name: 'playerZ', type: 'int', value: Math.round(playerZ) })
+
   return {
+    ...(mapProps.length > 0 ? { properties: mapProps } : {}),
     compressionlevel: -1,
     height: map.height,
     infinite: false,

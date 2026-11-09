@@ -143,6 +143,16 @@ export function validateEditorMap(data: unknown, options: ValidateEditorMapOptio
   if (!isPositiveInt(data.width)) errors.push(`map.width must be a positive integer (got ${JSON.stringify(data.width)})`)
   if (!isPositiveInt(data.height)) errors.push(`map.height must be a positive integer (got ${JSON.stringify(data.height)})`)
   const cellCount = isPositiveInt(data.width) && isPositiveInt(data.height) ? data.width * data.height : null
+  for (const [key, tiles] of [['pixelWidth', data.width], ['pixelHeight', data.height]] as const) {
+    const v = data[key]
+    if (v === undefined) continue
+    if (!isPositiveInt(v)) errors.push(`map.${key} must be a positive integer (got ${JSON.stringify(v)})`)
+    else if (isPositiveInt(tiles) && (v > tiles * 32 || v <= (tiles - 1) * 32)) warnings.push(`map.${key} ${v} does not fit the ${tiles}-tile grid; the grid's size is used`)
+  }
+  if (data.settings !== undefined) {
+    if (!isRecord(data.settings)) errors.push('map.settings must be an object')
+    else if (data.settings.playerZ !== undefined && (typeof data.settings.playerZ !== 'number' || !Number.isFinite(data.settings.playerZ))) errors.push('map.settings.playerZ must be a number')
+  }
 
   const tilesets = options.tilesets
   const tilesetByFile = new Map<string, { name?: string; width?: number; height?: number }>()

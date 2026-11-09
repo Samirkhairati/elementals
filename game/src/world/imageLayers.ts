@@ -6,6 +6,7 @@
 import { normalizeProps } from "@shared/engine/index.ts";
 import type { SpriteRegistry } from "@/data/spriteRegistry";
 import { buildSpriteComponents } from "@/sprites/spriteState";
+import { sortDepth } from "@/ecs/depth";
 
 export interface ImageObjectDef {
   name: string;
@@ -24,6 +25,8 @@ export interface ImageObjectDef {
   flipX: boolean;
   flipY: boolean;
   opacity: number;
+  /** Draws among the characters by its anchor's y instead of at the layer's depth (resolved by the exporter). */
+  ySort: boolean;
 }
 
 type Rec = Record<string, unknown>;
@@ -70,6 +73,7 @@ export function readImageObjects(raw: unknown): ImageObjectDef[] {
         flipX: p.flipX === true,
         flipY: p.flipY === true,
         opacity: Math.min(1, Math.max(0, num(p.opacity, 1))),
+        ySort: p.ySort === true,
       });
     }
   }
@@ -144,12 +148,17 @@ export class ImageLayerRenderer {
     this.shown = [];
   }
 
-  show(raw: unknown): void {
+  /**
+   * Draws a map's image layers. `ySortDepth` is the depth the characters stand at (the map's player depth): a y-sorted
+   * picture sorts with them by how far down its anchor is, exactly like a character's feet.
+   */
+  show(raw: unknown, options: { ySortDepth?: number } = {}): void {
     this.clear();
+    const ySortDepth = options.ySortDepth ?? 20;
     for (const def of readImageObjects(raw)) {
       const image = def.graphic ? this.picture(def) : this.sprite(def);
       if (!image) continue;
-      image.setDepth(def.depth);
+      image.setDepth(def.ySort ? sortDepth(ySortDepth, def.y) : def.depth);
       image.setAlpha(def.opacity);
       image.setFlip(def.flipX, def.flipY);
       if (def.scale !== 1) {

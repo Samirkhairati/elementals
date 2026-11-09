@@ -124,8 +124,8 @@ export function createProjectChannels(
         for (const w of result.warnings) console.warn(`[maps] ${w.file}: ${w.error}`);
         return result;
       }),
-    'create-map': (name: string, width: number, height: number, folderPath: string | null = null) =>
-      toResult(() => mapStore.createMap(mapsDir, name, width, height, folderPath)),
+    'create-map': (name: string, width: number, height: number, folderPath: string | null = null, pixelSize: { width: number; height: number } | null = null) =>
+      toResult(() => mapStore.createMap(mapsDir, name, width, height, folderPath, pixelSize)),
     'save-map': (folderPath: string | null, fileName: string, mapData: unknown) =>
       toResult(() => mapStore.saveMap(mapsDir, folderPath, fileName, mapData)),
     'delete-map': (folderPath: string | null, fileName: string) =>

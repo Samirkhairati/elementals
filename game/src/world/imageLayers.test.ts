@@ -1,3 +1,4 @@
+import { sortDepth } from "@/ecs/depth";
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { convertEditorMapToTiled } from "@shared/mapExport.ts";
@@ -144,6 +145,16 @@ describe("ImageLayerRenderer", () => {
     r.show(exported([{ id: "a", graphicId: "images/sky.png", x: 40, y: 64, flipX: true, opacity: 0.5 }]));
     expect(added).toHaveLength(1);
     expect(added[0]).toMatchObject({ x: 40, y: 64, texture: key, frame: "__BASE", origin: [0.5, 1], depth: 5, alpha: 0.5, flip: [true, false], display: null });
+  });
+
+  it("a y-sorted picture (from its layer) draws among the characters by its anchor's y, the others at the layer's depth", () => {
+    const { scene, added } = fakeScene({ [key]: sky });
+    const r = new ImageLayerRenderer(scene, realSprites);
+    r.show(exported([{ id: "a", graphicId: "images/sky.png", x: 40, y: 64 }, { id: "b", graphicId: "images/sky.png", x: 40, y: 96, ySort: false }], { ySort: true }), { ySortDepth: 20 });
+    expect(added[0].depth).toBeCloseTo(sortDepth(20, 64));
+    expect(added[0].depth).toBeGreaterThan(20);
+    expect(added[0].depth).toBeLessThan(21);
+    expect(added[1].depth).toBe(5);
   });
 
   it("crops are frames of the one picture texture: each distinct crop is added once, never a copy of the picture", () => {

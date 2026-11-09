@@ -4,15 +4,19 @@ import {
   applyResize,
   describeLoss,
   hasLoss,
+  mapPixelSize,
   occupiedCells,
   resizeLoss,
   resizeProblem,
   resizedSize,
+  tileEdges,
   type ResizableMap,
   type ResizeEdges,
 } from './mapResize'
 
-const edges = (e: Partial<ResizeEdges>): ResizeEdges => ({ left: 0, top: 0, right: 0, bottom: 0, ...e })
+// Edges in tiles, as pixels (most of these tests think in tiles).
+const edges = (e: Partial<ResizeEdges>): ResizeEdges => tileEdges({ left: 0, top: 0, right: 0, bottom: 0, ...e })
+const px = (e: Partial<ResizeEdges>): ResizeEdges => ({ left: 0, top: 0, right: 0, bottom: 0, ...e })
 const tile = (x = 0, y = 0) => ({ tilesetId: 'grass.png', x, y })
 
 // 4 x 3 map. Tile layer: (0,0) (3,0) (1,1) (3,2). Entity on (2,1), picture anchored on (0,2).
@@ -33,16 +37,19 @@ function makeMap(): ResizableMap {
 }
 
 describe('resizedSize / resizeProblem', () => {
-  it('adds the edges to the size', () => {
-    expect(resizedSize(makeMap(), edges({ left: 2, right: -1, bottom: 3 }))).toEqual({ width: 5, height: 6 })
+  it('adds the edges to the size in pixels', () => {
+    expect(resizedSize(makeMap(), edges({ left: 2, right: -1, bottom: 3 }))).toEqual({ width: 160, height: 192 })
+    expect(resizedSize(makeMap(), px({ right: 5 }))).toEqual({ width: 133, height: 96 })
   })
 
-  it('refuses empty, huge and fractional results', () => {
+  it('refuses empty, huge, fractional and off-grid left / top edges', () => {
     const m = makeMap()
     expect(resizeProblem(m, edges({ left: -2, right: -2 }))).toMatch(/at least/)
     expect(resizeProblem(m, edges({ top: -3 }))).toMatch(/at least/)
     expect(resizeProblem(m, edges({ right: 600 }))).toMatch(/at most/)
-    expect(resizeProblem(m, edges({ right: 1.5 }))).toMatch(/whole/)
+    expect(resizeProblem(m, px({ right: 1.5 }))).toMatch(/whole/)
+    expect(resizeProblem(m, px({ left: 5 }))).toMatch(/whole tiles/)
+    expect(resizeProblem(m, px({ right: 5, bottom: -7 }))).toBeNull()
     expect(resizeProblem(m, edges({ left: 1, right: -1 }))).toBeNull()
   })
 })
@@ -61,6 +68,7 @@ describe('applyResize', () => {
     expect(Object.keys(out.layers[0].data!).map(Number).sort((a, b) => a - b)).toEqual([0, 3, 7, 15])
     expect(out.layers[0].data![15]).toEqual(tile(4))
     expect(out.entities![0].x).toBe(80)
+    expect(out.pixelWidth).toBeUndefined()
     expect(hasLoss(resizeLoss(makeMap(), edges({ right: 2, bottom: 1 })))).toBe(false)
   })
 
@@ -75,27 +83,32 @@ describe('applyResize', () => {
     expect(out.layers[1].images![0]).toMatchObject({ x: 16 + 64, y: 96 + 32 })
   })
 
-  it('cropping drops what falls outside and shifts the rest', () => {
-    // remove the left column and the bottom row
-    const e = edges({ left: -1, bottom: -1 })
-    const out = applyResize(makeMap(), e)
+  it('cropping drops only the tiles that fall off; pictures and entities stay (outside the map if need be)', () => {
+    const out = applyResize(makeMap(), edges({ left: -1, bottom: -1 }))
     expect(out.width).toBe(3)
     expect(out.height).toBe(2)
     // survivors: (3,0)->(2,0)=2, (1,1)->(0,1)=3. Lost: (0,0) and (3,2).
     expect(Object.keys(out.layers[0].data!).map(Number).sort((a, b) => a - b)).toEqual([2, 3])
-    expect(out.layers[0].data![2]).toEqual(tile(2))
-    expect(out.layers[0].data![3]).toEqual(tile(3))
-    // the picture was on the cropped bottom row (0,2), the entity on (2,1) moves to (1,1)
-    expect(out.layers[1].images).toEqual([])
+    expect(out.layers[1].images).toEqual([{ id: 'i1', graphicId: 'a.png', x: 16 - 32, y: 96 }])
     expect(out.entities![0].x).toBe(32 + 16)
   })
 
-  it('drops entities cropped away and does not mutate its input', () => {
+  it('keeps an entity that is cropped off and does not mutate its input', () => {
     const m = makeMap()
     const before = JSON.stringify(m)
     const out = applyResize(m, edges({ right: -2 }))
-    expect(out.entities).toEqual([])
+    expect(out.entities).toHaveLength(1)
     expect(JSON.stringify(m)).toBe(before)
+  })
+
+  it('a size that is not whole tiles keeps its pixels and a grid that covers it', () => {
+    const out = applyResize(makeMap(), px({ right: 5, bottom: -10 }))
+    expect(out).toMatchObject({ width: 5, height: 3, pixelWidth: 133, pixelHeight: 86 })
+    expect(mapPixelSize(out)).toEqual({ width: 133, height: 86 })
+    // back to whole tiles: the pixel size goes away again
+    const back = applyResize(out, px({ right: -5, bottom: 10 }))
+    expect(back.pixelWidth).toBeUndefined()
+    expect(back.width).toBe(4)
   })
 
   it('throws for an impossible resize', () => {
@@ -111,42 +124,24 @@ describe('applyResize', () => {
 })
 
 describe('resizeLoss', () => {
-  it('counts tiles per layer, pictures and entities that would be cut', () => {
+  it('counts the painted tiles per layer that would be cut, and nothing else', () => {
     const loss = resizeLoss(makeMap(), edges({ left: -1, bottom: -1 }))
     expect(loss.tiles).toBe(2)
-    expect(loss.images).toBe(1)
-    expect(loss.entities).toEqual([])
-    expect(loss.layers).toEqual([
-      { layerId: 'g', name: 'ground', type: 'tile', tiles: 2, images: 0 },
-      { layerId: 'p', name: 'pics', type: 'image', tiles: 0, images: 1 },
-    ])
-    expect(describeLoss(loss)).toBe('2 painted tiles, 1 placed picture')
+    expect(loss.layers).toEqual([{ layerId: 'g', name: 'ground', type: 'tile', tiles: 2 }])
+    expect(describeLoss(loss)).toBe('2 painted tiles')
   })
 
-  it('names the cut entities and ignores empty strips', () => {
-    expect(resizeLoss(makeMap(), edges({ right: -2 })).entities).toEqual([{ id: 'e1', name: 'Sign' }])
+  it('a cropped strip without tiles loses nothing', () => {
     const m = makeMap()
     m.layers[0].data = { 0: tile() }
-    m.layers[1].images = []
-    m.entities = []
     expect(hasLoss(resizeLoss(m, edges({ right: -1, bottom: -1 })))).toBe(false)
   })
 })
 
 describe('occupiedCells', () => {
-  it('flags cells with tiles, pictures or entities', () => {
+  it('flags the cells with painted tiles', () => {
     const cells = occupiedCells(makeMap())
     expect(cells.length).toBe(12)
-    // tiles 0,3,5,11 + picture (0,2)=8 + entity (2,1)=6
-    expect([...cells].flatMap((v, i) => (v ? [i] : []))).toEqual([0, 3, 5, 6, 8, 11])
-  })
-
-  it('a picture that already runs past the map\'s edge is kept (and moved along), not counted as lost', () => {
-    const m = makeMap()
-    m.layers[1].images = [{ id: 'far', graphicId: 'a.png', x: -64, y: 500 }]
-    expect(resizeLoss(m, edges({ left: 1 })).images).toBe(0)
-    expect(hasLoss(resizeLoss({ ...m, layers: [m.layers[1]], entities: [] }, edges({ right: -1 })))).toBe(false)
-    const out = applyResize(m, edges({ left: 2, top: 1 }))
-    expect(out.layers[1].images![0]).toMatchObject({ x: -64 + 64, y: 500 + 32 })
+    expect([...cells].flatMap((v, i) => (v ? [i] : []))).toEqual([0, 3, 5, 11])
   })
 })

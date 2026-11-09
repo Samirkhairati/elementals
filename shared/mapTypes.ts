@@ -95,6 +95,11 @@ export interface EditorMap {
   name: string
   width: number
   height: number
+  /** Real size in pixels when not a whole number of tiles (see mapSize.ts). */
+  pixelWidth?: number
+  pixelHeight?: number
+  /** Per-map settings for the game. */
+  settings?: { playerZ?: number }
   layers: EditorLayer[]
   entities?: EditorEntity[]
   entityFolders?: unknown[]
@@ -166,6 +171,8 @@ export interface TiledLayer {
 }
 
 export interface TiledMap {
+  /** Map properties: `pixelWidth` / `pixelHeight` (a map that is not whole tiles) and `playerZ` (map settings). */
+  properties?: TiledProperty[]
   compressionlevel: number
   height: number
   infinite: boolean

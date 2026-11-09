@@ -119,6 +119,7 @@ export function spawnPlayer(
   mapSize: { width: number; height: number },
   tileSize: number,
   at?: { col: number; row: number; facing?: Facing },
+  depth?: number,
 ): PlayerSpawn {
   const centred = at === undefined;
   let x = Math.floor(mapSize.width / 2) * tileSize + tileSize / 2;
@@ -128,6 +129,6 @@ export function spawnPlayer(
     const row = Math.min(Math.max(0, Math.trunc(at.row)), Math.max(0, mapSize.height - 1));
     ({ x, y } = tileToAnchor(col, row));
   }
-  const entity = world.spawnPrefab(PlayerPrefab, { x, y, facing: centred ? undefined : at.facing });
+  const entity = world.spawnPrefab(PlayerPrefab, { x, y, facing: centred ? undefined : at.facing, ...(depth === undefined ? {} : { depth }) });
   return { entity, x, y };
 }

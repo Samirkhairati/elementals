@@ -37,7 +37,8 @@ export function useEditorDialogs(options: UseEditorDialogsOptions) {
     open: boolean
     parentPath?: string | null
   }>({ open: false })
-  const [createMapData, setCreateMapData] = useState({ name: '', width: 50, height: 50 })
+  // `width` / `height` are tiles; with `unit: 'pixels'` the map is made from `pixelWidth` x `pixelHeight` instead.
+  const [createMapData, setCreateMapData] = useState<{ name: string; width: number; height: number; unit: 'tiles' | 'pixels'; pixelWidth: number; pixelHeight: number }>({ name: '', width: 50, height: 50, unit: 'tiles', pixelWidth: 1280, pixelHeight: 720 })
 
   const [createMapFolderDialog, setCreateMapFolderDialog] = useState<{
     open: boolean
@@ -120,16 +121,20 @@ export function useEditorDialogs(options: UseEditorDialogsOptions) {
   // ── Create Map Confirmation ───────────────────────────────────────────────
   const handleConfirmCreateMap = useCallback(async () => {
     const cleanName = createMapData.name.trim()
-    if (!cleanName || createMapData.width <= 0 || createMapData.height <= 0) {
+    const byPixels = createMapData.unit === 'pixels'
+    const width = byPixels ? Math.ceil(createMapData.pixelWidth / 32) : createMapData.width
+    const height = byPixels ? Math.ceil(createMapData.pixelHeight / 32) : createMapData.height
+    if (!cleanName || width <= 0 || height <= 0) {
       alert('Invalid map data')
       return
     }
     if (!window.electronAPI) return
     const res = await window.electronAPI.createMap(
       cleanName,
-      createMapData.width,
-      createMapData.height,
-      createMapDialog.parentPath || null
+      width,
+      height,
+      createMapDialog.parentPath || null,
+      byPixels ? { width: createMapData.pixelWidth, height: createMapData.pixelHeight } : null
     )
     if (res.success) {
       if (createMapDialog.parentPath) {

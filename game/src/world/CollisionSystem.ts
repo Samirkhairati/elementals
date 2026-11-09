@@ -3,13 +3,17 @@ import { GAME_CONSTANTS } from "@/constants/game";
 export class CollisionSystem {
   private map: Phaser.Tilemaps.Tilemap | null = null;
   private collisionLayerName = "collision";
+  /** The walkable area: the map's real size (it can stop short of the last tile column / row). */
+  private size: { width: number; height: number } | null = null;
 
   /**
    * Updates the current map context for collision checks.
    * @param map The active Phaser Tilemap
+   * @param size The map's size in pixels when it is not the whole tile grid
    */
-  public setMap(map: Phaser.Tilemaps.Tilemap) {
+  public setMap(map: Phaser.Tilemaps.Tilemap, size?: { width: number; height: number }) {
     this.map = map;
+    this.size = size ?? null;
   }
 
   /**
@@ -22,8 +26,8 @@ export class CollisionSystem {
     if (!this.map) return true;
 
     const tileSize = GAME_CONSTANTS.TILE_SIZE;
-    const width = this.map.widthInPixels;
-    const height = this.map.heightInPixels;
+    const width = this.size?.width ?? this.map.widthInPixels;
+    const height = this.size?.height ?? this.map.heightInPixels;
 
     // 1. Boundary check
     if (x < 0 || x > width || y < tileSize || y > height) {

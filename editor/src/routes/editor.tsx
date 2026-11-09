@@ -23,7 +23,7 @@ import { useDatabase } from '@/hooks/useDatabase'
 import { useCommonEvents } from '@/hooks/useCommonEvents'
 import { useEntityPlacement } from '@/hooks/editor/useEntityPlacement'
 import { exportMap, exportMapToGame } from '@/hooks/useExportMap'
-import { applyResize, type ResizeEdges } from '@/lib/mapResize'
+import { applyResize, mapPixelSize, type ResizeEdges } from '@/lib/mapResize'
 import { ResizeMapDialog } from '@/components/editor/dialogs/ResizeMapDialog'
 
 // Layout
@@ -407,7 +407,8 @@ export function EditorPage() {
     layerManager.setSelectedImageId(null)
     mapManager.setActiveMap(resized)
     commitSnapshot()
-    setNotice({ kind: 'info', text: `Resized "${active.name}" to ${resized.width} × ${resized.height} tiles.` })
+    const px = mapPixelSize(resized)
+    setNotice({ kind: 'info', text: `Resized "${active.name}" to ${px.width} × ${px.height} px (${resized.width} × ${resized.height} tiles).` })
   })
 
   // ── Context Value for all panels ─────────────────────────────────────────

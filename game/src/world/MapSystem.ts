@@ -9,6 +9,7 @@ import {
   PhaserTilemapAdapter,
 } from "@/world/tilemap";
 import { CollisionSystem } from "@/world/CollisionSystem";
+import { readMapProps, type MapProps } from "@/world/mapProps";
 
 export class MapSystem {
   private scene: Scene;
@@ -18,6 +19,7 @@ export class MapSystem {
   private collisionSystem: CollisionSystem;
   private currentMap: Phaser.Tilemaps.Tilemap | null = null;
   private gridGraphics: Phaser.GameObjects.Graphics | null = null;
+  private currentProps: MapProps | null = null;
 
   constructor(scene: Scene) {
     this.scene = scene;
@@ -44,11 +46,12 @@ export class MapSystem {
 
     const rawData = this.scene.cache.tilemap.get(mapKey).data;
     const parsedData = MapParser.parse(rawData);
+    this.currentProps = readMapProps(rawData);
 
     this.currentMap = this.adapter.createTilemapFromLoadedJson(mapKey, parsedData);
 
-    // Wire up collision system
-    this.collisionSystem.setMap(this.currentMap);
+    // Wire up collision system (the walkable area is the map's real size, which can be less than whole tiles)
+    this.collisionSystem.setMap(this.currentMap, { width: this.currentProps.pixelWidth, height: this.currentProps.pixelHeight });
 
     this.updateWorldBounds();
     this.renderDebugGrid();
@@ -60,8 +63,8 @@ export class MapSystem {
     if (!this.currentMap) return;
     // A map smaller than the screen sits in the middle of it (the camera cannot scroll on that axis)
     const view = settingsStore.view;
-    const mapW = this.currentMap.widthInPixels;
-    const mapH = this.currentMap.heightInPixels;
+    const mapW = this.currentProps?.pixelWidth ?? this.currentMap.widthInPixels;
+    const mapH = this.currentProps?.pixelHeight ?? this.currentMap.heightInPixels;
     const boundsW = Math.max(mapW, view.width);
     const boundsH = Math.max(mapH, view.height);
     this.scene.cameras.main.setBounds((mapW - boundsW) / 2, (mapH - boundsH) / 2, boundsW, boundsH);
@@ -89,5 +92,7 @@ export class MapSystem {
   }
 
   get map() { return this.currentMap; }
+  /** The loaded map's size in pixels and settings. */
+  get props(): MapProps | null { return this.currentProps; }
   get collisions() { return this.collisionSystem; }
 }

@@ -453,3 +453,17 @@ describe('exporting to the game', () => {
     expect(fs.existsSync(path.join(root, 'x.json'))).toBe(false);
   });
 });
+
+describe('createMap by resolution', () => {
+  it('stores the pixel size when it is not whole tiles, and leaves it out when it is', async () => {
+    const fs = await import('node:fs')
+    const os = await import('node:os')
+    const path = await import('node:path')
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'maps-px-'))
+    const { map } = createMap(dir, 'Wide', 40, 23, null, { width: 1280, height: 720 })
+    expect(map).toMatchObject({ width: 40, height: 23, pixelWidth: 1280, pixelHeight: 720 })
+    expect(JSON.parse(fs.readFileSync(path.join(dir, map.fileName), 'utf8'))).toMatchObject({ pixelWidth: 1280, pixelHeight: 720 })
+    const whole = createMap(dir, 'Whole', 10, 10, null, { width: 320, height: 320 }).map
+    expect(whole.pixelWidth).toBeUndefined()
+  })
+})

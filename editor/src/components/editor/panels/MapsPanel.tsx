@@ -48,7 +48,7 @@ interface MapsPanelProps {
   activeMap: MapData | null
   expandedMapFolders: Set<string>
   toggleMapFolder: (folder: string) => void
-  setCreateMapData: (v: { name: string; width: number; height: number }) => void
+  setCreateMapData: (v: { name: string; width: number; height: number; unit: 'tiles' | 'pixels'; pixelWidth: number; pixelHeight: number }) => void
   setCreateMapDialog: (v: { open: boolean; parentPath?: string | null }) => void
   setCreateMapFolderName: (v: string) => void
   setCreateMapFolderDialog: (v: { open: boolean; parentPath?: string | null }) => void
@@ -92,7 +92,7 @@ export function MapsPanel({
 
   const openCreateMap = (parentPath: string | null = null) => {
     setTimeout(() => {
-      setCreateMapData({ name: '', width: 50, height: 50 })
+      setCreateMapData({ name: '', width: 50, height: 50, unit: 'tiles', pixelWidth: 1280, pixelHeight: 720 })
       setCreateMapDialog({ open: true, parentPath })
     }, 0)
   }

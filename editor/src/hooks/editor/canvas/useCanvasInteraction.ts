@@ -412,7 +412,8 @@ export function useCanvasInteraction({
       const activeLayer = layersRef.current.find((l) => l.id === activeLayerIdRef.current)
       if (activeLayer?.type === 'image') {
         if (button === 0) {
-          if (pendingImage && coords.isInside && !activeLayer.locked && activeLayer.visible) {
+          // Anywhere, the map's edge included: pictures can sit partly or wholly outside the map.
+          if (pendingImage && !activeLayer.locked && activeLayer.visible) {
             // Same maths as the ghost preview, so the image lands where the preview showed it.
             const p = stageRef?.current?.getPointerPosition()
             const stage = stageRef?.current

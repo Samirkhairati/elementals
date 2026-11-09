@@ -221,8 +221,10 @@ export class Game extends Scene {
     const map = this.mapSystem.loadMap(mapKey);
     const rawMapData = this.cache.tilemap.get(mapKey)?.data;
     this.currentMapKey = mapKey;
-    // Pictures and sprites placed on the map's image layers (the old map's are destroyed first).
-    this.imageLayers.show(rawMapData);
+    // Pictures and sprites placed on the map's image layers (the old map's are destroyed first). Y-sorted ones draw
+    // among the characters, at the player's depth.
+    const mapProps = this.mapSystem.props;
+    this.imageLayers.show(rawMapData, { ySortDepth: mapProps?.playerZ });
 
     this.spatialSystem.setMap(map);
 
@@ -234,7 +236,7 @@ export class Game extends Scene {
     // Spawn the player (map centre by default), then the editor-placed entities and the entities
     // converted from legacy `interactables` object layers.
     const tileSize = GAME_CONSTANTS.TILE_SIZE;
-    const spawned = spawnPlayer(this.world, map, tileSize, spawn);
+    const spawned = spawnPlayer(this.world, map, tileSize, spawn, mapProps?.playerZ);
     this.playerEntity = spawned.entity;
     const entityDefs = [
       ...(Array.isArray(rawMapData?.entities) ? rawMapData.entities : []),

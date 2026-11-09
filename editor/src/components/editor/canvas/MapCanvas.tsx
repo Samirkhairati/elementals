@@ -30,6 +30,7 @@ import { CanvasNavigator, type ViewportHandle } from './CanvasNavigator'
 import { PendingEntityPlacement } from '@/hooks/editor/useEntityPlacement'
 import { useCanvasView } from '@/hooks/editor/canvas/canvasView'
 import { clampEntitiesIndex } from '@/lib/layerOrder'
+import { mapPixelSize } from '../../../../../shared/mapSize'
 import { useEditorSelector, type EditorContextValue } from '@/components/editor/layout/EditorContext'
 import { openEventEditor } from '@/lib/openEventEditor'
 
@@ -258,8 +259,10 @@ export function MapCanvas({
     [updateComponentProp, updateComponentProps]
   )
 
-  const mapWidthPx = activeMap ? activeMap.width * 32 : 0
-  const mapHeightPx = activeMap ? activeMap.height * 32 : 0
+  // The map's real size: pixels when it is not a whole number of tiles (the tile grid covers it).
+  const mapPx = activeMap ? mapPixelSize(activeMap) : { width: 0, height: 0 }
+  const mapWidthPx = mapPx.width
+  const mapHeightPx = mapPx.height
 
   return (
     <>

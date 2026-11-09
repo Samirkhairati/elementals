@@ -1,107 +1,97 @@
 import type { EntityData, Layer, MapData } from '@/types/editor'
-import { TILE_SIZE, anchorToTile } from '../../../shared/engine/constants'
+import { TILE_SIZE } from '../../../shared/engine/constants'
+import { mapPixelSize } from '../../../shared/mapSize'
 
 /**
- * Pure model of "resize map". Each edge is a whole number of tiles: positive grows that side with empty
- * ground, negative crops it away. Tile (x, y) of the old map becomes (x + left, y + top) in the new one, and
- * every pixel position (entity anchors, image-layer items) moves with it.
+ * Pure model of "resize map", in pixels. A map is a size in pixels (any size: `pixelWidth` / `pixelHeight`, or whole
+ * tiles when those are absent) over a grid of 32 px tiles that covers it. Each edge grows (positive) or crops
+ * (negative) that side. The left and top edges move in whole tiles so painted tiles stay on the grid; the right and
+ * bottom edges can stop on any pixel. Tile (x, y) of the old map becomes (x + left/32, y + top/32), and every pixel
+ * position (entity anchors, image-layer items) moves by (left, top).
  *
- * Kept free of React and of anything map-specific beyond width/height/layers/entities so future map
- * connections (which sit on the edges) can hook into one place.
+ * Nothing placed is ever removed: pictures and entities that end up outside the map stay where they are (outside).
+ * Only painted tiles that fall off the new tile grid are cropped.
  */
 
 export interface ResizeEdges {
+  /** Pixels; a multiple of the tile size. */
   left: number
+  /** Pixels; a multiple of the tile size. */
   top: number
+  /** Pixels. */
   right: number
+  /** Pixels. */
   bottom: number
 }
 
-export type ResizableMap = Pick<MapData, 'width' | 'height' | 'layers'> & { entities?: EntityData[] }
+export type ResizableMap = Pick<MapData, 'width' | 'height' | 'layers' | 'pixelWidth' | 'pixelHeight'> & { entities?: EntityData[] }
 
 export const NO_RESIZE: ResizeEdges = { left: 0, top: 0, right: 0, bottom: 0 }
-export const MIN_MAP_SIZE = 1
+/** At most this many tiles on each side. */
 export const MAX_MAP_SIZE = 500
+
+export { mapPixelSize }
 
 export function isNoResize(e: ResizeEdges): boolean {
   return e.left === 0 && e.top === 0 && e.right === 0 && e.bottom === 0
 }
 
-export function resizedSize(map: Pick<MapData, 'width' | 'height'>, e: ResizeEdges): { width: number; height: number } {
-  return { width: map.width + e.left + e.right, height: map.height + e.top + e.bottom }
+/** The new size in pixels. */
+export function resizedSize(map: Pick<MapData, 'width' | 'height' | 'pixelWidth' | 'pixelHeight'>, e: ResizeEdges): { width: number; height: number } {
+  const px = mapPixelSize(map)
+  return { width: px.width + e.left + e.right, height: px.height + e.top + e.bottom }
 }
 
+/** Tiles needed to cover a pixel size. */
+export const tilesFor = (px: number): number => Math.max(1, Math.ceil(px / TILE_SIZE))
+
 /** Why `edges` cannot be applied, or null when they can. */
-export function resizeProblem(map: Pick<MapData, 'width' | 'height'>, e: ResizeEdges): string | null {
+export function resizeProblem(map: Pick<MapData, 'width' | 'height' | 'pixelWidth' | 'pixelHeight'>, e: ResizeEdges): string | null {
   for (const v of [e.left, e.top, e.right, e.bottom]) {
-    if (!Number.isInteger(v)) return 'Sizes must be whole numbers of tiles.'
+    if (!Number.isInteger(v)) return 'Sizes must be whole pixels.'
   }
+  if (e.left % TILE_SIZE !== 0 || e.top % TILE_SIZE !== 0) return `The left and top edges move in whole tiles (${TILE_SIZE} px), so painted tiles stay on the grid.`
   const { width, height } = resizedSize(map, e)
-  if (width < MIN_MAP_SIZE || height < MIN_MAP_SIZE) return 'The map must keep at least 1 × 1 tiles.'
-  if (width > MAX_MAP_SIZE || height > MAX_MAP_SIZE) return `A map can be at most ${MAX_MAP_SIZE} × ${MAX_MAP_SIZE} tiles.`
+  if (width < 1 || height < 1) return 'The map must keep at least 1 × 1 pixels.'
+  if (tilesFor(width) > MAX_MAP_SIZE || tilesFor(height) > MAX_MAP_SIZE) return `A map can be at most ${MAX_MAP_SIZE * TILE_SIZE} × ${MAX_MAP_SIZE * TILE_SIZE} pixels (${MAX_MAP_SIZE} × ${MAX_MAP_SIZE} tiles).`
   return null
 }
 
 const inside = (x: number, y: number, w: number, h: number) => x >= 0 && y >= 0 && x < w && y < h
 
-/** Tile of an entity / image anchor, in old-map coordinates. */
-function anchorCell(x: number, y: number): { col: number; row: number } {
-  return anchorToTile(x, y)
-}
-
-/**
- * A picture is lost when its anchor was inside the map and ends up outside the new one. Pictures that already ran past
- * the map's edge (they can be dragged there) stay, moved along with the rest.
- */
-function imageLost(map: ResizableMap, e: ResizeEdges, col: number, row: number, newW: number, newH: number): boolean {
-  return inside(col, row, map.width, map.height) && !inside(col + e.left, row + e.top, newW, newH)
-}
-
 export interface ResizeLoss {
-  /** Painted tiles that fall outside the new map, per layer (only layers that lose something). */
-  layers: { layerId: string; name: string; type: Layer['type']; tiles: number; images: number }[]
-  entities: { id: string; name: string }[]
+  /** Painted tiles that fall off the new tile grid, per layer (only layers that lose some). */
+  layers: { layerId: string; name: string; type: Layer['type']; tiles: number }[]
   tiles: number
-  images: number
 }
 
-/** What cropping throws away. Empty (all zero) when the map only grows or the cropped strip is empty. */
+/** What cropping throws away: painted tiles only (pictures and entities are always kept). */
 export function resizeLoss(map: ResizableMap, e: ResizeEdges): ResizeLoss {
-  const { width: newW, height: newH } = resizedSize(map, e)
-  const loss: ResizeLoss = { layers: [], entities: [], tiles: 0, images: 0 }
-
+  const size = resizedSize(map, e)
+  const newW = tilesFor(size.width)
+  const newH = tilesFor(size.height)
+  const dc = e.left / TILE_SIZE
+  const dr = e.top / TILE_SIZE
+  const loss: ResizeLoss = { layers: [], tiles: 0 }
   for (const layer of map.layers) {
     let tiles = 0
-    let images = 0
     for (const key of Object.keys(layer.data ?? {})) {
       const idx = Number(key)
-      const x = (idx % map.width) + e.left
-      const y = Math.floor(idx / map.width) + e.top
-      if (!inside(x, y, newW, newH)) tiles++
+      if (!inside((idx % map.width) + dc, Math.floor(idx / map.width) + dr, newW, newH)) tiles++
     }
-    for (const item of layer.images ?? []) {
-      const { col, row } = anchorCell(item.x, item.y)
-      if (imageLost(map, e, col, row, newW, newH)) images++
-    }
-    if (tiles || images) {
-      loss.layers.push({ layerId: layer.id, name: layer.name, type: layer.type, tiles, images })
+    if (tiles) {
+      loss.layers.push({ layerId: layer.id, name: layer.name, type: layer.type, tiles })
       loss.tiles += tiles
-      loss.images += images
     }
-  }
-
-  for (const ent of map.entities ?? []) {
-    const { col, row } = anchorCell(ent.x, ent.y)
-    if (!inside(col + e.left, row + e.top, newW, newH)) loss.entities.push({ id: ent.id, name: ent.name })
   }
   return loss
 }
 
 export function hasLoss(loss: ResizeLoss): boolean {
-  return loss.tiles > 0 || loss.images > 0 || loss.entities.length > 0
+  return loss.tiles > 0
 }
 
-/** One flag per old cell (`y * width + x`): does anything live there (a painted tile, an image anchor, an entity)? */
+/** One flag per old tile cell (`y * width + x`): is a tile painted there (on any layer)? */
 export function occupiedCells(map: ResizableMap): Uint8Array {
   const cells = new Uint8Array(map.width * map.height)
   for (const layer of map.layers) {
@@ -109,47 +99,33 @@ export function occupiedCells(map: ResizableMap): Uint8Array {
       const idx = Number(key)
       if (idx >= 0 && idx < cells.length) cells[idx] = 1
     }
-    for (const item of layer.images ?? []) mark(cells, map.width, map.height, item.x, item.y)
   }
-  for (const ent of map.entities ?? []) mark(cells, map.width, map.height, ent.x, ent.y)
   return cells
-}
-
-function mark(cells: Uint8Array, w: number, h: number, x: number, y: number) {
-  const { col, row } = anchorCell(x, y)
-  if (inside(col, row, w, h)) cells[row * w + col] = 1
 }
 
 function shiftLayer(layer: Layer, map: ResizableMap, e: ResizeEdges, newW: number, newH: number): Layer {
   const next: Layer = { ...layer }
+  const dc = e.left / TILE_SIZE
+  const dr = e.top / TILE_SIZE
   if (layer.data) {
     const data: NonNullable<Layer['data']> = {}
     for (const [key, tile] of Object.entries(layer.data)) {
       const idx = Number(key)
-      const x = (idx % map.width) + e.left
-      const y = Math.floor(idx / map.width) + e.top
+      const x = (idx % map.width) + dc
+      const y = Math.floor(idx / map.width) + dr
       if (inside(x, y, newW, newH)) data[y * newW + x] = tile
     }
     next.data = data
   }
-  if (layer.images) {
-    next.images = layer.images
-      .filter((item) => {
-        const { col, row } = anchorCell(item.x, item.y)
-        return !imageLost(map, e, col, row, newW, newH)
-      })
-      .map((item) => ({ ...item, x: item.x + e.left * TILE_SIZE, y: item.y + e.top * TILE_SIZE }))
-  }
+  if (layer.images) next.images = layer.images.map((item) => ({ ...item, x: item.x + e.left, y: item.y + e.top }))
   return next
 }
 
 function shiftEntity(ent: EntityData, e: ResizeEdges): EntityData {
-  const dx = e.left * TILE_SIZE
-  const dy = e.top * TILE_SIZE
-  const next: EntityData = { ...ent, x: ent.x + dx, y: ent.y + dy }
+  const next: EntityData = { ...ent, x: ent.x + e.left, y: ent.y + e.top }
   const transform = ent.components?.Transform
   if (transform && typeof transform.x === 'number' && typeof transform.y === 'number') {
-    next.components = { ...ent.components, Transform: { ...transform, x: transform.x + dx, y: transform.y + dy } }
+    next.components = { ...ent.components, Transform: { ...transform, x: transform.x + e.left, y: transform.y + e.top } }
   }
   return next
 }
@@ -160,26 +136,21 @@ export function applyResize<T extends ResizableMap>(map: T, e: ResizeEdges): T {
   if (problem) throw new Error(problem)
   if (isNoResize(e)) return map
 
-  const { width, height } = resizedSize(map, e)
+  const size = resizedSize(map, e)
+  const width = tilesFor(size.width)
+  const height = tilesFor(size.height)
   const layers = map.layers.map((l) => shiftLayer(l, map, e, width, height))
-  const result: T = { ...map, width, height, layers }
-  if (map.entities) {
-    result.entities = map.entities
-      .filter((ent) => {
-        const { col, row } = anchorCell(ent.x, ent.y)
-        return inside(col + e.left, row + e.top, width, height)
-      })
-      .map((ent) => shiftEntity(ent, e))
-  }
+  const { pixelWidth: _w, pixelHeight: _h, ...rest } = map
+  const wholeTiles = size.width === width * TILE_SIZE && size.height === height * TILE_SIZE
+  const result = { ...rest, width, height, layers, ...(wholeTiles ? {} : { pixelWidth: size.width, pixelHeight: size.height }) } as T
+  if (map.entities) result.entities = map.entities.map((ent) => shiftEntity(ent, e))
   return result
 }
 
-/** "3 layers lose 214 tiles, 2 pictures and 1 entity" for the warning box. */
+/** "214 painted tiles" for the warning box. */
 export function describeLoss(loss: ResizeLoss): string {
-  const parts: string[] = []
-  const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
-  if (loss.tiles) parts.push(plural(loss.tiles, 'painted tile'))
-  if (loss.images) parts.push(plural(loss.images, 'placed picture'))
-  if (loss.entities.length) parts.push(plural(loss.entities.length, 'entity', 'entities'))
-  return parts.join(', ')
+  return `${loss.tiles} painted ${loss.tiles === 1 ? 'tile' : 'tiles'}`
 }
+
+/** Edges given in tiles, as pixels. */
+export const tileEdges = (e: ResizeEdges): ResizeEdges => ({ left: e.left * TILE_SIZE, top: e.top * TILE_SIZE, right: e.right * TILE_SIZE, bottom: e.bottom * TILE_SIZE })

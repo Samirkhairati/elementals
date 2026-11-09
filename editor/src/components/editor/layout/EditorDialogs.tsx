@@ -19,8 +19,8 @@ interface EditorDialogsProps {
 
   createMapDialog: { open: boolean; parentPath?: string | null }
   setCreateMapDialog: React.Dispatch<React.SetStateAction<{ open: boolean; parentPath?: string | null }>>
-  createMapData: { name: string; width: number; height: number }
-  setCreateMapData: React.Dispatch<React.SetStateAction<{ name: string; width: number; height: number }>>
+  createMapData: { name: string; width: number; height: number; unit: 'tiles' | 'pixels'; pixelWidth: number; pixelHeight: number }
+  setCreateMapData: React.Dispatch<React.SetStateAction<{ name: string; width: number; height: number; unit: 'tiles' | 'pixels'; pixelWidth: number; pixelHeight: number }>>
   handleConfirmCreateMap: () => void
 
   confirmDialog: { open: boolean; title: string; description: string; action: () => void }
@@ -71,6 +71,12 @@ export function EditorDialogs({
         setName={(v) => setCreateMapData(d => ({ ...d, name: v }))}
         setWidth={(v) => setCreateMapData(d => ({ ...d, width: v }))}
         setHeight={(v) => setCreateMapData(d => ({ ...d, height: v }))}
+        unit={createMapData.unit}
+        pixelWidth={createMapData.pixelWidth}
+        pixelHeight={createMapData.pixelHeight}
+        setUnit={(unit) => setCreateMapData(d => ({ ...d, unit }))}
+        setPixelWidth={(v) => setCreateMapData(d => ({ ...d, pixelWidth: v }))}
+        setPixelHeight={(v) => setCreateMapData(d => ({ ...d, pixelHeight: v }))}
         onClose={() => setCreateMapDialog({ open: false })}
         onConfirm={handleConfirmCreateMap}
       />

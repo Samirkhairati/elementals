@@ -18,7 +18,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   deleteTileset: (folder: string | null, file: string) => ipcRenderer.invoke('delete-tileset', folder, file),
   moveTilesetFolder: (folderPath: string, newParent: string | null) => ipcRenderer.invoke('move-tileset-folder', folderPath, newParent),
   getMaps: () => ipcRenderer.invoke('get-maps'),
-  createMap: (name: string, width: number, height: number, folderPath: string | null) => ipcRenderer.invoke('create-map', name, width, height, folderPath),
+  createMap: (name: string, width: number, height: number, folderPath: string | null, pixelSize?: { width: number; height: number } | null) => ipcRenderer.invoke('create-map', name, width, height, folderPath, pixelSize ?? null),
   saveMap: (folderPath: string | null, fileName: string, mapData: unknown) => ipcRenderer.invoke('save-map', folderPath, fileName, mapData),
   deleteMap: (folderPath: string | null, fileName: string) => ipcRenderer.invoke('delete-map', folderPath, fileName),
   createMapFolder: (parentPath: string | null, folderName: string) => ipcRenderer.invoke('create-map-folder', parentPath, folderName),

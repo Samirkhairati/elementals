@@ -55,26 +55,36 @@ export const toWorldX = (v: ResizeView, px: number) => (px - v.originX) / v.scal
 export const toWorldY = (v: ResizeView, py: number) => (py - v.originY) / v.scale
 
 /**
- * The edges after dragging `handle` to the world position (wx, wy). Positions snap to whole tiles and the
- * rectangle keeps between 1 and MAX_MAP_SIZE tiles on each axis.
+ * The edges after dragging `handle` to the world position (wx, wy). The left and top edges snap to whole tiles; the
+ * right and bottom ones to `step` (1 = whole tiles, 1/32 = whole pixels). The rectangle keeps between `step` and
+ * MAX_MAP_SIZE tiles on each axis.
  */
 export function edgesFromDrag(
   handle: Handle,
   wx: number,
   wy: number,
   map: { width: number; height: number },
-  edges: ResizeEdges
+  edges: ResizeEdges,
+  step = 1
 ): ResizeEdges {
   const r = newRect(map, edges)
-  const clampX = (v: number, fixed: number, movingIsMin: boolean) =>
+  const snap = (v: number, by: number) => Math.round(v / by) * by
+  const clamp = (v: number, fixed: number, movingIsMin: boolean, min: number) =>
     movingIsMin
-      ? Math.max(fixed - MAX_MAP_SIZE, Math.min(fixed - 1, v))
-      : Math.min(fixed + MAX_MAP_SIZE, Math.max(fixed + 1, v))
-  const tx = Math.round(wx)
-  const ty = Math.round(wy)
-  if (handle.includes('w')) r.x0 = clampX(tx, r.x1, true)
-  if (handle.includes('e')) r.x1 = clampX(tx, r.x0, false)
-  if (handle.includes('n')) r.y0 = clampX(ty, r.y1, true)
-  if (handle.includes('s')) r.y1 = clampX(ty, r.y0, false)
-  return { left: 0 - r.x0, top: 0 - r.y0, right: r.x1 - map.width, bottom: r.y1 - map.height }
+      ? Math.max(fixed - MAX_MAP_SIZE, Math.min(fixed - min, v))
+      : Math.min(fixed + MAX_MAP_SIZE, Math.max(fixed + min, v))
+  // An edge that moves in whole tiles keeps at least one tile; the free ones at least one step.
+  if (handle.includes('w')) r.x0 = Math.floor(clamp(snap(wx, 1), r.x1, true, 1))
+  if (handle.includes('e')) r.x1 = clamp(snap(wx, step), r.x0, false, step)
+  if (handle.includes('n')) r.y0 = Math.floor(clamp(snap(wy, 1), r.y1, true, 1))
+  if (handle.includes('s')) r.y1 = clamp(snap(wy, step), r.y0, false, step)
+  const fix = (v: number) => Math.round(v * 1e6) / 1e6
+  return { left: fix(0 - r.x0), top: fix(0 - r.y0), right: fix(r.x1 - map.width), bottom: fix(r.y1 - map.height) }
+}
+
+/** `view` zoomed by `factor` around the screen point (px, py), which keeps showing the same spot. */
+export function zoomViewAt(view: ResizeView, factor: number, px: number, py: number): ResizeView {
+  const scale = Math.min(256, Math.max(0.05, view.scale * factor))
+  const f = scale / view.scale
+  return { scale, originX: px - (px - view.originX) * f, originY: py - (py - view.originY) * f }
 }

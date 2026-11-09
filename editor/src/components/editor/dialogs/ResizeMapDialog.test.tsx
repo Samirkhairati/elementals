@@ -41,18 +41,44 @@ describe('ResizeMapDialog', () => {
     expect(screen.getByTestId('resize-size')).toHaveTextContent('4 × 3 → 6 × 4')
     expect(screen.queryByTestId('resize-warning')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Resize' }))
-    expect(onConfirm).toHaveBeenCalledWith({ left: 2, top: 0, right: 0, bottom: 1 })
+    expect(onConfirm).toHaveBeenCalledWith({ left: 64, top: 0, right: 0, bottom: 32 })
   })
 
-  it('warns what a crop removes and makes the button say so', () => {
+  it('warns which painted tiles a crop cuts (entities are kept) and makes the button say so', () => {
     const { onConfirm } = setup()
     type('Right (tiles)', '-1')
     const warning = screen.getByTestId('resize-warning')
-    expect(warning).toHaveTextContent('This removes 2 painted tiles, 1 entity.')
+    expect(warning).toHaveTextContent('This crops 2 painted tiles.')
     expect(warning).toHaveTextContent('ground: 2 tiles')
-    expect(warning).toHaveTextContent('Entities: Sign')
-    fireEvent.click(screen.getByRole('button', { name: 'Resize and remove content' }))
-    expect(onConfirm).toHaveBeenCalledWith({ left: 0, top: 0, right: -1, bottom: 0 })
+    expect(warning).not.toHaveTextContent('Sign')
+    fireEvent.click(screen.getByRole('button', { name: 'Resize and crop tiles' }))
+    expect(onConfirm).toHaveBeenCalledWith({ left: 0, top: 0, right: -32, bottom: 0 })
+  })
+
+  it('in Pixels the right edge stops on any pixel, and the size can be typed', () => {
+    const { onConfirm } = setup()
+    fireEvent.click(screen.getByRole('radio', { name: 'Pixels' }))
+    type('Width (pixels)', '140')
+    expect(screen.getByTestId('resize-size')).toHaveTextContent('128 × 96 → 140 × 96 px')
+    expect(screen.getByTestId('resize-grid')).toHaveTextContent('5 × 3 tiles of 32 px')
+    fireEvent.click(screen.getByRole('button', { name: 'Resize' }))
+    expect(onConfirm).toHaveBeenCalledWith({ left: 0, top: 0, right: 12, bottom: 0 })
+  })
+
+  it('in Pixels the left edge still moves in whole tiles', () => {
+    setup()
+    fireEvent.click(screen.getByRole('radio', { name: 'Pixels' }))
+    type('Left (pixels)', '40')
+    expect(screen.getByTestId('resize-size')).toHaveTextContent('→ 160 × 96 px')
+  })
+
+  it('the preview zooms with its buttons', () => {
+    setup()
+    const before = screen.getByTestId('resize-zoom').textContent
+    fireEvent.click(screen.getByRole('button', { name: 'Zoom in' }))
+    expect(screen.getByTestId('resize-zoom').textContent).not.toBe(before)
+    fireEvent.click(screen.getByRole('button', { name: 'Fit' }))
+    expect(screen.getByTestId('resize-zoom').textContent).toBe(before)
   })
 
   it('refuses to crop the map away entirely', () => {

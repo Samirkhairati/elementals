@@ -147,8 +147,14 @@ export interface MapData {
   name: string
   fileName: string
   folderPath: string | null
+  /** Tiles (32 px) across: the grid tile layers paint on. */
   width: number
   height: number
+  /** The map's real size in pixels when it is not a whole number of tiles (shared/mapSize.ts). */
+  pixelWidth?: number
+  pixelHeight?: number
+  /** Map settings (right-click a map › Settings…). */
+  settings?: MapSettings
   layers: Layer[]
   entities?: EntityData[]
   entityFolders?: EntityFolder[]
@@ -156,6 +162,12 @@ export interface MapData {
   entitiesIndex?: number
   /** 2 = canonical engine components. Set when the map is loaded/migrated. */
   schemaVersion?: number
+}
+
+/** Per-map settings, exported as map properties for the game. */
+export interface MapSettings {
+  /** Draw depth of the player (and of the y-sorted pictures, which sort among the characters). Default 20. */
+  playerZ?: number
 }
 
 export interface TilesetData {

@@ -12,6 +12,8 @@ export interface PlayerPrefabProps {
   y: number;
   speed?: number;
   facing?: Facing;
+  /** Draw depth (the map's `playerZ` setting); the usual character depth by default. */
+  depth?: number;
 }
 
 /**
@@ -28,7 +30,7 @@ export const PlayerPrefab = definePrefab<PlayerPrefabProps>({
       x: props.x,
       y: props.y,
       components: {
-        Transform: createDefaultComponent("Transform", { x: props.x, y: props.y, depth: GAME_CONSTANTS.PLAYER_DEPTH }),
+        Transform: createDefaultComponent("Transform", { x: props.x, y: props.y, depth: props.depth ?? GAME_CONSTANTS.PLAYER_DEPTH }),
         Sprite: createDefaultComponent("Sprite", { asset: PLAYER_ASSET_ID, facing: props.facing ?? "down" }),
         Collider: createDefaultComponent("Collider", { width: 16, height: 8 }),
         Movement: createDefaultComponent("Movement", { controller: "player", speed: props.speed ?? settingsStore.movement.playerSpeed }),
