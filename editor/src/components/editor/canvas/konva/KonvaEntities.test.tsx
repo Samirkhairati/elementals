@@ -267,7 +267,7 @@ describe('KonvaEntities', () => {
 describe('mergeByDepth (y-sorted pictures among the entity sprites)', () => {
   const info = (id: string, y: number, depth = 20) => ({ id, entity: { y, components: { Transform: { depth } } } })
   const pic = (id: string, y: number, depth = 20) => ({ id, y, depth, draw: () => {} })
-  const order = (rows: ReturnType<typeof mergeByDepth>) => rows.map((r) => (r.kind === 'entity' ? (r.info as { id: string }).id : r.picture.id))
+  const order = (rows: ({ kind: 'entity'; info: { id: string } } | { kind: 'picture'; picture: { id: string } })[]) => rows.map((r) => (r.kind === 'entity' ? r.info.id : r.picture.id))
 
   it('sorts by depth, then by how far down: a tree whose foot is lower covers the hero', () => {
     expect(order(mergeByDepth([info('flat', 500, 5), info('hero', 100)], [pic('tree', 120), pic('bush', 50)]))).toEqual(['flat', 'bush', 'hero', 'tree'])
