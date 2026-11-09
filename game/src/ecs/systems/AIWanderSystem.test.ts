@@ -292,7 +292,7 @@ describe('AIWanderSystem + MovementSystem integration', () => {
         const [tx, ty] = tileOf(x, y);
         return !set.has(`${tx},${ty}`);
       },
-      setMap: () => {},
+      shapesBlockMove: () => false, setMap: () => {},
     } as unknown as CollisionSystem;
     const spatial = new SpatialSystem(collision);
     const movement = new MovementSystem(spatial);

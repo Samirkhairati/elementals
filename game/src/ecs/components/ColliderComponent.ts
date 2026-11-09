@@ -1,9 +1,15 @@
+import type { ShapePoint } from "@shared/collisionShapes.ts";
+
 export interface ColliderComponentInit {
   width?: number;
   height?: number;
   offsetX?: number;
   offsetY?: number;
   isSolid?: boolean;
+  shape?: "box" | "polygon";
+  /** Polygon points relative to the Transform anchor. */
+  points?: ShapePoint[];
+  closed?: boolean;
 }
 
 /**
@@ -16,6 +22,9 @@ export class ColliderComponent {
   public offsetX: number;
   public offsetY: number;
   public isSolid: boolean;
+  public shape: "box" | "polygon";
+  public points: ShapePoint[];
+  public closed: boolean;
 
   constructor(init?: ColliderComponentInit) {
     this.width = init?.width ?? 32;
@@ -23,6 +32,9 @@ export class ColliderComponent {
     this.offsetX = init?.offsetX ?? 0;
     this.offsetY = init?.offsetY ?? 0;
     this.isSolid = init?.isSolid ?? true;
+    this.shape = init?.shape === "polygon" && init.points ? "polygon" : "box";
+    this.points = init?.points ?? [];
+    this.closed = init?.closed ?? true;
   }
 }
 

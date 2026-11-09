@@ -297,7 +297,7 @@ describe('playerEnter', () => {
   });
 
   it('fires when a step ends on the trigger even if the player chains straight into the next step', async () => {
-    const collision = { isWalkable: () => true, setMap: () => {} } as unknown as CollisionSystem;
+    const collision = { isWalkable: () => true, shapesBlockMove: () => false, setMap: () => {} } as unknown as CollisionSystem;
     const spatial = new SpatialSystem(collision);
     const movement = new MovementSystem(spatial);
     rig.world.addSystem(spatial);

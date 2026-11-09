@@ -18,6 +18,7 @@ import { gameState } from '@/core/GameState';
 import { settingsStore } from '@/core/SettingsStore';
 import { EventBus, Events } from '@/utils/EventBus';
 import type { CollisionSystem } from '@/world/CollisionSystem';
+import { CollisionSystem as RealCollision } from '@/world/CollisionSystem';
 
 const TS = 32;
 // bottom-centre of tile (tx, ty)
@@ -30,7 +31,7 @@ function makeSystems(blocked: Array<[number, number]> = []) {
   const blockedSet = new Set(blocked.map(([x, y]) => `${x},${y}`));
   const collision = {
     isWalkable: (x: number, y: number) => !blockedSet.has(`${Math.floor(x / TS)},${Math.floor((y - 1) / TS)}`),
-    setMap: () => {},
+    shapesBlockMove: () => false, setMap: () => {},
   } as unknown as CollisionSystem;
   const spatial = new SpatialSystem(collision);
   const movement = new MovementSystem(spatial);
@@ -285,7 +286,7 @@ describe('MovementSystem free movement', () => {
 
   it('slides along walls (blocked axis does not move, other axis does)', () => {
     // block everything with x >= 300
-    const collision = { isWalkable: (x: number) => x < 300, setMap: () => {} } as unknown as CollisionSystem;
+    const collision = { isWalkable: (x: number) => x < 300, shapesBlockMove: () => false, setMap: () => {} } as unknown as CollisionSystem;
     const spatial = new SpatialSystem(collision);
     const world = new World();
     world.addSystem(new MovementSystem(spatial));
@@ -338,5 +339,42 @@ describe('MovementSystem lifecycle', () => {
     t.y = py(4) - 6;
     movement.snapTransformToGrid(t, e, world);
     expect([t.x, t.y]).toEqual([px(4), py(4)]);
+  });
+});
+
+describe('MovementSystem polyline walls', () => {
+  const realSpatial = (points: { x: number; y: number }[]) => {
+    const collision = new RealCollision();
+    collision.setMap({ widthInPixels: 640, heightInPixels: 640, getLayer: () => null } as unknown as Phaser.Tilemaps.Tilemap);
+    collision.setShapes([{ id: 'w', closed: false, points }]);
+    const spatial = new SpatialSystem(collision);
+    const world = new World();
+    world.addSystem(spatial);
+    const movement = new MovementSystem(spatial);
+    world.addSystem(movement);
+    created.push({ movement, world });
+    return world;
+  };
+
+  it('free movement stops at a vertical line', () => {
+    const world = realSpatial([{ x: 200, y: 0 }, { x: 200, y: 400 }]);
+    settingsStore.tileBasedMovement = false;
+    const e = world.createEntity();
+    const t = world.addComponent(e, new TransformComponent({ x: 150, y: 200 }));
+    const f = world.addComponent(e, new FreeMovementComponent({ speed: 100 }));
+    f.vx = 1;
+    for (let i = 0; i < 60; i++) world.update(16);
+    expect(t.x).toBeGreaterThan(150);
+    expect(t.x).toBeLessThan(200);
+  });
+
+  it('refuses a grid step across a line between two tiles', () => {
+    // line on the border between tile 4 and tile 5 (x = 160)
+    const world = realSpatial([{ x: 160, y: 0 }, { x: 160, y: 400 }]);
+    const { t, grid } = addGridEntity(world, 4, 4);
+    grid.pendingDirection = Direction.RIGHT;
+    for (let i = 0; i < 20; i++) world.update(100);
+    expect(t.x).toBe(px(4));
+    expect(grid.isMoving).toBe(false);
   });
 });

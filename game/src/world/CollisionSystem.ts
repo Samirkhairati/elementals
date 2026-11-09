@@ -1,4 +1,5 @@
 import { GAME_CONSTANTS } from "@/constants/game";
+import { pointInShape, shapeBlocksMove, type CollisionShape } from "@shared/collisionShapes.ts";
 
 export class CollisionSystem {
   private map: Phaser.Tilemaps.Tilemap | null = null;
@@ -6,14 +7,31 @@ export class CollisionSystem {
   /** The walkable area: the map's real size (it can stop short of the last tile column / row). */
   private size: { width: number; height: number } | null = null;
 
+  /** Polygon / polyline collision shapes of the map, in world pixels. */
+  private shapes: CollisionShape[] = [];
+
   /**
    * Updates the current map context for collision checks.
    * @param map The active Phaser Tilemap
    * @param size The map's size in pixels when it is not the whole tile grid
    */
   public setMap(map: Phaser.Tilemaps.Tilemap, size?: { width: number; height: number }) {
+    // The same map again without a size (SpatialSystem.setMap) keeps what the loader set; a new map starts clean.
+    const same = map === this.map;
     this.map = map;
-    this.size = size ?? null;
+    this.size = size ?? (same ? this.size : null);
+    if (!same) this.shapes = [];
+  }
+
+  /** The map's static collision shapes (closed areas and open walls). */
+  public setShapes(shapes: CollisionShape[]) {
+    this.shapes = shapes;
+  }
+
+  /** Would a mover whose feet go from (fromX, fromY) to (toX, toY) be stopped by a static shape? */
+  public shapesBlockMove(fromX: number, fromY: number, toX: number, toY: number, halfW: number, feetH: number): boolean {
+    for (const shape of this.shapes) if (shapeBlocksMove(shape, fromX, fromY, toX, toY, halfW, feetH)) return true;
+    return false;
   }
 
   /**
@@ -34,7 +52,10 @@ export class CollisionSystem {
       return false;
     }
 
-    // 2. Tile-based collision check
+    // 2. Closed polygons (a point on the bottom edge counts as the tile above, like the tile query)
+    for (const shape of this.shapes) if (pointInShape(shape, x, y - 1)) return false;
+
+    // 3. Tile-based collision check
     // If the map does not have a designated collision layer, the map is considered walkable.
     const collisionLayer = this.map.getLayer(this.collisionLayerName);
     if (!collisionLayer) {

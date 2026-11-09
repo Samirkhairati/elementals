@@ -9,6 +9,7 @@ import {
   PhaserTilemapAdapter,
 } from "@/world/tilemap";
 import { CollisionSystem } from "@/world/CollisionSystem";
+import { readCollisionShapes } from "@/world/collisionShapes";
 import { readMapProps, type MapProps } from "@/world/mapProps";
 
 export class MapSystem {
@@ -52,6 +53,8 @@ export class MapSystem {
 
     // Wire up collision system (the walkable area is the map's real size, which can be less than whole tiles)
     this.collisionSystem.setMap(this.currentMap, { width: this.currentProps.pixelWidth, height: this.currentProps.pixelHeight });
+
+    this.collisionSystem.setShapes(readCollisionShapes(rawData));
 
     this.updateWorldBounds();
     this.renderDebugGrid();

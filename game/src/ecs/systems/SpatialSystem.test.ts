@@ -4,9 +4,10 @@ import { World } from '../World';
 import { TransformComponent } from '../components/TransformComponent';
 import { ColliderComponent } from '../components/ColliderComponent';
 import type { CollisionSystem } from '@/world/CollisionSystem';
+import { CollisionSystem as CollisionSystemImpl } from '@/world/CollisionSystem';
 
 function stubCollision(walkable: (x: number, y: number) => boolean = () => true) {
-  const stub = { isWalkable: vi.fn(walkable), setMap: vi.fn() };
+  const stub = { isWalkable: vi.fn(walkable), shapesBlockMove: vi.fn(() => false), setMap: vi.fn() };
   return { stub, collision: stub as unknown as CollisionSystem };
 }
 
@@ -120,5 +121,52 @@ describe('SpatialSystem.setMap', () => {
     const map = {} as never;
     s.setMap(map);
     expect(stub.setMap).toHaveBeenCalledWith(map);
+  });
+});
+
+describe('SpatialSystem polygon colliders', () => {
+  function addPoly(world: World, x: number, y: number, points: { x: number; y: number }[], closed: boolean) {
+    const e = world.createEntity();
+    world.addComponent(e, new TransformComponent({ x, y }));
+    world.addComponent(e, new ColliderComponent({ shape: 'polygon', points, closed, width: 999, height: 999 }));
+    return e;
+  }
+  const tri = [{ x: -20, y: 0 }, { x: 20, y: 0 }, { x: 0, y: -40 }];
+
+  it('a closed polygon blocks the point inside it and ignores its bounding box', () => {
+    const w = new World();
+    addPoly(w, 100, 100, tri, true);
+    const s = new SpatialSystem(stubCollision().collision);
+    expect(s.isWalkable(100, 90, undefined, w)).toBe(false);
+    expect(s.isWalkable(100 + 18, 70, undefined, w)).toBe(true); // inside the box, outside the triangle
+  });
+
+  it('an open line blocks crossing via canMove, not walking alongside', () => {
+    const w = new World();
+    addPoly(w, 100, 100, [{ x: 0, y: -50 }, { x: 0, y: 50 }], false);
+    const s = new SpatialSystem(stubCollision().collision);
+    expect(s.isWalkable(100, 100, undefined, w)).toBe(true);
+    expect(s.canMove(80, 100, 95, 100, 8, 4, undefined, w)).toBe(false);
+    expect(s.canMove(60, 100, 60, 120, 8, 4, undefined, w)).toBe(true);
+    expect(s.stepBlocked(80, 100, 120, 100, undefined, w)).toBe(true);
+  });
+
+  it('ignores the entity itself and non-solid polygons', () => {
+    const w = new World();
+    const e = addPoly(w, 100, 100, [{ x: 0, y: -50 }, { x: 0, y: 50 }], false);
+    const s = new SpatialSystem(stubCollision().collision);
+    expect(s.canMove(80, 100, 120, 100, 8, 4, e, w)).toBe(true);
+    w.getComponent(e, ColliderComponent)!.isSolid = false;
+    expect(s.canMove(80, 100, 120, 100, 8, 4, undefined, w)).toBe(true);
+  });
+});
+
+describe('SpatialSystem.setMap', () => {
+  it('keeps the pixel size the loader gave the collision system', () => {
+    const collision = new CollisionSystemImpl();
+    const map = { widthInPixels: 640, heightInPixels: 640, getLayer: () => null } as unknown as Phaser.Tilemaps.Tilemap;
+    collision.setMap(map, { width: 100, height: 100 });
+    new SpatialSystem(collision).setMap(map);
+    expect(collision.isWalkable(150, 50)).toBe(false);
   });
 });

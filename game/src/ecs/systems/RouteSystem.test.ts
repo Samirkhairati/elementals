@@ -24,7 +24,7 @@ function setup() {
   blocked = new Set();
   const collision = {
     isWalkable: (x: number, y: number) => !blocked.has(`${Math.floor(x / 32)},${Math.floor((y - 1) / 32)}`),
-    setMap: () => {},
+    shapesBlockMove: () => false, setMap: () => {},
   } as unknown as CollisionSystem;
   const spatial = new SpatialSystem(collision);
   rig.world.addSystem(spatial);

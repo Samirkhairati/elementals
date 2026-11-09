@@ -150,7 +150,10 @@ export class MovementSystem extends System {
     const nextX = transform.x + dx * TILE_SIZE;
     const nextY = transform.y + dy * TILE_SIZE;
 
-    if (this.spatialSystem.isWalkable(nextX, nextY, entity, world)) {
+    if (
+      this.spatialSystem.isWalkable(nextX, nextY, entity, world) &&
+      !this.spatialSystem.stepBlocked(transform.x, transform.y, nextX, nextY, entity, world)
+    ) {
       grid.isMoving = true;
       grid.startX = transform.x;
       grid.startY = transform.y;
@@ -191,13 +194,13 @@ export class MovementSystem extends System {
     let moved = false;
 
     // Sliding collision on X
-    if (normX !== 0 && this.spatialSystem.canMoveTo(targetX, transform.y, 8, 4, entity, world)) {
+    if (normX !== 0 && this.spatialSystem.canMove(transform.x, transform.y, targetX, transform.y, 8, 4, entity, world)) {
       transform.x = targetX;
       moved = true;
     }
 
     // Sliding collision on Y
-    if (normY !== 0 && this.spatialSystem.canMoveTo(transform.x, targetY, 8, 4, entity, world)) {
+    if (normY !== 0 && this.spatialSystem.canMove(transform.x, transform.y, transform.x, targetY, 8, 4, entity, world)) {
       transform.y = targetY;
       moved = true;
     }
