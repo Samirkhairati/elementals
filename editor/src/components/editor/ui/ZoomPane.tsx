@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
-import { clampZoom, fitScale, stepZoom } from '@/lib/zoom'
+import { clampZoom, fitScale, focusView, stepZoom, type FocusRect } from '@/lib/zoom'
 import { ZoomControls } from './controls'
 
 interface ZoomPaneProps {
@@ -17,6 +17,11 @@ interface ZoomPaneProps {
   hint?: React.ReactNode | false
   /** Narrow controls, for side panels. */
   compact?: boolean
+  /**
+   * A part of the picture (picture pixels, the same units as `width` / `height`) to centre and fit. The view moves there when
+   * the rectangle changes (and when the pane opens); until it changes again, panning and zooming are the viewer's own.
+   */
+  focus?: FocusRect | null
   className?: string
 }
 
@@ -25,7 +30,7 @@ interface ZoomPaneProps {
  * Fit and 1:1; Ctrl/Cmd + scroll (or a trackpad pinch) zooms around the pointer; drag to pan; plain scroll scrolls.
  * It starts fitted and follows the pane while it is. Give it a `key` to reset the view for another picture.
  */
-export function ZoomPane({ width, height, children, toolbar, maxFit = 8, hint, compact, className }: ZoomPaneProps) {
+export function ZoomPane({ width, height, children, toolbar, maxFit = 8, hint, compact, focus, className }: ZoomPaneProps) {
   const scroller = useRef<HTMLDivElement>(null)
   const [box, setBox] = useState({ w: 0, h: 0 })
   const [userZoom, setUserZoom] = useState<number | null>(null) // null = fitted
@@ -65,6 +70,35 @@ export function ZoomPane({ width, height, children, toolbar, maxFit = 8, hint, c
     anchor.current = null
     el.scrollLeft = a.cx * zoom - a.px
     el.scrollTop = a.cy * zoom - a.py
+  }, [zoom])
+
+  // Centre the focus rectangle: fit it, and scroll once the new zoom has been laid out.
+  const focusKey = focus ? `${focus.x},${focus.y},${focus.w},${focus.h}` : ''
+  const pendingScroll = useRef<{ left: number; top: number } | null>(null)
+  const ready = box.w > 0 && box.h > 0
+  useLayoutEffect(() => {
+    const el = scroller.current
+    if (!focus || !el || !ready) return
+    const view = focusView(el.clientWidth - 2, el.clientHeight - 2, focus, maxFit)
+    pendingScroll.current = { left: view.scrollLeft, top: view.scrollTop }
+    if (view.zoom === zoom) {
+      el.scrollLeft = view.scrollLeft
+      el.scrollTop = view.scrollTop
+      pendingScroll.current = null
+    } else {
+      anchor.current = null
+      setUserZoom(view.zoom)
+    }
+    // Only a new rectangle (or the pane getting its size) moves the view.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusKey, ready])
+  useLayoutEffect(() => {
+    const el = scroller.current
+    const p = pendingScroll.current
+    if (!el || !p) return
+    pendingScroll.current = null
+    el.scrollLeft = p.left
+    el.scrollTop = p.top
   }, [zoom])
 
   const latest = useRef({ zoomAround, zoom })

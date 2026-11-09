@@ -210,10 +210,10 @@ describe('ImagesPanel', () => {
     expect(screen.getByRole('button', { name: 'Crop image' })).toBeDisabled()
   })
 
-  it('"Place more" starts placing the same picture and crop', () => {
+  it('"Place more" starts placing copies of the picked picture (crop, scale and flips come along)', () => {
     const f = setup(items, { selectedImageId: 'b' })
     fireEvent.click(screen.getByRole('button', { name: 'Place more of this image' }))
-    expect(f.startImagePlacement).toHaveBeenCalledWith({ assetId: undefined, graphicId: 'sky/sheet.png', crop: { x: 32, y: 0, w: 16, h: 16 } })
+    expect(f.placeMultiple).toHaveBeenCalledWith('i1', 'b')
   })
 
   it('asks for an image layer when the active layer is another kind', () => {
@@ -263,6 +263,52 @@ describe('ImagesPanel', () => {
       const f = setup(items, { pickedImageIds: ['b'], selectedImageId: 'b' })
       fireEvent.click(within(rowOf('Cloud')).getByRole('button', { name: 'Delete image' }))
       expect(f.deleteImages).toHaveBeenLastCalledWith('i1', ['a'])
+    })
+  })
+
+  describe('Resize and the Crop / Resize shortcuts', () => {
+    const key = (k: string, init: KeyboardEventInit = {}) => fireEvent.keyDown(window, { key: k, ...init })
+
+    it('has a Resize button beside Crop, with the shortcut in its tooltip, for the picked picture', () => {
+      setup(items, { selectedImageId: 'a' })
+      expect(screen.getByRole('button', { name: 'Resize image' }).getAttribute('title')).toMatch(/Ctrl\+T|⌘T/)
+      expect(screen.getByRole('button', { name: 'Crop image' }).getAttribute('title')).toMatch(/\(C\)/)
+    })
+
+    it('Resize applies a new scale to that picture only', () => {
+      const f = setup(items, { selectedImageId: 'a' })
+      fireEvent.click(screen.getByRole('button', { name: 'Resize image' }))
+      const dialog = screen.getByRole('dialog')
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Scale ×2' }))
+      fireEvent.click(within(dialog).getByRole('button', { name: /Resize/ }))
+      expect(f.updateImage).toHaveBeenCalledWith('i1', 'a', { scale: 2 })
+    })
+
+    it('Ctrl+T opens Resize and C opens Crop for the picked picture', () => {
+      setup(items, { selectedImageId: 'a' })
+      key('t', { ctrlKey: true })
+      expect(screen.getByRole('dialog', { name: 'Resize picture' })).toBeTruthy()
+    })
+
+    it('C opens the crop dialog', () => {
+      setup(items, { selectedImageId: 'a' })
+      key('c')
+      expect(screen.getByRole('dialog', { name: 'Crop picture' })).toBeTruthy()
+    })
+
+    it('the shortcuts and buttons are off on a locked layer, without a picked picture, and while typing', () => {
+      setup(items, { selectedImageId: 'a' }, { locked: true })
+      expect(screen.getByRole('button', { name: 'Resize image' })).toBeDisabled()
+      key('t', { ctrlKey: true })
+      key('c')
+      expect(screen.queryByRole('dialog')).toBeNull()
+    })
+
+    it('nothing happens with no picked picture', () => {
+      setup(items)
+      key('t', { ctrlKey: true })
+      key('c')
+      expect(screen.queryByRole('dialog')).toBeNull()
     })
   })
 })

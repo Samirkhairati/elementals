@@ -28,3 +28,23 @@ export const sliderToZoom = (v: number, min = MIN_ZOOM, max = MAX_ZOOM): number 
 
 /** Percent label: 100% , 250% , 12.5% */
 export const zoomLabel = (zoom: number): string => `${Math.round(zoom * 1000) / 10}%`
+
+export interface FocusRect {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
+/**
+ * The view that centres a rectangle of the picture (picture pixels) in a viewport of `boxW` x `boxH` screen px: the zoom
+ * that fits the whole rectangle (never above `maxFit`) and where the scrollbars go to put its middle in the middle of the box.
+ */
+export function focusView(boxW: number, boxH: number, rect: FocusRect, maxFit = 8): { zoom: number; scrollLeft: number; scrollTop: number } {
+  const zoom = fitScale(boxW, boxH, rect.w, rect.h, maxFit)
+  return {
+    zoom,
+    scrollLeft: Math.max(0, (rect.x + rect.w / 2) * zoom - boxW / 2),
+    scrollTop: Math.max(0, (rect.y + rect.h / 2) * zoom - boxH / 2),
+  }
+}
