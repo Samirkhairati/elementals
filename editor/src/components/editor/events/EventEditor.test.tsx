@@ -154,7 +154,11 @@ describe('EventEditor: state header', () => {
     fireEvent.click(trigger)
     expect(within(screen.getByRole('listbox')).getAllByRole('option').map((o) => o.textContent)).toEqual(['Action button', 'Player touch', 'Event touch', 'Autorun', 'Parallel'])
     fireEvent.click(trigger)
-    expect(screen.getByText(/presses the action button while facing this entity/)).toBeInTheDocument()
+    // the explanation sits behind the "i" beside the label, and covers every trigger with the chosen one first
+    expect(screen.queryByText(/presses the action button while facing this entity/)).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'About Trigger' }))
+    expect(screen.getByRole('tooltip')).toHaveTextContent(/Action button: Runs when the player presses the action button while facing this entity/)
+    expect(screen.getByRole('tooltip')).toHaveTextContent(/Autorun: Starts by itself/)
     chooseOption(trigger, 'autorun')
     expect(onChange).toHaveBeenCalledTimes(1)
     expect(last()[0].trigger).toBe('autorun')
@@ -196,7 +200,8 @@ describe('EventEditor: state header', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add condition' }))
     fireEvent.click(screen.getByRole('menuitem', { name: /^Self switch/ }))
     expect(last()[0].conditions).toEqual([{ kind: 'selfSwitch', key: 'A', value: true }])
-    expect(screen.getByText(/If a later state also qualifies, the later state wins/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'About Conditions' }))
+    expect(screen.getByRole('tooltip')).toHaveTextContent(/If a later state also qualifies, the later state wins/)
   })
 
   it('appearance override: each override can be switched on, edited and off', () => {
@@ -291,7 +296,9 @@ describe('EventEditor: canvas and inspector', () => {
   it('shows a planned note for planned commands', () => {
     setup([state('p1', [cmd('a', 'givePokemon', { species: 'pidgey' })])])
     pickNode('a')
-    expect(screen.getByText(/the game skips it until that system exists/)).toBeInTheDocument()
+    expect(screen.queryByText(/the game skips it until that system exists/)).toBeNull()
+    fireEvent.click(within(screen.getByTestId('node-inspector')).getByRole('button', { name: /^About / }))
+    expect(screen.getByRole('tooltip')).toHaveTextContent(/the game skips it until that system exists/)
   })
 
   it('shows validation issues of the selected node above its form', () => {

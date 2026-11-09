@@ -311,7 +311,7 @@ describe('ParamForm: every FieldKind has a real control', () => {
     expect(screen.queryByRole('option', { name: /Old man/ })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('option', { name: /Guard/ }))
     expect(onPatch).toHaveBeenCalledWith({ target: { entity: 'e2' } })
-    fireEvent.click(within(field('Target')).getByRole('button'))
+    fireEvent.click(within(field('Target')).getByRole('button', { name: /This event/ }))
     fireEvent.click(screen.getByRole('option', { name: /Player/ }))
     expect(onPatch).toHaveBeenLastCalledWith({ target: 'player' })
   })
@@ -328,7 +328,9 @@ describe('ParamForm: every FieldKind has a real control', () => {
 
   it('position: column and row fields with a hint', () => {
     const { onPatch } = setup(cmd('w', 'warp', { map: 'town', x: 1, y: 2 }))
-    expect(screen.getByText('Destination tile (column, row).')).toBeInTheDocument()
+    expect(screen.queryByText('Destination tile (column, row).')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /^About / }))
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Destination tile (column, row).')
     const col = screen.getByRole('spinbutton', { name: 'Tile column' })
     const row = screen.getByRole('spinbutton', { name: 'Tile row' })
     expect(col).toHaveValue('1')
@@ -399,7 +401,9 @@ describe('ParamForm: every FieldKind has a real control', () => {
     setup(cmd('t', 'showText'))
     expect(within(field('Text')).getByTitle('Required')).toBeInTheDocument()
     setup(cmd('s', 'setSwitch', { id: 'met' }))
-    expect(screen.getByText('On when checked.')).toBeInTheDocument()
+    expect(screen.queryByText('On when checked.')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /^About / }))
+    expect(screen.getByRole('tooltip')).toHaveTextContent('On when checked.')
   })
 
   it('commands without parameters and unknown commands say so', () => {
