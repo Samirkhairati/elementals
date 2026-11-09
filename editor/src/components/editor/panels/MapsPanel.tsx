@@ -10,8 +10,7 @@ import {
   Trash2,
   Download,
   Gamepad2,
-  Scaling,
-} from 'lucide-react'
+  Scaling, Settings2 } from 'lucide-react'
 import { MapData } from '@/types/editor'
 import {
   ContextMenu,
@@ -59,6 +58,8 @@ interface MapsPanelProps {
   handleExportMap: (m: MapData) => void
   handleExportMapToGame: (m: MapData) => void
   handleResizeMap: (m: MapData) => void
+  /** Right-click › Settings…: the map's settings for the game (player z-index, size). */
+  handleMapSettings?: (m: MapData) => void
   handleMapDrop: (e: React.DragEvent, targetFolder: string | null) => void
   onSelectMap: (m: MapData) => void
 }
@@ -80,6 +81,7 @@ export function MapsPanel({
   handleExportMap,
   handleExportMapToGame,
   handleResizeMap,
+  handleMapSettings,
   handleMapDrop,
   onSelectMap,
 }: MapsPanelProps) {
@@ -286,6 +288,12 @@ export function MapsPanel({
                   <Scaling className="w-3.5 h-3.5 mr-2" />
                   Resize…
                 </ContextMenuItem>
+                {handleMapSettings && (
+                  <ContextMenuItem onClick={() => setTimeout(() => handleMapSettings(m), 0)}>
+                    <Settings2 className="w-3.5 h-3.5 mr-2" />
+                    Settings…
+                  </ContextMenuItem>
+                )}
                 <ContextMenuSeparator />
                 <ContextMenuItem
                   onClick={() => handleExportMapToGame(m)}

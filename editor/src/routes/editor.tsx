@@ -25,6 +25,8 @@ import { useEntityPlacement } from '@/hooks/editor/useEntityPlacement'
 import { exportMap, exportMapToGame } from '@/hooks/useExportMap'
 import { applyResize, mapPixelSize, type ResizeEdges } from '@/lib/mapResize'
 import { ResizeMapDialog } from '@/components/editor/dialogs/ResizeMapDialog'
+import { MapSettingsDialog } from '@/components/editor/dialogs/MapSettingsDialog'
+import type { MapSettings } from '@/types/editor'
 
 // Layout
 import {
@@ -393,6 +395,27 @@ export function EditorPage() {
     setResizeTarget(m)
   })
 
+  /** Right-click > "Settings...": the map is opened first, like Resize, and the settings save with it. */
+  const [settingsTarget, setSettingsTarget] = useState<MapData | null>(null)
+  const handleMapSettings = useStableCallback((m: MapData) => {
+    const active = mapManager.getActiveMap()
+    if (sameMap(active, m)) {
+      setSettingsTarget(active)
+      return
+    }
+    mapManager.onSelectMap(m)
+    setSettingsTarget(m)
+  })
+  const handleSaveMapSettings = useStableCallback((settings: MapSettings) => {
+    const active = mapManager.getActiveMap()
+    const target = settingsTarget
+    setSettingsTarget(null)
+    if (!active || !sameMap(active, target)) return
+    const { settings: _old, ...rest } = active
+    mapManager.setActiveMap(Object.keys(settings).length > 0 ? { ...rest, settings } : rest)
+    setNotice({ kind: 'info', text: `Saved the settings of "${active.name}".` })
+  })
+
   const handleConfirmResize = useStableCallback((edges: ResizeEdges) => {
     const active = mapManager.getActiveMap()
     setResizeTarget(null)
@@ -437,6 +460,7 @@ export function EditorPage() {
     handleExportMap,
     handleExportMapToGame,
     handleResizeMap,
+    handleMapSettings,
     handleMapDrop: mapManager.handleMapDrop,
     onSelectMap: mapManager.onSelectMap,
     onClearActiveMap: handleDockClearActiveMap,
@@ -651,7 +675,7 @@ export function EditorPage() {
     mapManager.maps, mapManager.mapFolders, mapManager.activeMap,
     mapManager.expandedMapFolders, mapManager.toggleMapFolder,
     mapManager.handleDeleteMapFolder, mapManager.handleDeleteMap,
-    handleExportMap, handleExportMapToGame, handleResizeMap, mapManager.handleMapDrop, mapManager.onSelectMap,
+    handleExportMap, handleExportMapToGame, handleResizeMap, handleMapSettings, mapManager.handleMapDrop, mapManager.onSelectMap,
     handleDockClearActiveMap,
     dialogs.setCreateMapData, dialogs.setCreateMapDialog,
     dialogs.setCreateMapFolderName, dialogs.setCreateMapFolderDialog,
@@ -711,6 +735,16 @@ export function EditorPage() {
           spriteAssets={canvasAssets}
           onClose={() => setResizeTarget(null)}
           onConfirm={handleConfirmResize}
+        />
+        <MapSettingsDialog
+          map={settingsTarget}
+          onClose={() => setSettingsTarget(null)}
+          onSave={handleSaveMapSettings}
+          onResize={() => {
+            const target = settingsTarget
+            setSettingsTarget(null)
+            if (target) setTimeout(() => handleResizeMap(target), 0)
+          }}
         />
         {notice && (
           <div

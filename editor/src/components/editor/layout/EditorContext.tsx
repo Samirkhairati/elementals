@@ -173,6 +173,7 @@ export interface EditorBaseContextValue
   handleExportMapToGame: (map: MapData) => void
   /** Opens the resize dialog for the map (opening the map first). */
   handleResizeMap: (map: MapData) => void
+  handleMapSettings: (map: MapData) => void
   /** Called by the dock when the last map tab closed: persists pending edits, then clears the editor state. */
   onClearActiveMap: () => void
 

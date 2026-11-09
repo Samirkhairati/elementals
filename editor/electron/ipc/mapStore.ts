@@ -22,6 +22,7 @@ const MAP_EXT = '.json';
 const MAX_MAP_DIMENSION = 100_000;
 
 export interface MapFile {
+  [key: string]: unknown;
   fileName: string;
   folderPath: string | null;
   name: string;
@@ -64,7 +65,10 @@ export function listMaps(mapsDir: string): MapListing {
     ({ name, fullPath, folderPath }) => {
       if (!name.endsWith(MAP_EXT)) return;
       const data = readMapJson(fullPath);
+      // Everything else the file holds (pixel size, settings, entitiesIndex, entity folders, schemaVersion...) comes
+      // along unchanged, so a save writes it back instead of dropping it.
       maps.push({
+        ...data,
         fileName: name,
         folderPath,
         name: typeof data.name === 'string' && data.name ? data.name : path.parse(name).name,

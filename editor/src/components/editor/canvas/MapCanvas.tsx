@@ -31,6 +31,9 @@ import { PendingEntityPlacement } from '@/hooks/editor/useEntityPlacement'
 import { useCanvasView } from '@/hooks/editor/canvas/canvasView'
 import { clampEntitiesIndex } from '@/lib/layerOrder'
 import { mapPixelSize } from '../../../../../shared/mapSize'
+import { itemYSort } from '../../../../../shared/ySort'
+import { drawImageItem } from './konva/KonvaTilemapLayer'
+import type { YSortedPicture } from './konva/KonvaEntities'
 import { useEditorSelector, type EditorContextValue } from '@/components/editor/layout/EditorContext'
 import { openEventEditor } from '@/lib/openEventEditor'
 
@@ -241,6 +244,22 @@ export function MapCanvas({
   // The image being dragged, drawn at the mouse by the image layer itself (see KonvaImageItems).
   const imageDrag = useRef<ImageDrag | null>(null)
 
+  // Y-sorted pictures (layer, folder, group or picture setting) leave their layer and draw among the entity sprites,
+  // at the map's player depth, sorted by how far down they stand: what the game shows.
+  const playerZ = activeMap?.settings?.playerZ ?? 20
+  const ySortedPictures = useMemo<YSortedPicture[]>(() => {
+    const out: YSortedPicture[] = []
+    for (const layer of layers) {
+      if (layer.type !== 'image' || !layer.visible) continue
+      for (const item of layer.images ?? []) {
+        if (!itemYSort(item, layer, layers)) continue
+        out.push({ id: item.id, depth: playerZ, y: item.y, draw: (ctx) => drawImageItem(ctx, item, spriteAssets ?? {}, imageDrag.current) })
+      }
+    }
+    return out
+  }, [layers, playerZ, spriteAssets])
+  const ySortedIds = useMemo(() => new Set(ySortedPictures.map((p) => p.id)), [ySortedPictures])
+
   const activeLayer = useMemo(() => layers.find((l) => l.id === activeLayerId) ?? null, [layers, activeLayerId])
   const isImageLayerActive = activeLayer?.type === 'image'
   // Entity placement and image placement both need clicks to land on the map, not on pictures.
@@ -316,6 +335,7 @@ export function MapCanvas({
                 activeMap={activeMap}
                 spriteAssets={spriteAssets}
                 dragRef={imageDrag}
+                skipIds={ySortedIds}
               />
 
               <KonvaEntities
@@ -333,6 +353,7 @@ export function MapCanvas({
                 spriteAssets={spriteAssets}
                 view={view}
                 onOpenEvent={openEventEditor}
+                pictures={ySortedPictures}
               />
 
               <KonvaTilemapLayer
@@ -341,6 +362,7 @@ export function MapCanvas({
                 activeMap={activeMap}
                 spriteAssets={spriteAssets}
                 dragRef={imageDrag}
+                skipIds={ySortedIds}
               />
               </Group>
 

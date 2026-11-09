@@ -1,7 +1,7 @@
 import type { ImageDrag } from './imageDrag'
 import React from 'react'
 import { Shape, Group } from 'react-konva'
-import { Layer as MapLayer, MapData } from '@/types/editor'
+import { Layer as MapLayer, MapData, type ImageItem } from '@/types/editor'
 import type { SpriteAssetInfo } from '../../../../../../shared/engine/types'
 import { drawResolvedSprite, useSpriteImagesVersion } from '@/lib/spriteImages'
 import { renderOrder, sortedImages } from '@/lib/layerOrder'
@@ -16,6 +16,22 @@ interface KonvaTilemapLayerProps {
   spriteAssets?: Record<string, SpriteAssetInfo>
   /** The image being dragged and where the mouse has it right now; drawn there instead of at its saved position. */
   dragRef?: React.MutableRefObject<ImageDrag | null>
+  /** Pictures this pass leaves out (y-sorted ones, drawn among the entity sprites). */
+  skipIds?: ReadonlySet<string>
+}
+
+/** One placed picture on the canvas: the dragged picture at the mouse, and the rest of a dragged group moved along with it. */
+export function drawImageItem(ctx: CanvasRenderingContext2D, item: ImageItem, spriteAssets: Record<string, SpriteAssetInfo>, drag: ImageDrag | null) {
+  const resolved = resolveImageItem(drag && drag.id === item.id && drag.scale !== undefined ? { ...item, scale: drag.scale } : item, spriteAssets)
+  if (!resolved) return
+  const at = drag && drag.id === item.id ? drag : drag?.along?.ids.includes(item.id) ? { x: item.x + drag.along.dx, y: item.y + drag.along.dy } : item
+  drawResolvedSprite(ctx, resolved, {
+    anchorX: at.x,
+    anchorY: at.y,
+    opacity: item.opacity,
+    mirrorX: !!item.flipX,
+    mirrorY: !!item.flipY,
+  })
 }
 
 export const KonvaTilemapLayer = React.memo(function KonvaTilemapLayer({
@@ -24,6 +40,7 @@ export const KonvaTilemapLayer = React.memo(function KonvaTilemapLayer({
   activeMap,
   spriteAssets = NO_ASSETS,
   dragRef,
+  skipIds,
 }: KonvaTilemapLayerProps) {
   // Redraw image layers once a sprite sheet they use finishes loading.
   const imagesVersion = useSpriteImagesVersion()
@@ -42,18 +59,9 @@ export const KonvaTilemapLayer = React.memo(function KonvaTilemapLayer({
           sceneFunc={(context) => {
             const ctx = context._context as CanvasRenderingContext2D
             for (const item of sortedImages(layer.images)) {
-              const drag = dragRef?.current
-              const resolved = resolveImageItem(drag && drag.id === item.id && drag.scale !== undefined ? { ...item, scale: drag.scale } : item, spriteAssets)
-              if (!resolved) continue
-              // The dragged picture is at the mouse, and the rest of a dragged group moves by the same amount.
-              const at = drag && drag.id === item.id ? drag : drag?.along?.ids.includes(item.id) ? { x: item.x + drag.along.dx, y: item.y + drag.along.dy } : item
-              drawResolvedSprite(ctx, resolved, {
-                anchorX: at.x,
-                anchorY: at.y,
-                opacity: item.opacity,
-                mirrorX: !!item.flipX,
-                mirrorY: !!item.flipY,
-              })
+              // Y-sorted pictures draw among the entity sprites instead (see KonvaEntities `pictures`).
+              if (skipIds?.has(item.id)) continue
+              drawImageItem(ctx, item, spriteAssets, dragRef?.current ?? null)
             }
           }}
         />

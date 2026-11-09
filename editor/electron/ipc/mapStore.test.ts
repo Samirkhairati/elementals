@@ -467,3 +467,15 @@ describe('createMap by resolution', () => {
     expect(whole.pixelWidth).toBeUndefined()
   })
 })
+
+describe('listMaps keeps what it does not know', () => {
+  it('passes pixel size, settings, entitiesIndex and entity folders through', async () => {
+    const fs = await import('node:fs')
+    const os = await import('node:os')
+    const path = await import('node:path')
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'maps-keep-'))
+    fs.writeFileSync(path.join(dir, 'town.json'), JSON.stringify({ name: 'Town', width: 3, height: 2, pixelWidth: 90, pixelHeight: 50, settings: { playerZ: 7 }, entitiesIndex: 2, entityFolders: [{ id: 'f' }], layers: [], entities: [] }))
+    const { maps } = listMaps(dir)
+    expect(maps[0]).toMatchObject({ pixelWidth: 90, pixelHeight: 50, settings: { playerZ: 7 }, entitiesIndex: 2, entityFolders: [{ id: 'f' }] })
+  })
+})
