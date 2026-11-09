@@ -7,6 +7,7 @@ export function SettingsPage() {
   const { mode, setMode, accentColor, setAccentColor } = useThemeStore()
 
   return (
+    <div className="h-full overflow-y-auto" data-testid="settings-page">
     <div className="max-w-2xl space-y-8 mx-auto w-full pt-14 p-12">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
@@ -45,6 +46,7 @@ export function SettingsPage() {
       </div>
 
       <ShortcutsSettings />
+    </div>
     </div>
   )
 }
