@@ -33,7 +33,7 @@ vi.mock('./entityDraw', async (orig) => ({
   drawPlaceholder: drawn.placeholder,
 }))
 
-import { KonvaEntities, mergeByDepth } from './KonvaEntities'
+import { KonvaEntities } from './KonvaEntities'
 import { makeEntity, makeMap } from '@/test/helpers'
 
 const fakeCtx = () => ({ _context: new Proxy({}, { get: (_t, k) => (k === 'measureText' ? () => ({ width: 10 }) : () => undefined), set: () => true }) })
@@ -264,16 +264,3 @@ describe('KonvaEntities', () => {
   })
 })
 
-describe('mergeByDepth (y-sorted pictures among the entity sprites)', () => {
-  const info = (id: string, y: number, depth = 20) => ({ id, entity: { y, components: { Transform: { depth } } } })
-  const pic = (id: string, y: number, depth = 20) => ({ id, y, depth, draw: () => {} })
-  const order = (rows: ({ kind: 'entity'; info: { id: string } } | { kind: 'picture'; picture: { id: string } })[]) => rows.map((r) => (r.kind === 'entity' ? r.info.id : r.picture.id))
-
-  it('sorts by depth, then by how far down: a tree whose foot is lower covers the hero', () => {
-    expect(order(mergeByDepth([info('flat', 500, 5), info('hero', 100)], [pic('tree', 120), pic('bush', 50)]))).toEqual(['flat', 'bush', 'hero', 'tree'])
-  })
-
-  it('on the same line the entity draws first', () => {
-    expect(order(mergeByDepth([info('hero', 100)], [pic('sign', 100)]))).toEqual(['hero', 'sign'])
-  })
-})

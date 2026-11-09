@@ -16,8 +16,6 @@ interface KonvaTilemapLayerProps {
   spriteAssets?: Record<string, SpriteAssetInfo>
   /** The image being dragged and where the mouse has it right now; drawn there instead of at its saved position. */
   dragRef?: React.MutableRefObject<ImageDrag | null>
-  /** Pictures this pass leaves out (y-sorted ones, drawn among the entity sprites). */
-  skipIds?: ReadonlySet<string>
 }
 
 /** One placed picture on the canvas: the dragged picture at the mouse, and the rest of a dragged group moved along with it. */
@@ -40,7 +38,6 @@ export const KonvaTilemapLayer = React.memo(function KonvaTilemapLayer({
   activeMap,
   spriteAssets = NO_ASSETS,
   dragRef,
-  skipIds,
 }: KonvaTilemapLayerProps) {
   // Redraw image layers once a sprite sheet they use finishes loading.
   const imagesVersion = useSpriteImagesVersion()
@@ -59,8 +56,6 @@ export const KonvaTilemapLayer = React.memo(function KonvaTilemapLayer({
           sceneFunc={(context) => {
             const ctx = context._context as CanvasRenderingContext2D
             for (const item of sortedImages(layer.images)) {
-              // Y-sorted pictures draw among the entity sprites instead (see KonvaEntities `pictures`).
-              if (skipIds?.has(item.id)) continue
               drawImageItem(ctx, item, spriteAssets, dragRef?.current ?? null)
             }
           }}

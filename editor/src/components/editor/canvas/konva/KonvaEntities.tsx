@@ -42,26 +42,6 @@ import { setStageCursor } from '../canvasUtils'
 
 const EMPTY_ASSETS: Record<string, SpriteAssetInfo> = {}
 
-const NO_PICTURES: YSortedPicture[] = []
-
-/**
- * Entity sprites and y-sorted pictures in one draw order: by depth, then whatever stands further down draws on top
- * (an entity before a picture on the same line). `infos` are already sorted that way.
- */
-export function mergeByDepth<I extends { entity: { y: number; components: { Transform?: Record<string, unknown> } } }>(
-  infos: readonly I[],
-  pictures: readonly YSortedPicture[]
-): ({ kind: 'entity'; info: I } | { kind: 'picture'; picture: YSortedPicture })[] {
-  if (pictures.length === 0) return infos.map((info) => ({ kind: 'entity' as const, info }))
-  const depthOf = (info: I) => { const d = info.entity.components.Transform?.depth; return typeof d === 'number' ? d : 10 }
-  const rows = [
-    ...infos.map((info, i) => ({ row: { kind: 'entity' as const, info }, d: depthOf(info), y: info.entity.y, o: 0, i })),
-    ...pictures.map((picture, i) => ({ row: { kind: 'picture' as const, picture }, d: picture.depth, y: picture.y, o: 1, i })),
-  ]
-  rows.sort((a, b) => a.d - b.d || a.y - b.y || a.o - b.o || a.i - b.i)
-  return rows.map((r) => r.row)
-}
-
 interface KonvaEntitiesProps {
   entities: EntityData[]
   selectedEntityId: string | null
@@ -88,19 +68,6 @@ interface KonvaEntitiesProps {
    */
   part?: 'all' | 'sprites' | 'hits' | 'overlays'
   visuals?: React.MutableRefObject<Visuals>
-  /**
-   * Y-sorted pictures (sprites part): drawn among the entity sprites, sorted with them by depth and then by how far
-   * down they stand, like the game does. Shown even while the entities are hidden.
-   */
-  pictures?: YSortedPicture[]
-}
-
-/** A picture that sorts among the entities: its depth (the map's player depth), its anchor's y and how to draw it. */
-export interface YSortedPicture {
-  id: string
-  depth: number
-  y: number
-  draw: (ctx: CanvasRenderingContext2D) => void
 }
 
 /** Per-entity geometry, derived once per entities/assets change. All rects are relative to the anchor. */
@@ -339,7 +306,6 @@ export const KonvaEntities = React.memo(function KonvaEntities({
   onOpenEvent,
   part = 'all',
   visuals: sharedVisuals,
-  pictures = NO_PICTURES,
 }: KonvaEntitiesProps) {
   const imagesVersion = useSpriteImagesVersion()
   const ownVisuals = useRef<Visuals>({ hoverId: null, dragId: null, dragX: 0, dragY: 0 })
@@ -356,18 +322,13 @@ export const KonvaEntities = React.memo(function KonvaEntities({
 
   const selected = useMemo(() => infos.find((i) => i.id === selectedEntityId) ?? null, [infos, selectedEntityId])
 
-  const pictureNode = (p: YSortedPicture) => (
-    <Shape key={`picture:${p.id}`} listening={false} perfectDrawEnabled={false} sceneFunc={(context) => p.draw(context._context as CanvasRenderingContext2D)} />
-  )
-  if (showEntities === false) return part === 'sprites' && pictures.length > 0 ? <Group listening={false}>{pictures.map(pictureNode)}</Group> : null
+  if (showEntities === false) return null
 
   const colliderEntity = selected ? { id: selected.id, x: selected.entity.x, y: selected.entity.y, collider: selected.entity.components.Collider } : null
 
   return (
     <Group>
-      {part !== 'overlays' && mergeByDepth(infos, part === 'sprites' ? pictures : NO_PICTURES).map((row) => {
-        if (row.kind === 'picture') return pictureNode(row.picture)
-        const info = row.info
+      {part !== 'overlays' && infos.map((info) => {
         return (
           <KonvaEntityNode
             key={info.id}
