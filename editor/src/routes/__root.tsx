@@ -1,6 +1,7 @@
 import { createRootRoute, Outlet } from '@tanstack/react-router'
 import { SidebarProvider } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
+import { ViewShortcuts } from "@/components/ViewShortcuts"
 import { useThemeStore } from '@/store/themeStore'
 import { useEffect } from 'react'
 
@@ -37,6 +38,7 @@ export function RootComponent() {
     <SidebarProvider defaultOpen={false}>
       <div className="flex h-screen w-full bg-background text-foreground font-sans">
         <AppSidebar />
+        <ViewShortcuts />
         <main className="flex-1 flex flex-col relative overflow-hidden">
           <div className="flex-1 overflow-hidden flex flex-col relative">
             <Outlet />

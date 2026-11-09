@@ -1,5 +1,6 @@
 import { useThemeStore } from '@/store/themeStore'
 import { Switch } from '@/components/ui/switch'
+import { ShortcutsSettings } from '@/components/settings/ShortcutsSettings'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 export function SettingsPage() {
@@ -42,6 +43,8 @@ export function SettingsPage() {
           </Select>
         </div>
       </div>
+
+      <ShortcutsSettings />
     </div>
   )
 }

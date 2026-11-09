@@ -13,6 +13,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar"
 
+// Same order as MAIN_VIEWS in lib/views (Ctrl+1.. follows it); Settings sits at the bottom.
 const mainItems = [
   { title: "Home", url: "/", icon: Home },
   { title: "Map Editor", url: "/editor", icon: Map },
