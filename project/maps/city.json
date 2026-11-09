@@ -2,62 +2,36 @@
   "fileName": "city.json",
   "folderPath": null,
   "name": "city",
-  "width": 129,
-  "height": 121,
+  "width": 63,
+  "height": 27,
   "layers": [
     {
-      "id": "70226450-2952-4641-8699-e393222cf68a",
-      "name": "collisions",
-      "type": "collision",
+      "id": "cf9f0ba6-767b-45c9-903d-c8ac883baf8e",
+      "name": "foreground",
+      "type": "folder",
       "visible": true,
       "locked": false,
-      "data": {}
+      "collapsed": false
     },
     {
-      "id": "43cff3bd-b67a-4b23-91c9-94f0d726bb53",
-      "name": "terrain",
-      "type": "terrain",
+      "id": "2c586405-f81b-4eea-a2d6-7e5b58498f16",
+      "name": "silhouettes",
+      "type": "image",
       "visible": true,
       "locked": false,
-      "data": {}
+      "images": [
+        {
+          "graphicId": "images/city-exports/foreground.png",
+          "x": 1007,
+          "y": 1058,
+          "id": "0978e0dd-ebbd-4ca0-ae14-84581d13641a"
+        }
+      ],
+      "folderId": "cf9f0ba6-767b-45c9-903d-c8ac883baf8e",
+      "z": 40
     },
     {
-      "id": "78549b79-6e18-4d3f-8687-985dad04e334",
-      "name": "encounters",
-      "type": "encounters",
-      "visible": true,
-      "locked": false,
-      "data": {}
-    },
-    {
-      "id": "b7e5aa41-2cd4-4cc2-9c7d-5cf5b0d1a1b3",
-      "name": "decorations",
-      "type": "tile",
-      "visible": true,
-      "locked": false,
-      "z": 20,
-      "data": {}
-    },
-    {
-      "id": "606f4028-2dd0-4599-b52f-d4172038bbe4",
-      "name": "building",
-      "type": "tile",
-      "visible": true,
-      "locked": false,
-      "z": 10,
-      "data": {}
-    },
-    {
-      "id": "d7305b15-6d94-41c1-8c4f-a76733846873",
-      "name": "ground",
-      "type": "tile",
-      "visible": true,
-      "locked": false,
-      "z": 1,
-      "data": {}
-    },
-    {
-      "id": "bb97fc2a-6c48-4aa0-b8ac-b57cbdefc331",
+      "id": "e9aecfac-a308-4f1a-96d7-fbc4e0fb4fae",
       "name": "dam",
       "type": "folder",
       "visible": true,
@@ -65,303 +39,528 @@
       "collapsed": false
     },
     {
-      "id": "556a799d-8aaf-413c-bc68-57aba5405bcb",
+      "id": "1062724b-3c6d-4b05-8968-1c869d55a93f",
       "name": "wall",
       "type": "image",
       "visible": true,
       "locked": false,
       "images": [
         {
-          "graphicId": "images/city/dam/dam-wall.png",
-          "x": 3795,
-          "y": 3872,
-          "id": "73b04ba4-6d63-4d1f-ba6a-b7a9f7d2a46e",
-          "name": "wall"
-        },
-        {
-          "graphicId": "images/city/dam/dam-wall.png",
-          "x": 2419,
-          "y": 3872,
-          "id": "ff0211a6-0312-4311-b849-b4b25ff03929",
-          "name": "wall 6"
-        },
-        {
-          "graphicId": "images/city/dam/dam-wall.png",
-          "x": 3339,
-          "y": 3872,
-          "id": "01fac532-b19c-41b0-913a-d8d3d714b4c5",
-          "name": "wall 2",
-          "crop": {
-            "x": 364,
-            "y": 0,
-            "w": 301,
-            "h": 202
-          }
-        },
-        {
-          "graphicId": "images/city/dam/dam-wall.png",
-          "x": 2880,
-          "y": 3871,
-          "id": "5e2926ea-1f65-4622-8285-e92df2b4cd0f",
-          "name": "wall 5",
-          "crop": {
-            "x": 364,
-            "y": 0,
-            "w": 301,
-            "h": 202
-          },
-          "flipX": true
-        },
-        {
-          "graphicId": "images/city/dam/dam-wall.png",
-          "x": 3207,
-          "y": 3872,
-          "id": "59dba680-50b5-45d9-a15e-ed5bbaf4503c",
-          "name": "wall 3",
-          "crop": {
-            "x": 321,
-            "y": 0,
-            "w": 37,
-            "h": 202
-          }
-        },
-        {
-          "graphicId": "images/city/dam/dam-wall.png",
-          "x": 3018,
-          "y": 3872,
-          "id": "088737e4-97df-45ce-a6f0-28998b594a8e",
-          "name": "wall 4",
-          "crop": {
-            "x": 321,
-            "y": 0,
-            "w": 37,
-            "h": 202
-          },
-          "flipX": true
+          "graphicId": "images/city-exports/dam-wall.png",
+          "x": 1024,
+          "y": 821,
+          "id": "a4e89817-9548-4eee-bdbf-fb2faefa4adf"
         }
       ],
-      "folderId": "bb97fc2a-6c48-4aa0-b8ac-b57cbdefc331",
-      "z": 2
+      "folderId": "e9aecfac-a308-4f1a-96d7-fbc4e0fb4fae",
+      "z": 35
     },
     {
-      "id": "157c337d-43c1-4436-98de-2115f74a9074",
-      "name": "bottom right",
+      "id": "c19342eb-5031-4181-bbbe-addfc1c1623b",
+      "name": "decorations",
       "type": "folder",
       "visible": true,
       "locked": false,
-      "collapsed": false
+      "collapsed": true
     },
     {
-      "id": "7f1b484b-d63d-485c-a6ca-8ea9fdf9707b",
-      "name": "buildings",
+      "id": "462473a1-f45a-43dd-854c-b9a046865111",
+      "name": "props",
       "type": "image",
       "visible": true,
       "locked": false,
       "images": [
         {
-          "graphicId": "images/city/buildings/buildings-a.png",
-          "x": 4051,
-          "y": 3528,
-          "id": "8097e397-a4b9-4308-8bbf-3d817f24440d",
-          "name": "building 1",
-          "crop": {
-            "x": 1079,
-            "y": 0,
-            "w": 237,
-            "h": 448
-          }
+          "graphicId": "images/city-exports/props/middle-pole.png",
+          "x": 1167,
+          "y": 609,
+          "id": "b291f382-647d-41c8-b494-145e1d821249"
         },
         {
-          "graphicId": "images/city/buildings/buildings-a.png",
-          "x": 3874,
-          "y": 3595,
-          "id": "cea87e9a-3917-428b-a236-7b1a1f304318",
-          "name": "building 2",
-          "crop": {
-            "x": 801,
-            "y": 0,
-            "w": 263,
-            "h": 448
-          }
+          "graphicId": "images/city-exports/props/cycle.png",
+          "x": 1131,
+          "y": 611,
+          "id": "91060525-700c-4d8d-91aa-d7cbfbe6e7ed"
         },
         {
-          "graphicId": "images/city/buildings/buildings-a.png",
-          "x": 3596,
-          "y": 3533,
-          "id": "8a64889b-0348-4b31-8ae4-dc95c2f14770",
-          "name": "building 3",
-          "crop": {
-            "x": 534,
-            "y": 0,
-            "w": 243,
-            "h": 448
-          }
+          "graphicId": "images/city-exports/props/pump.png",
+          "x": 1154,
+          "y": 629,
+          "id": "95899807-c7f7-4712-9864-6b7e8ebebcec"
         },
         {
-          "graphicId": "images/city/buildings/buildings-a.png",
-          "x": 3239,
-          "y": 3524,
-          "id": "a208dae1-72e5-49c7-a75b-8cdd8197e05e",
-          "name": "building 5",
-          "crop": {
-            "x": 64,
-            "y": 0,
-            "w": 212,
-            "h": 448
-          }
+          "graphicId": "images/city-exports/props/postbox.png",
+          "x": 955,
+          "y": 613,
+          "id": "0f3e77ca-4eac-4789-b158-2b23ed260079"
         },
         {
-          "graphicId": "images/city/buildings/buildings-a.png",
-          "x": 3416,
-          "y": 3572,
-          "id": "efd39f16-3799-4430-a12e-964e893e979b",
-          "name": "building 4",
-          "crop": {
-            "x": 282,
-            "y": 0,
-            "w": 235,
-            "h": 448
-          }
+          "graphicId": "images/city-exports/props/crate.png",
+          "x": 1048,
+          "y": 618,
+          "id": "2d7c248a-b2a7-477a-beb9-b8afb655e94e"
+        },
+        {
+          "graphicId": "images/city-exports/props/left-pole.png",
+          "x": 417,
+          "y": 703,
+          "id": "6455f37e-ad41-4062-b0dc-a2f8f94fc4ec"
+        },
+        {
+          "graphicId": "images/city-exports/props/left-fence.png",
+          "x": 522,
+          "y": 743,
+          "id": "30eef3f2-4f77-4c12-8d59-200e3ac8ec32"
+        },
+        {
+          "graphicId": "images/city-exports/props/down-fence.png",
+          "x": 1038,
+          "y": 743,
+          "id": "3e4a16e5-5763-4068-827a-e21f38a213ce"
         }
       ],
-      "folderId": "157c337d-43c1-4436-98de-2115f74a9074",
+      "folderId": "c19342eb-5031-4181-bbbe-addfc1c1623b",
+      "z": 31
+    },
+    {
+      "id": "dec5ca88-e8b6-49e5-8989-e1ebf9e39508",
+      "name": "tall grass",
+      "type": "image",
+      "visible": true,
+      "locked": false,
+      "images": [
+        {
+          "graphicId": "images/city-exports/decorations/tall-grass/stairs-grass.png",
+          "x": 556,
+          "y": 749,
+          "id": "957b694d-e243-4cb2-a184-ad0fe8fa0b7c"
+        },
+        {
+          "graphicId": "images/city-exports/decorations/tall-grass/back-grass.png",
+          "x": 829,
+          "y": 734,
+          "id": "a98754d0-64d1-4563-b6ca-a2bf14cec43c"
+        },
+        {
+          "graphicId": "images/city-exports/decorations/tall-grass/front-grass.png",
+          "x": 928,
+          "y": 745,
+          "id": "04fff745-3470-4c19-8e79-15413ad31049"
+        }
+      ],
+      "folderId": "c19342eb-5031-4181-bbbe-addfc1c1623b",
+      "z": 30
+    },
+    {
+      "id": "830dcf41-293f-4140-957f-860b3be5f116",
+      "name": "buildings",
+      "type": "folder",
+      "visible": true,
+      "locked": false,
+      "collapsed": true
+    },
+    {
+      "id": "c4ed4986-b95a-43b4-af44-9beec2b10319",
+      "name": "pit",
+      "type": "image",
+      "visible": true,
+      "locked": false,
+      "images": [
+        {
+          "graphicId": "images/city-exports/buildings/pit/pit-back.png",
+          "x": 1033,
+          "y": 565,
+          "id": "31bdab5c-c1c0-4781-9971-2acfb05cabe8"
+        },
+        {
+          "graphicId": "images/city-exports/buildings/pit/orange-fence.png",
+          "x": 1053,
+          "y": 605,
+          "id": "a0fb6c39-defd-47ec-882b-cf149feed917"
+        },
+        {
+          "graphicId": "images/city-exports/buildings/pit/subway.png",
+          "x": 857,
+          "y": 606,
+          "id": "e996ec21-5ee9-43b6-b0e2-ac6c76729da1"
+        }
+      ],
+      "folderId": "830dcf41-293f-4140-957f-860b3be5f116",
+      "z": 26
+    },
+    {
+      "id": "ff9e542c-19ae-4dd3-b083-899e67de0de7",
+      "name": "right",
+      "type": "image",
+      "visible": true,
+      "locked": false,
+      "images": [
+        {
+          "graphicId": "images/city-exports/buildings/buildings-right/top-up.png",
+          "x": 1851,
+          "y": 251,
+          "id": "1a1276fd-c61f-4d7f-ad06-0124307d147e",
+          "groupId": "c3f0471e-3b9c-4ec7-8e2c-8f417db725fa"
+        },
+        {
+          "graphicId": "images/city-exports/buildings/buildings-right/top-left.png",
+          "x": 1811,
+          "y": 396,
+          "id": "243e282d-2a3b-4e27-af63-37a59b1b40f7",
+          "groupId": "c3f0471e-3b9c-4ec7-8e2c-8f417db725fa"
+        },
+        {
+          "graphicId": "images/city-exports/buildings/buildings-right/top-right.png",
+          "x": 1930,
+          "y": 345,
+          "id": "4093b496-01a5-41be-a3b5-7a19e14087ef",
+          "groupId": "c3f0471e-3b9c-4ec7-8e2c-8f417db725fa"
+        },
+        {
+          "graphicId": "images/city-exports/buildings/buildings-right/rightmost.png",
+          "x": 1926,
+          "y": 625,
+          "id": "899425c1-2590-48f1-86b2-8b5bc757f119"
+        },
+        {
+          "graphicId": "images/city-exports/buildings/buildings-right/tata.png",
+          "x": 1809,
+          "y": 676,
+          "id": "2d0a450b-778d-4340-904e-04ae618efb85"
+        },
+        {
+          "graphicId": "images/city-exports/buildings/buildings-right/fridge.png",
+          "x": 1612,
+          "y": 635,
+          "id": "80f1ed70-2df9-41cc-a140-ffc2cd249fa0"
+        },
+        {
+          "graphicId": "images/city-exports/buildings/buildings-right/bluehut.png",
+          "x": 1358,
+          "y": 629,
+          "id": "7c47b4bb-763f-4932-a861-3f0610760e41"
+        },
+        {
+          "graphicId": "images/city-exports/buildings/buildings-right/chicken.png",
+          "x": 1481,
+          "y": 674,
+          "id": "d7d04734-a89f-41bc-8766-c97f6b334b6c"
+        }
+      ],
+      "folderId": "830dcf41-293f-4140-957f-860b3be5f116",
+      "groups": [
+        {
+          "id": "c3f0471e-3b9c-4ec7-8e2c-8f417db725fa",
+          "name": "tops"
+        }
+      ],
+      "z": 26
+    },
+    {
+      "id": "981cd06b-2783-45fd-a65e-e9bc1f16ad55",
+      "name": "left",
+      "type": "image",
+      "visible": true,
+      "locked": false,
+      "images": [
+        {
+          "graphicId": "images/city-exports/buildings/left/left-background.png",
+          "x": 689,
+          "y": 461,
+          "id": "c4752a37-5b69-47ee-948e-89d79704b106"
+        },
+        {
+          "graphicId": "images/city-exports/buildings/left/oldbrown-side.png",
+          "x": 917,
+          "y": 385,
+          "id": "1f75fd77-0a4d-40e8-bbae-fea0d27488be"
+        },
+        {
+          "graphicId": "images/city-exports/buildings/left/movie.png",
+          "x": 657,
+          "y": 545,
+          "id": "8d5fcfe7-70eb-4473-9214-834710ff391a"
+        },
+        {
+          "graphicId": "images/city-exports/buildings/left/ramen.png",
+          "x": 392,
+          "y": 542,
+          "id": "3a195837-bd6a-47be-ad9e-1da83b22e27d"
+        },
+        {
+          "graphicId": "images/city-exports/buildings/left/coffee.png",
+          "x": 497,
+          "y": 542,
+          "id": "08e3af34-d93a-4c70-a54d-d6576939b7a7"
+        },
+        {
+          "graphicId": "images/city-exports/buildings/left/oldbrown.png",
+          "x": 820,
+          "y": 390,
+          "id": "6cff1d70-84ae-46ee-9165-5b6209527ae6"
+        },
+        {
+          "graphicId": "images/city-exports/buildings/left/princess.png",
+          "x": 1051,
+          "y": 377,
+          "id": "11fec32a-4cb4-47ff-9f38-fc2d049e55d5"
+        },
+        {
+          "graphicId": "images/city-exports/buildings/left/right-background.png",
+          "x": 1466,
+          "y": 375,
+          "id": "da032503-dbce-45ec-9d29-e52bca856801"
+        }
+      ],
+      "folderId": "830dcf41-293f-4140-957f-860b3be5f116",
+      "z": 25
+    },
+    {
+      "id": "8cace5b9-20fc-40db-8e33-bef448ab38a8",
+      "name": "leftmost",
+      "type": "image",
+      "visible": true,
+      "locked": false,
+      "images": [
+        {
+          "graphicId": "images/city-exports/buildings/left/leftmost-building.png",
+          "x": 99,
+          "y": 792,
+          "id": "01c11482-b9ab-4f17-a811-4b7ffe67ed95"
+        }
+      ],
+      "z": 25
+    },
+    {
+      "id": "722b29f9-2787-4182-9bf4-f189de94fdd7",
+      "name": "stairs",
+      "type": "folder",
+      "visible": true,
+      "locked": false,
+      "collapsed": true
+    },
+    {
+      "id": "96da9c83-62e9-4266-a6b3-f5cf81545f0f",
+      "name": "top",
+      "type": "image",
+      "visible": true,
+      "locked": false,
+      "images": [
+        {
+          "graphicId": "images/city-exports/top-stairs.png",
+          "x": 1171,
+          "y": 357,
+          "id": "8c3aa485-9371-437d-9471-a6e8bd35c636"
+        }
+      ],
+      "folderId": "722b29f9-2787-4182-9bf4-f189de94fdd7",
       "z": 2
     },
     {
-      "id": "38dd319c-33e0-4af2-ae70-6a374cb38e1e",
-      "name": "stairs",
+      "id": "fb805f7c-60e6-45a2-981e-f6cd52633e44",
+      "name": "middle",
       "type": "image",
       "visible": true,
       "locked": false,
       "images": [
         {
-          "graphicId": "images/city/shared/stairs.png",
-          "x": 3118,
-          "y": 3906,
-          "id": "34f89857-f655-4a90-bbf0-bcf6957b73b2",
-          "name": "stairs"
-        },
-        {
-          "graphicId": "images/city/shared/stairs.png",
-          "x": 3092,
-          "y": 3489,
-          "id": "ec06384b-db5c-4d1a-aae7-705e8cf5015d",
-          "name": "stairs 2"
-        },
-        {
-          "graphicId": "images/city/shared/stairs.png",
-          "x": 3020,
-          "y": 3489,
-          "id": "be21521c-a1ba-4ecb-b03c-302f6f5fece3",
-          "name": "stairs 3",
-          "crop": {
-            "x": 15,
-            "y": 0,
-            "w": 132,
-            "h": 336
-          }
+          "graphicId": "images/city-exports/stairs-middle.png",
+          "x": 1230,
+          "y": 629,
+          "id": "35922b97-776a-4716-896c-525ab48d9bf6"
         }
       ],
-      "folderId": "157c337d-43c1-4436-98de-2115f74a9074",
+      "folderId": "722b29f9-2787-4182-9bf4-f189de94fdd7",
+      "z": 2
+    },
+    {
+      "id": "cd7d5719-9517-44ff-9808-f5d548a63e1e",
+      "name": "bottom",
+      "type": "image",
+      "visible": true,
+      "locked": false,
+      "images": [
+        {
+          "graphicId": "images/city-exports/stairs-down.png",
+          "x": 1247,
+          "y": 871,
+          "id": "6e1020de-692a-4c64-a29b-3960b2248c7a"
+        }
+      ],
+      "folderId": "722b29f9-2787-4182-9bf4-f189de94fdd7",
+      "z": 2
+    },
+    {
+      "id": "b2d45497-c988-4196-b2ce-6e5fff1943e3",
+      "name": "walls",
+      "type": "folder",
+      "visible": true,
+      "locked": false,
+      "collapsed": true
+    },
+    {
+      "id": "83ca873c-9f8b-4018-8ced-1ad6a4e07e18",
+      "name": "wall structure",
+      "type": "image",
+      "visible": true,
+      "locked": false,
+      "images": [
+        {
+          "graphicId": "images/city-exports/walls.png",
+          "x": 921,
+          "y": 691,
+          "id": "08ebfdba-6ebb-4847-837c-e6cd296adb4d"
+        }
+      ],
+      "z": 1,
+      "folderId": "b2d45497-c988-4196-b2ce-6e5fff1943e3"
+    },
+    {
+      "id": "4db9a865-c3ee-4338-872b-c7bc957b08db",
+      "name": "background",
+      "type": "folder",
+      "visible": true,
+      "locked": false,
+      "collapsed": true
+    },
+    {
+      "id": "0384f305-5f3f-4eb6-a3ba-38d00c3d05c5",
+      "name": "background",
+      "type": "image",
+      "visible": true,
+      "locked": false,
+      "images": [
+        {
+          "graphicId": "images/city-exports/right-background/distant-building.png",
+          "x": 1721,
+          "y": 458,
+          "id": "30eead17-9601-432b-a19f-7ba6d19c09af"
+        },
+        {
+          "graphicId": "images/city-exports/right-background/distant-building-overlay.png",
+          "x": 1703,
+          "y": 453,
+          "id": "59d57323-3985-48ea-9b3b-eb8472d1a935",
+          "scale": 2,
+          "crop": {
+            "x": 56,
+            "y": 115,
+            "w": 117,
+            "h": 169
+          }
+        },
+        {
+          "graphicId": "images/city-exports/right-background/alley-darkness.png",
+          "x": 1705,
+          "y": 469,
+          "id": "cbe54379-046b-4154-9565-f5d284bdecaa"
+        }
+      ],
+      "folderId": "4db9a865-c3ee-4338-872b-c7bc957b08db",
+      "z": 4
+    },
+    {
+      "id": "6527677c-8ca5-45e9-a2bb-0f7f8e7051be",
+      "name": "ground",
+      "type": "folder",
+      "visible": true,
+      "locked": false,
+      "collapsed": true
+    },
+    {
+      "id": "937d0218-8f15-4c6f-a6a5-5dd4fe696586",
+      "name": "dirt",
+      "type": "image",
+      "visible": true,
+      "locked": false,
+      "images": [
+        {
+          "graphicId": "images/city-exports/decorations/dirt/1.png",
+          "x": 1847,
+          "y": 712,
+          "id": "806714ec-7472-4254-b815-a7c92458b186"
+        },
+        {
+          "graphicId": "images/city-exports/decorations/dirt/2.png",
+          "x": 773,
+          "y": 630,
+          "id": "225acf4e-04ca-4fe0-8d8d-b5cf6a08f58b"
+        },
+        {
+          "graphicId": "images/city-exports/decorations/dirt/3.png",
+          "x": 1550,
+          "y": 714,
+          "id": "61f61227-4732-438e-b95d-ccfa1ea48224"
+        },
+        {
+          "graphicId": "images/city-exports/decorations/dirt/4.png",
+          "x": 828,
+          "y": 693,
+          "id": "1796f039-48de-43bd-b221-0e574a501f04"
+        },
+        {
+          "graphicId": "images/city-exports/decorations/dirt/5.png",
+          "x": 1307,
+          "y": 658,
+          "id": "a3638ac2-fc56-44ce-b2e4-4a428ca88afe"
+        },
+        {
+          "graphicId": "images/city-exports/decorations/dirt/5.png",
+          "x": 1367,
+          "y": 662,
+          "id": "b010738d-586b-45d8-97cc-5778ef4792eb"
+        },
+        {
+          "graphicId": "images/city-exports/decorations/dirt/5.png",
+          "x": 1689,
+          "y": 622,
+          "id": "6893618b-839d-44f3-abba-9883b156a0b4"
+        },
+        {
+          "graphicId": "images/city-exports/decorations/dirt/1.png",
+          "x": 1724,
+          "y": 725,
+          "id": "2405e7ef-a931-47d8-9079-e343591b42de",
+          "name": "1 2"
+        }
+      ],
+      "folderId": "6527677c-8ca5-45e9-a2bb-0f7f8e7051be",
+      "z": 2
+    },
+    {
+      "id": "6e3a24af-bb92-447f-9071-1630f8f9fceb",
+      "name": "grass",
+      "type": "image",
+      "visible": true,
+      "locked": false,
+      "images": [
+        {
+          "graphicId": "images/city-exports/decorations/grass-overlay.png",
+          "x": 1039,
+          "y": 742,
+          "id": "4b85cce5-08bf-4bfe-a809-adbcea924c02"
+        }
+      ],
+      "folderId": "6527677c-8ca5-45e9-a2bb-0f7f8e7051be",
       "z": 1
     },
     {
-      "id": "86c57a22-0a60-418a-aef7-22049672bd4f",
+      "id": "6cede2e8-64ef-462c-adb0-63193a54c304",
       "name": "pavement",
       "type": "image",
       "visible": true,
       "locked": false,
       "images": [
         {
-          "graphicId": "images/ground/city-pavement.png",
-          "x": 3328,
-          "y": 3872,
-          "id": "d9a1a976-fb52-4104-8919-6487d37cf9f1",
-          "name": "br"
-        },
-        {
-          "graphicId": "images/ground/city-pavement.png",
-          "x": 1728,
-          "y": 3872,
-          "id": "ae2afa24-f2b2-4ade-9bce-ca1a62026b14",
-          "name": "br 2"
+          "graphicId": "images/city-exports/level-1-pavement.png",
+          "x": 1021,
+          "y": 747,
+          "id": "90a50133-d62e-40da-bff9-28fb996eee3a"
         }
-      ]
+      ],
+      "folderId": "6527677c-8ca5-45e9-a2bb-0f7f8e7051be"
     }
   ],
-  "entities": [
-    {
-      "id": "d7595d0f-265c-4b35-ab4f-2d8bb352db26",
-      "name": "New Entity",
-      "x": 3815.1602612695733,
-      "y": 3630.3963157313474,
-      "visible": true,
-      "folder": null,
-      "components": {
-        "Transform": {
-          "x": 3815.1602612695733,
-          "y": 3630.3963157313474,
-          "depth": 20
-        },
-        "Sprite": {
-          "asset": "characters/npc-red",
-          "facing": "down",
-          "animation": "",
-          "animSpeed": 1,
-          "frame": 0,
-          "offsetX": 0,
-          "offsetY": 0,
-          "scale": 1,
-          "flipX": false,
-          "tint": "",
-          "opacity": 1,
-          "visible": true
-        },
-        "Event": {
-          "states": [
-            {
-              "id": "c8b847ea-a21b-44a6-9bfd-506ba37a3efe",
-              "name": "State 1",
-              "conditions": [],
-              "trigger": "interact",
-              "graph": {
-                "nodes": [
-                  {
-                    "id": "e57a5f37-84e3-4619-98ae-75efa2ca719a",
-                    "type": "start",
-                    "params": {},
-                    "out": {
-                      "next": "16db4921-3bb8-49f1-b8bc-7ed5d0ac8ecb"
-                    },
-                    "x": 0,
-                    "y": 0
-                  },
-                  {
-                    "id": "16db4921-3bb8-49f1-b8bc-7ed5d0ac8ecb",
-                    "type": "warp",
-                    "params": {
-                      "map": "market",
-                      "x": 9,
-                      "y": 11,
-                      "facing": "",
-                      "fade": true
-                    },
-                    "out": {},
-                    "x": 135,
-                    "y": 10
-                  }
-                ],
-                "frames": []
-              },
-              "faceOnInteract": true,
-              "solid": null,
-              "appearance": {},
-              "blocks": true
-            }
-          ]
-        }
-      }
-    }
-  ],
+  "entities": [],
   "schemaVersion": 5
 }
