@@ -96,7 +96,8 @@ describe('defaults', () => {
       id: 'p-1',
       name: 'State 1',
       conditions: [],
-      trigger: 'action',
+      trigger: 'interact',
+      blocks: true,
       graph: { nodes: [{ id: 'p-2', type: 'start', params: {}, out: {}, x: 0, y: 0 }], frames: [] },
       faceOnInteract: true,
       solid: null,
@@ -218,7 +219,7 @@ describe('normalizeProps', () => {
     const state = ev.states[0]
     expect(state.id).toBe('n-1')
     expect(state.name).toBe('State 1')
-    expect(state.trigger).toBe('action')
+    expect(state.trigger).toBe('interact')
     expect(state.conditions).toEqual([{ kind: 'switch', id: 's', value: true }, { kind: 'hasItem', item: 'potion', qty: 1 }])
     // the legacy command tree becomes a graph: the loop is a reroute head, the old ids are kept
     expect(commandNodes(state.graph).map((n) => n.type)).toEqual(['showText', 'wait'])

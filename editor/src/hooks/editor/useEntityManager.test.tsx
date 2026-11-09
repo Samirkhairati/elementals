@@ -69,7 +69,7 @@ describe('useEntityManager (StrictMode)', () => {
     act(() => result.current.manager.addComponent('b', 'Event'))
     const [a, b] = result.current.manager.entities
     expect(a.components.Event?.states).toHaveLength(1)
-    expect(a.components.Event?.states[0]).toMatchObject({ trigger: 'action' })
+    expect(a.components.Event?.states[0]).toMatchObject({ trigger: 'interact' })
     expect(a.components.Event?.states[0].graph.nodes.map((n: { type: string }) => n.type)).toEqual(['start'])
     expect(a.components.Collider).toMatchObject({ width: 32, height: 32, isSolid: true })
     expect(b.components.Event?.states[0].id).not.toBe(a.components.Event?.states[0].id)

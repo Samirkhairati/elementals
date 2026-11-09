@@ -1,4 +1,4 @@
-import type { CommonEvent, EventState, GameDatabase } from "@shared/engine/index.ts";
+import { statePriority, type CommonEvent, type EventState, type GameDatabase } from "@shared/engine/index.ts";
 import type { World } from "@/ecs/World";
 import type { Entity } from "@/ecs/Entity";
 import { EventComponent } from "@/ecs/components/EventComponent";
@@ -43,7 +43,7 @@ export interface EventRuntimeOptions {
 export interface StartOptions {
   /** Blocking events lock player input and exclude each other (only one at a time). Default true. */
   blocking?: boolean;
-  /** `action` triggers: the entity turns towards this entity when the state asks for it (faceOnInteract). */
+  /** `interact` triggers: the entity turns towards this entity when the state asks for it (faceOnInteract). */
   faceTarget?: Entity;
 }
 
@@ -65,7 +65,7 @@ export interface RunningEvent {
  * Rules:
  *  - one interpreter per entity at a time (an event cannot interrupt itself);
  *  - at most one BLOCKING interpreter at a time; it holds the `event` input lock until it ends;
- *  - parallel events are non-blocking;
+ *  - events whose state does not block run in the background (several at once);
  *  - `cancelAll` (map switch) cancels every interpreter and releases the lock immediately.
  */
 export class EventRuntime {
@@ -173,6 +173,33 @@ export class EventRuntime {
     this.states.refreshAll();
     // Entities without an Event (the player) are not visited by the state selector.
     for (const [entity] of this.world.view(EntityInfoComponent)) this.ops.applyStoredAppearance(entity);
+  }
+
+  /**
+   * The player is about to leave this map by a warp: runs the active `mapLeave` states and resolves when all
+   * of them ended (input stays locked meanwhile). The event that warps keeps running; only other entities'
+   * states start. Call it before the map is torn down.
+   */
+  public async runMapLeave(): Promise<void> {
+    const found: Array<{ entity: Entity; index: number; state: EventState }> = [];
+    for (const [entity, ev] of this.world.view(EventComponent)) {
+      if (ev.activeState < 0 || this.running.has(entity)) continue;
+      const state = ev.states[ev.activeState];
+      if (state.trigger === "mapLeave") found.push({ entity, index: ev.activeState, state });
+    }
+    found.sort((a, b) => statePriority(b.state) - statePriority(a.state));
+    const runs: RunningEvent[] = [];
+    for (const f of found) {
+      const run = this.start(f.entity, f.index, { blocking: false });
+      if (run) runs.push(run);
+    }
+    if (runs.length === 0) return;
+    const release = this.lockInput("mapLeave");
+    try {
+      await Promise.all(runs.map((r) => r.done));
+    } finally {
+      release();
+    }
   }
 
   /** Forces a state re-evaluation on the next update. */

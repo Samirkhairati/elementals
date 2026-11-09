@@ -44,13 +44,21 @@ TriggerSystem     ECS system (priority 350): decides when events start
 RouteSystem       ECS system (priority 260): runs moveRoute steps through GridMovement.pendingDirection
 BusEventUI        EventUI over the EventBus -> DialogueHUD / ChoiceMenuHUD (UIScene); CameraEffects does fade/shake
 ```
-* Rules: one interpreter per entity; one **blocking** interpreter at a time (holds `gameState` lock reason `event`); `parallel` is
-  non-blocking. A map switch cancels everything (`runtime.onMapLoaded`). Global switches/variables/inventory and self switches
+* Rules: one interpreter per entity; one **blocking** interpreter at a time (holds `gameState` lock reason `event`); a state with `blocks: false` runs in
+  the background (several at once). A map switch cancels everything (`runtime.onMapLoaded`). Global switches/variables/inventory and self switches
   persist across maps; the new map's entities select their states from them.
-* **Triggers.** `action`: player tile, tile in front, then the other three neighbours, against each entity's live footprint (a wandering NPC
-  keeps its dialogue); presses made while input is locked are dropped. `playerTouch`: the player's step ends on the tile (also when chaining
-  into the next step) or bumps into a solid trigger; the spawn/warp tile never fires. `eventTouch`: another walking entity ends a step on it.
-  `autorun`: blocking, restarts while its state stays active. `parallel`: background, restarts, cancelled when its state is no longer active.
+* **Triggers** (`TriggerSystem`; every start kind honours the state's `blocks`, and when several events could start from the same
+  input the highest `priority` wins, then the nearest, then entity order). `interact`: player tile, the tiles in front up to the state's `range`,
+  then (unless `mustFace`) the other three neighbours, against each entity's live footprint (a wandering NPC keeps its dialogue); presses
+  made while input is locked are dropped. `playerEnter`: the player's step ends on the tile (also when chaining into the next step) or
+  bumps into a solid trigger; the spawn/warp tile never fires. `playerLeave`: the player's step moved off every tile the entity covers (a
+  blocking leave event holds the enter events of the new tile back until it ends). `eventEnter` / `eventLeave`: the same for another walking
+  entity. `playerNear`: fires once each time the player comes within `range` tiles (a square around the entity; with `lineOfSight` a solid tile
+  between hides the player). `onActive`: once when the state becomes active (restarts while active only when the state carries `repeat`,
+  i.e. migrated from autorun / parallel); a background run is cancelled when its state is no longer active. `timer`: every `interval` seconds
+  while the state is active; the count restarts when the state changes. `mapEnter`: once after the map was loaded (`TriggerSystem.onMapEntered`).
+  `mapLeave`: before a warp to another map (not a same-map warp) `Game.warpPlayer` awaits `EventRuntime.runMapLeave()`, which runs the active
+  `mapLeave` states with input locked, before the fade-out. Repeating is done in the graph (wire the last node back; a loop needs a wait).
 * **Inactive events.** No active state = hidden and not solid (RPG Maker behaviour).
 * **Movement routes.** Steps use the normal movement intent (collision applies, blocked steps are skipped). `back` turns the character
   around (the movement system sets the facing from the intent). `speed` persists. Routed entities ignore the input lock, wander AI and player input

@@ -116,6 +116,8 @@ export class Game extends Scene {
       ensureCharacter: (id) => void this.characters.ensure([id]),
     });
     this.triggerSystem = new TriggerSystem(this.runtime);
+    // `playerNear` with a line of sight: a tile hides the player when something solid stands on its centre.
+    this.triggerSystem.setSightBlocker((col, row, ignore) => !this.spatialSystem.isWalkable((col + 0.5) * GAME_CONSTANTS.TILE_SIZE, (row + 0.5) * GAME_CONSTANTS.TILE_SIZE, ignore));
     this.triggerSystem.attach();
 
     this.world.addSystem(this.spatialSystem);
@@ -243,6 +245,7 @@ export class Game extends Scene {
     // Events of the new map: states, then no touch event fires for the tile we arrive on.
     this.runtime.onMapLoaded(mapKey);
     this.triggerSystem.resetTouchState(this.world);
+    this.triggerSystem.onMapEntered(this.world);
 
     // Tick world with 0 delta to instantiate sprites on the render bridge immediately
     this.world.update(0);
@@ -288,6 +291,9 @@ export class Game extends Scene {
       console.warn(`[Game] warp: unknown map "${request.map}"`);
       return;
     }
+
+    // Leaving for another map: the `mapLeave` states of this one run first, before the screen fades.
+    if (mapKey !== this.currentMapKey) await this.runtime.runMapLeave();
 
     if (request.fade) await this.cameraEffects.fade("out", FADE_MS, never);
 

@@ -72,7 +72,7 @@ describe('hydrateMapEntities', () => {
     expect(w.getComponent(e, ColliderComponent)).toMatchObject({ width: 32, height: 32, isSolid: true });
     const event = w.getComponent(e, EventComponent)!;
     expect(event.states).toHaveLength(1);
-    expect(event.states[0]).toMatchObject({ trigger: 'action' });
+    expect(event.states[0]).toMatchObject({ trigger: 'interact' });
     expect(firstCommand(event.states[0])).toMatchObject({ type: 'showText', params: { text: 'The ancient sign is faded...' } });
     expect(w.getComponent(e, EntityInfoComponent)).toMatchObject({ editorId: 'e41e2972', name: 'Sign / Inspectable' });
     expect(w.getComponent(e, TagComponent)?.tag).toBe('sign');

@@ -11,7 +11,45 @@ export const RUN_SPEED_MULTIPLIER = 1.5;
 /** Sheet row order of character sprites: down, left, right, up. */
 export const FACINGS: readonly Facing[] = ['down', 'left', 'right', 'up'];
 export const CONTROLLERS: readonly Controller[] = ['none', 'player', 'wander'];
-export const EVENT_TRIGGERS: readonly EventTrigger[] = ['action', 'playerTouch', 'eventTouch', 'autorun', 'parallel'];
+export const EVENT_TRIGGERS: readonly EventTrigger[] = [
+  'interact',
+  'playerEnter',
+  'playerLeave',
+  'playerNear',
+  'eventEnter',
+  'eventLeave',
+  'onActive',
+  'timer',
+  'mapEnter',
+  'mapLeave',
+];
+
+/** The editor's groups of start kinds (the order of the "When" picker). */
+export const TRIGGER_GROUPS: readonly { label: string; triggers: readonly EventTrigger[] }[] = [
+  { label: 'Player', triggers: ['interact', 'playerEnter', 'playerLeave', 'playerNear'] },
+  { label: 'Other characters', triggers: ['eventEnter', 'eventLeave'] },
+  { label: 'Time and map', triggers: ['onActive', 'timer', 'mapEnter', 'mapLeave'] },
+];
+
+/** Whether a start kind blocks the player unless the state says otherwise. */
+export const TRIGGER_BLOCKS_BY_DEFAULT: Record<EventTrigger, boolean> = {
+  interact: true,
+  playerEnter: true,
+  playerLeave: true,
+  playerNear: false,
+  eventEnter: true,
+  eventLeave: true,
+  onActive: true,
+  timer: false,
+  mapEnter: true,
+  mapLeave: true,
+};
+
+export const DEFAULT_INTERACT_RANGE = 1;
+export const DEFAULT_NEAR_RANGE = 4;
+export const DEFAULT_TIMER_SECONDS = 1;
+/** Largest `range` the editor offers and the game looks at. */
+export const MAX_TRIGGER_RANGE = 16;
 export const COMPARISON_OPS: readonly ComparisonOp[] = ['==', '!=', '>', '>=', '<', '<='];
 export const SELF_SWITCH_KEYS: readonly SelfSwitchKey[] = ['A', 'B', 'C', 'D'];
 export const ROUTE_STEP_TYPES: readonly RouteStepType[] = [
@@ -27,11 +65,16 @@ export const ROUTE_STEP_TYPES: readonly RouteStepType[] = [
 ];
 
 export const TRIGGER_LABELS: Record<EventTrigger, string> = {
-  action: 'Action button',
-  playerTouch: 'Player touch',
-  eventTouch: 'Event touch',
-  autorun: 'Autorun',
-  parallel: 'Parallel',
+  interact: 'Player presses Action',
+  playerEnter: 'Player steps onto it',
+  playerLeave: 'Player steps off it',
+  playerNear: 'Player comes near',
+  eventEnter: 'Character steps onto it',
+  eventLeave: 'Character steps off it',
+  onActive: 'State becomes active',
+  timer: 'Every few seconds',
+  mapEnter: 'Map is entered',
+  mapLeave: 'Map is left',
 };
 
 const FACING_LABELS: Record<Facing, string> = { down: 'Down', left: 'Left', right: 'Right', up: 'Up' };

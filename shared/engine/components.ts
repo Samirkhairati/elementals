@@ -13,7 +13,8 @@ import type {
   FieldDef,
   StateAppearance,
 } from './types.ts';
-import { EVENT_TRIGGERS, COMPARISON_OPS, SELF_SWITCH_KEYS, isFacing } from './constants.ts';
+import { COMPARISON_OPS, SELF_SWITCH_KEYS, isFacing } from './constants.ts';
+import { defaultBlocks, isEventTrigger, normalizeRange, upgradeLegacyTrigger } from './triggers.ts';
 import { cloneGraph, commandsToGraph, createGraph, normalizeGraph } from './graph.ts';
 import { deterministicId, newId } from './ids.ts';
 import { cloneJson, isRecord } from './util.ts';
@@ -31,7 +32,8 @@ export function createDefaultEventState(name = 'State 1'): EventState {
     id: newId(),
     name,
     conditions: [],
-    trigger: 'action',
+    trigger: 'interact',
+    blocks: true,
     graph: createGraph(),
     faceOnInteract: true,
     solid: null,
@@ -39,7 +41,7 @@ export function createDefaultEventState(name = 'State 1'): EventState {
   };
 }
 
-/** One `action` state with an empty graph. */
+/** One `interact` state with an empty graph. */
 export function createDefaultEventProps(): EventProps {
   return { states: [createDefaultEventState()] };
 }
@@ -298,19 +300,29 @@ function normalizeAppearance(a: unknown): StateAppearance {
 }
 
 export function normalizeEventState(state: unknown, index = 0): EventState {
-  const p = isRecord(state) ? state : {};
-  return {
+  const p = upgradeLegacyTrigger(isRecord(state) ? state : {}) as Record<string, unknown>;
+  const trigger: EventState['trigger'] = isEventTrigger(p.trigger) ? p.trigger : 'interact';
+  const out: EventState = {
     id: typeof p.id === 'string' && p.id ? p.id : newId(),
     name: typeof p.name === 'string' ? p.name : `State ${index + 1}`,
     conditions: Array.isArray(p.conditions)
       ? p.conditions.map(normalizeCondition).filter((c): c is Condition => c !== null)
       : [],
-    trigger: (EVENT_TRIGGERS as readonly unknown[]).includes(p.trigger) ? (p.trigger as EventState['trigger']) : 'action',
+    trigger,
+    blocks: typeof p.blocks === 'boolean' ? p.blocks : defaultBlocks(trigger),
     graph: normalizeStateGraph(p),
     faceOnInteract: typeof p.faceOnInteract === 'boolean' ? p.faceOnInteract : true,
     solid: typeof p.solid === 'boolean' ? p.solid : null,
     appearance: normalizeAppearance(p.appearance),
   };
+  // Optional start settings are only written when they differ from the default, so saved data stays small.
+  if (typeof p.range === 'number' && Number.isFinite(p.range)) out.range = normalizeRange(p.range, 1);
+  if (p.mustFace === true) out.mustFace = true;
+  if (p.lineOfSight === true) out.lineOfSight = true;
+  if (typeof p.interval === 'number' && Number.isFinite(p.interval) && p.interval > 0) out.interval = p.interval;
+  if (typeof p.priority === 'number' && Number.isFinite(p.priority) && p.priority !== 0) out.priority = Math.round(p.priority);
+  if (p.repeat === true) out.repeat = true;
+  return out;
 }
 
 export function normalizeEventProps(props: unknown): EventProps {

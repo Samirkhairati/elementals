@@ -26,7 +26,7 @@ function install(extra: Record<string, unknown> = {}) {
     }),
     getTilesets: () => Promise.resolve({ success: true, tilesets: [{ name: 'grass', fileName: 'grass.png', folderPath: null, dataUrl: PNG }, { name: 'lonely', fileName: 'lonely.png', folderPath: null, dataUrl: PNG }] }),
     getMaps: () => Promise.resolve({ success: true, maps: [{
-      name: 'Town', fileName: 'town.json', folderPath: null, width: 10, height: 8, schemaVersion: 4,
+      name: 'Town', fileName: 'town.json', folderPath: null, width: 10, height: 8, schemaVersion: 5,
       layers: [{ id: 'g', name: 'ground', type: 'tile', visible: true, locked: false, data: { 0: { tilesetId: 'grass.png', x: 0, y: 0 } } }],
       entities: [{ id: 'c', name: 'Chest', x: 0, y: 0, components: { Sprite: { asset: 'objects/chest' } } }],
     }] }),

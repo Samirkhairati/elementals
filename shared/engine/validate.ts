@@ -4,7 +4,8 @@ import type { EntityIssue, FieldDef, IssueSeverity, ValidationContext } from './
 import { COMPONENT_SCHEMAS, isComponentType } from './components.ts';
 import { validateCommands, validateConditions } from './commands.ts';
 import { validateGraph } from './graph.ts';
-import { EVENT_TRIGGERS, isFacing } from './constants.ts';
+import { isFacing } from './constants.ts';
+import { isEventTrigger, isLegacyTrigger } from './triggers.ts';
 import { isLegacyComponentType } from './migrate.ts';
 import { isRecord } from './util.ts';
 
@@ -138,8 +139,21 @@ function validateEvent(
     else if (stateIds.has(state.id)) add('error', 'duplicate-state-id', `State id "${state.id}" is used more than once`, `${pp}.id`);
     else stateIds.add(state.id);
 
-    if (!(EVENT_TRIGGERS as readonly unknown[]).includes(state.trigger)) {
+    // Old trigger names (schemaVersion 4) are still fine: they are upgraded on load.
+    if (!isEventTrigger(state.trigger) && !isLegacyTrigger(state.trigger)) {
       add('error', 'bad-trigger', `State ${i + 1}: unknown trigger "${String(state.trigger)}"`, `${pp}.trigger`);
+    }
+    if (state.blocks !== undefined && typeof state.blocks !== 'boolean') {
+      add('error', 'bad-state', `State ${i + 1}: blocks must be true or false`, `${pp}.blocks`);
+    }
+    for (const key of ['range', 'interval', 'priority'] as const) {
+      const v = state[key];
+      if (v !== undefined && (typeof v !== 'number' || !Number.isFinite(v))) {
+        add('error', 'bad-state', `State ${i + 1}: ${key} must be a number`, `${pp}.${key}`);
+      }
+    }
+    if (typeof state.interval === 'number' && state.interval <= 0) {
+      add('error', 'bad-state', `State ${i + 1}: interval must be more than 0 seconds`, `${pp}.interval`);
     }
     if (state.faceOnInteract !== undefined && typeof state.faceOnInteract !== 'boolean') {
       add('error', 'bad-state', `State ${i + 1}: faceOnInteract must be true or false`, `${pp}.faceOnInteract`);

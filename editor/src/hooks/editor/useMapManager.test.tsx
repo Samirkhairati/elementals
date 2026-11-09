@@ -55,7 +55,7 @@ describe('useMapManager', () => {
     const { result } = renderHook(() => useMapManager({ onMapSelected }), { wrapper })
     act(() => result.current.onSelectMap(legacy))
     const active = result.current.activeMap!
-    expect(active.schemaVersion).toBe(4)
+    expect(active.schemaVersion).toBe(5)
     expect(Object.keys(active.entities![0].components)).toEqual(['Transform', 'Event'])
     expect(commandNodes(active.entities![0].components.Event!.states[0].graph)[0]).toMatchObject({ type: 'showText', params: { text: 'hello' } })
     expect(legacy.entities![0].components).toHaveProperty('Interactable') // input untouched
@@ -74,7 +74,7 @@ describe('useMapManager', () => {
       await result.current.loadMaps()
     })
     const loaded = result.current.maps[0]
-    expect(loaded.schemaVersion).toBe(4)
+    expect(loaded.schemaVersion).toBe(5)
     expect(loaded.entities![0].components.Movement).toMatchObject({ controller: 'player' })
     expect(loaded.entities![0].components.Sprite).toMatchObject({ asset: 'characters/player' })
   })

@@ -173,7 +173,7 @@ describe('action trigger', () => {
 
   it('only triggers action states; other triggers are ignored by the action key', async () => {
     rig.addPlayer(5, 5, 'down');
-    rig.add({ id: 'touchy', col: 5, row: 6, states: [state([say('t')], { trigger: 'playerTouch' })] });
+    rig.add({ id: 'touchy', col: 5, row: 6, states: [state([say('t')], { trigger: 'playerEnter' })] });
     triggers.resetTouchState(rig.world);
     triggers.requestAction();
     await step();
@@ -251,7 +251,7 @@ describe('only one blocking event at a time', () => {
     rig.addPlayer(5, 5, 'down');
     const a = rig.add({ id: 'a', col: 5, row: 6, states: [state([say('a')])] });
     const b = rig.add({ id: 'b', col: 4, row: 5, states: [state([say('b')])] });
-    const par = rig.add({ id: 'par', col: 0, row: 0, sprite: false, collider: false, states: [state([cmd('wait', { ms: 1000 })], { trigger: 'parallel' })] });
+    const par = rig.add({ id: 'par', col: 0, row: 0, sprite: false, collider: false, states: [state([cmd('wait', { ms: 1000 })], { trigger: 'onActive', blocks: false, repeat: true })] });
     triggers.resetTouchState(rig.world);
     await step();
     expect(rig.runtime.isRunning(par)).toBe(true);
@@ -263,10 +263,10 @@ describe('only one blocking event at a time', () => {
   });
 });
 
-describe('playerTouch', () => {
+describe('playerEnter', () => {
   it('fires when the player arrives on the tile, not while standing there, again after leaving and re-entering', async () => {
     const player = rig.addPlayer(5, 5);
-    rig.add({ id: 'door', col: 6, row: 5, sprite: false, collider: { isSolid: false }, states: [state([cmd('setVariable', { id: 'v1', op: 'add', operand: 'const', value: 1 })], { trigger: 'playerTouch' })] });
+    rig.add({ id: 'door', col: 6, row: 5, sprite: false, collider: { isSolid: false }, states: [state([cmd('setVariable', { id: 'v1', op: 'add', operand: 'const', value: 1 })], { trigger: 'playerEnter' })] });
     triggers.resetTouchState(rig.world);
     await step();
     expect(rig.runtime.flags.getVariable('v1')).toBe(0);
@@ -289,7 +289,7 @@ describe('playerTouch', () => {
 
   it('does not fire for the tile the player spawned / was warped onto', async () => {
     rig.addPlayer(6, 5);
-    rig.add({ id: 'door', col: 6, row: 5, sprite: false, collider: { isSolid: false }, states: [state([cmd('setSwitch', { id: 's1', value: true })], { trigger: 'playerTouch' })] });
+    rig.add({ id: 'door', col: 6, row: 5, sprite: false, collider: { isSolid: false }, states: [state([cmd('setSwitch', { id: 's1', value: true })], { trigger: 'playerEnter' })] });
     triggers.resetTouchState(rig.world);
     await step();
     await step();
@@ -303,7 +303,7 @@ describe('playerTouch', () => {
     rig.world.addSystem(spatial);
     rig.world.addSystem(movement);
     const player = rig.addPlayer(5, 5, 'right');
-    rig.add({ id: 'door', col: 6, row: 5, sprite: false, collider: { isSolid: false }, states: [state([cmd('setSwitch', { id: 's1', value: true })], { trigger: 'playerTouch' })] });
+    rig.add({ id: 'door', col: 6, row: 5, sprite: false, collider: { isSolid: false }, states: [state([cmd('setSwitch', { id: 's1', value: true })], { trigger: 'playerEnter' })] });
     triggers.resetTouchState(rig.world);
 
     const grid = rig.world.getComponent(player, GridMovementComponent)!;
@@ -325,9 +325,9 @@ describe('playerTouch', () => {
     movement.destroy(rig.world);
   });
 
-  it('bumping into a SOLID playerTouch event triggers it; walkable ones wait for arrival', async () => {
+  it('bumping into a SOLID playerEnter event triggers it; walkable ones wait for arrival', async () => {
     const player = rig.addPlayer(5, 5, 'right');
-    rig.add({ id: 'guard', col: 6, row: 5, states: [state([cmd('setSwitch', { id: 's1', value: true })], { trigger: 'playerTouch' })] });
+    rig.add({ id: 'guard', col: 6, row: 5, states: [state([cmd('setSwitch', { id: 's1', value: true })], { trigger: 'playerEnter' })] });
     triggers.resetTouchState(rig.world);
     const grid = rig.world.getComponent(player, GridMovementComponent)!;
     grid.pendingDirection = 'right';
@@ -341,10 +341,10 @@ describe('playerTouch', () => {
   });
 });
 
-describe('eventTouch', () => {
+describe('eventEnter', () => {
   it('fires when another entity ends a step on the event', async () => {
     rig.addPlayer(1, 1);
-    rig.add({ id: 'pad', col: 8, row: 8, sprite: false, collider: { isSolid: false }, states: [state([cmd('setSwitch', { id: 's1', value: true })], { trigger: 'eventTouch' })] });
+    rig.add({ id: 'pad', col: 8, row: 8, sprite: false, collider: { isSolid: false }, states: [state([cmd('setSwitch', { id: 's1', value: true })], { trigger: 'eventEnter' })] });
     const walker = rig.add({ id: 'walker', col: 7, row: 8, movement: { controller: 'none' } });
     triggers.resetTouchState(rig.world);
     await step();
@@ -357,7 +357,7 @@ describe('eventTouch', () => {
   });
 });
 
-describe('autorun', () => {
+describe('onActive + repeat (migrated autorun)', () => {
   it('blocks input, runs, and restarts while its state stays active until it switches itself off', async () => {
     rig.addPlayer(5, 5);
     rig.add({
@@ -367,8 +367,8 @@ describe('autorun', () => {
       sprite: false,
       collider: false,
       states: [
-        state([cmd('showText', { text: 'intro' }), cmd('setVariable', { id: 'v1', op: 'add', operand: 'const', value: 1 })], { trigger: 'autorun' }),
-        state([], { conditions: [{ kind: 'selfSwitch', key: 'A', value: true }], trigger: 'action' }),
+        state([cmd('showText', { text: 'intro' }), cmd('setVariable', { id: 'v1', op: 'add', operand: 'const', value: 1 })], { trigger: 'onActive', repeat: true }),
+        state([], { conditions: [{ kind: 'selfSwitch', key: 'A', value: true }], trigger: 'interact' }),
       ],
     });
     triggers.resetTouchState(rig.world);
@@ -395,7 +395,7 @@ describe('autorun', () => {
     triggers.resetTouchState(rig.world);
     triggers.requestAction();
     await step();
-    rig.add({ id: 'auto', col: 0, row: 0, sprite: false, collider: false, states: [state([cmd('setSwitch', { id: 's1', value: true })], { trigger: 'autorun' })] });
+    rig.add({ id: 'auto', col: 0, row: 0, sprite: false, collider: false, states: [state([cmd('setSwitch', { id: 's1', value: true })], { trigger: 'onActive', repeat: true })] });
     await step();
     expect(rig.runtime.flags.getSwitch('s1')).toBe(false);
     rig.ui.dismiss();
@@ -405,10 +405,10 @@ describe('autorun', () => {
   });
 });
 
-describe('parallel', () => {
+describe('onActive in the background + repeat (migrated parallel)', () => {
   it('runs in the background without locking input and restarts when finished', async () => {
     rig.addPlayer(5, 5);
-    rig.add({ id: 'par', col: 0, row: 0, sprite: false, collider: false, states: [state([cmd('setVariable', { id: 'v1', op: 'add', operand: 'const', value: 1 }), cmd('wait', { ms: 32 })], { trigger: 'parallel' })] });
+    rig.add({ id: 'par', col: 0, row: 0, sprite: false, collider: false, states: [state([cmd('setVariable', { id: 'v1', op: 'add', operand: 'const', value: 1 }), cmd('wait', { ms: 32 })], { trigger: 'onActive', blocks: false, repeat: true })] });
     triggers.resetTouchState(rig.world);
     for (let i = 0; i < 10; i++) await step(16);
     expect(rig.runtime.flags.getVariable('v1')).toBeGreaterThanOrEqual(3);
@@ -419,7 +419,7 @@ describe('parallel', () => {
     rig.addPlayer(5, 5);
     const par = rig.add({
       id: 'par', col: 0, row: 0, sprite: false, collider: false,
-      states: [state([cmd('wait', { ms: 100000 })], { trigger: 'parallel', conditions: [{ kind: 'switch', id: 's1', value: false }] })],
+      states: [state([cmd('wait', { ms: 100000 })], { trigger: 'onActive', blocks: false, repeat: true, conditions: [{ kind: 'switch', id: 's1', value: false }] })],
     });
     triggers.resetTouchState(rig.world);
     await step();
@@ -428,6 +428,336 @@ describe('parallel', () => {
     await step();
     await step();
     expect(rig.runtime.isRunning(par)).toBe(false);
+  });
+});
+
+
+const setSwitch = (id = 's1') => cmd('setSwitch', { id, value: true });
+const addOne = (id = 'v1') => cmd('setVariable', { id, op: 'add', operand: 'const', value: 1 });
+const zone = { sprite: false as const, collider: { isSolid: false } };
+
+describe('playerLeave', () => {
+  it('fires when the player steps off the tile, not on arriving there', async () => {
+    const player = rig.addPlayer(5, 5);
+    rig.add({ id: 'door', col: 6, row: 5, ...zone, states: [state([addOne()], { trigger: 'playerLeave' })] });
+    triggers.resetTouchState(rig.world);
+    place(player, 6, 5);
+    await step();
+    await step();
+    expect(rig.runtime.flags.getVariable('v1')).toBe(0);
+    place(player, 7, 5);
+    await step();
+    await step();
+    expect(rig.runtime.flags.getVariable('v1')).toBe(1);
+  });
+
+  it('a leave event that blocks holds back the enter event of the next tile until it ends', async () => {
+    const player = rig.addPlayer(5, 5);
+    rig.add({ id: 'from', col: 6, row: 5, ...zone, states: [state([say('bye')], { trigger: 'playerLeave' })] });
+    rig.add({ id: 'to', col: 7, row: 5, ...zone, states: [state([setSwitch()], { trigger: 'playerEnter' })] });
+    triggers.resetTouchState(rig.world);
+    place(player, 6, 5);
+    await step();
+    place(player, 7, 5);
+    await step();
+    await step();
+    expect(rig.ui.texts.map((t) => t.text)).toEqual(['bye']);
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(false);
+    rig.ui.dismiss();
+    await flush();
+    await step();
+    await step();
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(true);
+  });
+
+  it('a multi-tile zone is only left when the player steps off all of it', async () => {
+    const player = rig.addPlayer(5, 5);
+    // two tiles wide: columns 6 and 7
+    rig.add({ id: 'wide', col: 6, row: 5, sprite: false, collider: { isSolid: false, width: 64, height: 32, offsetX: 16 }, states: [state([addOne()], { trigger: 'playerLeave' })] });
+    triggers.resetTouchState(rig.world);
+    place(player, 6, 5);
+    await step();
+    place(player, 7, 5); // still on the zone
+    await step();
+    await step();
+    expect(rig.runtime.flags.getVariable('v1')).toBe(0);
+    place(player, 8, 5);
+    await step();
+    await step();
+    expect(rig.runtime.flags.getVariable('v1')).toBe(1);
+  });
+});
+
+describe('eventLeave', () => {
+  it('fires when another entity steps off the event', async () => {
+    rig.addPlayer(1, 1);
+    rig.add({ id: 'pad', col: 8, row: 8, ...zone, states: [state([setSwitch()], { trigger: 'eventLeave' })] });
+    const walker = rig.add({ id: 'walker', col: 8, row: 8, movement: { controller: 'none' } });
+    triggers.resetTouchState(rig.world);
+    await step();
+    await step();
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(false);
+    place(walker, 9, 8);
+    await step();
+    await step();
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(true);
+  });
+});
+
+describe('playerNear', () => {
+  const near = (extra: Record<string, unknown> = {}) => state([addOne()], { trigger: 'playerNear', range: 3, blocks: false, ...extra });
+
+  it('fires once when the player comes within range, and again after leaving and returning', async () => {
+    const player = rig.addPlayer(0, 5);
+    rig.add({ id: 'guard', col: 8, row: 5, states: [near()] });
+    triggers.resetTouchState(rig.world);
+    await step();
+    expect(rig.runtime.flags.getVariable('v1')).toBe(0); // 8 tiles away
+    place(player, 4, 5); // 4 tiles away: still outside
+    await step();
+    expect(rig.runtime.flags.getVariable('v1')).toBe(0);
+    place(player, 5, 5);
+    await step();
+    await step();
+    expect(rig.runtime.flags.getVariable('v1')).toBe(1);
+    place(player, 6, 5);
+    await step();
+    await step();
+    expect(rig.runtime.flags.getVariable('v1')).toBe(1); // staying near does not repeat it
+    place(player, 0, 5);
+    await step();
+    place(player, 6, 5);
+    await step();
+    await step();
+    expect(rig.runtime.flags.getVariable('v1')).toBe(2);
+  });
+
+  it('a background reaction does not lock the player', async () => {
+    rig.addPlayer(5, 5);
+    rig.add({ id: 'guard', col: 6, row: 5, states: [state([say('hey')], { trigger: 'playerNear', blocks: false })] });
+    triggers.resetTouchState(rig.world);
+    await step();
+    expect(rig.ui.texts.map((t) => t.text)).toEqual(['hey']);
+    expect(gameState.isInputLocked).toBe(false);
+  });
+
+  it('with a line of sight, something solid in between hides the player', async () => {
+    const player = rig.addPlayer(0, 5);
+    rig.add({ id: 'guard', col: 4, row: 5, states: [near({ lineOfSight: true })] });
+    triggers.resetTouchState(rig.world);
+    triggers.setSightBlocker((col) => col === 2); // a wall in column 2
+    place(player, 1, 5);
+    await step();
+    await step();
+    expect(rig.runtime.flags.getVariable('v1')).toBe(0);
+    place(player, 3, 5); // past the wall, nothing in between
+    await step();
+    await step();
+    expect(rig.runtime.flags.getVariable('v1')).toBe(1);
+  });
+});
+
+describe('onActive (runs once)', () => {
+  it('runs once when the state becomes active, not again while it stays active, and again when it re-activates', async () => {
+    rig.addPlayer(5, 5);
+    rig.add({
+      id: 'once', col: 0, row: 0, sprite: false, collider: false,
+      states: [state([addOne()], { trigger: 'onActive', conditions: [{ kind: 'switch', id: 's1', value: true }] })],
+    });
+    triggers.resetTouchState(rig.world);
+    await step();
+    await step();
+    expect(rig.runtime.flags.getVariable('v1')).toBe(0);
+    rig.runtime.flags.setSwitch('s1', true);
+    for (let i = 0; i < 5; i++) await step();
+    expect(rig.runtime.flags.getVariable('v1')).toBe(1);
+    rig.runtime.flags.setSwitch('s1', false);
+    await step();
+    rig.runtime.flags.setSwitch('s1', true);
+    for (let i = 0; i < 5; i++) await step();
+    expect(rig.runtime.flags.getVariable('v1')).toBe(2);
+  });
+
+  it('a graph that loops back keeps repeating by itself', async () => {
+    rig.addPlayer(5, 5);
+    const loop = state([], { trigger: 'onActive', blocks: false });
+    const start = loop.graph.nodes.find((n) => n.type === 'start')!;
+    loop.graph.nodes.push(
+      { id: 'a', type: 'setVariable', params: { id: 'v1', op: 'add', operand: 'const', value: 1 }, out: { next: 'w' }, x: 0, y: 0 },
+      { id: 'w', type: 'wait', params: { ms: 32 }, out: { next: 'a' }, x: 0, y: 0 },
+    );
+    start.out = { next: 'a' };
+    rig.add({ id: 'looper', col: 0, row: 0, sprite: false, collider: false, states: [loop] });
+    triggers.resetTouchState(rig.world);
+    for (let i = 0; i < 12; i++) await step(16);
+    expect(rig.runtime.flags.getVariable('v1')).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe('timer', () => {
+  it('runs every interval while its state is active, not before', async () => {
+    rig.addPlayer(5, 5);
+    rig.add({ id: 'clock', col: 0, row: 0, sprite: false, collider: false, states: [state([addOne()], { trigger: 'timer', interval: 2, blocks: false })] });
+    triggers.resetTouchState(rig.world);
+    await step(1000);
+    expect(rig.runtime.flags.getVariable('v1')).toBe(0);
+    await step(1000);
+    await step(16);
+    expect(rig.runtime.flags.getVariable('v1')).toBe(1);
+    await step(1000);
+    expect(rig.runtime.flags.getVariable('v1')).toBe(1);
+    await step(1000);
+    await step(16);
+    expect(rig.runtime.flags.getVariable('v1')).toBe(2);
+  });
+
+  it('starts counting again from zero when its state changes', async () => {
+    rig.addPlayer(5, 5);
+    rig.add({
+      id: 'clock', col: 0, row: 0, sprite: false, collider: false,
+      states: [state([addOne()], { trigger: 'timer', interval: 2, blocks: false, conditions: [{ kind: 'switch', id: 's1', value: true }] })],
+    });
+    triggers.resetTouchState(rig.world);
+    rig.runtime.flags.setSwitch('s1', true);
+    await step(1500);
+    rig.runtime.flags.setSwitch('s1', false);
+    await step(16);
+    rig.runtime.flags.setSwitch('s1', true);
+    await step(16);
+    await step(1500);
+    expect(rig.runtime.flags.getVariable('v1')).toBe(0);
+  });
+});
+
+describe('mapEnter / mapLeave', () => {
+  it('mapEnter runs once after the map was entered, and waits for a running cutscene', async () => {
+    rig.addPlayer(5, 5);
+    rig.add({ id: 'other', col: 1, row: 0, sprite: false, collider: false, states: [state([say('first')], { trigger: 'mapEnter' })] });
+    rig.add({ id: 'intro', col: 0, row: 0, sprite: false, collider: false, states: [state([addOne()], { trigger: 'mapEnter' })] });
+    triggers.resetTouchState(rig.world);
+    await step();
+    await step();
+    expect(rig.runtime.flags.getVariable('v1')).toBe(0); // the map has not been "entered" yet
+    triggers.onMapEntered(rig.world);
+    await step();
+    await step();
+    expect(rig.ui.texts.map((t) => t.text)).toEqual(['first']);
+    expect(rig.runtime.flags.getVariable('v1')).toBe(0); // blocked behind the dialogue
+    rig.ui.dismiss();
+    await flush();
+    for (let i = 0; i < 4; i++) await step();
+    expect(rig.runtime.flags.getVariable('v1')).toBe(1);
+    for (let i = 0; i < 4; i++) await step();
+    expect(rig.runtime.flags.getVariable('v1')).toBe(1); // only once
+  });
+
+  it('runMapLeave runs the mapLeave states and resolves when they ended, input locked meanwhile', async () => {
+    rig.addPlayer(5, 5);
+    rig.add({ id: 'goodbye', col: 0, row: 0, sprite: false, collider: false, states: [state([say('bye')], { trigger: 'mapLeave' })] });
+    rig.add({ id: 'quiet', col: 1, row: 0, sprite: false, collider: false, states: [state([addOne()], { trigger: 'playerEnter' })] });
+    let done = false;
+    const p = rig.runtime.runMapLeave().then(() => {
+      done = true;
+    });
+    await flush();
+    expect(rig.ui.texts.map((t) => t.text)).toEqual(['bye']);
+    expect(done).toBe(false);
+    expect(gameState.isInputLocked).toBe(true);
+    rig.ui.dismiss();
+    await p;
+    expect(done).toBe(true);
+    expect(gameState.isInputLocked).toBe(false);
+    expect(rig.runtime.flags.getVariable('v1')).toBe(0);
+  });
+
+  it('runMapLeave resolves at once when nothing is waiting', async () => {
+    rig.addPlayer(5, 5);
+    await expect(rig.runtime.runMapLeave()).resolves.toBeUndefined();
+  });
+});
+
+describe('interact options', () => {
+  it('range reaches further along the facing line, and a plain event does not', async () => {
+    rig.addPlayer(5, 5, 'right');
+    rig.add({ id: 'far', col: 7, row: 5, states: [state([say('far')], { range: 3 })] });
+    triggers.resetTouchState(rig.world);
+    triggers.requestAction();
+    await step();
+    expect(rig.ui.texts.map((t) => t.text)).toEqual(['far']);
+  });
+
+  it('an event with range 1 two tiles away does not start', async () => {
+    rig.addPlayer(5, 5, 'right');
+    rig.add({ id: 'far', col: 7, row: 5, states: [state([say('far')])] });
+    triggers.resetTouchState(rig.world);
+    triggers.requestAction();
+    await step();
+    expect(rig.ui.texts).toEqual([]);
+  });
+
+  it('range only counts in the direction the player faces', async () => {
+    rig.addPlayer(5, 5, 'up');
+    rig.add({ id: 'side', col: 7, row: 5, states: [state([say('side')], { range: 3 })] });
+    triggers.resetTouchState(rig.world);
+    triggers.requestAction();
+    await step();
+    expect(rig.ui.texts).toEqual([]);
+  });
+
+  it('mustFace ignores the neighbours the player is not facing', async () => {
+    rig.addPlayer(5, 5, 'up');
+    rig.add({ id: 'right', col: 6, row: 5, states: [state([say('right')], { mustFace: true })] });
+    triggers.resetTouchState(rig.world);
+    triggers.requestAction();
+    await step();
+    expect(rig.ui.texts).toEqual([]);
+
+    rig.world.getComponent(rig.world.query(GridMovementComponent)[0], GridMovementComponent)!.direction = 'right';
+    triggers.requestAction();
+    await step();
+    expect(rig.ui.texts.map((t) => t.text)).toEqual(['right']);
+  });
+
+  it('a state that does not block starts without locking input', async () => {
+    rig.addPlayer(5, 5, 'down');
+    rig.add({ id: 'lever', col: 5, row: 6, states: [state([say('click')], { blocks: false })] });
+    triggers.resetTouchState(rig.world);
+    triggers.requestAction();
+    await step();
+    expect(rig.ui.texts.map((t) => t.text)).toEqual(['click']);
+    expect(gameState.isInputLocked).toBe(false);
+  });
+});
+
+describe('priority', () => {
+  it('the higher priority wins when two events cover the same tile', async () => {
+    rig.addPlayer(5, 5, 'down');
+    rig.add({ id: 'low', col: 5, row: 6, states: [state([say('low')])] });
+    rig.add({ id: 'high', col: 5, row: 6, states: [state([say('high')], { priority: 5 })] });
+    triggers.resetTouchState(rig.world);
+    triggers.requestAction();
+    await step();
+    expect(rig.ui.texts.map((t) => t.text)).toEqual(['high']);
+  });
+
+  it('at equal priority the nearer event wins over one further along the line', async () => {
+    rig.addPlayer(5, 5, 'down');
+    rig.add({ id: 'far', col: 5, row: 7, states: [state([say('far')], { range: 3 })] });
+    rig.add({ id: 'near', col: 5, row: 6, states: [state([say('near')], { range: 3 })] });
+    triggers.resetTouchState(rig.world);
+    triggers.requestAction();
+    await step();
+    expect(rig.ui.texts.map((t) => t.text)).toEqual(['near']);
+  });
+
+  it('without priority entity order decides, as before', async () => {
+    rig.addPlayer(5, 5, 'down');
+    rig.add({ id: 'first', col: 5, row: 6, states: [state([say('first')])] });
+    rig.add({ id: 'second', col: 5, row: 6, states: [state([say('second')])] });
+    triggers.resetTouchState(rig.world);
+    triggers.requestAction();
+    await step();
+    expect(rig.ui.texts.map((t) => t.text)).toEqual(['first']);
   });
 });
 

@@ -47,7 +47,7 @@ Contents
 
 * Data wires / expression nodes (Blueprint-style typed pins). There is **one wire type: flow**. All
   settings live inside nodes.
-* Parallel forks inside one graph (one run = one token). Parallelism stays "one `parallel` state per entity".
+* Parallel forks inside one graph (one run = one token). Parallelism stays "one background run per entity" (a state with `blocks: false`).
 * Bytecode compilation. The roadmap sketches `Graph JSON → bytecode → VM`; v1 interprets the JSON directly
   (after building a lookup index). The node model does not prevent adding a compiler later.
 * Map-scoped flags, string/enum-valued variables beyond *stages*, array/struct variables.
@@ -94,7 +94,9 @@ export interface EventState {
   id: string
   name: string                 // shown on the tab; '' falls back to "State N"
   conditions: Condition[]      // unchanged name: "active when these all hold"
-  trigger: EventTrigger
+  trigger: EventTrigger        // start kind; since schemaVersion 5 (was action / playerTouch / ... until 4)
+  blocks: boolean              // cutscene (locks input, one at a time) or background
+  range?, mustFace?, lineOfSight?, interval?, priority?, repeat?   // see engine-design.md §3
   faceOnInteract: boolean
   solid: boolean | null
   appearance: PageAppearance   // renamed StateAppearance
