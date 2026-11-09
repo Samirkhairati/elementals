@@ -2,7 +2,7 @@ import { app, ipcMain, dialog, BrowserWindow } from 'electron';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import { scanImageFolder } from './imageFolder';
+import { scanImageFolder } from './imageFolder.js';
 
 /** Sprite channels that need a native dialog. The pure ones live in projectApi.ts. */
 export function registerSpriteHandlers(): void {
