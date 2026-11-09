@@ -1,0 +1,367 @@
+{
+  "fileName": "city.json",
+  "folderPath": null,
+  "name": "city",
+  "width": 129,
+  "height": 121,
+  "layers": [
+    {
+      "id": "70226450-2952-4641-8699-e393222cf68a",
+      "name": "collisions",
+      "type": "collision",
+      "visible": true,
+      "locked": false,
+      "data": {}
+    },
+    {
+      "id": "43cff3bd-b67a-4b23-91c9-94f0d726bb53",
+      "name": "terrain",
+      "type": "terrain",
+      "visible": true,
+      "locked": false,
+      "data": {}
+    },
+    {
+      "id": "78549b79-6e18-4d3f-8687-985dad04e334",
+      "name": "encounters",
+      "type": "encounters",
+      "visible": true,
+      "locked": false,
+      "data": {}
+    },
+    {
+      "id": "b7e5aa41-2cd4-4cc2-9c7d-5cf5b0d1a1b3",
+      "name": "decorations",
+      "type": "tile",
+      "visible": true,
+      "locked": false,
+      "z": 20,
+      "data": {}
+    },
+    {
+      "id": "606f4028-2dd0-4599-b52f-d4172038bbe4",
+      "name": "building",
+      "type": "tile",
+      "visible": true,
+      "locked": false,
+      "z": 10,
+      "data": {}
+    },
+    {
+      "id": "d7305b15-6d94-41c1-8c4f-a76733846873",
+      "name": "ground",
+      "type": "tile",
+      "visible": true,
+      "locked": false,
+      "z": 1,
+      "data": {}
+    },
+    {
+      "id": "bb97fc2a-6c48-4aa0-b8ac-b57cbdefc331",
+      "name": "dam",
+      "type": "folder",
+      "visible": true,
+      "locked": false,
+      "collapsed": false
+    },
+    {
+      "id": "556a799d-8aaf-413c-bc68-57aba5405bcb",
+      "name": "wall",
+      "type": "image",
+      "visible": true,
+      "locked": false,
+      "images": [
+        {
+          "graphicId": "images/city/dam/dam-wall.png",
+          "x": 3795,
+          "y": 3872,
+          "id": "73b04ba4-6d63-4d1f-ba6a-b7a9f7d2a46e",
+          "name": "wall"
+        },
+        {
+          "graphicId": "images/city/dam/dam-wall.png",
+          "x": 2419,
+          "y": 3872,
+          "id": "ff0211a6-0312-4311-b849-b4b25ff03929",
+          "name": "wall 6"
+        },
+        {
+          "graphicId": "images/city/dam/dam-wall.png",
+          "x": 3339,
+          "y": 3872,
+          "id": "01fac532-b19c-41b0-913a-d8d3d714b4c5",
+          "name": "wall 2",
+          "crop": {
+            "x": 364,
+            "y": 0,
+            "w": 301,
+            "h": 202
+          }
+        },
+        {
+          "graphicId": "images/city/dam/dam-wall.png",
+          "x": 2880,
+          "y": 3871,
+          "id": "5e2926ea-1f65-4622-8285-e92df2b4cd0f",
+          "name": "wall 5",
+          "crop": {
+            "x": 364,
+            "y": 0,
+            "w": 301,
+            "h": 202
+          },
+          "flipX": true
+        },
+        {
+          "graphicId": "images/city/dam/dam-wall.png",
+          "x": 3207,
+          "y": 3872,
+          "id": "59dba680-50b5-45d9-a15e-ed5bbaf4503c",
+          "name": "wall 3",
+          "crop": {
+            "x": 321,
+            "y": 0,
+            "w": 37,
+            "h": 202
+          }
+        },
+        {
+          "graphicId": "images/city/dam/dam-wall.png",
+          "x": 3018,
+          "y": 3872,
+          "id": "088737e4-97df-45ce-a6f0-28998b594a8e",
+          "name": "wall 4",
+          "crop": {
+            "x": 321,
+            "y": 0,
+            "w": 37,
+            "h": 202
+          },
+          "flipX": true
+        }
+      ],
+      "folderId": "bb97fc2a-6c48-4aa0-b8ac-b57cbdefc331",
+      "z": 2
+    },
+    {
+      "id": "157c337d-43c1-4436-98de-2115f74a9074",
+      "name": "bottom right",
+      "type": "folder",
+      "visible": true,
+      "locked": false,
+      "collapsed": false
+    },
+    {
+      "id": "7f1b484b-d63d-485c-a6ca-8ea9fdf9707b",
+      "name": "buildings",
+      "type": "image",
+      "visible": true,
+      "locked": false,
+      "images": [
+        {
+          "graphicId": "images/city/buildings/buildings-a.png",
+          "x": 4051,
+          "y": 3528,
+          "id": "8097e397-a4b9-4308-8bbf-3d817f24440d",
+          "name": "building 1",
+          "crop": {
+            "x": 1079,
+            "y": 0,
+            "w": 237,
+            "h": 448
+          }
+        },
+        {
+          "graphicId": "images/city/buildings/buildings-a.png",
+          "x": 3874,
+          "y": 3595,
+          "id": "cea87e9a-3917-428b-a236-7b1a1f304318",
+          "name": "building 2",
+          "crop": {
+            "x": 801,
+            "y": 0,
+            "w": 263,
+            "h": 448
+          }
+        },
+        {
+          "graphicId": "images/city/buildings/buildings-a.png",
+          "x": 3596,
+          "y": 3533,
+          "id": "8a64889b-0348-4b31-8ae4-dc95c2f14770",
+          "name": "building 3",
+          "crop": {
+            "x": 534,
+            "y": 0,
+            "w": 243,
+            "h": 448
+          }
+        },
+        {
+          "graphicId": "images/city/buildings/buildings-a.png",
+          "x": 3239,
+          "y": 3524,
+          "id": "a208dae1-72e5-49c7-a75b-8cdd8197e05e",
+          "name": "building 5",
+          "crop": {
+            "x": 64,
+            "y": 0,
+            "w": 212,
+            "h": 448
+          }
+        },
+        {
+          "graphicId": "images/city/buildings/buildings-a.png",
+          "x": 3416,
+          "y": 3572,
+          "id": "efd39f16-3799-4430-a12e-964e893e979b",
+          "name": "building 4",
+          "crop": {
+            "x": 282,
+            "y": 0,
+            "w": 235,
+            "h": 448
+          }
+        }
+      ],
+      "folderId": "157c337d-43c1-4436-98de-2115f74a9074",
+      "z": 2
+    },
+    {
+      "id": "38dd319c-33e0-4af2-ae70-6a374cb38e1e",
+      "name": "stairs",
+      "type": "image",
+      "visible": true,
+      "locked": false,
+      "images": [
+        {
+          "graphicId": "images/city/shared/stairs.png",
+          "x": 3118,
+          "y": 3906,
+          "id": "34f89857-f655-4a90-bbf0-bcf6957b73b2",
+          "name": "stairs"
+        },
+        {
+          "graphicId": "images/city/shared/stairs.png",
+          "x": 3092,
+          "y": 3489,
+          "id": "ec06384b-db5c-4d1a-aae7-705e8cf5015d",
+          "name": "stairs 2"
+        },
+        {
+          "graphicId": "images/city/shared/stairs.png",
+          "x": 3020,
+          "y": 3489,
+          "id": "be21521c-a1ba-4ecb-b03c-302f6f5fece3",
+          "name": "stairs 3",
+          "crop": {
+            "x": 15,
+            "y": 0,
+            "w": 132,
+            "h": 336
+          }
+        }
+      ],
+      "folderId": "157c337d-43c1-4436-98de-2115f74a9074",
+      "z": 1
+    },
+    {
+      "id": "86c57a22-0a60-418a-aef7-22049672bd4f",
+      "name": "pavement",
+      "type": "image",
+      "visible": true,
+      "locked": false,
+      "images": [
+        {
+          "graphicId": "images/ground/city-pavement.png",
+          "x": 3328,
+          "y": 3872,
+          "id": "d9a1a976-fb52-4104-8919-6487d37cf9f1",
+          "name": "br"
+        },
+        {
+          "graphicId": "images/ground/city-pavement.png",
+          "x": 1728,
+          "y": 3872,
+          "id": "ae2afa24-f2b2-4ade-9bce-ca1a62026b14",
+          "name": "br 2"
+        }
+      ]
+    }
+  ],
+  "entities": [
+    {
+      "id": "d7595d0f-265c-4b35-ab4f-2d8bb352db26",
+      "name": "New Entity",
+      "x": 3815.1602612695733,
+      "y": 3630.3963157313474,
+      "visible": true,
+      "folder": null,
+      "components": {
+        "Transform": {
+          "x": 3815.1602612695733,
+          "y": 3630.3963157313474,
+          "depth": 20
+        },
+        "Sprite": {
+          "asset": "characters/npc-red",
+          "facing": "down",
+          "animation": "",
+          "animSpeed": 1,
+          "frame": 0,
+          "offsetX": 0,
+          "offsetY": 0,
+          "scale": 1,
+          "flipX": false,
+          "tint": "",
+          "opacity": 1,
+          "visible": true
+        },
+        "Event": {
+          "states": [
+            {
+              "id": "c8b847ea-a21b-44a6-9bfd-506ba37a3efe",
+              "name": "State 1",
+              "conditions": [],
+              "trigger": "interact",
+              "graph": {
+                "nodes": [
+                  {
+                    "id": "e57a5f37-84e3-4619-98ae-75efa2ca719a",
+                    "type": "start",
+                    "params": {},
+                    "out": {
+                      "next": "16db4921-3bb8-49f1-b8bc-7ed5d0ac8ecb"
+                    },
+                    "x": 0,
+                    "y": 0
+                  },
+                  {
+                    "id": "16db4921-3bb8-49f1-b8bc-7ed5d0ac8ecb",
+                    "type": "warp",
+                    "params": {
+                      "map": "market",
+                      "x": 9,
+                      "y": 11,
+                      "facing": "",
+                      "fade": true
+                    },
+                    "out": {},
+                    "x": 135,
+                    "y": 10
+                  }
+                ],
+                "frames": []
+              },
+              "faceOnInteract": true,
+              "solid": null,
+              "appearance": {},
+              "blocks": true
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "schemaVersion": 5
+}
