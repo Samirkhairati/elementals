@@ -330,6 +330,140 @@ describe('Graphics', () => {
     expect(await screen.findByRole('status')).toHaveTextContent('Moved chest.png')
   })
 
+  describe('picking several pictures and folders', () => {
+    const dt = () => {
+      const data = new Map<string, string>()
+      return { setData: (k: string, v: string) => data.set(k, v), getData: (k: string) => data.get(k) ?? '', effectAllowed: '', dropEffect: '' }
+    }
+    // the list may be re-rendered by a click (the open picture goes to the URL), so look it up afresh each time
+    const rowOf = (_tree: HTMLElement, text: string) => within(screen.getByRole('tree')).getByText(text).closest('button') as HTMLElement
+    const folderRow = (tree: HTMLElement, name: string) => within(tree).getByRole('treeitem', { name }).querySelector('.ed-row') as HTMLElement
+
+    beforeEach(() => {
+      const record = (name: string, result: unknown = { success: true }) => (...args: unknown[]) => { calls.push([name, ...args]); return Promise.resolve(result) }
+      install({
+        renameGraphic: record('renameGraphic', { success: true, id: 'x' }),
+        deleteGraphic: record('deleteGraphic'),
+        deleteGraphicFolder: record('deleteGraphicFolder'),
+        moveGraphicFolder: record('moveGraphicFolder', { success: true, folderId: 'x' }),
+        saveCharacter: (id: string, d: CharacterDef) => { calls.push(['saveCharacter', id, d]); return Promise.resolve({ success: true, character: { id, def: d, images: {} } }) },
+        saveMap: record('saveMap'),
+      })
+    })
+
+    it('Ctrl/Cmd+click adds pictures to the selection, and a plain click starts over', async () => {
+      renderAt('/database?table=graphics')
+      const tree = await screen.findByRole('tree')
+      fireEvent.click(rowOf(tree, 'orphan.png'))
+      await waitFor(() => expect(rowOf(tree, 'orphan.png')).toHaveAttribute('data-selected', 'true'))
+      fireEvent.click(rowOf(tree, 'walk.png'), { ctrlKey: true })
+      expect(await screen.findByTestId('library-selection')).toHaveTextContent('2 pictures selected')
+      fireEvent.click(rowOf(tree, 'walk.png'), { metaKey: true })
+      expect(screen.queryByTestId('library-selection')).toBeNull()
+      fireEvent.click(rowOf(tree, 'orphan.png'), { ctrlKey: true })
+      fireEvent.click(rowOf(tree, 'chest.png'), { ctrlKey: true })
+      expect(screen.getByTestId('library-selection')).toHaveTextContent('2 pictures selected')
+      fireEvent.click(rowOf(tree, 'chest.png'))
+      expect(screen.queryByTestId('library-selection')).toBeNull()
+    })
+
+    it('Shift+click takes every row from the last click, folders included', async () => {
+      renderAt('/database?table=graphics')
+      const tree = await screen.findByRole('tree')
+      fireEvent.click(within(tree).getByRole('treeitem', { name: 'props' }).querySelector('.ed-row button') as HTMLElement, { ctrlKey: true })
+      fireEvent.click(rowOf(tree, 'orphan.png'), { shiftKey: true })
+      // props folder, its two pictures in between (chest, orphan)
+      expect(await screen.findByTestId('library-selection')).toHaveTextContent('2 pictures and 1 folder selected')
+    })
+
+    it('Delete asks once for everything picked, refuses while one is in use, and deletes pictures and folders', async () => {
+      renderAt('/database?table=graphics')
+      const tree = await screen.findByRole('tree')
+      fireEvent.click(rowOf(tree, 'chest.png'), { ctrlKey: true })
+      fireEvent.click(rowOf(tree, 'orphan.png'), { ctrlKey: true })
+      fireEvent.keyDown(rowOf(tree, 'orphan.png'), { key: 'Delete' })
+      const blocked = await screen.findByRole('dialog')
+      expect(within(blocked).getByTestId('delete-blocked')).toBeInTheDocument()
+      expect(within(blocked).getByRole('button', { name: /Delete/ })).toBeDisabled()
+      fireEvent.click(within(blocked).getByRole('button', { name: /Cancel/ }))
+
+      // chest is out; the folder `sprites` (with walk.png) goes along with orphan
+      fireEvent.click(rowOf(tree, 'chest.png'), { ctrlKey: true })
+      fireEvent.click(within(tree).getByRole('treeitem', { name: 'sprites' }).querySelector('.ed-row button') as HTMLElement, { ctrlKey: true })
+      fireEvent.click(screen.getByRole('button', { name: 'Delete selected' }))
+      const dialog = await screen.findByRole('dialog')
+      expect(calls.some((c) => c[0] === 'deleteGraphic')).toBe(false)
+      fireEvent.click(within(dialog).getByRole('button', { name: /Delete/ }))
+      await waitFor(() => expect(calls).toContainEqual(['deleteGraphic', 'props/orphan.png']))
+      await waitFor(() => expect(calls).toContainEqual(['deleteGraphicFolder', 'sprites']))
+    })
+
+    it('right-clicking a picked picture deletes everything picked', async () => {
+      renderAt('/database?table=graphics')
+      const tree = await screen.findByRole('tree')
+      fireEvent.click(rowOf(tree, 'orphan.png'), { ctrlKey: true })
+      fireEvent.click(rowOf(tree, 'walk.png'), { ctrlKey: true })
+      fireEvent.contextMenu(rowOf(tree, 'walk.png'))
+      fireEvent.click(await screen.findByText('Delete 2 pictures…'))
+      const dialog = await screen.findByRole('dialog')
+      expect(within(dialog).getByText('2 pictures')).toBeInTheDocument()
+    })
+
+    it('dragging one of the picked pictures onto a folder moves them all, rewriting what uses them', async () => {
+      renderAt('/database?table=graphics')
+      const tree = await screen.findByRole('tree')
+      fireEvent.click(rowOf(tree, 'chest.png'), { ctrlKey: true })
+      fireEvent.click(rowOf(tree, 'orphan.png'), { ctrlKey: true })
+      const transfer = dt()
+      fireEvent.dragStart(rowOf(tree, 'orphan.png'), { dataTransfer: transfer })
+      const target = folderRow(tree, 'sprites')
+      fireEvent.dragOver(target, { dataTransfer: transfer })
+      fireEvent.drop(target, { dataTransfer: transfer })
+      await waitFor(() => expect(calls).toContainEqual(['renameGraphic', 'props/chest.png', 'sprites/chest.png']))
+      expect(calls).toContainEqual(['renameGraphic', 'props/orphan.png', 'sprites/orphan.png'])
+      expect(calls.some((c) => c[0] === 'saveCharacter')).toBe(true)
+      expect(await screen.findByRole('status')).toHaveTextContent('Moved 2 pictures')
+    })
+
+    it('a picked folder moves with the pictures picked beside it, and what is inside it is not moved twice', async () => {
+      renderAt('/database?table=graphics')
+      const tree = await screen.findByRole('tree')
+      fireEvent.click(within(tree).getByRole('treeitem', { name: 'sprites' }).querySelector('.ed-row button') as HTMLElement, { ctrlKey: true })
+      fireEvent.click(rowOf(tree, 'walk.png'), { ctrlKey: true })
+      fireEvent.click(rowOf(tree, 'orphan.png'), { ctrlKey: true })
+      const transfer = dt()
+      fireEvent.dragStart(rowOf(tree, 'orphan.png'), { dataTransfer: transfer })
+      const target = folderRow(tree, 'props')
+      fireEvent.dragOver(target, { dataTransfer: transfer })
+      fireEvent.drop(target, { dataTransfer: transfer })
+      await waitFor(() => expect(calls).toContainEqual(['moveGraphicFolder', 'sprites', 'props']))
+      expect(calls.filter((c) => c[0] === 'renameGraphic')).toEqual([])
+    })
+
+    it('a folder cannot be dropped into itself', async () => {
+      renderAt('/database?table=graphics')
+      const tree = await screen.findByRole('tree')
+      fireEvent.click(within(tree).getByRole('treeitem', { name: 'sprites' }).querySelector('.ed-row button') as HTMLElement, { ctrlKey: true })
+      fireEvent.click(rowOf(tree, 'orphan.png'), { ctrlKey: true })
+      const transfer = dt()
+      fireEvent.dragStart(rowOf(tree, 'orphan.png'), { dataTransfer: transfer })
+      const inside = folderRow(tree, 'sprites/a')
+      fireEvent.dragOver(inside, { dataTransfer: transfer })
+      fireEvent.drop(inside, { dataTransfer: transfer })
+      await new Promise((r) => setTimeout(r, 20))
+      expect(calls.filter((c) => c[0] === 'moveGraphicFolder' || c[0] === 'renameGraphic')).toEqual([])
+    })
+
+    it('Escape clears the selection', async () => {
+      renderAt('/database?table=graphics')
+      const tree = await screen.findByRole('tree')
+      fireEvent.click(rowOf(tree, 'orphan.png'), { ctrlKey: true })
+      fireEvent.click(rowOf(tree, 'walk.png'), { ctrlKey: true })
+      fireEvent.keyDown(rowOf(tree, 'walk.png'), { key: 'Escape' })
+      expect(screen.queryByTestId('library-selection')).toBeNull()
+    })
+  })
+
   describe('replacing a picture', () => {
     const clip = (files: File[]) => ({ clipboardData: { types: ['Files'], files, items: files.map((f) => ({ kind: 'file', getAsFile: () => f })) } })
 
@@ -583,6 +717,24 @@ describe('Graphics', () => {
         await waitFor(() => expect(imported).toEqual(['props/Trees/oak.png', 'props/Trees/old-oak/elm.png', 'props/Trees/old-oak/oak.png']))
       })
 
+      it('holds the game-asset sync back while the folder goes in, and runs it once afterwards', async () => {
+        const order: string[] = []
+        install({
+          pickImageFolder: folderPick(['Trees', 'oak'], ['Trees', 'elm'], ['Trees', 'pine']),
+          beginBulkImport: () => { order.push('begin'); return Promise.resolve({ success: true }) },
+          endBulkImport: () => { order.push('end'); return Promise.resolve({ success: true }) },
+          importGraphic: (_src: string, id: string) => { order.push(id); return Promise.resolve({ success: true, graphic: graphic(id), image: PNG }) },
+        })
+        renderAt('/database?table=graphics')
+        fireEvent.click(await screen.findByRole('button', { name: /Import folder…/ }))
+        const dialog = await screen.findByRole('dialog')
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Import 3 pictures' }))
+        await waitFor(() => expect(order.at(-1)).toBe('end'))
+        expect(order[0]).toBe('begin')
+        expect(order.filter((x) => x === 'begin' || x === 'end')).toHaveLength(2)
+        expect(order).toHaveLength(5)
+      })
+
       it('still catches a name that clashes inside one folder, or with a picture already in it', async () => {
         install({ pickImageFolder: folderPick(['Stuff', 'rock'], ['Stuff', 'Rock'], ['props', 'chest']) })
         renderAt('/database?table=graphics')
@@ -729,6 +881,30 @@ describe('Tilesets', () => {
     fireEvent.dragOver(row, { dataTransfer })
     fireEvent.drop(row, { dataTransfer })
     await waitFor(() => expect(calls).toContainEqual(['moveTileset', 'grass.png', null, 'Outside']))
+    expect(calls.some((c) => c[0] === 'saveMap')).toBe(false)
+  })
+
+  it('picking several tilesets: dragging moves them all, Delete asks once and refuses while a map paints with one', async () => {
+    renderAt('/database?table=tilesets')
+    const tree = await screen.findByRole('tree')
+    const rowOf = (text: string) => within(tree).getByText(text).closest('button') as HTMLElement
+    fireEvent.click(rowOf('grass'), { ctrlKey: true })
+    fireEvent.click(rowOf('lonely'), { ctrlKey: true })
+    expect(await screen.findByTestId('library-selection')).toHaveTextContent('2 tilesets selected')
+
+    fireEvent.keyDown(rowOf('lonely'), { key: 'Delete' })
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByTestId('delete-blocked')).toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('button', { name: /Cancel/ }))
+
+    const data = new Map<string, string>()
+    const dataTransfer = { setData: (k: string, v: string) => data.set(k, v), getData: (k: string) => data.get(k) ?? '', effectAllowed: '', dropEffect: '' }
+    const row = within(tree).getByRole('treeitem', { name: 'Outside' }).querySelector('.ed-row') as HTMLElement
+    fireEvent.dragStart(rowOf('lonely'), { dataTransfer })
+    fireEvent.dragOver(row, { dataTransfer })
+    fireEvent.drop(row, { dataTransfer })
+    await waitFor(() => expect(calls).toContainEqual(['moveTileset', 'grass.png', null, 'Outside']))
+    expect(calls).toContainEqual(['moveTileset', 'lonely.png', null, 'Outside'])
     expect(calls.some((c) => c[0] === 'saveMap')).toBe(false)
   })
 

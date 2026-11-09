@@ -154,6 +154,21 @@ export function defaultRowNames(candidates: Candidate[], fallback: string, taken
 
 const failure = (path: string, error: string) => ({ path, error })
 
+/**
+ * Runs a batch of file operations (imports, moves, deletes) with the game-asset sync held back, so a folder of hundreds of pictures syncs once at the end
+ * instead of once per file (each sync starts a Node process).
+ */
+export async function withBulkImport<T>(rows: number, work: () => Promise<T>): Promise<T> {
+  const api = window.electronAPI
+  const bulk = rows > 1 && typeof api?.beginBulkImport === 'function' ? api : undefined
+  await bulk?.beginBulkImport().catch(() => undefined)
+  try {
+    return await work()
+  } finally {
+    await bulk?.endBulkImport().catch(() => undefined)
+  }
+}
+
 export function graphicImporter(data: DatabaseData): Importer {
   const { graphics, graphicFolders } = data.sprites
   const ids = graphics.map((g) => g.id)
@@ -162,16 +177,17 @@ export function graphicImporter(data: DatabaseData): Importer {
     accepts: ['png', 'gif'],
     folders: [...new Set([...graphicFolders, ...ids.map(folderOfId).filter(Boolean)])].sort(),
     taken: (folder) => new Set(ids.filter((id) => folderOfId(id) === folder).map((id) => leafOfId(id).replace(/\.(png|gif)$/i, '').toLowerCase())),
-    run: async (rows, folder) => {
-      const result: ImportResult = { imported: [], failed: [] }
-      for (const row of rows) {
-        const id = joinId(joinDirs(folder, row.dir), `${row.name}.${row.ext}`)
-        const r = await data.sprites.importGraphic(row.path, id)
-        if (r.ok) result.imported.push(id)
-        else result.failed.push(failure(row.path, r.error))
-      }
-      return result
-    },
+    run: (rows, folder) =>
+      withBulkImport(rows.length, async () => {
+        const result: ImportResult = { imported: [], failed: [] }
+        for (const row of rows) {
+          const id = joinId(joinDirs(folder, row.dir), `${row.name}.${row.ext}`)
+          const r = await data.sprites.importGraphic(row.path, id)
+          if (r.ok) result.imported.push(id)
+          else result.failed.push(failure(row.path, r.error))
+        }
+        return result
+      }),
   }
 }
 
@@ -184,14 +200,17 @@ export function tilesetImporter(data: DatabaseData): Importer {
     // Maps find a tileset by its file name alone, so a name is taken whatever folder holds it.
     taken: () => new Set(tilesets.map((t) => t.fileName.replace(/\.png$/i, '').toLowerCase())),
     flat: true,
-    run: async (rows, folder) => {
-      const result: ImportResult = { imported: [], failed: [] }
-      for (const row of rows) {
-        const r = await data.tilesetOps.importTileset(row.path, row.name, joinDirs(folder, row.dir) || null, row.name)
-        if (r.ok) result.imported.push(r.tileset.fileName)
-        else result.failed.push(failure(row.path, r.error))
-      }
-      return result
-    },
+    run: (rows, folder) =>
+      withBulkImport(rows.length, () =>
+        data.tilesetOps.batch(async () => {
+          const result: ImportResult = { imported: [], failed: [] }
+          for (const row of rows) {
+            const r = await data.tilesetOps.importTileset(row.path, row.name, joinDirs(folder, row.dir) || null, row.name)
+            if (r.ok) result.imported.push(r.tileset.fileName)
+            else result.failed.push(failure(row.path, r.error))
+          }
+          return result
+        })
+      ),
   }
 }

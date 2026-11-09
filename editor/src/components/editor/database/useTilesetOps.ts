@@ -7,6 +7,8 @@ export interface TilesetOps {
   pickFile: () => Promise<OpResult<{ sourcePath: string | null; defaultName: string }>>
   /** Copies a PNG into the tileset library under `folder`; `fileStem` is the file name to use (the source's by default; a free one is picked). */
   importTileset: (sourcePath: string, name: string, folder: string | null, fileStem?: string) => Promise<OpResult<{ tileset: TilesetData }>>
+  /** Runs several operations and re-reads the project once at the end instead of after each one. */
+  batch: <T>(work: () => Promise<T>) => Promise<T>
   /** Changes the name shown in the editor (the file, and so the id maps use, stays). */
   setName: (folder: string | null, fileName: string, name: string) => Promise<OpResult>
   /** Renames the file, which is the id maps store. References are NOT rewritten (see lib/assetOps). */
@@ -37,12 +39,29 @@ async function ipc<A extends Answer, T extends object>(call: () => Promise<A> | 
 /** Tileset library operations; every successful one re-reads the project through `reload`. */
 export function useTilesetOps(reload: () => Promise<void>): TilesetOps {
   return useMemo<TilesetOps>(() => {
+    let batching = 0
+    let dirty = false
     const then = async <T extends object>(p: Promise<OpResult<T>>): Promise<OpResult<T>> => {
       const r = await p
-      if (r.ok) await reload()
+      if (r.ok) {
+        if (batching > 0) dirty = true
+        else await reload()
+      }
       return r
     }
     return {
+      batch: async (work) => {
+        batching++
+        try {
+          return await work()
+        } finally {
+          batching--
+          if (batching === 0 && dirty) {
+            dirty = false
+            await reload()
+          }
+        }
+      },
       pickFile: async () => {
         try {
           const r = await api()?.pickTilesetFile()

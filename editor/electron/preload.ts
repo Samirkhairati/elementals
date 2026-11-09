@@ -36,6 +36,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveCharacter: (id: string, def: unknown) => ipcRenderer.invoke('save-character', id, def),
   renameCharacter: (id: string, newId: string) => ipcRenderer.invoke('rename-character', id, newId),
   deleteCharacter: (id: string) => ipcRenderer.invoke('delete-character', id),
+  beginBulkImport: () => ipcRenderer.invoke('begin-bulk-import'),
+  endBulkImport: () => ipcRenderer.invoke('end-bulk-import'),
   importGraphic: (sourcePath: string, graphicId: string) => ipcRenderer.invoke('import-graphic', sourcePath, graphicId),
   replaceGraphic: (sourcePath: string, graphicId: string) => ipcRenderer.invoke('replace-graphic', sourcePath, graphicId),
   renameGraphic: (id: string, newId: string) => ipcRenderer.invoke('rename-graphic', id, newId),

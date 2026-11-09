@@ -6,6 +6,7 @@ import { gifFps } from '@/lib/characterEdit'
 import { formatBytes } from '@/lib/databaseModel'
 import { graphicUsage } from '@/lib/databaseModel'
 import type { LibraryItem } from '@/lib/libraryTree'
+import { describeSelection, type LibrarySelection } from '@/lib/librarySelection'
 import { Badge, EdButton, Field } from '../ui/controls'
 import { GraphicThumb } from './browse'
 import { GifPreview } from './GifPreview'
@@ -25,7 +26,7 @@ function StatusLine({ outcome }: { outcome: Outcome | null }) {
   return outcome.ok ? <p role="status" className="ed-hint px-1 pb-1">{outcome.message}</p> : <p role="alert" className="px-1 pb-1 text-destructive">{outcome.error}</p>
 }
 
-type FolderDialog = { kind: 'new'; parent: string } | { kind: 'item'; id: string } | { kind: 'change'; folder: string } | { kind: 'delete'; folder: string } | null
+type FolderDialog = { kind: 'new'; parent: string } | { kind: 'item'; id: string } | { kind: 'many'; selection: LibrarySelection } | { kind: 'change'; folder: string } | { kind: 'delete'; folder: string } | null
 
 export function GraphicsBrowser({ data, query, selected, onSelect, mode, library }: TableProps) {
   const { graphics, images } = data.sprites
@@ -37,7 +38,17 @@ export function GraphicsBrowser({ data, query, selected, onSelect, mode, library
   const size = (key: string) => graphics.find((g) => g.id === key)
 
   const move = async (drag: DragPayload, target: string) => {
-    if (drag.kind === 'item') {
+    if (drag.kind === 'many') {
+      const r = await actions.moveMany(drag, target)
+      if (r.message || r.error) setOutcome(r)
+      // The open picture follows its new id (or its folder's).
+      const top = actions.topLevel(drag)
+      if (r.ok && top.items.includes(selected)) onSelect(joinId(target, leafOfId(selected)))
+      else if (r.ok) {
+        const folder = top.folders.find((f) => selected.startsWith(`${f}/`))
+        if (folder) onSelect(joinId(joinId(target, leafOfId(folder)), selected.slice(folder.length + 1)))
+      }
+    } else if (drag.kind === 'item') {
       if (folderOfId(drag.key) === target) return
       const r = await actions.rename(drag.key, joinId(target, leafOfId(drag.key)))
       setOutcome(r)
@@ -66,6 +77,8 @@ export function GraphicsBrowser({ data, query, selected, onSelect, mode, library
         hint={(item) => (used[item.key] ? (size(item.key)?.gif ? `GIF · ${size(item.key)?.gif?.frames} fr` : `${size(item.key)?.width}×${size(item.key)?.height}`) : 'unused')}
         onMove={(d, t) => void move(d, t)}
         onDeleteItem={(id) => setDialog({ kind: 'item', id })}
+        onDeleteMany={(selection) => setDialog({ kind: 'many', selection })}
+        noun="picture"
         folderActions={{ onCreate: (parent) => setDialog({ kind: 'new', parent }), onRename: (folder) => setDialog({ kind: 'change', folder }), onDelete: (folder) => setDialog({ kind: 'delete', folder }) }}
         emptyText="No pictures yet. Import images, or drop them here."
         library={library}
@@ -81,6 +94,18 @@ export function GraphicsBrowser({ data, query, selected, onSelect, mode, library
           guard={actions.deleteGuard([dialog.id])}
           blockedHint="Change those first, or rename it instead."
           onConfirm={async () => { const r = await actions.remove(dialog.id); setOutcome(r); if (r.ok && selected === dialog.id) onSelect(''); return r.error }}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog?.kind === 'many' && (
+        <DeleteDialog
+          open
+          title={`Delete ${describeSelection(dialog.selection, 'picture')}?`}
+          subject={describeSelection(actions.topLevel(dialog.selection), 'picture')}
+          description={`The files${dialog.selection.folders.length ? ' and folders' : ''} are removed from the project, ${actions.reached(dialog.selection).length} picture${actions.reached(dialog.selection).length === 1 ? '' : 's'} in all. This cannot be undone.`}
+          guard={actions.deleteGuard(actions.reached(dialog.selection))}
+          blockedHint="Change those first, or leave the pictures that are in use out of the selection."
+          onConfirm={async () => { const r = await actions.removeMany(dialog.selection); setOutcome(r); if (r.ok && (actions.reached(dialog.selection).includes(selected))) onSelect(''); return r.error }}
           onClose={() => setDialog(null)}
         />
       )}
@@ -258,7 +283,7 @@ export function GraphicsToolbar({ data, library }: { data: DatabaseData; onSelec
   return (
     <LibraryToolbar
       library={library}
-      info="Import copies PNGs and GIF animations into the project: pick several, or pick a whole folder (the folders inside it are kept), drag files or folders from your computer onto the list or onto a folder, or paste a copied picture or screenshot (Ctrl/Cmd+V). Each one gets a naming step first. They go into the folder you clicked last. Rename and rearrange afterwards from here and every sprite and map follows."
+      info="Import copies PNGs and GIF animations into the project: pick several, or pick a whole folder (the folders inside it are kept), drag files or folders from your computer onto the list or onto a folder, or paste a copied picture or screenshot (Ctrl/Cmd+V). Each one gets a naming step first. They go into the folder you clicked last. Rename and rearrange afterwards from here and every sprite and map follows. Ctrl/Cmd+click and Shift+click pick several pictures and folders at once: drag them onto a folder to move them, or press Delete."
       newFolder={(onClose, parent) => <NewFolder parent={parent} actions={actions} onDone={() => undefined} onClose={onClose} />}
     />
   )

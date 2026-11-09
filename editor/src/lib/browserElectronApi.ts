@@ -158,6 +158,8 @@ export function createBrowserElectronApi(): ElectronAPI {
     saveCharacter: (id: string, def: unknown) => c('save-character', id, def),
     renameCharacter: (id: string, newId: string) => c('rename-character', id, newId),
     deleteCharacter: (id: string) => c('delete-character', id),
+    beginBulkImport: () => c('begin-bulk-import'),
+    endBulkImport: () => c('end-bulk-import'),
     importGraphic: (sourcePath: string, graphicId: string) => c('import-graphic', sourcePath, graphicId),
     replaceGraphic: (sourcePath: string, graphicId: string) => c('replace-graphic', sourcePath, graphicId),
     renameGraphic: (id: string, newId: string) => c('rename-graphic', id, newId),

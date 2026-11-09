@@ -85,7 +85,7 @@ export function CharacterThumb({ def, images, sizes, size }: { def: CharacterDef
 }
 
 /** One entry in the tile view: a picture over its name. */
-export function Tile({ selected, title, name, hint, thumb, badge, onClick, dragProps }: { selected: boolean; title?: string; name: string; hint?: React.ReactNode; thumb: React.ReactNode; badge?: React.ReactNode; onClick: () => void; dragProps?: React.HTMLAttributes<HTMLButtonElement> }) {
+export function Tile({ selected, title, name, hint, thumb, badge, onClick, dragProps }: { selected: boolean; title?: string; name: string; hint?: React.ReactNode; thumb: React.ReactNode; badge?: React.ReactNode; onClick: (e: React.MouseEvent) => void; dragProps?: React.HTMLAttributes<HTMLButtonElement> }) {
   return (
     <button
       type="button"

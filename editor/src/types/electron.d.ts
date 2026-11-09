@@ -51,6 +51,9 @@ interface ElectronAPI {
   saveCharacter: (id: string, def: CharacterDef) => Promise<({ success: true; character: CharacterInfo }) | IpcFailure>;
   renameCharacter: (id: string, newId: string) => Promise<({ success: true; id: string }) | IpcFailure>;
   deleteCharacter: (id: string) => Promise<({ success: true }) | IpcFailure>;
+  /** Hold the game-asset sync back while many pictures go in; `endBulkImport` runs it once. */
+  beginBulkImport: () => Promise<{ success: boolean }>;
+  endBulkImport: () => Promise<{ success: boolean }>;
   importGraphic: (sourcePath: string, graphicId: string) => Promise<({ success: true; graphic: GraphicInfo; image: string }) | IpcFailure>;
   /** Puts a PNG in the place of an existing graphic (same id). */
   replaceGraphic: (sourcePath: string, graphicId: string) => Promise<({ success: true; graphic: GraphicInfo; image: string; assets?: { written: number; skipped?: string } }) | IpcFailure>;

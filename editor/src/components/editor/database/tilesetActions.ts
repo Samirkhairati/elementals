@@ -2,6 +2,7 @@
 // touches a map; only renaming the file does, and that goes through lib/assetOps like the graphics do.
 
 import { applyAssetPlan, canMoveFolder, folderOfId, joinId, leafOfId, planTilesetRename, summarizeReferences, tilesetDeleteGuard, type AssetPlan } from '@/lib/assetOps'
+import { describeSelection, topLevelOnly, type LibrarySelection } from '@/lib/librarySelection'
 import type { OpResult } from '@/lib/opResult'
 import type { TilesetData } from '@/types/editor'
 import type { DatabaseData } from './useDatabaseData'
@@ -88,6 +89,46 @@ export function tilesetActions(data: DatabaseData) {
       return { allowed: references.length === 0, references }
     },
     inFolder,
+
+    /** Tilesets are keyed by file name; this is the folder of one. */
+    topLevel: (sel: LibrarySelection): LibrarySelection => topLevelOnly(sel, (key) => folderOfTileset(tilesets.find((t) => t.fileName === key) ?? { folderPath: null })),
+    /** File names of every tileset a selection reaches (the picked ones and everything inside the picked folders). */
+    reached: (sel: LibrarySelection): string[] => {
+      const top = topLevelOnly(sel, (key) => folderOfTileset(tilesets.find((t) => t.fileName === key) ?? { folderPath: null }))
+      return [...new Set([...top.items, ...top.folders.flatMap((f) => inFolder(f).map((t) => t.fileName))])]
+    },
+    /** Several tilesets and folders into `target` at once (file names are the ids, so no map changes). */
+    moveMany: (sel: LibrarySelection, target: string): Promise<Outcome> =>
+      ops.batch(async () => {
+        const top = topLevelOnly(sel, (key) => folderOfTileset(tilesets.find((t) => t.fileName === key) ?? { folderPath: null }))
+        const items = top.items.flatMap((key) => tilesets.filter((t) => t.fileName === key && folderOfTileset(t) !== target))
+        const folders = top.folders.filter((f) => canMoveFolder(f, target))
+        for (const t of items) {
+          const r = await ops.move(t.fileName, orNull(folderOfTileset(t)), orNull(target))
+          if (!r.ok) return fail(r.error)
+        }
+        for (const f of folders) {
+          const r = await ops.moveFolder(f, orNull(target))
+          if (!r.ok) return fail(r.error)
+        }
+        return items.length + folders.length === 0 ? ok : { ...ok, message: `Moved ${describeSelection({ items: items.map((t) => t.fileName), folders }, 'tileset')}.` }
+      }),
+    /** Deletes the tilesets and folders picked (the caller has checked the guard). */
+    removeMany: (sel: LibrarySelection): Promise<Outcome> =>
+      ops.batch(async () => {
+        const top = topLevelOnly(sel, (key) => folderOfTileset(tilesets.find((t) => t.fileName === key) ?? { folderPath: null }))
+        for (const key of top.items) {
+          const t = tilesets.find((x) => x.fileName === key)
+          if (!t) continue
+          const r = await ops.remove(orNull(folderOfTileset(t)), t.fileName)
+          if (!r.ok) return fail(r.error)
+        }
+        for (const f of top.folders) {
+          const r = await ops.deleteFolder(f)
+          if (!r.ok) return fail(r.error)
+        }
+        return { ...ok, message: `Deleted ${describeSelection(top, 'tileset')}.` }
+      }),
     remove: async (tileset: TilesetData): Promise<Outcome> => {
       const r = await ops.remove(orNull(folderOfTileset(tileset)), tileset.fileName)
       return r.ok ? { ...ok, message: `Deleted ${tileset.name}.` } : fail(r.error)

@@ -44,6 +44,9 @@ export function defaultGameMapsDir(projectDir: string): string {
   return path.join(path.resolve(projectDir), '..', 'game', 'public', 'data', 'maps');
 }
 
+/** The longest a bulk import may hold the asset sync back. */
+const BULK_IMPORT_LIMIT_MS = 10 * 60_000;
+
 export function createProjectChannels(
   projectDir: string,
   options: { gameMapsDir?: string } = {}
@@ -59,14 +62,35 @@ export function createProjectChannels(
    * result gets the asset sync (what `npm run assets:sync` does) and carries its summary as `assets`. A sync that cannot
    * run (a project copy, a packaged editor) or finds problems never turns the result into a failure.
    */
+  // A bulk import (a whole folder) adds hundreds of files one call at a time: the sync waits for its end and runs once.
+  // The deadline keeps a renderer that died half way from switching the sync off for good.
+  let deferUntil = 0;
+  let syncWaiting = false;
+
   const withAssetSync = async <T extends { success: boolean }>(result: T): Promise<T | (T & { assets: AssetSyncSummary })> => {
     if (!result.success) return result;
+    if (Date.now() < deferUntil) {
+      syncWaiting = true;
+      return result;
+    }
     const assets = await syncGameAssets(root, gameMapsDir);
     if (assets.skipped) console.warn(`[assets] ${assets.skipped}`);
     return { ...result, assets };
   };
 
   return {
+    // ── bulk imports ──
+    'begin-bulk-import': () => {
+      deferUntil = Date.now() + BULK_IMPORT_LIMIT_MS;
+      syncWaiting = false;
+      return { success: true };
+    },
+    'end-bulk-import': async () => {
+      deferUntil = 0;
+      if (!syncWaiting) return { success: true };
+      syncWaiting = false;
+      return withAssetSync({ success: true });
+    },
     // ── tilesets ──
     'get-tilesets': () =>
       toResult(() => {
