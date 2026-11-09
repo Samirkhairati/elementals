@@ -86,6 +86,7 @@ const selectLayers = (c: EditorContextValue) => ({
   setActiveLayerId: c.setActiveLayerId,
   selectLayer: c.selectLayer,
   selectedLayerIds: c.selectedLayerIds,
+  justCreatedLayer: c.justCreatedLayer,
   showEntities: c.showEntities,
   toggleShowEntities: c.toggleShowEntities,
   entitiesIndex: c.activeMap?.entitiesIndex ?? 0,
@@ -104,6 +105,7 @@ const selectLayers = (c: EditorContextValue) => ({
 
 export function LayersWrapper(_props: IDockviewPanelProps) {
   const ctx = useEditorSelector(selectLayers);
+  const bindings = useBindings();
   return (
     <div
       onClick={() => ctx.setFocusedDomain('layers')}
@@ -116,6 +118,9 @@ export function LayersWrapper(_props: IDockviewPanelProps) {
         setActiveLayerId={ctx.setActiveLayerId}
         selectLayer={ctx.selectLayer}
         selectedLayerIds={ctx.selectedLayerIds}
+        justCreatedLayer={ctx.justCreatedLayer}
+        newLayerKeys={describeBindings('layer.new', bindings)}
+        newFolderKeys={describeBindings('layer.newFolder', bindings)}
         showEntities={ctx.showEntities}
         toggleShowEntities={ctx.toggleShowEntities}
         entitiesIndex={ctx.entitiesIndex}
@@ -300,6 +305,7 @@ const selectCanvas = (c: EditorContextValue) => ({
   setSelectedImageId: c.setSelectedImageId,
   pickedImageIds: c.pickedImageIds,
   selectImage: c.selectImage,
+  moveImages: c.moveImages,
   placeMultiple: c.placeMultiple,
   setActiveLayerId: c.setActiveLayerId,
   addImage: c.addImage,
@@ -400,6 +406,7 @@ export function CanvasWrapper(props: IDockviewPanelProps) {
         setSelectedImageId={isActive ? ctx.setSelectedImageId : noop}
         pickedImageIds={isActive ? ctx.pickedImageIds : undefined}
         selectImage={isActive ? ctx.selectImage : noop}
+        moveImages={isActive ? ctx.moveImages : noop}
         onPlaceMultiple={isActive ? (imageId: string) => ctx.activeLayerId && ctx.placeMultiple(ctx.activeLayerId, imageId) : undefined}
         placeMultipleKeys={placeKeys}
         activateLayer={isActive ? ctx.setActiveLayerId : noop}

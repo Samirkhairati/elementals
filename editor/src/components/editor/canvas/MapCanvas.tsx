@@ -1,4 +1,5 @@
 import type { SelectMode } from '@/lib/imageSelection'
+import type { ImageDrag } from './konva/imageDrag'
 import React, { useCallback, useMemo, useRef } from 'react'
 import type { ImagePick } from '@/lib/graphicAssets'
 import { Stage, Layer as KonvaLayer, Rect, Group } from 'react-konva'
@@ -82,6 +83,8 @@ interface MapCanvasProps {
   setSelectedImageId?: (id: string | null) => void
   pickedImageIds?: readonly string[]
   selectImage?: (layerId: string, imageId: string, mode: SelectMode) => void
+  /** A dragged picked set (a group) moves as a whole. */
+  moveImages?: (layerId: string, imageIds: readonly string[], dx: number, dy: number) => void
   /** "Place multiple" from the menu of a right-clicked picture, and the keys to show beside it. */
   onPlaceMultiple?: (imageId: string) => void
   placeMultipleKeys?: string
@@ -134,6 +137,7 @@ export function MapCanvas({
   setSelectedImageId,
   pickedImageIds,
   selectImage,
+  moveImages,
   onPlaceMultiple,
   placeMultipleKeys,
   activateLayer,
@@ -228,7 +232,7 @@ export function MapCanvas({
   const layersBelowEntities = useMemo(() => withoutFolders(layers.slice(entitiesAt)), [layers, entitiesAt])
   const entityVisuals = useRef<Visuals>({ hoverId: null, dragId: null, dragX: 0, dragY: 0 })
   // The image being dragged, drawn at the mouse by the image layer itself (see KonvaImageItems).
-  const imageDrag = useRef<{ id: string; x: number; y: number } | null>(null)
+  const imageDrag = useRef<ImageDrag | null>(null)
 
   const activeLayer = useMemo(() => layers.find((l) => l.id === activeLayerId) ?? null, [layers, activeLayerId])
   const isImageLayerActive = activeLayer?.type === 'image'
@@ -355,6 +359,7 @@ export function MapCanvas({
                 setSelectedImageId={setSelectedImageId || (() => {})}
                 pickedImageIds={pickedImageIds}
                 selectImage={selectImage}
+                moveImages={moveImages}
                 moveImage={moveImage || (() => {})}
                 snapToGrid={snapToGrid}
                 spriteAssets={spriteAssets}

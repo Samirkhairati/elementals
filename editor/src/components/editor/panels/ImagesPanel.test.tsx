@@ -18,6 +18,11 @@ function setup(images: any[], extra: Record<string, unknown> = {}, layerOver: Re
     setSelectedImageId: vi.fn(),
     selectImage: vi.fn(),
     placeMultiple: vi.fn(),
+    selectImageGroup: vi.fn(),
+    groupPickedImages: vi.fn(),
+    ungroupImageGroup: vi.fn(),
+    renameImageGroup: vi.fn(),
+    setImageGroupLocked: vi.fn(),
     deleteImages: vi.fn(),
     duplicateImages: vi.fn(),
     updateImage: vi.fn(),
@@ -38,6 +43,7 @@ function setup(images: any[], extra: Record<string, unknown> = {}, layerOver: Re
     pendingImage: null,
     selectedImageId: null,
     pickedImageIds: (extra.selectedImageId ? [extra.selectedImageId] : []) as string[],
+    openImageGroupId: null,
     ...fns,
     ...extra,
   } as any)
@@ -309,6 +315,101 @@ describe('ImagesPanel', () => {
       key('t', { ctrlKey: true })
       key('c')
       expect(screen.queryByRole('dialog')).toBeNull()
+    })
+  })
+
+  describe('groups', () => {
+    const grouped = [
+      { id: 'a', graphicId: 'sky/sheet.png', x: 4, y: 5, name: 'Left', groupId: 'g1', z: 1 },
+      { id: 'b', graphicId: 'sky/sheet.png', x: 40, y: 5, name: 'Right', groupId: 'g1', z: 2 },
+      { id: 'c', graphicId: 'sky/sheet.png', x: 80, y: 5, name: 'Loose', z: 3 },
+    ]
+    const withGroup = (extra: Record<string, unknown> = {}, group: Record<string, unknown> = {}, layerOver: Record<string, unknown> = {}) =>
+      setup(grouped, extra, { groups: [{ id: 'g1', name: 'Dam wall', ...group }], ...layerOver })
+    const groupRow = () => within(screen.getByTestId('image-group')).getByText('Dam wall').closest('.ed-row') as HTMLElement
+
+    it('shows a group as one row with its members under it, and loose pictures as before', () => {
+      withGroup()
+      const order = within(screen.getByTestId('image-list')).getAllByText(/Dam wall|Left|Right|Loose/).map((e) => e.textContent)
+      expect(order).toEqual(['Loose', 'Dam wall', 'Right', 'Left'])
+      expect(within(groupRow()).getByText('2')).toBeTruthy()
+    })
+
+    it('can be collapsed to hide its pictures', () => {
+      withGroup()
+      fireEvent.click(screen.getByRole('button', { name: 'Hide the pictures of Dam wall' }))
+      expect(screen.queryByText('Left')).toBeNull()
+      expect(screen.getByText('Loose')).toBeTruthy()
+      fireEvent.click(screen.getByRole('button', { name: 'Show the pictures of Dam wall' }))
+      expect(screen.getByText('Left')).toBeTruthy()
+    })
+
+    it('a click on the group row selects the whole group, and it says when it is the open one', () => {
+      const f = withGroup({ openImageGroupId: 'g1', pickedImageIds: ['a', 'b'], selectedImageId: 'a' })
+      expect(groupRow().dataset.current).toBe('true')
+      expect(groupRow().dataset.selected).toBe('true')
+      fireEvent.click(groupRow())
+      expect(f.selectImageGroup).toHaveBeenCalledWith('i1', 'g1')
+    })
+
+    it('the lock button toggles the group lock without selecting it', () => {
+      const f = withGroup()
+      fireEvent.click(within(groupRow()).getByRole('button', { name: 'Lock Dam wall' }))
+      expect(f.setImageGroupLocked).toHaveBeenCalledWith('i1', 'g1', true)
+      expect(f.selectImageGroup).not.toHaveBeenCalled()
+    })
+
+    it('a locked group shows as locked and unlocks again', () => {
+      const f = withGroup({}, { locked: true })
+      const button = within(groupRow()).getByRole('button', { name: 'Unlock Dam wall' })
+      expect(button).toHaveAttribute('aria-pressed', 'true')
+      fireEvent.click(button)
+      expect(f.setImageGroupLocked).toHaveBeenCalledWith('i1', 'g1', false)
+    })
+
+    it('rename, duplicate, ungroup and delete act on the group', () => {
+      const f = withGroup()
+      const row = groupRow()
+      fireEvent.click(within(row).getByRole('button', { name: 'Duplicate Dam wall' }))
+      expect(f.duplicateImages).toHaveBeenCalledWith('i1', ['b', 'a'])
+      fireEvent.click(within(row).getByRole('button', { name: 'Ungroup Dam wall' }))
+      expect(f.ungroupImageGroup).toHaveBeenCalledWith('i1', 'g1')
+      fireEvent.click(within(row).getByRole('button', { name: 'Delete Dam wall' }))
+      expect(f.deleteImages).toHaveBeenCalledWith('i1', ['b', 'a'])
+      fireEvent.click(within(row).getByRole('button', { name: 'Rename Dam wall' }))
+      const input = screen.getByLabelText('Group name') as HTMLInputElement
+      fireEvent.change(input, { target: { value: 'Wall' } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+      expect(f.renameImageGroup).toHaveBeenCalledWith('i1', 'g1', 'Wall')
+    })
+
+    it('Group needs two picked pictures; Ungroup needs a group to act on', () => {
+      const none = withGroup()
+      expect(screen.getByRole('button', { name: 'Group pictures' })).toBeDisabled()
+      expect(screen.getByRole('button', { name: 'Ungroup pictures' })).toBeDisabled()
+      expect(none.groupPickedImages).not.toHaveBeenCalled()
+    })
+
+    it('with two pictures picked, the Group button and Ctrl+G group them; Ctrl+Shift+G ungroups the picked picture\'s group', () => {
+      const f = setup(items, { pickedImageIds: ['a', 'b'], selectedImageId: 'a' })
+      fireEvent.click(screen.getByRole('button', { name: 'Group pictures' }))
+      expect(f.groupPickedImages).toHaveBeenCalledWith('i1')
+      fireEvent.keyDown(window, { key: 'g', ctrlKey: true })
+      expect(f.groupPickedImages).toHaveBeenCalledTimes(2)
+    })
+
+    it('Ungroup acts on the open group, or the group of the picked picture', () => {
+      const f = withGroup({ selectedImageId: 'a', pickedImageIds: ['a'] })
+      fireEvent.click(screen.getByRole('button', { name: 'Ungroup pictures' }))
+      expect(f.ungroupImageGroup).toHaveBeenCalledWith('i1', 'g1')
+      fireEvent.keyDown(window, { key: 'G', ctrlKey: true, shiftKey: true })
+      expect(f.ungroupImageGroup).toHaveBeenCalledTimes(2)
+    })
+
+    it('everything about groups is off on a locked layer', () => {
+      withGroup({}, {}, { locked: true })
+      expect(within(groupRow()).getByRole('button', { name: 'Lock Dam wall' })).toBeDisabled()
+      expect(within(groupRow()).getByRole('button', { name: 'Ungroup Dam wall' })).toBeDisabled()
     })
   })
 })

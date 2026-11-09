@@ -280,6 +280,8 @@ export function EditorPage() {
     handlePaste: handlePasteSelected,
     handleDuplicate: handleDuplicateSelected,
     handlePlaceMultiple,
+    handleNewLayer: () => mapManager.activeMap && handleCreateLayerOfType('tile'),
+    handleNewFolder: () => mapManager.activeMap && handleCreateLayerOfType('folder'),
   })
 
   // ── Paint Tools Hook ─────────────────────────────────────────────────────
@@ -444,6 +446,7 @@ export function EditorPage() {
     setActiveLayerId: handleSelectLayer,
     selectLayer: handleSelectLayerExtended,
     selectedLayerIds: layerManager.selectedLayerIds,
+    justCreatedLayer: layerManager.justCreatedLayer,
     pinSelection: layerManager.pinSelection,
     setPinSelection: layerManager.setPinSelection,
     pendingImage: layerManager.pendingImage,
@@ -453,6 +456,13 @@ export function EditorPage() {
     setSelectedImageId: layerManager.setSelectedImageId,
     pickedImageIds: layerManager.pickedImageIds,
     selectImage: layerManager.selectImage,
+    openImageGroupId: layerManager.openImageGroupId,
+    selectImageGroup: layerManager.selectImageGroup,
+    groupPickedImages: layerManager.groupPickedImages,
+    ungroupImageGroup: layerManager.ungroupImageGroup,
+    renameImageGroup: layerManager.renameImageGroup,
+    setImageGroupLocked: layerManager.setImageGroupLocked,
+    moveImages: layerManager.moveImages,
     deleteImages: layerManager.deleteImages,
     duplicateImages: layerManager.duplicateImages,
     placeMultiple: layerManager.placeMultiple,
@@ -635,10 +645,10 @@ export function EditorPage() {
     // Layers
     layerManager.layers, layerManager.activeLayerId, layerManager.activeLayerType,
     handleSelectLayer, handleSelectLayerExtended, layerManager.toggleLayerVisibility,
-    layerManager.selectedLayerIds, layerManager.pinSelection, layerManager.setPinSelection,
+    layerManager.selectedLayerIds, layerManager.justCreatedLayer, layerManager.pinSelection, layerManager.setPinSelection,
     layerManager.pendingImage, layerManager.startImagePlacement, layerManager.cancelImagePlacement,
     layerManager.selectedImageId, layerManager.setSelectedImageId,
-    layerManager.pickedImageIds, layerManager.selectImage, layerManager.deleteImages, layerManager.duplicateImages, layerManager.placeMultiple, layerManager.copyImages, layerManager.pasteImages,
+    layerManager.pickedImageIds, layerManager.selectImage, layerManager.openImageGroupId, layerManager.selectImageGroup, layerManager.groupPickedImages, layerManager.ungroupImageGroup, layerManager.renameImageGroup, layerManager.setImageGroupLocked, layerManager.moveImages, layerManager.deleteImages, layerManager.duplicateImages, layerManager.placeMultiple, layerManager.copyImages, layerManager.pasteImages,
     layerManager.addImage, layerManager.updateImage, layerManager.deleteImage, layerManager.duplicateImage, layerManager.reorderImage, layerManager.moveImageTo,
     layerManager.toggleLayerLock, layerManager.handleDeleteLayer,
     layerManager.handleReorderLayers, layerManager.toggleFolderCollapsed, layerManager.handleCreateLayer,

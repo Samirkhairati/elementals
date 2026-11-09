@@ -1,9 +1,9 @@
 import { create } from 'zustand'
-import type { EntityData, ImageItem, Layer } from '@/types/editor'
+import type { EntityData, ImageGroup, ImageItem, Layer } from '@/types/editor'
 
 /** What Ctrl/Cmd+C copied inside the editor (kept in memory; pasting needs the same kind of target). */
 export type ClipboardContent =
-  | { kind: 'images'; items: ImageItem[] }
+  | { kind: 'images'; items: ImageItem[]; /** The groups the copied pictures belonged to. */ groups?: ImageGroup[] }
   | { kind: 'entities'; entities: EntityData[] }
   | { kind: 'layers'; layers: Layer[] }
 

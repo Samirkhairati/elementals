@@ -209,7 +209,7 @@ export function TilesetsToolbar({ data, library }: { data: DatabaseData; onSelec
     <LibraryToolbar
       library={library}
       info="Import copies PNGs into the project: pick several, drag them from your computer onto the list or onto a folder, or paste a copied picture or screenshot (Ctrl/Cmd+V). Each one gets a naming step first. They go into the folder you clicked last. The map editor lists what you add here and lets you pick it."
-      newFolder={(onClose) => <NewTilesetFolder parent="" actions={actions} onDone={() => undefined} onClose={onClose} />}
+      newFolder={(onClose, parent) => <NewTilesetFolder parent={parent} actions={actions} onDone={() => undefined} onClose={onClose} />}
     />
   )
 }

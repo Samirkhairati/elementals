@@ -303,6 +303,18 @@ describe('Graphics', () => {
     await waitFor(() => expect(calls).toContainEqual(['createGraphicFolder', null, 'scenery']))
   })
 
+  it('New folder… creates inside the folder that was clicked last, not at the top level', async () => {
+    renderAt('/database?table=graphics')
+    fireEvent.click(await screen.findByRole('button', { name: /^props/ }))
+    await waitFor(() => expect(screen.getByTestId('import-target')).toHaveTextContent('Importing into props'))
+    fireEvent.click(screen.getByRole('button', { name: /New folder…/ }))
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog).toHaveTextContent('New folder in props')
+    fireEvent.change(within(dialog).getByLabelText('Folder name'), { target: { value: 'inner' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Create' }))
+    await waitFor(() => expect(calls).toContainEqual(['createGraphicFolder', 'props', 'inner']))
+  })
+
   it('dragging a picture onto a folder moves it (and rewrites what uses it)', async () => {
     renderAt('/database?table=graphics')
     const tree = await screen.findByRole('tree')

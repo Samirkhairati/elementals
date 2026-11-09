@@ -3,7 +3,7 @@
 // duplicate, rename, delete), a zoomable preview of the picked item with the Crop button, and its properties.
 
 import React, { useMemo, useRef, useState } from 'react'
-import { ArrowDown, ArrowUp, Copy, CopyPlus, Crop, Scaling, Pencil, Plus, Stamp, Trash2, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Copy, CopyPlus, Crop, Folder as FolderIcon, Group as GroupIcon, Lock, Scaling, Ungroup, Unlock, Pencil, Plus, Stamp, Trash2, X } from 'lucide-react'
 import type { ImageItem } from '@/types/editor'
 import { imagePickLabel, imagePickName } from '@/lib/graphicAssets'
 import { flippedItemBounds, itemSourceSize } from '@/lib/imageItems'
@@ -11,6 +11,8 @@ import { snapPicture } from '@/lib/imageSnap'
 import { describeBindings } from '@/lib/shortcuts'
 import { useBindings } from '@/store/shortcutStore'
 import { sortedImages } from '@/lib/layerOrder'
+import { imageRows } from '@/lib/imageGroups'
+import type { ImageGroup } from '@/types/editor'
 import { Badge, EdButton, Field, IconButton, InfoTip, NumberField, TextField, Toggle } from '../ui/controls'
 import { ZoomPane } from '../ui/ZoomPane'
 import { ImageItemView } from '../sprites/ImageItemView'
@@ -37,6 +39,12 @@ const selectImages = (c: EditorContextValue) => ({
   setSelectedImageId: c.setSelectedImageId,
   pickedImageIds: c.pickedImageIds,
   selectImage: c.selectImage,
+  openImageGroupId: c.openImageGroupId,
+  selectImageGroup: c.selectImageGroup,
+  groupPickedImages: c.groupPickedImages,
+  ungroupImageGroup: c.ungroupImageGroup,
+  renameImageGroup: c.renameImageGroup,
+  setImageGroupLocked: c.setImageGroupLocked,
   deleteImages: c.deleteImages,
   duplicateImages: c.duplicateImages,
   placeMultiple: c.placeMultiple,
@@ -57,10 +65,12 @@ export function ImagesPanel() {
   const [cropOpen, setCropOpen] = useState(false)
   const [resizeOpen, setResizeOpen] = useState(false)
   // The shortcuts act on whatever the panel can do right now (set below, once the picked item is known).
-  const actions = useRef<{ crop?: () => void; resize?: () => void }>({})
+  const actions = useRef<{ crop?: () => void; resize?: () => void; group?: () => void; ungroup?: () => void }>({})
   useShortcuts({
     'image.crop': (e) => { if (actions.current.crop) { e.preventDefault(); actions.current.crop() } },
     'image.resize': (e) => { if (actions.current.resize) { e.preventDefault(); actions.current.resize() } },
+    'image.group': (e) => { if (actions.current.group) { e.preventDefault(); actions.current.group() } },
+    'image.ungroup': (e) => { if (actions.current.ungroup) { e.preventDefault(); actions.current.ungroup() } },
   })
   const [renaming, setRenaming] = useState<string | null>(null)
   // Dragging a row changes the draw order: the row being dragged and where it would land.
@@ -79,6 +89,8 @@ export function ImagesPanel() {
   const placeKeys = describeBindings('image.placeMultiple', bindings)
   const cropKeys = describeBindings('image.crop', bindings)
   const resizeKeys = describeBindings('image.resize', bindings)
+  const groupKeys = describeBindings('image.group', bindings)
+  const ungroupKeys = describeBindings('image.ungroup', bindings)
   // Row buttons act on the whole picked set when the row belongs to it, otherwise on that row alone.
   const targetsOf = (id: string) => (picked.length > 1 && picked.includes(id) ? picked : [id])
 
@@ -95,12 +107,105 @@ export function ImagesPanel() {
   const canCrop = !!selected && !locked && !!graphic && !!ctx.graphicImages[graphic.id]
   const itemSize = selected ? itemSourceSize(selected, assets) : null
   const canResize = !!selected && !locked && !!itemSize
+  // Group needs two or more picked pictures; Ungroup acts on the open group, or the group of the picked picture.
+  const groupOfPicked = ctx.openImageGroupId ?? selected?.groupId ?? null
   actions.current = {
+    group: !locked && picked.length > 1 ? () => ctx.groupPickedImages(layer.id) : undefined,
+    ungroup: !locked && groupOfPicked ? () => ctx.ungroupImageGroup(layer.id, groupOfPicked) : undefined,
     crop: canCrop && !cropOpen && !resizeOpen ? () => setCropOpen(true) : undefined,
     resize: canResize && !cropOpen && !resizeOpen ? () => setResizeOpen(true) : undefined,
   }
   // After a crop, the preview centres on (and fits) the cropped part of the whole picture.
   const cropFocus = whole && selected?.crop ? { x: selected.crop.x * previewScale, y: selected.crop.y * previewScale, w: selected.crop.w * previewScale, h: selected.crop.h * previewScale } : null
+
+  const renderRow = (img: ImageItem, indent = false) => {
+    const i = rows.findIndex((r) => r.id === img.id)
+    return (
+                  <div
+                    key={img.id}
+                    className="ed-row group"
+                    style={indent ? { marginLeft: 16 } : undefined}
+                    data-selected={picked.includes(img.id) ? 'true' : undefined}
+                    data-dim={dragId === img.id ? 'true' : undefined}
+                    draggable={!locked && renaming !== img.id}
+                    onClick={(e) => ctx.selectImage(layer.id, img.id, e.shiftKey ? 'range' : e.metaKey || e.ctrlKey ? 'toggle' : 'replace')}
+                    onDragStart={(e) => {
+                      setDragId(img.id)
+                      e.dataTransfer.effectAllowed = 'move'
+                      e.dataTransfer.setData('text/plain', img.id)
+                    }}
+                    onDragOver={(e) => {
+                      if (!dragId) return
+                      e.preventDefault()
+                      e.dataTransfer.dropEffect = 'move'
+                      const r = e.currentTarget.getBoundingClientRect()
+                      setDropAt(dragId === img.id ? null : { id: img.id, position: e.clientY - r.top < r.height / 2 ? 'top' : 'bottom' })
+                    }}
+                    onDragEnd={() => { setDragId(null); setDropAt(null) }}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      if (dragId && dropAt && dropAt.id === img.id) ctx.moveImageTo(layer.id, dragId, img.id, dropAt.position)
+                      setDragId(null)
+                      setDropAt(null)
+                    }}
+                  >
+                    {dropAt?.id === img.id && dragId !== img.id && (
+                      <div className={`pointer-events-none absolute left-0 right-0 z-30 h-[2px] rounded-full bg-primary ${dropAt.position === 'top' ? '-top-[2px]' : '-bottom-[2px]'}`} />
+                    )}
+                    <div className="ed-checker flex h-6 w-6 shrink-0 items-center justify-center rounded-sm">
+                      <ImageItemView item={img} assets={assets} size={24} />
+                    </div>
+                    {renaming === img.id ? (
+                      <input
+                        className="ed-input min-w-0 flex-1"
+                        aria-label="Image name"
+                        defaultValue={nameOf(img)}
+                        autoFocus
+                        onClick={(e) => e.stopPropagation()}
+                        onFocus={(e) => e.currentTarget.select()}
+                        onBlur={(e) => {
+                          const name = e.currentTarget.value.trim()
+                          if (name && name !== nameOf(img)) ctx.updateImage(layer.id, img.id, { name })
+                          setRenaming(null)
+                        }}
+                        onKeyDown={(e) => {
+                          e.stopPropagation()
+                          if (e.key === 'Enter') e.currentTarget.blur()
+                          else if (e.key === 'Escape') {
+                            e.currentTarget.value = nameOf(img)
+                            e.currentTarget.blur()
+                          }
+                        }}
+                      />
+                    ) : (
+                      <span className="ed-row-label" title={imagePickLabel(img)} onDoubleClick={() => !locked && setRenaming(img.id)}>
+                        {nameOf(img)}
+                      </span>
+                    )}
+                    {img.crop && <span className="ed-badge" title={`Shows ${img.crop.w}×${img.crop.h} px of the picture, from ${img.crop.x}, ${img.crop.y}`}>crop</span>}
+                    <span className="ed-row-actions hidden group-hover:flex group-focus-within:flex">
+                      <IconButton title="Bring forward" aria-label="Bring forward" disabled={locked || i === 0} onClick={(e) => { e.stopPropagation(); ctx.reorderImage(layer.id, img.id, 1) }}>
+                        <ArrowUp />
+                      </IconButton>
+                      <IconButton title="Send backward" aria-label="Send backward" disabled={locked || i === rows.length - 1} onClick={(e) => { e.stopPropagation(); ctx.reorderImage(layer.id, img.id, -1) }}>
+                        <ArrowDown />
+                      </IconButton>
+                      <IconButton title="Rename" aria-label="Rename image" disabled={locked} onClick={(e) => { e.stopPropagation(); ctx.setSelectedImageId(img.id); setRenaming(img.id) }}>
+                        <Pencil />
+                      </IconButton>
+                      <IconButton title={`Place multiple: click the map to add more copies${placeKeys ? ` (${placeKeys})` : ''}`} aria-label="Place multiple" disabled={locked} onClick={(e) => { e.stopPropagation(); ctx.placeMultiple(layer.id, img.id) }}>
+                        <CopyPlus />
+                      </IconButton>
+                      <IconButton title="Duplicate" aria-label="Duplicate image" disabled={locked} onClick={(e) => { e.stopPropagation(); ctx.duplicateImages(layer.id, targetsOf(img.id)) }}>
+                        <Copy />
+                      </IconButton>
+                      <IconButton title="Delete" aria-label="Delete image" tone="danger" disabled={locked} onClick={(e) => { e.stopPropagation(); ctx.deleteImages(layer.id, targetsOf(img.id)) }}>
+                        <Trash2 />
+                      </IconButton>
+                    </span>
+                  </div>
+    )
+  }
 
   return (
     <div className="flex w-full flex-col gap-3 text-left" data-testid="images-panel">
@@ -110,6 +215,22 @@ export function ImagesPanel() {
           <InfoTip>Images snap to the grid while the magnet in the top toolbar is on, and move freely when it is off. Ctrl/Cmd+click adds or removes an image from the selection and Shift+click picks a range; Delete, Duplicate, Ctrl/Cmd+C and Ctrl/Cmd+V work on all of them.</InfoTip>
           {picked.length > 1 && <Badge>{picked.length} selected</Badge>}
           <Badge>{images.length}</Badge>
+          <IconButton
+            title={`Group the selected pictures: they are picked, duplicated and moved together${groupKeys ? ` (${groupKeys})` : ''}`}
+            aria-label="Group pictures"
+            disabled={locked || picked.length < 2}
+            onClick={() => ctx.groupPickedImages(layer.id)}
+          >
+            <GroupIcon />
+          </IconButton>
+          <IconButton
+            title={`Ungroup: the pictures stay where they are${ungroupKeys ? ` (${ungroupKeys})` : ''}`}
+            aria-label="Ungroup pictures"
+            disabled={locked || !groupOfPicked}
+            onClick={() => groupOfPicked && ctx.ungroupImageGroup(layer.id, groupOfPicked)}
+          >
+            <Ungroup />
+          </IconButton>
           <button type="button" className="ed-btn" data-size="sm" data-variant="primary" aria-label="Add image" disabled={locked} onClick={() => setPickerOpen(true)}>
             <Plus />
             Add
@@ -137,90 +258,23 @@ export function ImagesPanel() {
             <p className="ed-hint">No images yet. Use Add to place one.</p>
           ) : (
             <div className="flex flex-col gap-0.5" data-testid="image-list">
-              {rows.map((img, i) => (
-                <div
-                  key={img.id}
-                  className="ed-row group"
-                  data-selected={picked.includes(img.id) ? 'true' : undefined}
-                  data-dim={dragId === img.id ? 'true' : undefined}
-                  draggable={!locked && renaming !== img.id}
-                  onClick={(e) => ctx.selectImage(layer.id, img.id, e.shiftKey ? 'range' : e.metaKey || e.ctrlKey ? 'toggle' : 'replace')}
-                  onDragStart={(e) => {
-                    setDragId(img.id)
-                    e.dataTransfer.effectAllowed = 'move'
-                    e.dataTransfer.setData('text/plain', img.id)
-                  }}
-                  onDragOver={(e) => {
-                    if (!dragId) return
-                    e.preventDefault()
-                    e.dataTransfer.dropEffect = 'move'
-                    const r = e.currentTarget.getBoundingClientRect()
-                    setDropAt(dragId === img.id ? null : { id: img.id, position: e.clientY - r.top < r.height / 2 ? 'top' : 'bottom' })
-                  }}
-                  onDragEnd={() => { setDragId(null); setDropAt(null) }}
-                  onDrop={(e) => {
-                    e.preventDefault()
-                    if (dragId && dropAt && dropAt.id === img.id) ctx.moveImageTo(layer.id, dragId, img.id, dropAt.position)
-                    setDragId(null)
-                    setDropAt(null)
-                  }}
-                >
-                  {dropAt?.id === img.id && dragId !== img.id && (
-                    <div className={`pointer-events-none absolute left-0 right-0 z-30 h-[2px] rounded-full bg-primary ${dropAt.position === 'top' ? '-top-[2px]' : '-bottom-[2px]'}`} />
-                  )}
-                  <div className="ed-checker flex h-6 w-6 shrink-0 items-center justify-center rounded-sm">
-                    <ImageItemView item={img} assets={assets} size={24} />
-                  </div>
-                  {renaming === img.id ? (
-                    <input
-                      className="ed-input min-w-0 flex-1"
-                      aria-label="Image name"
-                      defaultValue={nameOf(img)}
-                      autoFocus
-                      onClick={(e) => e.stopPropagation()}
-                      onFocus={(e) => e.currentTarget.select()}
-                      onBlur={(e) => {
-                        const name = e.currentTarget.value.trim()
-                        if (name && name !== nameOf(img)) ctx.updateImage(layer.id, img.id, { name })
-                        setRenaming(null)
-                      }}
-                      onKeyDown={(e) => {
-                        e.stopPropagation()
-                        if (e.key === 'Enter') e.currentTarget.blur()
-                        else if (e.key === 'Escape') {
-                          e.currentTarget.value = nameOf(img)
-                          e.currentTarget.blur()
-                        }
-                      }}
-                    />
-                  ) : (
-                    <span className="ed-row-label" title={imagePickLabel(img)} onDoubleClick={() => !locked && setRenaming(img.id)}>
-                      {nameOf(img)}
-                    </span>
-                  )}
-                  {img.crop && <span className="ed-badge" title={`Shows ${img.crop.w}×${img.crop.h} px of the picture, from ${img.crop.x}, ${img.crop.y}`}>crop</span>}
-                  <span className="ed-row-actions hidden group-hover:flex group-focus-within:flex">
-                    <IconButton title="Bring forward" aria-label="Bring forward" disabled={locked || i === 0} onClick={(e) => { e.stopPropagation(); ctx.reorderImage(layer.id, img.id, 1) }}>
-                      <ArrowUp />
-                    </IconButton>
-                    <IconButton title="Send backward" aria-label="Send backward" disabled={locked || i === rows.length - 1} onClick={(e) => { e.stopPropagation(); ctx.reorderImage(layer.id, img.id, -1) }}>
-                      <ArrowDown />
-                    </IconButton>
-                    <IconButton title="Rename" aria-label="Rename image" disabled={locked} onClick={(e) => { e.stopPropagation(); ctx.setSelectedImageId(img.id); setRenaming(img.id) }}>
-                      <Pencil />
-                    </IconButton>
-                    <IconButton title={`Place multiple: click the map to add more copies${placeKeys ? ` (${placeKeys})` : ''}`} aria-label="Place multiple" disabled={locked} onClick={(e) => { e.stopPropagation(); ctx.placeMultiple(layer.id, img.id) }}>
-                      <CopyPlus />
-                    </IconButton>
-                    <IconButton title="Duplicate" aria-label="Duplicate image" disabled={locked} onClick={(e) => { e.stopPropagation(); ctx.duplicateImages(layer.id, targetsOf(img.id)) }}>
-                      <Copy />
-                    </IconButton>
-                    <IconButton title="Delete" aria-label="Delete image" tone="danger" disabled={locked} onClick={(e) => { e.stopPropagation(); ctx.deleteImages(layer.id, targetsOf(img.id)) }}>
-                      <Trash2 />
-                    </IconButton>
-                  </span>
-                </div>
-              ))}
+              {imageRows(layer.images ?? [], layer.groups ?? []).map((row) =>
+                row.kind === 'item' ? (
+                  renderRow(row.item)
+                ) : (
+                  <ImageGroupBlock
+                    key={row.group.id}
+                    layerId={layer.id}
+                    group={row.group}
+                    members={row.members}
+                    locked={locked}
+                    open={ctx.openImageGroupId === row.group.id}
+                    selected={row.members.every((m) => picked.includes(m.id))}
+                    ctx={ctx}
+                    renderRow={(m) => renderRow(m, true)}
+                  />
+                )
+              )}
             </div>
           )}
         </div>
@@ -355,6 +409,99 @@ export function ImagesPanel() {
           )}
         </section>
       )}
+    </div>
+  )
+}
+
+type PanelCtx = ReturnType<typeof selectImages>
+
+/** A group in the pictures list: its own row (select the group, lock it, rename, duplicate, ungroup) with its members under it. */
+function ImageGroupBlock({
+  layerId,
+  group,
+  members,
+  locked,
+  open,
+  selected,
+  ctx,
+  renderRow,
+}: {
+  layerId: string
+  group: ImageGroup
+  members: ImageItem[]
+  locked: boolean
+  open: boolean
+  selected: boolean
+  ctx: PanelCtx
+  renderRow: (item: ImageItem) => React.ReactNode
+}) {
+  const [collapsed, setCollapsed] = useState(false)
+  const [renaming, setRenaming] = useState(false)
+  const ids = members.map((m) => m.id)
+  return (
+    <div className="flex flex-col gap-0.5" data-testid="image-group">
+      <div
+        className="ed-row group"
+        data-selected={selected ? 'true' : undefined}
+        data-current={open ? 'true' : undefined}
+        title={open ? 'This group is selected: click a picture inside it to pick just that one' : 'Select the whole group'}
+        onClick={() => ctx.selectImageGroup(layerId, group.id)}
+      >
+        <button
+          type="button"
+          className="ed-iconbtn"
+          aria-label={collapsed ? `Show the pictures of ${group.name}` : `Hide the pictures of ${group.name}`}
+          aria-expanded={!collapsed}
+          onClick={(e) => { e.stopPropagation(); setCollapsed((c) => !c) }}
+        >
+          {collapsed ? <ChevronRight /> : <ChevronDown />}
+        </button>
+        <FolderIcon className="text-yellow-400" />
+        {renaming ? (
+          <input
+            className="ed-input min-w-0 flex-1"
+            aria-label="Group name"
+            defaultValue={group.name}
+            autoFocus
+            onClick={(e) => e.stopPropagation()}
+            onFocus={(e) => e.currentTarget.select()}
+            onBlur={(e) => { ctx.renameImageGroup(layerId, group.id, e.currentTarget.value); setRenaming(false) }}
+            onKeyDown={(e) => {
+              e.stopPropagation()
+              if (e.key === 'Enter') e.currentTarget.blur()
+              else if (e.key === 'Escape') { e.currentTarget.value = group.name; e.currentTarget.blur() }
+            }}
+          />
+        ) : (
+          <span className="ed-row-label" onDoubleClick={() => !locked && setRenaming(true)}>{group.name}</span>
+        )}
+        <Badge>{members.length}</Badge>
+        <IconButton
+          title={group.locked ? 'Locked: clicking a picture on the map picks the whole group. Select the group here to pick single pictures. Click to unlock.' : 'Unlocked. Lock it so that clicking any picture on the map picks the whole group.'}
+          aria-label={group.locked ? `Unlock ${group.name}` : `Lock ${group.name}`}
+          aria-pressed={!!group.locked}
+          active={!!group.locked}
+          disabled={locked}
+          onClick={(e) => { e.stopPropagation(); ctx.setImageGroupLocked(layerId, group.id, !group.locked) }}
+        >
+          {group.locked ? <Lock /> : <Unlock />}
+        </IconButton>
+        <span className="ed-row-actions hidden group-hover:flex group-focus-within:flex">
+          <IconButton title="Rename group" aria-label={`Rename ${group.name}`} disabled={locked} onClick={(e) => { e.stopPropagation(); setRenaming(true) }}>
+            <Pencil />
+          </IconButton>
+          <IconButton title="Duplicate the group with all its pictures" aria-label={`Duplicate ${group.name}`} disabled={locked} onClick={(e) => { e.stopPropagation(); ctx.duplicateImages(layerId, ids) }}>
+            <Copy />
+          </IconButton>
+          <IconButton title="Ungroup: the pictures stay where they are" aria-label={`Ungroup ${group.name}`} disabled={locked} onClick={(e) => { e.stopPropagation(); ctx.ungroupImageGroup(layerId, group.id) }}>
+            <Ungroup />
+          </IconButton>
+          <IconButton title="Delete the group and all its pictures" aria-label={`Delete ${group.name}`} tone="danger" disabled={locked} onClick={(e) => { e.stopPropagation(); ctx.deleteImages(layerId, ids) }}>
+            <Trash2 />
+          </IconButton>
+        </span>
+      </div>
+      {!collapsed && members.map((m) => renderRow(m))}
     </div>
   )
 }

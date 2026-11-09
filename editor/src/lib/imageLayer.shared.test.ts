@@ -115,3 +115,32 @@ describe('image layers: export', () => {
     expect(check({ assetId: 'objects/chest', crop: { x: 0, y: 0, w: 4, h: 4 } })[0]).toMatch(/only a picture/)
   })
 })
+
+describe('image layers: groups (editor view only)', () => {
+  const grouped = (groups: unknown, images: EditorMap['layers'][number]['images']) =>
+    validateEditorMap(map([{ ...imageLayer, groups: groups as never, images }]))
+
+  it('accepts groups and pictures that belong to them, and the export ignores both', () => {
+    const layer = { ...imageLayer, groups: [{ id: 'g1', name: 'Wall', locked: true }], images: [{ id: 'a', assetId: 'rock', x: 16, y: 32, groupId: 'g1' }] }
+    expect(validateEditorMap(map([layer])).errors).toEqual([])
+    const withGroups = JSON.stringify(convertEditorMapToTiled(map([layer]), []))
+    const without = JSON.stringify(convertEditorMapToTiled(map([{ ...layer, groups: undefined, images: [{ id: 'a', assetId: 'rock', x: 16, y: 32 }] }]), []))
+    expect(withGroups).toBe(without)
+  })
+
+  it('reports malformed groups', () => {
+    expect(grouped('nope', []).errors.some((e) => e.includes('groups must be an array'))).toBe(true)
+    const r = grouped([{ id: 'g', name: 'A' }, { id: 'g', name: 'B', locked: 'yes' }, { id: '', name: 1 }, 5], [])
+    expect(r.errors.some((e) => e.includes('duplicate group id'))).toBe(true)
+    expect(r.errors.some((e) => e.includes('locked must be true or false'))).toBe(true)
+    expect(r.errors.some((e) => e.includes('name must be a string'))).toBe(true)
+    expect(r.errors.some((e) => e.includes('is not an object'))).toBe(true)
+  })
+
+  it('warns (does not fail) about a picture whose group is gone, and errors on a non-string groupId', () => {
+    const gone = grouped([{ id: 'g', name: 'A' }], [{ id: 'a', assetId: 'rock', x: 0, y: 0, groupId: 'zzz' }])
+    expect(gone.errors).toEqual([])
+    expect(gone.warnings.some((w) => w.includes('is not one of the layer'))).toBe(true)
+    expect(grouped([], [{ id: 'a', assetId: 'rock', x: 0, y: 0, groupId: 3 as never }]).errors.some((e) => e.includes('groupId must be a string'))).toBe(true)
+  })
+})

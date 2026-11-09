@@ -14,9 +14,11 @@ import {
   Copy,
   Plus,
   Image as ImageIcon,
+  Images as ImagesIcon,
   Users,
   Folder as FolderIcon,
   FolderOpen,
+  FolderPlus,
   ChevronRight,
   ChevronDown,
 } from 'lucide-react'
@@ -28,6 +30,7 @@ import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
+  ContextMenuShortcut,
   ContextMenuSub,
   ContextMenuSubContent,
   ContextMenuSubTrigger,
@@ -60,17 +63,21 @@ function NewLayerSubmenu({
   hasCollision,
   hasTerrain,
   hasEncounters,
+  keys,
 }: {
   createLayerOfType: (type: LayerType) => void
   hasCollision: boolean
   hasTerrain: boolean
   hasEncounters: boolean
+  /** The shortcut of New layer (a plain tile layer). */
+  keys?: string
 }) {
   return (
     <ContextMenuSub>
       <ContextMenuSubTrigger>
         <Plus className="w-3.5 h-3.5 mr-2" />
         New Layer
+        {keys && <span className="ml-auto pl-3 text-muted-foreground">{keys}</span>}
       </ContextMenuSubTrigger>
       <ContextMenuSubContent className="w-44">
         <ContextMenuItem onClick={() => createLayerOfType('tile')}>Tile Layer</ContextMenuItem>
@@ -167,6 +174,11 @@ interface LayersPanelProps {
   duplicateLayer: (id: string) => void
   /** Opens or closes a folder row (a view change, not an undo step). */
   toggleFolderCollapsed?: (id: string) => void
+  /** The layer just made by New layer / New folder (a new `n` each time): its name opens for typing. */
+  justCreatedLayer?: { id: string; n: number } | null
+  /** The shortcuts to show beside the New layer / New folder entries. */
+  newLayerKeys?: string
+  newFolderKeys?: string
   setConfirmDialog: (config: {
     open: boolean
     title: string
@@ -195,6 +207,9 @@ export function LayersPanel({
   renameLayer,
   duplicateLayer,
   toggleFolderCollapsed,
+  justCreatedLayer = null,
+  newLayerKeys,
+  newFolderKeys,
   setConfirmDialog,
 }: LayersPanelProps) {
   const [draggedLayerId, setDraggedLayerId] = useState<string | null>(null)
@@ -217,6 +232,14 @@ export function LayersPanel({
     setEditingLayerId(layer.id)
     setEditingName(layer.name)
   }
+
+  // A layer or folder that was just created opens its name for typing, so Ctrl+N then a name is all it takes.
+  useEffect(() => {
+    if (!justCreatedLayer) return
+    const made = layers.find((l) => l.id === justCreatedLayer.id)
+    if (made) startEditing(made)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [justCreatedLayer?.n])
 
   const commitEditing = (id: string) => {
     if (editingName.trim()) {
@@ -314,7 +337,13 @@ export function LayersPanel({
             hasCollision={hasCollision}
             hasTerrain={hasTerrain}
             hasEncounters={hasEncounters}
+            keys={newLayerKeys}
           />
+          <ContextMenuItem onClick={() => createLayerOfType('folder')}>
+            <FolderPlus className="w-3.5 h-3.5 mr-2" />
+            New Folder
+            {newFolderKeys && <ContextMenuShortcut>{newFolderKeys}</ContextMenuShortcut>}
+          </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
     )
@@ -413,13 +442,22 @@ export function LayersPanel({
                     )}
 
                     {isFolderRow ? (
-                      <span className="ed-badge" title="Layers in this folder" data-testid="folder-count">
+                      <span className="ed-badge" data-tone="count" title="Layers in this folder" data-testid="folder-count">
+                        <LayersIcon />
                         {layers.filter((l) => l.folderId === layer.id).length}
                       </span>
                     ) : (
-                      <span className="ed-badge" title="Z-index: draw order, higher draws on top" data-testid="layer-z">
-                        z {layer.z ?? 0}
-                      </span>
+                      <>
+                        {layer.type === 'image' && (
+                          <span className="ed-badge" data-tone="count" title={`${layer.images?.length ?? 0} pictures in this layer`} data-testid="item-count">
+                            <ImagesIcon />
+                            {layer.images?.length ?? 0}
+                          </span>
+                        )}
+                        <span className="ed-badge" data-tone="z" title="z-index, the layer's draw order in the game: higher draws on top" data-testid="layer-z">
+                          z {layer.z ?? 0}
+                        </span>
+                      </>
                     )}
 
                     {/* Compact status & inline visibility toggle */}
@@ -467,6 +505,20 @@ export function LayersPanel({
                       </ContextMenuSubContent>
                     </ContextMenuSub>
                   )}
+                  {!isFolderRow && (
+                    <NewLayerSubmenu
+                      createLayerOfType={(type) => createLayerOfType(type, layer.folderId)}
+                      hasCollision={hasCollision}
+                      hasTerrain={hasTerrain}
+                      hasEncounters={hasEncounters}
+                      keys={newLayerKeys}
+                    />
+                  )}
+                  <ContextMenuItem onClick={() => createLayerOfType('folder')}>
+                    <FolderPlus className="w-3.5 h-3.5 mr-2" />
+                    New Folder
+                    {newFolderKeys && <ContextMenuShortcut>{newFolderKeys}</ContextMenuShortcut>}
+                  </ContextMenuItem>
                   {!isFolderRow && (
                     <ContextMenuItem onClick={() => duplicateLayer(layer.id)}>
                       <Copy className="w-3.5 h-3.5 mr-2" />
@@ -542,7 +594,13 @@ export function LayersPanel({
           hasCollision={hasCollision}
           hasTerrain={hasTerrain}
           hasEncounters={hasEncounters}
+          keys={newLayerKeys}
         />
+        <ContextMenuItem onClick={() => createLayerOfType('folder')}>
+          <FolderPlus className="w-3.5 h-3.5 mr-2" />
+          New Folder
+          {newFolderKeys && <ContextMenuShortcut>{newFolderKeys}</ContextMenuShortcut>}
+        </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
   )

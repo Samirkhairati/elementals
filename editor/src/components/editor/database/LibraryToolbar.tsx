@@ -6,13 +6,13 @@ import { FolderPlus, Upload, X } from 'lucide-react'
 import { EdButton, InfoTip } from '../ui/controls'
 import type { LibraryControls } from './shared'
 
-export function LibraryToolbar({ library, info, newFolder }: { library?: LibraryControls; info: React.ReactNode; newFolder: (onClose: () => void) => React.ReactNode }) {
+export function LibraryToolbar({ library, info, newFolder }: { library?: LibraryControls; info: React.ReactNode; newFolder: (onClose: () => void, parent: string) => React.ReactNode }) {
   const [folderOpen, setFolderOpen] = useState(false)
   return (
     <div className="flex flex-col gap-1 border-b border-border p-2">
       <div className="flex items-center gap-1">
         <EdButton size="sm" onClick={() => library?.pick()} disabled={!library}><Upload /> Import…</EdButton>
-        <EdButton size="sm" onClick={() => setFolderOpen(true)}><FolderPlus /> New folder…</EdButton>
+        <EdButton size="sm" title={library?.folder ? `Creates the folder inside ${library.folder} (the folder last clicked)` : 'Creates the folder at the top level'} onClick={() => setFolderOpen(true)}><FolderPlus /> New folder…</EdButton>
         <InfoTip>{info}</InfoTip>
       </div>
       {library && (
@@ -22,7 +22,7 @@ export function LibraryToolbar({ library, info, newFolder }: { library?: Library
         </p>
       )}
       {library?.note && (library.note.ok ? <p role="status" className="ed-hint">{library.note.text}</p> : <p role="alert" className="text-destructive">{library.note.text}</p>)}
-      {folderOpen && newFolder(() => setFolderOpen(false))}
+      {folderOpen && newFolder(() => setFolderOpen(false), library?.folder ?? '')}
     </div>
   )
 }

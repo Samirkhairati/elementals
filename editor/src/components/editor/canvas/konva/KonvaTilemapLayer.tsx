@@ -1,3 +1,4 @@
+import type { ImageDrag } from './imageDrag'
 import React from 'react'
 import { Shape, Group } from 'react-konva'
 import { Layer as MapLayer, MapData } from '@/types/editor'
@@ -14,7 +15,7 @@ interface KonvaTilemapLayerProps {
   activeMap: MapData
   spriteAssets?: Record<string, SpriteAssetInfo>
   /** The image being dragged and where the mouse has it right now; drawn there instead of at its saved position. */
-  dragRef?: React.MutableRefObject<{ id: string; x: number; y: number } | null>
+  dragRef?: React.MutableRefObject<ImageDrag | null>
 }
 
 export const KonvaTilemapLayer = React.memo(function KonvaTilemapLayer({
@@ -44,7 +45,8 @@ export const KonvaTilemapLayer = React.memo(function KonvaTilemapLayer({
               const resolved = resolveImageItem(item, spriteAssets)
               if (!resolved) continue
               const drag = dragRef?.current
-              const at = drag && drag.id === item.id ? drag : item
+              // The dragged picture is at the mouse, and the rest of a dragged group moves by the same amount.
+              const at = drag && drag.id === item.id ? drag : drag?.along?.ids.includes(item.id) ? { x: item.x + drag.along.dx, y: item.y + drag.along.dy } : item
               drawResolvedSprite(ctx, resolved, {
                 anchorX: at.x,
                 anchorY: at.y,

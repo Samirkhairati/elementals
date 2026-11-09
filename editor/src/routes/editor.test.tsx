@@ -146,4 +146,37 @@ describe('EditorPage wiring', () => {
     expect(ctx.entities.map(e => e.id)).toEqual([id])
     expect(ctx.activeMap?.entities?.map(e => e.id)).toEqual([id])
   })
+
+  describe('keyboard shortcuts', () => {
+    const press = (key: string, init: KeyboardEventInit = {}) =>
+      act(() => {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...init }))
+      })
+
+    it('Ctrl+N makes a layer and Ctrl+Shift+N a folder, each one undo step, and the list is told to open its name', async () => {
+      await mount()
+      const before = ctx.layers.length
+      press('n', { ctrlKey: true })
+      await waitFor(() => expect(ctx.layers).toHaveLength(before + 1))
+      expect(ctx.layers[0]).toMatchObject({ type: 'tile' })
+      expect(ctx.justCreatedLayer?.id).toBe(ctx.layers[0].id)
+      press('N', { ctrlKey: true, shiftKey: true })
+      await waitFor(() => expect(ctx.layers).toHaveLength(before + 2))
+      expect(ctx.layers[0]).toMatchObject({ type: 'folder', name: 'Folder' })
+      expect(ctx.justCreatedLayer?.id).toBe(ctx.layers[0].id)
+      expect(ctx.justCreatedLayer?.n).toBe(2)
+    })
+
+    it('does not fire while typing in a field', async () => {
+      await mount()
+      const before = ctx.layers.length
+      const input = document.createElement('input')
+      document.body.appendChild(input)
+      act(() => {
+        input.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', ctrlKey: true, bubbles: true, cancelable: true }))
+      })
+      input.remove()
+      expect(ctx.layers).toHaveLength(before)
+    })
+  })
 })

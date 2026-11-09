@@ -461,6 +461,17 @@
     background: hsl(var(--accent-emerald) / 0.18);
     color: hsl(var(--accent-emerald));
   }
+  /* A layer's z-index (game depth): outlined, so it never reads as the filled count of what the layer holds. */
+  .ed-badge[data-tone='z'] {
+    background: transparent;
+    box-shadow: inset 0 0 0 1px hsl(var(--accent-blue) / 0.55);
+    color: hsl(var(--accent-blue));
+  }
+  /* How many things a layer or folder holds: filled, with an icon for what is counted. */
+  .ed-badge[data-tone='count'] {
+    background: hsl(var(--accent-emerald) / 0.18);
+    color: hsl(var(--accent-emerald));
+  }
   .ed-badge[data-tone='warn'] {
     background: hsl(var(--warning) / 0.18);
     color: hsl(var(--warning));

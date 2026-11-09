@@ -44,6 +44,16 @@ export interface EditorImageItem {
   flipX?: boolean
   flipY?: boolean
   opacity?: number
+  /** The group of the layer's `groups` this item belongs to (editor view only, not exported). */
+  groupId?: string
+}
+
+/** A named set of the pictures of one image layer: they are picked, duplicated and moved together (editor view only, not exported). */
+export interface EditorImageGroup {
+  id: string
+  name: string
+  /** Locked: clicking any member picks the whole group, until the group itself is the selected one. */
+  locked?: boolean
 }
 
 export interface EditorLayer {
@@ -56,6 +66,8 @@ export interface EditorLayer {
   data?: Record<number | string, EditorTile>
   /** `image` layers only. */
   images?: EditorImageItem[]
+  /** `image` layers only: the groups the pictures can belong to (editor view only, not exported). */
+  groups?: EditorImageGroup[]
   /** Tile and image layers only: the `folder` layer that holds this one in the layer list (editor view only, not exported). */
   folderId?: string
   /** `folder` layers only: the folder is shown closed in the list. */
