@@ -78,6 +78,14 @@ export interface ColliderProps {
   offsetY: number;
   /** Solid colliders block movement; non-solid ones only exist for event triggers. */
   isSolid: boolean;
+  /**
+   * `polygon`: the collider is `points` (relative to the anchor) instead of the box; the box fields then hold its
+   * bounding box. Absent = box.
+   */
+  shape?: 'box' | 'polygon';
+  points?: { x: number; y: number }[];
+  /** Polygon colliders: closed (a solid area) or open (a line that cannot be crossed). */
+  closed?: boolean;
 }
 
 export type Controller = 'none' | 'player' | 'wander';

@@ -2,8 +2,9 @@
 // No runtime code lives here so it can be imported with `import type` everywhere.
 
 import type { EngineEntity } from './engine/types.ts'
+import type { CollisionShape, ShapePoint } from './collisionShapes.ts'
 
-export type EditorLayerType = 'tile' | 'collision' | 'terrain' | 'objects' | 'encounters' | 'image' | 'folder'
+export type EditorLayerType = 'tile' | 'collision' | 'terrain' | 'objects' | 'encounters' | 'image' | 'folder' | 'polygons'
 
 export interface EditorTile {
   tilesetId: string
@@ -78,6 +79,8 @@ export interface EditorLayer {
   collapsed?: boolean
   /** Image layers and folders: y-sort the pictures (see shared/ySort.ts); absent = follow the folder, else off. */
   ySort?: boolean
+  /** `polygons` layers only: collision shapes in map pixels (see shared/collisionShapes.ts). */
+  shapes?: CollisionShape[]
 }
 
 export interface EditorEntity {
@@ -151,6 +154,10 @@ export interface TiledObject {
   height: number
   rotation: number
   visible: boolean
+  /** Closed collision shape: points relative to the object's x / y. */
+  polygon?: ShapePoint[]
+  /** Open collision line: points relative to the object's x / y. */
+  polyline?: ShapePoint[]
   properties?: TiledProperty[]
 }
 

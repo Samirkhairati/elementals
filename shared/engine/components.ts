@@ -18,6 +18,7 @@ import { defaultBlocks, isEventTrigger, normalizeRange, upgradeLegacyTrigger } f
 import { cloneGraph, commandsToGraph, createGraph, normalizeGraph } from './graph.ts';
 import { deterministicId, newId } from './ids.ts';
 import { cloneJson, isRecord } from './util.ts';
+import { cleanPoints, minPoints } from '../collisionShapes.ts';
 
 export const COMPONENT_TYPES = ['Transform', 'Sprite', 'Collider', 'Movement', 'Event', 'Tag'] as const satisfies readonly ComponentType[];
 
@@ -350,7 +351,19 @@ export function normalizeProps(type: ComponentType, props: unknown): ComponentPr
     const fallback = schema.defaultProps[field.key];
     out[field.key] = Object.hasOwn(input, field.key) ? coerceFieldValue(field, input[field.key], fallback) : fallback;
   }
+  if (type === 'Collider') Object.assign(out, colliderShape(input));
   return out as unknown as ComponentPropsMap[ComponentType];
+}
+
+/**
+ * The polygon part of a Collider (not a schema field: the Collider has its own editor): kept only when `shape` is
+ * `polygon` with enough finite points (3 closed, 2 open); anything else is a plain box.
+ */
+function colliderShape(input: Record<string, unknown>): Record<string, unknown> {
+  if (input.shape !== 'polygon') return {};
+  const closed = input.closed !== false;
+  const points = cleanPoints(input.points).map((p) => ({ x: Math.round(p.x * 100) / 100, y: Math.round(p.y * 100) / 100 }));
+  return points.length >= minPoints(closed) ? { shape: 'polygon', points, closed } : {};
 }
 
 /** Default props for a component (a fresh object each call), merged with `overrides` and normalised. */

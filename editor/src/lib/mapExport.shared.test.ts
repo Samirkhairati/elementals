@@ -235,7 +235,7 @@ describe('convertEditorMapToTiled: golden equivalence with the legacy export hoo
       // The legacy hook predates image layers (their export is covered in imageLayer.shared.test.ts), and so do folders (editor-only rows), so compare the rest.
       // It also predates the pixel size and map settings (map properties, covered in the shared export tests).
       const { pixelWidth: _w, pixelHeight: _h, settings: _s, ...rest } = full
-      const map = { ...rest, layers: full.layers.filter((l) => l.type !== 'image' && l.type !== 'folder') }
+      const map = { ...rest, layers: full.layers.filter((l) => l.type !== 'image' && l.type !== 'folder' && l.type !== 'polygons') }
       expect(serializeTiledMap(convertEditorMapToTiled(map, tilesets))).toBe(legacyConvert(map, tilesets))
     }
   })

@@ -7,9 +7,10 @@ import { COMPONENT_TYPES } from './engine/components.ts'
 import { LEGACY_COMPONENT_TYPES, listLegacyComponents, migrateEntity } from './engine/migrate.ts'
 import type { EntityLike } from './engine/migrate.ts'
 import { validateEntity } from './engine/validate.ts'
+import { minPoints } from './collisionShapes.ts'
 
 /** Mirrors `LayerType` in editor/src/types/editor.ts (checked at compile time by the editor tests). */
-export const LAYER_TYPES = ['tile', 'collision', 'terrain', 'objects', 'encounters', 'image', 'folder'] as const
+export const LAYER_TYPES = ['tile', 'collision', 'terrain', 'objects', 'encounters', 'image', 'folder', 'polygons'] as const
 
 /**
  * Canonical component names (mirrors `ComponentType` in editor/src/types/editor.ts, checked at compile
@@ -44,6 +45,34 @@ function finish(errors: string[], warnings: string[]): ValidationResult {
 }
 
 /** Reports every non-finite number found anywhere inside `value`. */
+/** `shapes` of a polygon collision layer: `[{ id, points: [{ x, y }], closed }]`. */
+function validateShapes(shapes: unknown, label: string, errors: string[], warnings: string[]): void {
+  if (!Array.isArray(shapes)) {
+    errors.push(`${label}: shapes must be an array`)
+    return
+  }
+  const ids = new Set<string>()
+  shapes.forEach((shape, i) => {
+    const at = `${label} shape ${i}`
+    if (!isRecord(shape)) {
+      errors.push(`${at}: must be an object`)
+      return
+    }
+    if (typeof shape.id !== 'string' || shape.id === '') errors.push(`${at}: id must be a non-empty string`)
+    else if (ids.has(shape.id)) errors.push(`${at}: duplicate id ${JSON.stringify(shape.id)}`)
+    else ids.add(shape.id)
+    if (typeof shape.closed !== 'boolean') errors.push(`${at}: closed must be a boolean`)
+    if (!Array.isArray(shape.points)) {
+      errors.push(`${at}: points must be an array`)
+      return
+    }
+    shape.points.forEach((p, j) => {
+      if (!isRecord(p) || !isFiniteNumber(p.x) || !isFiniteNumber(p.y)) errors.push(`${at} point ${j}: x and y must be finite numbers`)
+    })
+    if (shape.points.length < minPoints(shape.closed !== false)) warnings.push(`${at}: too few points to collide; it is dropped on export`)
+  })
+}
+
 function checkFinite(value: unknown, path: string, errors: string[], depth = 0): void {
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) errors.push(`${path} is not a finite number`)
@@ -208,6 +237,11 @@ export function validateEditorMap(data: unknown, options: ValidateEditorMapOptio
         validateImages(layer.images, label, errors, warnings, validateGroups(layer.groups, label, errors))
       } else if (layer.groups !== undefined) {
         validateGroups(layer.groups, label, errors)
+      }
+
+      if (layer.shapes !== undefined) {
+        if (layer.type !== 'polygons') warnings.push(`${label}: only polygon collision layers keep "shapes"; they are dropped on export`)
+        validateShapes(layer.shapes, label, errors, warnings)
       }
 
       if (layer.data === undefined) return

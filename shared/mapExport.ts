@@ -8,6 +8,7 @@ import { SCHEMA_VERSION } from './engine/types.ts'
 import { migrateMap } from './engine/migrate.ts'
 import { itemYSort } from './ySort.ts'
 import { mapPixelSize } from './mapSize.ts'
+import { isUsableShape } from './collisionShapes.ts'
 
 export const TILE_SIZE = 32
 export const COLLISION_TILESET_ID = '__collision__'
@@ -26,7 +27,27 @@ export function collectUsedTilesetIds(map: Pick<EditorMap, 'layers'>): string[] 
 }
 
 function tiledLayerType(layer: EditorLayer): TiledLayer['type'] {
-  return layer.type === 'objects' || layer.type === 'image' ? 'objectgroup' : 'tilelayer'
+  return layer.type === 'objects' || layer.type === 'image' || layer.type === 'polygons' ? 'objectgroup' : 'tilelayer'
+}
+
+/** A polygon layer's usable shapes as Tiled objects: x / y = the first point, `polygon` (closed) or `polyline` (open) relative to it. */
+function shapeObjects(layer: EditorLayer, nextId: () => number): TiledObject[] {
+  return (layer.shapes || []).filter(isUsableShape).map((shape) => {
+    const [first] = shape.points
+    const rel = shape.points.map((p) => ({ x: p.x - first.x, y: p.y - first.y }))
+    return {
+      id: nextId(),
+      name: '',
+      type: '',
+      x: first.x,
+      y: first.y,
+      width: 0,
+      height: 0,
+      rotation: 0,
+      visible: true,
+      ...(shape.closed ? { polygon: rel } : { polyline: rel }),
+    }
+  })
 }
 
 /** The images of an image layer as Tiled objects (x/y = the sprite anchor); `nextId` hands out map-unique object ids. */
@@ -126,6 +147,22 @@ export function convertEditorMapToTiled(map: EditorMap, tilesets: TilesetInfo[])
   const nextObjectId = () => objectId++
 
   const exportLayers: TiledLayer[] = layers.map((layer, index) => {
+    if (layer.type === 'polygons') {
+      // Collision data: the game blocks movement with these whether the layer is shown in the editor or not.
+      return {
+        id: index + 1,
+        name: layer.name,
+        objects: shapeObjects(layer, nextObjectId),
+        opacity: 1,
+        type: 'objectgroup',
+        visible: layer.visible,
+        width: map.width,
+        height: map.height,
+        x: 0,
+        y: 0,
+        properties: [{ name: 'kind', type: 'string', value: 'collision' }],
+      }
+    }
     if (layer.type === 'image') {
       const imageLayer: TiledLayer = {
         id: index + 1,

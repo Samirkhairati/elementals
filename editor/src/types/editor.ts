@@ -1,6 +1,8 @@
 import type { ComponentSchema, ComponentType as EngineComponentType, FieldKind } from '../../../shared/engine/types'
+import type { CollisionShape } from '../../../shared/collisionShapes'
+export type { CollisionShape, ShapePoint } from '../../../shared/collisionShapes'
 
-export type LayerType = 'tile' | 'collision' | 'terrain' | 'objects' | 'encounters' | 'image' | 'folder'
+export type LayerType = 'tile' | 'collision' | 'terrain' | 'objects' | 'encounters' | 'image' | 'folder' | 'polygons'
 
 /** A rectangle of a picture in its own pixels. */
 export interface ImageCrop {
@@ -66,6 +68,8 @@ export interface Layer {
   collapsed?: boolean
   /** Image layers and folders: y-sort the pictures; absent = follow the folder, else off. */
   ySort?: boolean
+  /** `polygons` layers only: collision shapes in map pixels. */
+  shapes?: CollisionShape[]
 }
 
 export interface CopiedTile {
