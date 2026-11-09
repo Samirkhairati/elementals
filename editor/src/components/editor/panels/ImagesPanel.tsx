@@ -3,10 +3,13 @@
 // duplicate, rename, delete), a zoomable preview of the picked item with the Crop button, and its properties.
 
 import React, { useMemo, useState } from 'react'
-import { ArrowDown, ArrowUp, Copy, Crop, Pencil, Plus, Stamp, Trash2, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, Copy, CopyPlus, Crop, Pencil, Plus, Stamp, Trash2, X } from 'lucide-react'
 import type { ImageItem } from '@/types/editor'
 import { imagePickLabel, imagePickName } from '@/lib/graphicAssets'
-import { flippedItemBounds, itemSourceSize, snapImageAnchor } from '@/lib/imageItems'
+import { flippedItemBounds, itemSourceSize } from '@/lib/imageItems'
+import { snapPicture } from '@/lib/imageSnap'
+import { describeBindings } from '@/lib/shortcuts'
+import { useBindings } from '@/store/shortcutStore'
 import { sortedImages } from '@/lib/layerOrder'
 import { Badge, EdButton, Field, IconButton, InfoTip, NumberField, TextField, Toggle } from '../ui/controls'
 import { ZoomPane } from '../ui/ZoomPane'
@@ -34,6 +37,7 @@ const selectImages = (c: EditorContextValue) => ({
   selectImage: c.selectImage,
   deleteImages: c.deleteImages,
   duplicateImages: c.duplicateImages,
+  placeMultiple: c.placeMultiple,
   updateImage: c.updateImage,
   deleteImage: c.deleteImage,
   duplicateImage: c.duplicateImage,
@@ -62,6 +66,7 @@ export function ImagesPanel() {
   const rows = useMemo(() => sortedImages(layer?.images).reverse(), [layer?.images])
   const selected = images.find((img) => img.id === ctx.selectedImageId) ?? null
   const picked = ctx.pickedImageIds
+  const placeKeys = describeBindings('image.placeMultiple', useBindings())
   // Row buttons act on the whole picked set when the row belongs to it, otherwise on that row alone.
   const targetsOf = (id: string) => (picked.length > 1 && picked.includes(id) ? picked : [id])
 
@@ -183,6 +188,9 @@ export function ImagesPanel() {
                     <IconButton title="Rename" aria-label="Rename image" disabled={locked} onClick={(e) => { e.stopPropagation(); ctx.setSelectedImageId(img.id); setRenaming(img.id) }}>
                       <Pencil />
                     </IconButton>
+                    <IconButton title={`Place multiple: click the map to add more copies${placeKeys ? ` (${placeKeys})` : ''}`} aria-label="Place multiple" disabled={locked} onClick={(e) => { e.stopPropagation(); ctx.placeMultiple(layer.id, img.id) }}>
+                      <CopyPlus />
+                    </IconButton>
                     <IconButton title="Duplicate" aria-label="Duplicate image" disabled={locked} onClick={(e) => { e.stopPropagation(); ctx.duplicateImages(layer.id, targetsOf(img.id)) }}>
                       <Copy />
                     </IconButton>
@@ -260,7 +268,7 @@ export function ImagesPanel() {
                 size="sm"
                 disabled={locked}
                 onClick={() => {
-                  const p = snapImageAnchor(flippedItemBounds(selected, assets), selected.x, selected.y)
+                  const p = snapPicture(flippedItemBounds(selected, assets, true), selected.x, selected.y)
                   ctx.updateImage(layer.id, selected.id, { x: p.x, y: p.y })
                 }}
               >

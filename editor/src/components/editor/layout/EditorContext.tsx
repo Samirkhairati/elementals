@@ -83,6 +83,7 @@ export interface EditorBaseContextValue
       | 'selectImage'
       | 'deleteImages'
       | 'duplicateImages'
+      | 'placeMultiple'
       | 'copyImages'
       | 'pasteImages'
       | 'addImage'

@@ -258,6 +258,11 @@ export function EditorPage() {
     else layerManager.pasteLayers(layerManager.activeLayerId)
   })
 
+  const handlePlaceMultiple = useStableCallback(() => {
+    const layer = layerManager.layers.find(l => l.id === layerManager.activeLayerId)
+    if (layer?.type === 'image' && !layer.locked && layerManager.selectedImageId) layerManager.placeMultiple(layer.id, layerManager.selectedImageId)
+  })
+
   const handleDuplicateSelected = useStableCallback(() => {
     const target = selectionTarget()
     if (target === 'images' && layerManager.activeLayerId) layerManager.duplicateImages(layerManager.activeLayerId, layerManager.pickedImageIds)
@@ -274,6 +279,7 @@ export function EditorPage() {
     handleCopy: handleCopySelected,
     handlePaste: handlePasteSelected,
     handleDuplicate: handleDuplicateSelected,
+    handlePlaceMultiple,
   })
 
   // ── Paint Tools Hook ─────────────────────────────────────────────────────
@@ -449,6 +455,7 @@ export function EditorPage() {
     selectImage: layerManager.selectImage,
     deleteImages: layerManager.deleteImages,
     duplicateImages: layerManager.duplicateImages,
+    placeMultiple: layerManager.placeMultiple,
     copyImages: layerManager.copyImages,
     pasteImages: layerManager.pasteImages,
     addImage: layerManager.addImage,
@@ -631,7 +638,7 @@ export function EditorPage() {
     layerManager.selectedLayerIds, layerManager.pinSelection, layerManager.setPinSelection,
     layerManager.pendingImage, layerManager.startImagePlacement, layerManager.cancelImagePlacement,
     layerManager.selectedImageId, layerManager.setSelectedImageId,
-    layerManager.pickedImageIds, layerManager.selectImage, layerManager.deleteImages, layerManager.duplicateImages, layerManager.copyImages, layerManager.pasteImages,
+    layerManager.pickedImageIds, layerManager.selectImage, layerManager.deleteImages, layerManager.duplicateImages, layerManager.placeMultiple, layerManager.copyImages, layerManager.pasteImages,
     layerManager.addImage, layerManager.updateImage, layerManager.deleteImage, layerManager.duplicateImage, layerManager.reorderImage, layerManager.moveImageTo,
     layerManager.toggleLayerLock, layerManager.handleDeleteLayer,
     layerManager.handleReorderLayers, layerManager.toggleFolderCollapsed, layerManager.handleCreateLayer,

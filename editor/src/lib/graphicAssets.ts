@@ -12,6 +12,11 @@ export interface ImagePick {
   graphicId?: string
   /** Only this part of the picture (see EditorImageItem.crop). */
   crop?: { x: number; y: number; w: number; h: number }
+  /** Look of the copies when placing several of an existing picture (see "Place multiple"); absent = the defaults. */
+  scale?: number
+  flipX?: boolean
+  flipY?: boolean
+  opacity?: number
 }
 
 export const graphicAssetKey = (graphicId: string): string => `graphic:${graphicId}`

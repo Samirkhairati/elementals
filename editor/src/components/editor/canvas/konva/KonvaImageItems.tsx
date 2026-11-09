@@ -1,16 +1,32 @@
-import React, { useMemo } from 'react'
-import { Group, Rect, Shape } from 'react-konva'
+import React, { useMemo, useRef, useState } from 'react'
+import { Group, Line, Rect, Shape } from 'react-konva'
 import type { ImageItem, Layer } from '@/types/editor'
 import type { SpriteAssetInfo } from '../../../../../../shared/engine/types'
 import { drawResolvedSprite, useSpriteImagesVersion } from '@/lib/spriteImages'
-import { flippedItemBounds, resolveImageItem, snapImageAnchor } from '@/lib/imageItems'
+import { flippedItemBounds, resolveImageItem } from '@/lib/imageItems'
+import { snapPicture } from '@/lib/imageSnap'
 import { sortedImages } from '@/lib/layerOrder'
 import type { ImagePick } from '@/lib/graphicAssets'
 import type { SelectMode } from '@/lib/imageSelection'
+import { applyAxisLock, guideLines, type Axis, type AxisLock } from '@/lib/axisLock'
 import { setStageCursor } from '../canvasUtils'
 
 const NO_ASSETS: Record<string, SpriteAssetInfo> = {}
 const NO_LAYERS: Layer[] = []
+/** Guide lines are drawn this far to each side of the picture (further than any map). */
+const GUIDE_EXTENT = 100000
+const GUIDE_STROKE = '#38bdf8'
+
+/** The two parallel lines that show which axis a Shift-locked picture moves along. */
+function AxisGuides({ axis, bounds, anchor }: { axis: Axis; bounds: { x: number; y: number; w: number; h: number }; anchor: { x: number; y: number } }) {
+  return (
+    <>
+      {guideLines(axis, bounds, anchor, GUIDE_EXTENT).map((l, i) => (
+        <Line key={i} points={[l.x1, l.y1, l.x2, l.y2]} stroke={GUIDE_STROKE} strokeWidth={1} strokeScaleEnabled={false} dash={[6, 4]} listening={false} />
+      ))}
+    </>
+  )
+}
 
 interface KonvaImageItemsProps {
   /** The active image layer: its images can always be picked and dragged. */
@@ -54,7 +70,7 @@ export const KonvaImageItems = React.memo(function KonvaImageItems({
   // Snapping puts the picture's edges on the grid, so the item's own size decides where its anchor goes.
   // Pictures may be dragged past the map's edge (scenery that runs off it); only the snap or the rounding applies.
   const place = (item: ImageItem, x: number, y: number) =>
-    snapToGrid ? snapImageAnchor(flippedItemBounds(item, spriteAssets), x, y) : { x: Math.round(x), y: Math.round(y) }
+    snapToGrid ? snapPicture(flippedItemBounds(item, spriteAssets, true), x, y) : { x: Math.round(x), y: Math.round(y) }
 
   return (
     <Group>
@@ -158,10 +174,14 @@ function ImageHandle({
 }) {
   // Without the picture (deleted or still loading) itemBounds falls back to a tile-sized box so the item can still be picked.
   const bounds = flippedItemBounds(item, assets)
+  // Holding Shift while dragging locks the picture to one axis (see lib/axisLock); the guides show which.
+  const lockRef = useRef<AxisLock | null>(null)
+  const [axis, setAxis] = useState<Axis | null>(null)
 
   return (
     <Group
       name="image-handle"
+      imageId={item.id}
       x={item.x}
       y={item.y}
       listening={interactive}
@@ -177,12 +197,16 @@ function ImageHandle({
         e.cancelBubble = true
         // A Ctrl/Cmd+click that turns into a drag keeps the picked set; a plain drag picks the dragged picture.
         if (!selected) pick(item.id)
+        lockRef.current = null
         if (dragRef) dragRef.current = { id: item.id, x: item.x, y: item.y }
         setStageCursor(e.target.getStage(), 'grabbing')
       }}
       onDragMove={(e) => {
         e.cancelBubble = true
-        const p = place(item, e.target.x(), e.target.y())
+        const locked = applyAxisLock(lockRef.current, e.evt.shiftKey, e.target.x(), e.target.y())
+        lockRef.current = locked.lock
+        setAxis(locked.lock?.axis ?? null)
+        const p = place(item, locked.x, locked.y)
         e.target.x(p.x)
         e.target.y(p.y)
         // The picture is drawn by its layer: tell it where the mouse has the image (Konva redraws while dragging).
@@ -195,6 +219,8 @@ function ImageHandle({
         e.target.y(p.y)
         setStageCursor(e.target.getStage(), 'move')
         moveImage(layerId, item.id, p.x, p.y)
+        lockRef.current = null
+        setAxis(null)
         if (dragRef) dragRef.current = null
       }}
       onMouseEnter={(e) => interactive && setStageCursor(e.target.getStage(), 'move')}
@@ -216,6 +242,7 @@ function ImageHandle({
         dash={selected ? [4, 3] : undefined}
       />
       {selected && <Rect x={-3} y={-3} width={6} height={6} fill="#facc15" listening={false} />}
+      {axis && <AxisGuides axis={axis} bounds={bounds} anchor={{ x: 0, y: 0 }} />}
     </Group>
   )
 }
@@ -225,6 +252,8 @@ interface KonvaGhostImageProps {
   pointerPos: { x: number; y: number } | null
   snapToGrid: boolean
   spriteAssets?: Record<string, SpriteAssetInfo>
+  /** The axis a Shift-locked placement moves along, to draw its guide lines. */
+  axis?: Axis | null
 }
 
 /** Translucent preview of the image about to be placed, snapped (or not) exactly like the placement itself. */
@@ -233,18 +262,22 @@ export const KonvaGhostImage = React.memo(function KonvaGhostImage({
   pointerPos,
   snapToGrid,
   spriteAssets = NO_ASSETS,
+  axis = null,
 }: KonvaGhostImageProps) {
   const version = useSpriteImagesVersion()
   if (!pending || !pointerPos) return null
-  const at = snapToGrid ? snapImageAnchor(flippedItemBounds(pending, spriteAssets), pointerPos.x, pointerPos.y) : { x: Math.round(pointerPos.x), y: Math.round(pointerPos.y) }
+  const at = snapToGrid ? snapPicture(flippedItemBounds(pending, spriteAssets, true), pointerPos.x, pointerPos.y) : { x: Math.round(pointerPos.x), y: Math.round(pointerPos.y) }
   const resolved = resolveImageItem(pending, spriteAssets)
   return (
-    <Shape
-      key={version}
-      listening={false}
-      sceneFunc={(context) => {
-        if (resolved) drawResolvedSprite(context._context as CanvasRenderingContext2D, resolved, { anchorX: at.x, anchorY: at.y, opacity: 0.6 })
-      }}
-    />
+    <Group listening={false}>
+      <Shape
+        key={version}
+        listening={false}
+        sceneFunc={(context) => {
+          if (resolved) drawResolvedSprite(context._context as CanvasRenderingContext2D, resolved, { anchorX: at.x, anchorY: at.y, opacity: 0.6 })
+        }}
+      />
+      {axis && <AxisGuides axis={axis} bounds={flippedItemBounds(pending, spriteAssets)} anchor={at} />}
+    </Group>
   )
 })

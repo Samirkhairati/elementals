@@ -244,7 +244,7 @@ describe('useLayerManager: Entities row position', () => {
       return { ...r, id, pos }
     }
 
-    it('move the picked image one pixel, and with Shift 8 px doubling for every repeat while held', () => {
+    it('move the picked image one pixel, and with Shift 8 px every time, however long the key is held', () => {
       const { pos } = picked()
       act(() => { press('ArrowRight') })
       expect(pos()).toEqual([101, 100])
@@ -253,12 +253,9 @@ describe('useLayerManager: Entities row position', () => {
       act(() => { press('ArrowLeft', { shiftKey: true }) })
       expect(pos()).toEqual([93, 99])
       act(() => { press('ArrowLeft', { shiftKey: true, repeat: true }) })
-      expect(pos()).toEqual([77, 99]) // 16 more
+      expect(pos()).toEqual([85, 99]) // 8 more
       act(() => { press('ArrowLeft', { shiftKey: true, repeat: true }) })
-      expect(pos()).toEqual([45, 99]) // 32 more
-      act(() => { window.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowLeft' })) })
-      act(() => { press('ArrowLeft', { shiftKey: true }) })
-      expect(pos()).toEqual([37, 99]) // released: back to 8
+      expect(pos()).toEqual([77, 99]) // 8 more, no acceleration
     })
 
     it('do nothing on a locked layer, while typing in a field, or while placing a picture', () => {

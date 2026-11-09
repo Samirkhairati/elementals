@@ -134,3 +134,21 @@ describe('several layers at once', () => {
     expect(result.current.layers.map(l => l.name)).toContain('B Copy 2')
   })
 })
+
+describe('place multiple', () => {
+  it('turns a picture into the placement preview with its crop, scale, flips and opacity, and drops what is unset', () => {
+    const item: ImageItem = { id: 'a', graphicId: 'images/city/dam-wall.png', x: 5, y: 6, name: 'Wall', crop: { x: 1, y: 2, w: 3, h: 4 }, scale: 2, flipX: true, opacity: 0.5 }
+    const { result } = setup([imageLayer([item, img('b', 0)])])
+    act(() => result.current.placeMultiple('I1', 'a'))
+    expect(result.current.pendingImage).toEqual({ graphicId: 'images/city/dam-wall.png', crop: { x: 1, y: 2, w: 3, h: 4 }, scale: 2, flipX: true, opacity: 0.5 })
+    expect(result.current.pendingImage?.crop).not.toBe(item.crop)
+    act(() => result.current.placeMultiple('I1', 'b'))
+    expect(result.current.pendingImage).toEqual({ graphicId: 'images/city/dam-wall.png' })
+  })
+
+  it('does nothing for a picture that is not there', () => {
+    const { result } = setup([imageLayer([img('a', 0)])])
+    act(() => result.current.placeMultiple('I1', 'zzz'))
+    expect(result.current.pendingImage).toBeNull()
+  })
+})

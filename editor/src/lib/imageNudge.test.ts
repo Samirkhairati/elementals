@@ -3,12 +3,9 @@ import { nudgeStep } from './imageNudge'
 import { moveInDrawOrderTo, sortedImages } from './layerOrder'
 
 describe('nudgeStep', () => {
-  it('is one pixel without Shift, however long the key is held', () => {
-    expect([0, 1, 5, 30].map((n) => nudgeStep(false, n))).toEqual([1, 1, 1, 1])
-  })
-  it('with Shift starts at 8 and doubles for every repeat, up to a cap', () => {
-    expect([0, 1, 2, 3, 4].map((n) => nudgeStep(true, n))).toEqual([8, 16, 32, 64, 128])
-    expect(nudgeStep(true, 40)).toBe(512)
+  it('is one pixel without Shift and 8 with it, and never grows while the key is held', () => {
+    expect(nudgeStep(false)).toBe(1)
+    expect(nudgeStep(true)).toBe(8)
   })
 })
 

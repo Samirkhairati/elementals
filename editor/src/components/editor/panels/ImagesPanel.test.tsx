@@ -17,6 +17,7 @@ function setup(images: any[], extra: Record<string, unknown> = {}, layerOver: Re
     cancelImagePlacement: vi.fn(),
     setSelectedImageId: vi.fn(),
     selectImage: vi.fn(),
+    placeMultiple: vi.fn(),
     deleteImages: vi.fn(),
     duplicateImages: vi.fn(),
     updateImage: vi.fn(),
@@ -218,6 +219,14 @@ describe('ImagesPanel', () => {
   it('asks for an image layer when the active layer is another kind', () => {
     renderWithEditor(<ImagesPanel />, { layers: [{ id: 't', name: 'Ground', type: 'tile', visible: true, locked: false }], activeLayerId: 't' } as any)
     expect(screen.getByText(/Select an image layer/)).toBeInTheDocument()
+  })
+
+  it('Place multiple starts placing copies of that picture', () => {
+    const f = setup(items)
+    const row = within(screen.getByTestId('image-list')).getByText('Cloud').closest('.ed-row') as HTMLElement
+    fireEvent.click(within(row).getByRole('button', { name: 'Place multiple' }))
+    expect(f.placeMultiple).toHaveBeenCalledWith('i1', 'a')
+    expect(f.selectImage).not.toHaveBeenCalled()
   })
 
   describe('several images', () => {

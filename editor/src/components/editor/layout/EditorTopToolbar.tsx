@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import { useEditorSelector, type EditorContextValue } from './EditorContext'
 import { ShortcutsDialog } from '../dialogs/ShortcutsDialog'
+import { GridSettingsPanel } from './GridSettingsPanel'
 import { toggleCanvasView, useCanvasView, type CanvasViewToggle } from '@/hooks/editor/canvas/canvasView'
 import { IconButton } from '../ui/controls'
 
@@ -66,12 +67,13 @@ interface ToolButtonProps {
   active?: boolean
   disabled?: boolean
   onClick: () => void
+  onContextMenu?: (e: React.MouseEvent) => void
   children: React.ReactNode
   label?: string
   tone?: 'solid'
 }
 
-function ToolButton({ title, active, disabled, onClick, children, label, tone }: ToolButtonProps) {
+function ToolButton({ title, active, disabled, onClick, onContextMenu, children, label, tone }: ToolButtonProps) {
   return (
     <IconButton
       title={title}
@@ -80,6 +82,7 @@ function ToolButton({ title, active, disabled, onClick, children, label, tone }:
       disabled={disabled}
       active={active}
       onClick={onClick}
+      onContextMenu={onContextMenu}
       className={active ? (tone === 'solid' ? '!bg-solid !text-white' : '!bg-primary !text-primary-foreground') : undefined}
     >
       {children}
@@ -109,6 +112,7 @@ function MapToolbar() {
   const ctx = useEditorSelector(selectToolbar)
   const view = useCanvasView()
   const [infoOpen, setInfoOpen] = useState(false)
+  const [gridPanel, setGridPanel] = useState<{ left: number; top: number } | null>(null)
 
   const hasActiveMap = ctx.hasActiveMap
   const canUndo = hasActiveMap && ctx.historyIndex > 0
@@ -177,7 +181,17 @@ function MapToolbar() {
           <ToolButton title={ctx.showGrid ? 'Hide Grid Lines' : 'Show Grid Lines'} label="Grid lines" active={ctx.showGrid} onClick={ctx.toggleShowGrid}>
             <Grid3X3 />
           </ToolButton>
-          <ToolButton title={ctx.snapToGrid ? 'Disable Grid Snapping' : 'Enable Grid Snapping'} label="Grid snapping" active={ctx.snapToGrid} onClick={ctx.toggleSnapToGrid}>
+          <ToolButton
+            title={`${ctx.snapToGrid ? 'Disable Grid Snapping' : 'Enable Grid Snapping'} (right-click for the picture grid size and offset)`}
+            label="Grid snapping"
+            active={ctx.snapToGrid}
+            onClick={ctx.toggleSnapToGrid}
+            onContextMenu={(e) => {
+              e.preventDefault()
+              const r = e.currentTarget.getBoundingClientRect()
+              setGridPanel({ left: Math.min(r.left, window.innerWidth - 256), top: r.bottom + 6 })
+            }}
+          >
             <Magnet />
           </ToolButton>
         </ToolGroup>
@@ -212,6 +226,7 @@ function MapToolbar() {
           <Info />
         </IconButton>
         <ShortcutsDialog open={infoOpen} onClose={() => setInfoOpen(false)} />
+        {gridPanel && <GridSettingsPanel at={gridPanel} onClose={() => setGridPanel(null)} />}
       </div>
     </div>
   )
