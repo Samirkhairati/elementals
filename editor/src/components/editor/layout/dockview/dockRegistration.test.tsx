@@ -8,7 +8,7 @@ vi.mock('@/components/editor/canvas/MapCanvas', () => ({ MapCanvas: () => null }
 
 import { ALL_PANELS, DEFAULT_PANEL_IDS } from './types'
 import { DatabaseWrapper, dockviewComponents } from './PanelWrappers'
-import { useDockviewLayout } from './useDockviewLayout'
+import { useDockviewLayout, writeSavedLayout } from './useDockviewLayout'
 import { EditorProvider, type EditorBaseContextValue } from '../EditorContext'
 import type { IDockviewPanelProps } from 'dockview-react'
 
@@ -266,6 +266,60 @@ describe('useDockviewLayout with the new panels', () => {
       const event = new KeyboardEvent('keydown', { code: 'KeyD', altKey: true, cancelable: true, bubbles: true })
       window.dispatchEvent(event)
       expect(event.defaultPrevented).toBe(false)
+    })
+  })
+
+  describe('remembered layout', () => {
+    afterEach(() => writeSavedLayout(null))
+
+    it('shows Layers first: Entities is added as a tab behind it', () => {
+      const { addPanel } = mountLayout()
+      const entities = addPanel.mock.calls.map((c) => c[0] as { id: string; inactive?: boolean }).find((c) => c.id === 'entities')
+      expect(entities?.inactive).toBe(true)
+    })
+
+    it('restores the saved layout instead of building the default one, and saves every change', () => {
+      const saved = { grid: {}, panels: {} } as never
+      writeSavedLayout(saved)
+      const fake = createFakeApi()
+      let onChange: (() => void) | undefined
+      const fromJSON = vi.fn(() => {
+        fake.addPanel({ id: 'layers', component: 'layers' })
+        fake.addPanel({ id: 'inspector', component: 'inspector' })
+      })
+      const toJSON = vi.fn(() => ({ grid: { saved: true }, panels: {} }))
+      Object.assign(fake.api, { fromJSON, toJSON, onDidLayoutChange: (cb: () => void) => { onChange = cb } })
+      const hook = renderHook(() => useDockviewLayout({}))
+      act(() => hook.result.current.onReady({ api: fake.api } as unknown as DockviewReadyEvent))
+      expect(fromJSON).toHaveBeenCalledWith(saved)
+      expect(fake.addPanel.mock.calls.some((c) => (c[0] as { id: string }).id === 'maps')).toBe(false)
+      act(() => onChange?.())
+      expect(toJSON).toHaveBeenCalled()
+      expect(JSON.parse(localStorage.getItem('elementals.editor.dockLayout.v1') ?? 'null')).toEqual({ grid: { saved: true }, panels: {} })
+    })
+
+    it('falls back to the default layout when the saved one does not load', () => {
+      writeSavedLayout({ grid: {}, panels: {} } as never)
+      const fake = createFakeApi()
+      Object.assign(fake.api, { fromJSON: () => { throw new Error('unknown component') }, toJSON: () => ({}), onDidLayoutChange: () => {} })
+      const hook = renderHook(() => useDockviewLayout({}))
+      act(() => hook.result.current.onReady({ api: fake.api } as unknown as DockviewReadyEvent))
+      expect(fake.panels.has('maps')).toBe(true)
+      expect(localStorage.getItem('elementals.editor.dockLayout.v1')).toBeNull()
+    })
+
+    it('only resizes the tileset column when coming back to it, to the heights it had', () => {
+      const { panels, hook } = mountLayout()
+      const tilesets = panels.get('tilesets')!
+      ;(tilesets.group.api as unknown as { height: number }).height = 123
+      tilesets.api.setSize.mockClear()
+      hook.rerender({ imageFocus: true })
+      expect(tilesets.api.setSize).not.toHaveBeenCalled()
+      hook.rerender({ imageFocus: false })
+      expect(tilesets.api.setSize).toHaveBeenCalledWith({ height: 123 })
+      tilesets.api.setSize.mockClear()
+      act(() => hook.result.current.openPanel('database'))
+      expect(tilesets.api.setSize).not.toHaveBeenCalled()
     })
   })
 

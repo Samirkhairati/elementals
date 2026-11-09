@@ -1,7 +1,34 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { DockviewApi, DockviewReadyEvent } from 'dockview-react';
+import type { SerializedDockview } from 'dockview-core';
 import { ALL_PANELS, PanelId, getMapPanelId, isMapPanelId, parseMapPanelId } from './types';
 import { MapData } from '@/types/editor';
+
+// The layout survives leaving the Map view (the page unmounts) and a reload: it is kept in memory and in
+// localStorage, written whenever dockview reports a layout change, and read back when the dock is ready.
+const LAYOUT_KEY = 'elementals.editor.dockLayout.v1';
+let memoryLayout: SerializedDockview | null = null;
+
+export function readSavedLayout(): SerializedDockview | null {
+  if (memoryLayout) return memoryLayout;
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(LAYOUT_KEY) : null;
+    return raw ? (JSON.parse(raw) as SerializedDockview) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeSavedLayout(layout: SerializedDockview | null): void {
+  memoryLayout = layout;
+  try {
+    if (typeof localStorage === 'undefined') return;
+    if (layout) localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout));
+    else localStorage.removeItem(LAYOUT_KEY);
+  } catch {
+    // Storage full or blocked: the in-memory copy still covers switching views.
+  }
+}
 
 interface UseDockviewLayoutOptions {
   maps?: MapData[];
@@ -28,6 +55,10 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
   }, [maps, activeMap, onSelectMap, onClearActiveMap, rightFocus]);
 
   const apiRef = useRef<DockviewApi | null>(null);
+  // What the right column showed last, and the heights of the tileset panels before they were hidden, so coming back
+  // to them restores the sizes you left instead of a fixed split.
+  const lastFocus = useRef<RightFocus | null>(null);
+  const tileHeights = useRef<Record<string, number> | null>(null);
   const [openPanels, setOpenPanels] = useState<string[]>([
     'maps', 'layers', 'entities', 'properties', 'tilesets', 'preview', 'activeSelection'
   ]);
@@ -42,26 +73,38 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
   }, []);
 
   // The right sidebar shows either the tileset panels, the entity inspector or the images panel: the others are hidden.
-  const applyRightFocus = useCallback((api: DockviewApi, focus: RightFocus) => {
+  // Sizes only change on a real switch (never when another panel opens), so the column does not jump around.
+  const applyRightFocus = useCallback((api: DockviewApi, focus: RightFocus, freshLayout = false) => {
     if (!api.getPanel('inspector')) return;
+    const prev = freshLayout ? null : lastFocus.current;
+    if (prev === 'tiles' && focus !== 'tiles') {
+      const heights: Record<string, number> = {};
+      for (const id of TILE_PANELS) {
+        const h = api.getPanel(id)?.group.api.height;
+        if (typeof h === 'number' && h > 0) heights[id] = h;
+      }
+      if (Object.keys(heights).length > 0) tileHeights.current = heights;
+    }
     const focusGroups = FOCUS_PANELS.map((id) => api.getPanel(id)?.group);
     for (const id of TILE_PANELS) {
       const panel = api.getPanel(id);
       if (panel && !focusGroups.includes(panel.group)) panel.group.api.setVisible(focus === 'tiles');
     }
     for (const id of FOCUS_PANELS) api.getPanel(id)?.group.api.setVisible(id === focus);
-    if (focus === 'tiles') {
-      // Showing the groups again leaves the first two squeezed: split the column 40 / 40 / 20.
-      const resize = () => {
-        const total = api.height;
-        if (!(total > 0)) return;
-        api.getPanel('tilesets')?.api.setSize({ height: Math.round(total * 0.4) });
-        api.getPanel('preview')?.api.setSize({ height: Math.round(total * 0.4) });
-        api.getPanel('activeSelection')?.api.setSize({ height: Math.round(total * 0.2) });
-      };
-      resize();
-      if (typeof requestAnimationFrame !== 'undefined') requestAnimationFrame(resize);
-    }
+    lastFocus.current = focus;
+    if (focus !== 'tiles' || prev === 'tiles') return;
+    // Showing the groups again leaves them squeezed: give back the heights they had, or split 40 / 40 / 20 the first time.
+    const saved = freshLayout ? null : tileHeights.current;
+    const resize = () => {
+      const total = api.height;
+      if (!(total > 0)) return;
+      const heightOf = (id: string, share: number) => saved?.[id] ?? Math.round(total * share);
+      api.getPanel('tilesets')?.api.setSize({ height: heightOf('tilesets', 0.4) });
+      api.getPanel('preview')?.api.setSize({ height: heightOf('preview', 0.4) });
+      api.getPanel('activeSelection')?.api.setSize({ height: heightOf('activeSelection', 0.2) });
+    };
+    resize();
+    if (typeof requestAnimationFrame !== 'undefined') requestAnimationFrame(resize);
   }, []);
 
   const buildDefaultLayout = useCallback((api: DockviewApi) => {
@@ -103,11 +146,13 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
       position: { referencePanel: mapsPanel, direction: 'below' },
     });
 
-    const entitiesPanel = api.addPanel({
+    // A tab behind Layers: Layers is the one shown at first.
+    api.addPanel({
       id: 'entities',
       component: 'entities',
       title: 'ENTITIES',
       position: { referencePanel: layersPanel, direction: 'within' },
+      inactive: true,
     });
 
     const propsPanel = api.addPanel({
@@ -171,7 +216,7 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
     centerPanel.api.setSize({ width: centerWidth });
 
     api.layout(api.width, api.height);
-    applyRightFocus(api, optionsRef.current.rightFocus);
+    applyRightFocus(api, optionsRef.current.rightFocus, true);
   }, [applyRightFocus]);
 
   const applyDefaultSizes = useCallback((api: DockviewApi) => {
@@ -290,6 +335,7 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
     }
   }, [updateOpenPanels]);
 
+  const ensureEmptyCanvasRef = useRef<((api: DockviewApi) => void) | null>(null);
   /** The "no map" placeholder tab, added when the last map tab goes away. */
   const ensureEmptyCanvas = useCallback((api: DockviewApi) => {
     if (api.getPanel('empty_canvas')) return;
@@ -315,17 +361,48 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
         : undefined,
     });
   }, []);
+  ensureEmptyCanvasRef.current = ensureEmptyCanvas;
 
   const onReady = useCallback((event: DockviewReadyEvent) => {
     const api = event.api;
     apiRef.current = api;
 
-    buildDefaultLayout(api);
-    applyDefaultSizes(api);
-
-    requestAnimationFrame(() => {
+    // The layout you left (tabs, sizes, what is open), or the default one when there is none or it no longer loads.
+    const saved = readSavedLayout();
+    let restored = false;
+    if (saved && typeof api.fromJSON === 'function') {
+      try {
+        api.fromJSON(saved);
+        restored = !!api.getPanel('inspector') || api.panels.length > 0;
+      } catch {
+        restored = false;
+      }
+      if (!restored) {
+        api.clear();
+        writeSavedLayout(null);
+      }
+    }
+    if (restored) {
+      if (!api.panels.some((p) => isMapPanelId(p.id) || p.id === 'empty_canvas')) ensureEmptyCanvasRef.current?.(api);
+      lastFocus.current = null;
+      applyRightFocus(api, optionsRef.current.rightFocus);
+    } else {
+      buildDefaultLayout(api);
       applyDefaultSizes(api);
-    });
+      requestAnimationFrame(() => {
+        applyDefaultSizes(api);
+      });
+    }
+
+    if (typeof api.onDidLayoutChange === 'function' && typeof api.toJSON === 'function') {
+      api.onDidLayoutChange(() => {
+        try {
+          writeSavedLayout(api.toJSON());
+        } catch {
+          // a half-built layout during a reset: the next change saves it
+        }
+      });
+    }
 
     api.onDidAddPanel(updateOpenPanels);
 
@@ -391,7 +468,7 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
     });
 
     updateOpenPanels();
-  }, [buildDefaultLayout, updateOpenPanels, ensureEmptyCanvas]);
+  }, [buildDefaultLayout, applyDefaultSizes, applyRightFocus, updateOpenPanels, ensureEmptyCanvas]);
 
   // Sync activeMap tab when the active map *identity* changes from outside
   // (content edits produce a new activeMap object on every stroke and must not re-run this).
@@ -407,6 +484,7 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
   // A map that disappears from the project (deleted, or its folder was) closes its tab. Only maps that were
   // in the previous list count, so the empty list before the first load never closes anything.
   const knownMapIds = useRef<Set<string>>(new Set());
+  const reconciled = useRef(false);
   useEffect(() => {
     const api = apiRef.current;
     const present = new Set(maps.map((m) => getMapPanelId(m.folderPath || null, m.fileName)));
@@ -417,7 +495,17 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
       const panel = api.getPanel(id);
       if (panel) panel.api.close();
     }
-  }, [maps]);
+    if (reconciled.current || present.size === 0) return;
+    reconciled.current = true;
+    // A restored layout may hold tabs of maps that are gone since; and the map whose tab was in front opens again.
+    for (const panel of api.panels.filter((p) => isMapPanelId(p.id) && !present.has(p.id))) panel.api.close();
+    if (!optionsRef.current.activeMap) {
+      const front = api.panels.find((p) => isMapPanelId(p.id) && p.api.isActive) ?? api.panels.find((p) => isMapPanelId(p.id) && p.api.isVisible);
+      const parsed = front ? parseMapPanelId(front.id) : null;
+      const map = parsed && maps.find((m) => m.fileName === parsed.fileName && (m.folderPath || null) === parsed.folderPath);
+      if (map) optionsRef.current.onSelectMap?.(map);
+    }
+  }, [maps, openPanels]);
 
   // Entity selected: the inspector replaces the right sidebar (tileset browser, tileset, active selection); on an image
   // layer the images panel does; otherwise the tileset panels are back. Also re-applied after a layout reset.
@@ -684,6 +772,7 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
 
   const resetLayout = useCallback(() => {
     if (!apiRef.current) return;
+    writeSavedLayout(null);
     apiRef.current.clear();
     buildDefaultLayout(apiRef.current);
     applyDefaultSizes(apiRef.current);
