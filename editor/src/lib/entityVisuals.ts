@@ -6,6 +6,7 @@
 //  * A collider box is bottom-centred on the anchor, then shifted by offsetX/offsetY.
 //  * A sprite frame is drawn with its pivot on the anchor, shifted by the Sprite offsetX/offsetY.
 
+import { cleanPoints, minPoints } from '../../../shared/collisionShapes'
 import type { PropBag } from '@/types/editor'
 import { ICON_PATHS } from '@/lib/iconPaths'
 import type { ColliderProps, SpriteAssetMeta, SpriteProps } from '../../../shared/engine/types'
@@ -102,7 +103,16 @@ export function normalizeCollider(raw: Record<string, unknown> | undefined | nul
     offsetX: num(raw?.offsetX, 0),
     offsetY: num(raw?.offsetY, 0),
     isSolid: typeof raw?.isSolid === 'boolean' ? raw.isSolid : true,
+    ...colliderPolygon(raw),
   }
+}
+
+/** The polygon of a polygon collider (points relative to the anchor), or nothing for a box. */
+export function colliderPolygon(raw: Record<string, unknown> | undefined | null): Pick<ColliderProps, 'shape' | 'points' | 'closed'> {
+  if (raw?.shape !== 'polygon') return {}
+  const closed = raw.closed !== false
+  const points = cleanPoints(raw.points)
+  return points.length >= minPoints(closed) ? { shape: 'polygon', points, closed } : {}
 }
 
 /** Collider box relative to the anchor. */

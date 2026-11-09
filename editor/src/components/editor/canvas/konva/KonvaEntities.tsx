@@ -81,6 +81,8 @@ interface EntityInfo {
   /** A free entity: dragged pixel by pixel; a tile-based one always lands on a tile. */
   free: boolean
   solid: boolean
+  /** A polygon collider (points relative to the anchor), drawn instead of the box. */
+  poly: { points: { x: number; y: number }[]; closed: boolean } | null
   hasEvent: boolean
   controller: 'none' | 'player' | 'wander' | null
   wanderRadius: number
@@ -104,6 +106,7 @@ function buildInfo(entity: EntityData, assets: Record<string, SpriteAssetInfo>):
     foot: entityAreaLocal(entity),
     free: isFreeEntityLike(entity),
     solid: collider ? collider.isSolid : true,
+    poly: collider?.points ? { points: collider.points, closed: collider.closed !== false } : null,
     hasEvent: sum.hasEvent,
     controller: sum.controller,
     wanderRadius: sum.wanderRadius,
@@ -372,7 +375,7 @@ export const KonvaEntities = React.memo(function KonvaEntities({
             const ay = info.id === v.dragId ? v.dragY : info.entity.y
             const f = info.foot
             if (ax + f.x + f.w < left || ax + f.x > right || ay + f.y + f.h < top || ay + f.y > bottom) continue
-            drawFootprint(ctx, ax + f.x, ay + f.y, f.w, f.h, info.rgb, s, false)
+            drawFootprint(ctx, ax + f.x, ay + f.y, f.w, f.h, info.rgb, s, false, info.poly && { ...info.poly, ax, ay })
           }
 
           // 2) hover
@@ -387,7 +390,7 @@ export const KonvaEntities = React.memo(function KonvaEntities({
             const ay = v.dragId === selected.id ? v.dragY : selected.entity.y
             if (selected.controller === 'wander') drawWanderRing(ctx, ax, ay, selected.wanderRadius, s)
             drawSelectionFrame(ctx, translateRect(selected.bounds, ax, ay), s)
-            drawFootprint(ctx, ax + selected.foot.x, ay + selected.foot.y, selected.foot.w, selected.foot.h, selected.rgb, s, true)
+            drawFootprint(ctx, ax + selected.foot.x, ay + selected.foot.y, selected.foot.w, selected.foot.h, selected.rgb, s, true, selected.poly && { ...selected.poly, ax, ay })
             drawAnchorCross(ctx, ax, ay, s)
           }
 

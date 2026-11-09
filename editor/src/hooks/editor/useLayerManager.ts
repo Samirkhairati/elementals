@@ -266,6 +266,12 @@ export function useLayerManager(options: UseLayerManagerOptions) {
               counter++
             }
             name = counter === 1 ? 'Folder' : `Folder ${counter}`
+          } else if (type === 'polygons') {
+            let counter = 1
+            while (prev.some(l => l.name === (counter === 1 ? 'Collision shapes' : `Collision shapes ${counter}`))) {
+              counter++
+            }
+            name = counter === 1 ? 'Collision shapes' : `Collision shapes ${counter}`
           } else if (type === 'objects') {
             let counter = 1
             while (prev.some(l => l.name === (counter === 1 ? 'Objects' : `Objects ${counter}`))) {
@@ -283,6 +289,7 @@ export function useLayerManager(options: UseLayerManagerOptions) {
             visible: true,
             locked: false,
             ...(type === 'image' ? { images: [] } : {}),
+            ...(type === 'polygons' ? { shapes: [] } : {}),
             ...(folderAt >= 0 ? { folderId } : {}),
           }
           createdId = newLayer.id

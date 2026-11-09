@@ -18,6 +18,7 @@ import { Badge, EdButton, Field, IconButton, NumberField, ReadoutField, Segmente
 import { accentVar, NamedIcon } from '../ui/icons'
 import { SpriteThumb } from '../sprites/SpriteThumb'
 import { useEditorSelector, type EditorContextValue } from '../layout/EditorContext'
+import { PolygonLayerCard } from './PolygonLayerCard'
 
 interface PropertiesPanelProps {
   layers: Layer[]
@@ -232,16 +233,19 @@ export function PropertiesPanel({
               <Field label="Name">
                 <TextField value={layer.name} onCommit={(name) => updateLayers(layers.map((l) => (l.id === activeLayerId ? { ...l, name } : l)))} aria-label="Layer name" />
               </Field>
-              <Field label="Z-index" hint="Draw order of the layer: higher draws on top, equal keeps the list order">
-                <NumberField
-                  value={layer.z ?? 0}
-                  integer
-                  aria-label="Layer z-index"
-                  onCommit={(z) => updateLayers(layers.map((l) => (l.id === activeLayerId ? { ...l, z } : l)))}
-                />
-              </Field>
+              {layer.type !== 'polygons' && (
+                <Field label="Z-index" hint="Draw order of the layer: higher draws on top, equal keeps the list order">
+                  <NumberField
+                    value={layer.z ?? 0}
+                    integer
+                    aria-label="Layer z-index"
+                    onCommit={(z) => updateLayers(layers.map((l) => (l.id === activeLayerId ? { ...l, z } : l)))}
+                  />
+                </Field>
+              )}
             </div>
           </section>
+          {layer.type === 'polygons' && <PolygonLayerCard layer={layer} layers={layers} updateLayers={updateLayers} />}
         </div>
       )
     }

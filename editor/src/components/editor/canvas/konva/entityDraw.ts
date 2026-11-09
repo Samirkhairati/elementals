@@ -72,11 +72,33 @@ export function drawPlaceholder(ctx: CanvasRenderingContext2D, iconName: string,
  * Entity area (collider box, or the tile for entities without one): a solid 1px border in the overlay tint
  * over an almost transparent fill of the same tint. `strong` is the selected entity's.
  */
-export function drawFootprint(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, rgb: string, scale: number, strong: boolean) {
+export function drawFootprint(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  rgb: string,
+  scale: number,
+  strong: boolean,
+  /** A polygon collider instead of the box: points relative to (ax, ay). */
+  poly?: { points: readonly { x: number; y: number }[]; closed: boolean; ax: number; ay: number } | null
+) {
   ctx.beginPath()
-  ctx.rect(x, y, w, h)
+  if (poly) {
+    poly.points.forEach((p, i) => (i === 0 ? ctx.moveTo(poly.ax + p.x, poly.ay + p.y) : ctx.lineTo(poly.ax + p.x, poly.ay + p.y)))
+    if (poly.closed) ctx.closePath()
+  } else {
+    ctx.rect(x, y, w, h)
+  }
   ctx.fillStyle = `rgba(${rgb},${strong ? 0.5 : 0.38})`
-  ctx.fill()
+  if (!poly || poly.closed) ctx.fill()
+  if (poly && !poly.closed) {
+    // A line collider: a wider band so it reads at any zoom.
+    ctx.lineWidth = Math.max(strong ? 4 : 3, 3 / scale)
+    ctx.strokeStyle = `rgba(${rgb},0.5)`
+    ctx.stroke()
+  }
   // Border width is in map pixels, so it scales with the zoom like the entity does (never thinner than one screen pixel).
   ctx.lineWidth = Math.max(strong ? 2 : 1.5, 1 / scale)
   ctx.strokeStyle = `rgba(${rgb},1)`

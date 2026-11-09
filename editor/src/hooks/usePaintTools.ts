@@ -27,6 +27,8 @@ function locatePaintableLayer(layers: Layer[], layerId: string) {
   if (layerIndex === -1) return 'Layer not found'
   const layer = layers[layerIndex]
   if (layer.type === 'image') return 'Image layers hold images, not tiles'
+  if (layer.type === 'polygons') return 'Collision shape layers hold shapes, not tiles'
+  if (layer.type === 'folder') return 'Folders hold layers, not tiles'
   if (layer.locked || !layer.visible) return 'Layer locked/hidden'
   return { layers, layerIndex, layer }
 }
@@ -45,7 +47,7 @@ function multiTargets(layers: Layer[], selection: TileSelection): MultiTarget[] 
     const layerIndex = targetLayerIndex(layers, part)
     if (layerIndex === -1 || seen.has(layerIndex)) continue
     const layer = layers[layerIndex]
-    if (layer.type === 'image' || layer.locked || !layer.visible) continue
+    if (layer.type === 'image' || layer.type === 'polygons' || layer.type === 'folder' || layer.locked || !layer.visible) continue
     seen.add(layerIndex)
     targets.push({ layerIndex, layer, selection: partSelection(selection, part) })
   }

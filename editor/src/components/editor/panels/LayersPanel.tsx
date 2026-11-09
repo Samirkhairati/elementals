@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import {
   Layers as LayersIcon,
   XSquare,
+  Pentagon,
   Droplet,
   Leaf,
   Box,
@@ -58,6 +59,8 @@ function getLayerIcon(type: LayerType) {
       return <ImageIcon className="text-violet-400" />
     case 'folder':
       return <FolderIcon className="text-yellow-400" />
+    case 'polygons':
+      return <Pentagon className="text-red-400" />
     default:
       return <LayersIcon className="text-gray-400" />
   }
@@ -91,6 +94,7 @@ function NewLayerSubmenu({
         <ContextMenuItem disabled={hasCollision} onClick={() => createLayerOfType('collision')}>
           Collision Layer
         </ContextMenuItem>
+        <ContextMenuItem onClick={() => createLayerOfType('polygons')}>Collision Shapes</ContextMenuItem>
         <ContextMenuItem disabled={hasTerrain} onClick={() => createLayerOfType('terrain')}>
           Terrain Layer
         </ContextMenuItem>

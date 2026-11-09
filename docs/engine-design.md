@@ -34,7 +34,11 @@ answers one question about the entity:
 ### Coordinates
 * Pixels in map space, tile = 32px. `Transform` is the **anchor**: bottom-centre of the entity's tile
   (`x = col*32 + 16`, `y = (row+1)*32`). Placing on the grid snaps to this.
-* Collider box is bottom-centred on the anchor, then shifted by `offsetX/offsetY` (+y is down).
+* Collider box is bottom-centred on the anchor, then shifted by `offsetX/offsetY` (+y is down). A collider can instead be a **polygon**
+  (`shape: 'polygon'`, `points` relative to the anchor, `closed`: a solid area, or an open line that cannot be crossed); the box fields
+  then hold its bounding box. Inspector › Collider › Shape: Polygon, edited on the map (same editor as collision shape layers, docs/maps.md).
+  `normalizeProps` keeps the polygon only with enough finite points. In the game a solid polygon collider blocks other movers like a
+  collision shape (`SpatialSystem.canMove` / `stepBlocked`); an entity's own movement still uses its 16 × 4 feet box.
 * Sprite is drawn with its pivot (asset `pivotX/pivotY`, default bottom-centre) on the anchor, then shifted
   by the Sprite `offsetX/offsetY`.
 * **Tile-based and free entities.** Both are the same six-component entity; `Transform.free` (boolean, default `false`) says

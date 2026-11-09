@@ -322,6 +322,7 @@ const selectCanvas = (c: EditorContextValue) => ({
   setActiveLayerId: c.setActiveLayerId,
   addImage: c.addImage,
   updateImage: c.updateImage,
+  updateLayers: c.updateLayers,
 });
 
 export function CanvasWrapper(props: IDockviewPanelProps) {
@@ -429,6 +430,7 @@ export function CanvasWrapper(props: IDockviewPanelProps) {
         moveImage={isActive ? moveImage : noop}
         resizingImageId={isActive ? ctx.resizingImageId : null}
         resizeImage={isActive ? resizeImage : noop}
+        updateLayers={isActive ? ctx.updateLayers : undefined}
       />
     </div>
   );

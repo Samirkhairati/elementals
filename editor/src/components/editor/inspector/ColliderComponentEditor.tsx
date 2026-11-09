@@ -1,18 +1,21 @@
 import React, { useMemo, useState } from 'react'
-import { Maximize, RotateCcw, Square } from 'lucide-react'
+import { Maximize, PenLine, RotateCcw, Square } from 'lucide-react'
 import { COMPONENT_SCHEMAS } from '../../../../../shared/engine/components'
-import { FIT_TILE, fitColliderToSprite, normalizeCollider, sameCollider, type ColliderPatch } from '@/lib/entityVisuals'
+import { FIT_TILE, colliderLocalRect, fitColliderToSprite, normalizeCollider, sameCollider, type ColliderPatch } from '@/lib/entityVisuals'
 import { useEditorSelector, type EditorContextValue } from '../layout/EditorContext'
 import { TILE_SIZE } from '../../../../../shared/engine/constants'
 import { snapColliderToTiles } from '../../../../../shared/engine/placement'
-import { Badge, EdButton, Field, InfoTip, NumberField, Toggle } from '../ui/controls'
+import { Badge, EdButton, Field, InfoTip, NumberField, Segmented, Toggle } from '../ui/controls'
+import { polygonColliderBox, rectCorners } from '@/lib/polygonEdit'
+import { polygonEditStore, usePolygonEdit } from '@/lib/polygonEditStore'
+import { ShapeEditorHelp } from '../panels/PolygonLayerCard'
 import { EntityViewport } from './EntityViewport'
 import type { CustomEditorProps } from './customEditors'
 
 const selectSprites = (c: EditorContextValue) => ({ spriteAssets: c.spriteAssets })
 
 
-export function ColliderComponentEditor({ value, components, onChange, onChangeMany }: CustomEditorProps) {
+export function ColliderComponentEditor({ entityId, value, components, onChange, onChangeMany }: CustomEditorProps) {
   const { spriteAssets } = useEditorSelector(selectSprites)
   // A tile-based entity's area always covers whole tiles; a free entity's takes any size and offset (see Transform.free).
   const free = components.Transform?.free === true
@@ -55,12 +58,74 @@ export function ColliderComponentEditor({ value, components, onChange, onChangeM
   const isSpriteFit = !!spriteFit && sameCollider(current, spriteFit)
   const defaults = COMPONENT_SCHEMAS.Collider.defaultProps as { width: number; height: number; offsetX: number; offsetY: number; isSolid: boolean }
   const isDefault = isTileFit && collider.isSolid === defaults.isSolid
+  const { colliderEntityId } = usePolygonEdit()
+  const drawingOnMap = colliderEntityId === entityId
+  const polygon = collider.shape === 'polygon' && collider.points ? { points: collider.points, closed: collider.closed !== false } : null
+
+  const shapeField = (
+    <Field label="Shape" info="Box: a rectangle on the anchor. Polygon: any shape, closed (a solid area) or open (a line that cannot be crossed), drawn on the map.">
+      <Segmented<'box' | 'polygon'>
+        aria-label="Collider shape"
+        value={polygon ? 'polygon' : 'box'}
+        options={[
+          { value: 'box', label: 'Box' },
+          { value: 'polygon', label: 'Polygon' },
+        ]}
+        onChange={(v) => {
+          if (v === 'box') {
+            if (drawingOnMap) polygonEditStore.set({ colliderEntityId: null })
+            onChangeMany({ shape: undefined, points: undefined, closed: undefined })
+            return
+          }
+          // Starts as the current box, ready to reshape on the map.
+          const points = rectCorners(colliderLocalRect(collider))
+          onChangeMany({ shape: 'polygon', points, closed: true, ...polygonColliderBox(points) })
+          polygonEditStore.set({ colliderEntityId: entityId, selectedShapeId: null })
+        }}
+      />
+    </Field>
+  )
+
+  if (polygon) {
+    return (
+      <div className="flex flex-col gap-3" data-testid="collider-editor">
+        <Field label="Solid" info="Solid blocks the player and other entities. Off lets them walk through; the area still exists for events.">
+          <Toggle checked={collider.isSolid} onChange={(v) => onChange('isSolid', v)} aria-label="Solid" />
+        </Field>
+        {shapeField}
+        <Field label="Kind">
+          <Segmented<'closed' | 'open'>
+            aria-label="Polygon kind"
+            value={polygon.closed ? 'closed' : 'open'}
+            options={[
+              { value: 'closed', label: 'Closed' },
+              { value: 'open', label: 'Open line' },
+            ]}
+            onChange={(v) => (v === 'open' || polygon.points.length >= 3) && onChange('closed', v === 'closed')}
+          />
+        </Field>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span data-testid="collider-points">{polygon.points.length} points</span>
+          <ShapeEditorHelp />
+        </div>
+        <EdButton
+          variant={drawingOnMap ? 'primary' : 'default'}
+          aria-pressed={drawingOnMap}
+          onClick={() => polygonEditStore.set({ colliderEntityId: drawingOnMap ? null : entityId, selectedShapeId: null })}
+          title={drawingOnMap ? 'Stop editing the collider on the map (Esc)' : 'Edit the polygon on the map: drag its points, or click elsewhere to draw a new one'}
+        >
+          <PenLine /> {drawingOnMap ? 'Done editing on map' : 'Edit on map'}
+        </EdButton>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-3" data-testid="collider-editor">
       <Field label="Solid" info="Solid blocks the player and other entities. Off lets them walk through; the area still exists for events.">
         <Toggle checked={collider.isSolid} onChange={(v) => onChange('isSolid', v)} aria-label="Solid" />
       </Field>
+      {shapeField}
 
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-1">

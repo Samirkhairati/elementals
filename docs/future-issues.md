@@ -39,3 +39,17 @@ Things that work today but will need attention later. Add an entry whenever you 
 - **What:** y-sort works on pictures (image layers, folders, groups, single pictures); a tile layer is one Phaser tilemap layer drawn at one depth.
 - **Idea:** draw a y-sorted tile layer as one small tilemap per row (width x 1) at `sortDepth(playerZ, (row + 1) * 32)`, or move tall tile-built objects onto image layers.
 
+## Open collision lines and AI / sight
+
+- **What:** wander targets and the line-of-sight blocker (`Game.ts` `setSightBlocker`) only ask `isWalkable` for a point, so closed collision shapes count but open lines do not: a wanderer can pick a target behind a wall line (its steps are still blocked) and a trigger can see through one.
+- **Idea:** give the sight blocker a segment query (`shapeCrossesPath` from the viewer to the cell) and let wander reject targets whose path crosses a shape.
+
+## A mover's own polygon collider
+
+- **What:** a polygon collider blocks other movers, but the entity's own movement still uses the fixed 16 × 4 feet box, and so does the player.
+- **Idea:** sweep the mover's own collider (box or polygon) against shapes, if non-box movers ever matter.
+
+## Collision shape layers in folders
+
+- **What:** only tile and image layers can sit in a layer folder; `polygons` layers stay loose in the list.
+- **Idea:** allow them in `lib/layerFolders.ts` and the schema's folder check.

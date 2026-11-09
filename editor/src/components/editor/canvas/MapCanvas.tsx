@@ -25,6 +25,7 @@ import { KonvaEntities, type Visuals } from './konva/KonvaEntities'
 import { KonvaGhostEntity } from './konva/KonvaGhostEntity'
 import { withoutFolders } from '@/lib/layerFolders'
 import { KonvaGhostImage, KonvaImageItems } from './konva/KonvaImageItems'
+import { KonvaShapes } from './konva/KonvaShapes'
 import { CanvasContextMenu } from './CanvasContextMenu'
 import { CanvasNavigator, type ViewportHandle } from './CanvasNavigator'
 import { PendingEntityPlacement } from '@/hooks/editor/useEntityPlacement'
@@ -96,6 +97,8 @@ interface MapCanvasProps {
   /** Picking an image of another layer (toolbar lock off) makes that layer the active one. */
   activateLayer?: (layerId: string) => void
   moveImage?: (layerId: string, imageId: string, x: number, y: number) => void
+  /** Replaces the layer list (the collision-shape editor); absent on a map tab that is not the active map. */
+  updateLayers?: (layers: Layer[]) => void
 }
 
 export function MapCanvas({
@@ -149,6 +152,7 @@ export function MapCanvas({
   placeMultipleKeys,
   activateLayer,
   moveImage,
+  updateLayers,
 }: MapCanvasProps) {
   // Preload and cache tileset image textures
   const images = useTilesetImages(tilesets)
@@ -355,7 +359,7 @@ export function MapCanvas({
                 rectStart={rectStart}
                 rectCurrent={rectCurrent}
                 showGrid={showGrid}
-                paintingEnabled={!isImageLayerActive}
+                paintingEnabled={!isImageLayerActive && activeLayer?.type !== 'polygons'}
               />
 
               {/* Pick / drag handles of the active image layer (above the art; the entities' own handles are above these) */}
@@ -409,6 +413,17 @@ export function MapCanvas({
                 entityFolders={entityFolders}
                 spriteAssets={spriteAssets}
                 view={view}
+              />
+
+              {/* Collision shapes of the polygon layers, and their editor while one is active (or an entity's polygon collider is drawn) */}
+              <KonvaShapes
+                layers={layers}
+                activeLayerId={activeLayerId}
+                entities={entities}
+                enabled={!!updateLayers}
+                placing={placingAnything}
+                updateLayers={updateLayers}
+                updateComponentProps={updateComponentProps}
               />
 
               {/* The image waiting to be placed follows the mouse, snapped (or not) exactly like the placement */}
