@@ -1,6 +1,6 @@
 {
   "display": {
-    "visibleTilesX": 32,
+    "visibleTilesX": 25,
     "integerScaling": false,
     "pixelSnapping": false
   },
@@ -8,7 +8,7 @@
     "followLag": 0.08
   },
   "movement": {
-    "tileBased": true,
+    "tileBased": false,
     "playerSpeed": 200,
     "turnDelayMs": 50
   }

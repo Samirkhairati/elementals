@@ -10,6 +10,10 @@
       "file": "graphics/tilesets/bush.png"
     },
     {
+      "name": "city-pavement",
+      "file": "graphics/tilesets/city-pavement.png"
+    },
+    {
       "name": "collision",
       "file": "graphics/tilesets/collision.png"
     },
