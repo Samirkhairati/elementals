@@ -97,7 +97,7 @@ type Factory<T> = (data: ComponentData) => T;
 
 const FACTORIES: { [K in ComponentTypeName]: Factory<ComponentTypeMap[K]> } = {
   Transform: (d) =>
-    new TransformComponent(defined({ x: num(d, "x"), y: num(d, "y"), depth: num(d, "depth") })),
+    new TransformComponent(defined({ x: num(d, "x"), y: num(d, "y"), depth: num(d, "depth"), free: d.free === true ? true : undefined })),
 
   Sprite: (d) => {
     const props = normalizeProps("Sprite", d);

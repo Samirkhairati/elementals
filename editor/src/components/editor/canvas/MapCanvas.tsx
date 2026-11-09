@@ -1,3 +1,4 @@
+import { withPlacement } from '@/lib/placementKind'
 import type { SelectMode } from '@/lib/imageSelection'
 import type { ImageDrag } from './konva/imageDrag'
 import React, { useCallback, useMemo, useRef } from 'react'
@@ -317,7 +318,6 @@ export function MapCanvas({
                 setSelectedEntityId={setSelectedEntityId || (() => {})}
                 moveEntity={moveEntity || (() => {})}
                 activeMap={activeMap}
-                snapToGrid={snapToGrid}
                 snapEntityPos={snapEntityPos}
                 onRightClickEntity={handleRightClickEntity}
                 showEntities={showEntities}
@@ -376,7 +376,6 @@ export function MapCanvas({
                 setSelectedEntityId={setSelectedEntityId || (() => {})}
                 moveEntity={moveEntity || (() => {})}
                 activeMap={activeMap}
-                snapToGrid={snapToGrid}
                 snapEntityPos={snapEntityPos}
                 onRightClickEntity={handleRightClickEntity}
                 showEntities={showEntities}
@@ -395,7 +394,6 @@ export function MapCanvas({
                 setSelectedEntityId={setSelectedEntityId || (() => {})}
                 moveEntity={moveEntity || (() => {})}
                 activeMap={activeMap}
-                snapToGrid={snapToGrid}
                 snapEntityPos={snapEntityPos}
                 showEntities={showEntities}
                 entityFolders={entityFolders}
@@ -416,7 +414,6 @@ export function MapCanvas({
               <KonvaGhostEntity
                 pendingPlacement={pendingPlacement}
                 pointerPos={stagePointerPos}
-                snapToGrid={snapToGrid}
                 snapEntityPos={snapEntityPos}
                 spriteAssets={spriteAssets}
               />
@@ -444,7 +441,7 @@ export function MapCanvas({
       <CanvasContextMenu
         menuState={contextMenuState}
         onClose={closeContextMenu}
-        onCreateEntity={(name, x, y, comps) => createEntity?.(name, x, y, comps)}
+        onCreateEntity={(name, x, y, comps, free) => createEntity?.(name, x, y, withPlacement(comps, free === true))}
         onDuplicateEntity={duplicateEntity}
         onDeleteEntity={deleteEntity}
         onSetAreaColor={(id, color) => {

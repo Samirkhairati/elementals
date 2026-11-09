@@ -208,6 +208,8 @@ export class MovementSystem extends System {
   }
 
   public snapTransformToGrid(transform: TransformComponent, entity: Entity, world: World): void {
+    // A free entity keeps its pixel position; it steps a whole tile from wherever it stands.
+    if (transform.free) return;
     const tileSize = GAME_CONSTANTS.TILE_SIZE;
     const gridX = Math.round((transform.x - tileSize / 2) / tileSize);
     const targetX = gridX * tileSize + tileSize / 2;

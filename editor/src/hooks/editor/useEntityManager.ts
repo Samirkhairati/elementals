@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { EntityData, ComponentType, MapData, EntityFolder } from '@/types/editor'
 import { COMPONENT_REGISTRY } from '@/lib/componentRegistry'
 import { cloneEntity, createDefaultComponent } from '../../../../shared/engine/components'
+import { setEntityFree } from '../../../../shared/engine/placement'
 import { useSyncedState } from '@/hooks/useSyncedState'
 import { withCharacterDepth } from '@/lib/entityDepth'
 
@@ -331,6 +332,20 @@ export function useEntityManager(options: UseEntityManagerOptions) {
     [commitNewEntities]
   )
 
+  /** Make an entity free (any pixel, any size) or tile-based (anchor and collider snapped to the grid): one undo step. */
+  const setEntityPlacement = useCallback(
+    (id: string, free: boolean) => {
+      commitNewEntities(prev => {
+        const index = prev.findIndex(e => e.id === id)
+        if (index === -1) return prev
+        const next = setEntityFree(prev[index] as any, free) as unknown as EntityData
+        if (next === (prev[index] as unknown)) return prev
+        return prev.map((e, i) => (i === index ? next : e))
+      })
+    },
+    [commitNewEntities]
+  )
+
   const reorderEntities = useCallback(
     (newEntities: EntityData[]) => {
       updateEntities(newEntities)
@@ -472,6 +487,7 @@ export function useEntityManager(options: UseEntityManagerOptions) {
     deleteEntity,
     renameEntity,
     moveEntity,
+    setEntityPlacement,
     reorderEntities,
     addComponent,
     removeComponent,

@@ -1,3 +1,4 @@
+import { withPlacement } from '@/lib/placementKind'
 import React, { useState, useRef, useEffect } from 'react'
 import {
   Edit2,
@@ -29,6 +30,9 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
@@ -65,7 +69,7 @@ interface EntitiesPanelProps {
     description: string
     action: () => void
   }) => void
-  startPlacement?: (template: { name: string; components?: any }) => void
+  startPlacement?: (template: { name: string; components?: any; free?: boolean }) => void
   showEntities?: boolean
   toggleShowEntities?: () => void
   entityFolders?: EntityFolder[]
@@ -295,35 +299,39 @@ export function EntitiesPanel({
     )
   }
 
-  const placeEmpty = (targetFolderId?: string | null) => {
-    if (startPlacement) startPlacement({ name: 'New Entity' })
-    else createEntity('New Entity', 0, 0, undefined, targetFolderId)
+  const placeEmpty = (free: boolean, targetFolderId?: string | null) => {
+    if (startPlacement) startPlacement({ name: 'New Entity', free })
+    else createEntity('New Entity', 0, 0, withPlacement(undefined, free), targetFolderId)
   }
-  const placePrefab = (prefab: (typeof PRESET_PREFABS)[number], targetFolderId?: string | null) => {
-    if (startPlacement) startPlacement({ name: prefab.name, components: prefab.components })
-    else createEntity(prefab.name, 0, 0, prefab.components, targetFolderId)
+  const placePrefab = (prefab: (typeof PRESET_PREFABS)[number], free: boolean, targetFolderId?: string | null) => {
+    if (startPlacement) startPlacement({ name: prefab.name, components: prefab.components, free })
+    else createEntity(prefab.name, 0, 0, withPlacement(prefab.components, free), targetFolderId)
   }
 
   const renderNewEntityMenuItems = (targetFolderId?: string | null) => (
     <>
-      <ContextMenuItem onClick={() => placeEmpty(targetFolderId)}>
-        <Plus className="ed-icon mr-2 text-primary" />
-        Empty entity
-      </ContextMenuItem>
-      <ContextMenuSub>
-        <ContextMenuSubTrigger>
-          <Sparkles className="ed-icon mr-2 text-amber-400" />
-          From prefab
-        </ContextMenuSubTrigger>
-        <ContextMenuSubContent className="w-64">
-          {PRESET_PREFABS.map((prefab) => (
-            <ContextMenuItem key={prefab.id} onClick={() => placePrefab(prefab, targetFolderId)}>
-              <NamedIcon name={prefab.icon} className="ed-icon mr-2 text-muted-foreground" />
-              {prefab.name}
-            </ContextMenuItem>
-          ))}
-        </ContextMenuSubContent>
-      </ContextMenuSub>
+      {([false, true] as const).map((free) => (
+        <React.Fragment key={free ? 'free' : 'tile'}>
+          <ContextMenuItem onClick={() => placeEmpty(free, targetFolderId)} title={free ? 'Any pixel position and any size' : 'Sits on the 32px grid; its collider covers whole tiles'}>
+            <Plus className="ed-icon mr-2 text-primary" />
+            {free ? 'Empty free entity' : 'Empty tile entity'}
+          </ContextMenuItem>
+          <ContextMenuSub>
+            <ContextMenuSubTrigger>
+              <Sparkles className="ed-icon mr-2 text-amber-400" />
+              {free ? 'Free entity from prefab' : 'Tile entity from prefab'}
+            </ContextMenuSubTrigger>
+            <ContextMenuSubContent className="w-64">
+              {PRESET_PREFABS.map((prefab) => (
+                <ContextMenuItem key={prefab.id} onClick={() => placePrefab(prefab, free, targetFolderId)}>
+                  <NamedIcon name={prefab.icon} className="ed-icon mr-2 text-muted-foreground" />
+                  {prefab.name}
+                </ContextMenuItem>
+              ))}
+            </ContextMenuSubContent>
+          </ContextMenuSub>
+        </React.Fragment>
+      ))}
     </>
   )
 
@@ -497,20 +505,29 @@ export function EntitiesPanel({
                 Pick one, then click the map to place it
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => placeEmpty(null)} className="flex items-start gap-2 px-2 py-2" aria-label="Empty entity">
+              <DropdownMenuItem onClick={() => placeEmpty(false, null)} className="flex items-start gap-2 px-2 py-2" aria-label="Empty entity">
                 <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary">
                   <Plus className="ed-icon" />
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-ed-body text-foreground">Empty entity</span>
-                  <span className="block text-ed-label leading-4 text-muted-foreground">Just a position. Add the components you need.</span>
+                  <span className="block text-ed-label leading-4 text-muted-foreground">Just a position on the tile grid. Add the components you need.</span>
+                </span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => placeEmpty(true, null)} className="flex items-start gap-2 px-2 py-2" aria-label="Empty free entity">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary">
+                  <Plus className="ed-icon" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-ed-body text-foreground">Empty free entity</span>
+                  <span className="block text-ed-label leading-4 text-muted-foreground">Any pixel position and any size; nothing snaps.</span>
                 </span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               {PRESET_PREFABS.map(prefab => (
                 <DropdownMenuItem
                   key={prefab.id}
-                  onClick={() => placePrefab(prefab, null)}
+                  onClick={() => placePrefab(prefab, false, null)}
                   className="flex items-start gap-2 px-2 py-2"
                   aria-label={prefab.name}
                 >
@@ -523,6 +540,21 @@ export function EntitiesPanel({
                   </span>
                 </DropdownMenuItem>
               ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger className="px-2 py-2" aria-label="Free entity from prefab">
+                  <Sparkles className="ed-icon mr-2 text-amber-400" />
+                  Free entity from prefab
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="w-56">
+                  {PRESET_PREFABS.map(prefab => (
+                    <DropdownMenuItem key={prefab.id} onClick={() => placePrefab(prefab, true, null)} aria-label={`Free ${prefab.name}`}>
+                      <NamedIcon name={prefab.icon} className="ed-icon mr-2 text-muted-foreground" />
+                      {prefab.name}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

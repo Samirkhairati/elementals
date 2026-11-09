@@ -19,6 +19,9 @@ export interface CanvasContextMenuTarget {
   type: 'tile' | 'entity'
   tileX?: number
   tileY?: number
+  /** The map pixel that was right-clicked (where a free entity is created). */
+  worldX?: number
+  worldY?: number
   entity?: EntityData
   /** A tile menu opened over a picture of the active image layer. */
   pictureId?: string
@@ -38,7 +41,9 @@ interface CanvasContextMenuProps {
     name: string,
     x: number,
     y: number,
-    components?: Partial<Record<ComponentType, Record<string, any>>>
+    components?: Partial<Record<ComponentType, Record<string, any>>>,
+    /** A free entity: any pixel position and size, instead of one on the tile grid. */
+    free?: boolean
   ) => void
   onDuplicateEntity?: (id: string) => void
   onDeleteEntity?: (id: string) => void
@@ -168,41 +173,42 @@ export function CanvasContextMenu({
                 <DropdownMenuSeparator />
               </>
             )}
-            <DropdownMenuItem
-              onClick={() => {
-                // Center entity on tile: x = tileX * 32 + 16, y = tileY * 32 + 32
-                onCreateEntity('New Entity', tileX * 32 + 16, tileY * 32 + 32)
-                onClose()
-              }}
-            >
-              <Plus className="w-3.5 h-3.5 mr-2 text-primary" />
-              New Empty Entity
-            </DropdownMenuItem>
-
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger>
-                <Sparkles className="w-3.5 h-3.5 mr-2 text-amber-400" />
-                From Prefab
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="w-48 text-xs z-50 bg-popover/95 backdrop-blur-sm">
-                {PRESET_PREFABS.map((prefab) => (
+            {([false, true] as const).map((free) => {
+              // Tile-based entities are centred on the tile; a free one is created on the exact pixel.
+              const at = free ? { x: target?.worldX ?? tileX * 32 + 16, y: target?.worldY ?? tileY * 32 + 32 } : { x: tileX * 32 + 16, y: tileY * 32 + 32 }
+              return (
+                <React.Fragment key={free ? 'free' : 'tile'}>
                   <DropdownMenuItem
-                    key={prefab.name}
                     onClick={() => {
-                      onCreateEntity(
-                        prefab.name,
-                        tileX * 32 + 16,
-                        tileY * 32 + 32,
-                        prefab.components
-                      )
+                      onCreateEntity('New Entity', at.x, at.y, undefined, free)
                       onClose()
                     }}
                   >
-                    {prefab.name}
+                    <Plus className="w-3.5 h-3.5 mr-2 text-primary" />
+                    {free ? 'New Free Entity' : 'New Tile Entity'}
                   </DropdownMenuItem>
-                ))}
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger>
+                      <Sparkles className="w-3.5 h-3.5 mr-2 text-amber-400" />
+                      {free ? 'Free From Prefab' : 'Tile From Prefab'}
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className="w-48 text-xs z-50 bg-popover/95 backdrop-blur-sm">
+                      {PRESET_PREFABS.map((prefab) => (
+                        <DropdownMenuItem
+                          key={prefab.name}
+                          onClick={() => {
+                            onCreateEntity(prefab.name, at.x, at.y, prefab.components, free)
+                            onClose()
+                          }}
+                        >
+                          {prefab.name}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                </React.Fragment>
+              )
+            })}
 
             <DropdownMenuSeparator />
             <DropdownMenuItem

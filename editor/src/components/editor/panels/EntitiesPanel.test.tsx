@@ -58,7 +58,27 @@ describe('EntitiesPanel add menu', () => {
     const props = setup()
     fireEvent.pointerDown(screen.getByRole('button', { name: 'Add entity' }), { button: 0, ctrlKey: false })
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Empty entity' }))
-    expect(props.startPlacement).toHaveBeenCalledWith({ name: 'New Entity' })
+    expect(props.startPlacement).toHaveBeenCalledWith({ name: 'New Entity', free: false })
+  })
+})
+
+describe('EntitiesPanel add menu: free entities', () => {
+  it('Empty free entity starts a free placement', async () => {
+    const props = setup()
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Add entity' }), { button: 0, ctrlKey: false })
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Empty free entity' }))
+    expect(props.startPlacement).toHaveBeenCalledWith({ name: 'New Entity', free: true })
+  })
+
+  it('a prefab can be placed free from its own submenu, and is tile-based from the list', async () => {
+    const props = setup()
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Add entity' }), { button: 0, ctrlKey: false })
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'NPC' }))
+    expect(props.startPlacement.mock.calls[0][0]).toMatchObject({ name: 'NPC', free: false })
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Add entity' }), { button: 0, ctrlKey: false })
+    fireEvent.keyDown(await screen.findByRole('menuitem', { name: 'Free entity from prefab' }), { key: 'ArrowRight' })
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Free NPC' }))
+    expect(props.startPlacement.mock.calls[1][0]).toMatchObject({ name: 'NPC', free: true })
   })
 })
 

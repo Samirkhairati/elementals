@@ -4,6 +4,8 @@ import { ComponentType } from '@/types/editor'
 export interface PendingEntityPlacement {
   name: string
   components?: Partial<Record<ComponentType, Record<string, any>>>
+  /** A free entity (any pixel, any size) instead of a tile-based one. */
+  free?: boolean
 }
 
 export interface EntityPlacementManager {

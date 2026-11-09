@@ -50,3 +50,30 @@ describe('CanvasContextMenu over a picture', () => {
     expect(screen.queryByText('Place multiple')).toBeNull()
   })
 })
+
+describe('CanvasContextMenu creating entities', () => {
+  const open = (onCreateEntity: (...a: unknown[]) => void) =>
+    render(
+      <CanvasContextMenu
+        menuState={{ isOpen: true, x: 10, y: 10, target: { type: 'tile', tileX: 3, tileY: 2, worldX: 117, worldY: 83 } }}
+        onClose={vi.fn()}
+        onCreateEntity={onCreateEntity as never}
+      />,
+    )
+
+  it('a tile entity is centred on the tile, a free one is made on the exact pixel', () => {
+    const create = vi.fn()
+    open(create)
+    fireEvent.click(screen.getByText('New Tile Entity'))
+    expect(create).toHaveBeenLastCalledWith('New Entity', 112, 96, undefined, false)
+    fireEvent.click(screen.getByText('New Free Entity'))
+    expect(create).toHaveBeenLastCalledWith('New Entity', 117, 83, undefined, true)
+  })
+
+  it('a free entity without a known pixel falls back to the tile anchor', () => {
+    const create = vi.fn()
+    render(<CanvasContextMenu menuState={{ isOpen: true, x: 0, y: 0, target: { type: 'tile', tileX: 3, tileY: 2 } }} onClose={vi.fn()} onCreateEntity={create} />)
+    fireEvent.click(screen.getByText('New Free Entity'))
+    expect(create).toHaveBeenLastCalledWith('New Entity', 112, 96, undefined, true)
+  })
+})

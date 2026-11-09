@@ -48,6 +48,14 @@ The **Clip to map** toggle in the top toolbar's View group (dashed square with a
 A picture waiting to be placed follows the mouse as a translucent ghost (snapped like the placement itself).
 **In the game** (`game/src/world/imageLayers.ts`): `Game.switchMap` shows every visible `kind=image` object group through `ImageLayerRenderer`. A picture item (`graphic`) is a Phaser image of ONE texture per picture file (`picture:<id>`, loaded for all maps in the Preloader from `graphics/<id>`); each distinct crop is a frame of that texture, added once. A sprite item (`sprite`) shows the character's own static frame, pivot and sheet (its character loads with the map, `charactersForMap`). Position = the bottom-centre anchor, depth = the layer's `z` (items keep their exported order), flips and opacity as set, size = `round(w * scale)` x `round(h * scale)` whole pixels, nearest-neighbour (the game runs with `pixelArt`). A missing picture or sprite, or a crop outside the picture, warns in the console and is skipped. `npm run assets:sync` copies every picture a map's image layer uses to `game/public/graphics/<id>` (once, however many crops) and removes it again when no map uses it.
 
+## Entities: tile-based and free
+
+An entity's `components.Transform.free` is `true` for a free entity (any pixel position, any collider size) and absent or `false`
+for a tile-based one (anchor `x = col*32+16`, `y = (row+1)*32`, collider of whole tiles). The map format and the Tiled export carry
+it unchanged inside the entity's Transform (`convertEditorMapToTiled` never touches entities beyond migration), and a map written
+before the flag keeps validating and exporting byte for byte: `schemaVersion` is still 5 and nothing is rewritten. Resizing a map
+(below) moves both kinds by whole tiles. See docs/engine-design.md (Coordinates) for how the editor and the game treat the two.
+
 ## Checking and exporting
 
 ```sh

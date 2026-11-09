@@ -91,10 +91,16 @@ export class AIWanderSystem extends System {
   }
 
   private initHome(wander: AIWanderComponent, transform: TransformComponent, tileSize: number): void {
-    const gridX = Math.floor(transform.x / tileSize);
-    const gridY = Math.floor((transform.y - 1) / tileSize);
-    wander.originX = gridX * tileSize + tileSize / 2;
-    wander.originY = (gridY + 1) * tileSize;
+    if (transform.free) {
+      // A free entity wanders around the pixel it was placed on, not around its tile.
+      wander.originX = transform.x;
+      wander.originY = transform.y;
+    } else {
+      const gridX = Math.floor(transform.x / tileSize);
+      const gridY = Math.floor((transform.y - 1) / tileSize);
+      wander.originX = gridX * tileSize + tileSize / 2;
+      wander.originY = (gridY + 1) * tileSize;
+    }
     wander.homeInitialized = true;
     // Desynchronise NPCs that spawn together: random head start on the first interval.
     wander.timer = Math.max(0, wander.interval) * this.rng();
@@ -117,9 +123,9 @@ export class AIWanderSystem extends System {
       const tx = curX + dx;
       const ty = curY + dy;
       if (Math.abs(tx - homeX) > wander.radius || Math.abs(ty - homeY) > wander.radius) continue;
-      // Same sample point MovementSystem uses: bottom-centre of the target tile.
-      const wx = tx * tileSize + tileSize / 2;
-      const wy = (ty + 1) * tileSize;
+      // Same sample point MovementSystem uses: bottom-centre of the target tile; a free entity steps from its own pixel.
+      const wx = transform.free ? transform.x + dx * tileSize : tx * tileSize + tileSize / 2;
+      const wy = transform.free ? transform.y + dy * tileSize : (ty + 1) * tileSize;
       if (!this.walkability.isWalkable(wx, wy, entity, world)) continue;
       options.push(dir);
     }

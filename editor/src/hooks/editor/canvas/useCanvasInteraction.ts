@@ -141,6 +141,9 @@ export function useCanvasInteraction({
     clientY: number
     tileX: number
     tileY: number
+    /** The pixel under the pointer in map space (a free entity is created exactly there). */
+    worldX?: number
+    worldY?: number
     isEntity: boolean
     entity?: EntityData
     /** The picture under the pointer when the right button went down (its menu offers "Place multiple"). */
@@ -269,6 +272,15 @@ export function useCanvasInteraction({
     [setTileSelection]
   )
 
+  /** The pixel under the pointer in map space, rounded (nothing when the stage has no pointer yet). */
+  const worldPixel = (): { worldX?: number; worldY?: number } => {
+    const stage = stageRef?.current
+    const p = stage?.getPointerPosition()
+    if (!stage || !p) return {}
+    const scale = stage.scaleX() || 1
+    return { worldX: Math.round((p.x - stage.x()) / scale), worldY: Math.round((p.y - stage.y()) / scale) }
+  }
+
   // ── Right-Click on Entity Handler ────────────────────────────────────────
   const handleRightClickEntity = useCallback(
     (entity: EntityData, clientX: number, clientY: number) => {
@@ -338,7 +350,8 @@ export function useCanvasInteraction({
           const stage = stageRef?.current
           let posX = coords.rawX * 32 + 16
           let posY = coords.rawY * 32 + 32
-          if (!snapToGrid && stage) {
+          // A tile-based entity always lands on its tile; a free one on the pixel under the pointer.
+          if (pendingPlacement.free && stage) {
             const p = stage.getPointerPosition()
             if (p) {
               const scale = stage.scaleX() || 1
@@ -374,6 +387,7 @@ export function useCanvasInteraction({
           clientY: e.evt.clientY,
           tileX: coords.x,
           tileY: coords.y,
+          ...worldPixel(),
           isEntity: false,
           pictureId: pictureHandleId(e.target) ?? undefined,
         }
@@ -575,7 +589,7 @@ export function useCanvasInteraction({
                 isOpen: true,
                 x: e.clientX,
                 y: e.clientY,
-                target: { type: 'tile', tileX: rightClickRef.current.tileX, tileY: rightClickRef.current.tileY, pictureId: rightClickRef.current.pictureId },
+                target: { type: 'tile', tileX: rightClickRef.current.tileX, tileY: rightClickRef.current.tileY, worldX: rightClickRef.current.worldX, worldY: rightClickRef.current.worldY, pictureId: rightClickRef.current.pictureId },
               })
             }
           }

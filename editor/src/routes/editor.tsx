@@ -1,3 +1,4 @@
+import { withPlacement } from '@/lib/placementKind'
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { graphicAssets } from '@/lib/graphicAssets'
 import { EntityData, Layer, LayerType, MapData } from '@/types/editor'
@@ -120,7 +121,7 @@ export function EditorPage() {
         entityPlacement.pendingPlacement.name,
         x,
         y,
-        entityPlacement.pendingPlacement.components
+        withPlacement(entityPlacement.pendingPlacement.components, entityPlacement.pendingPlacement.free === true)
       )
       entityPlacement.cancelPlacement()
     }
@@ -507,6 +508,7 @@ export function EditorPage() {
     handleDeleteEntity: entityManager.deleteEntity,
     handleRenameEntity: entityManager.renameEntity,
     handleMoveEntity: entityManager.moveEntity,
+    handleSetEntityPlacement: entityManager.setEntityPlacement,
     handleReorderEntities: entityManager.reorderEntities,
     handleAddComponent: entityManager.addComponent,
     handleRemoveComponent: entityManager.removeComponent,
@@ -666,7 +668,7 @@ export function EditorPage() {
     entityManager.toggleEntityFolderExpanded, entityManager.toggleEntityVisibility,
     entityManager.moveEntityToFolder,
     entityManager.createEntity, entityManager.duplicateEntity, entityManager.deleteEntity,
-    entityManager.renameEntity, entityManager.moveEntity, entityManager.reorderEntities,
+    entityManager.renameEntity, entityManager.moveEntity, entityManager.setEntityPlacement, entityManager.reorderEntities,
     entityManager.addComponent, entityManager.removeComponent, entityManager.updateComponentProp,
     entityManager.updateComponentProps,
     // History

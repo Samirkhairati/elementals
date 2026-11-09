@@ -207,6 +207,7 @@ const selectProperties = (c: EditorContextValue) => ({
   selectedEntityId: c.selectedEntityId,
   handleRenameEntity: c.handleRenameEntity,
   handleMoveEntity: c.handleMoveEntity,
+  handleSetEntityPlacement: c.handleSetEntityPlacement,
   handleAddComponent: c.handleAddComponent,
   handleRemoveComponent: c.handleRemoveComponent,
   handleUpdateComponentProp: c.handleUpdateComponentProp,
@@ -232,6 +233,7 @@ function PropertiesBody({ entityMode }: { entityMode: boolean }) {
         selectedEntityId={entityMode ? ctx.selectedEntityId : null}
         renameEntity={ctx.handleRenameEntity}
         moveEntity={ctx.handleMoveEntity}
+        setEntityPlacement={ctx.handleSetEntityPlacement}
         addComponent={ctx.handleAddComponent}
         removeComponent={ctx.handleRemoveComponent}
         updateComponentProp={ctx.handleUpdateComponentProp}

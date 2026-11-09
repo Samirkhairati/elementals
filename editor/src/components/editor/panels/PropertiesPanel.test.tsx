@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- tests build partial editor contexts and entity props */
 import React from 'react'
 import { describe, expect, it, vi } from 'vitest'
-import { fireEvent, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, screen, within } from '@testing-library/react'
 import { PropertiesPanel } from './PropertiesPanel'
 import { renderWithEditor } from '@/test/editorContext'
 import { makeEntity } from '@/test/helpers'
@@ -17,6 +17,7 @@ function setup(components: Record<string, any>, x = 80, y = 128) {
     selectedEntityId: 'e1',
     renameEntity: vi.fn(),
     moveEntity: vi.fn(),
+    setEntityPlacement: vi.fn(),
     addComponent: vi.fn(),
     removeComponent: vi.fn(),
     updateComponentProp: vi.fn(),
@@ -133,5 +134,38 @@ describe('PropertiesPanel image layer', () => {
     renderWithEditor(<PropertiesPanel layers={[layer] as any} activeLayerId="i1" updateLayers={vi.fn()} />, {} as any)
     expect(screen.getByLabelText('Layer name')).toHaveValue('Sky')
     expect(screen.queryByTestId('image-list')).toBeNull()
+  })
+})
+
+describe('PropertiesPanel placement (tile-based or free)', () => {
+  it('a tile-based entity shows the tile and the anchor read-out, and Free switches it', () => {
+    const p = setup({})
+    const seg = screen.getByRole('radiogroup', { name: 'Placement' })
+    expect(within(seg).getByRole('radio', { name: 'Tile-based' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getAllByLabelText('Tile column').length).toBeGreaterThan(0)
+    fireEvent.click(within(seg).getByRole('radio', { name: 'Free' }))
+    expect(p.setEntityPlacement).toHaveBeenCalledWith('e1', true)
+  })
+
+  it('a free entity takes any pixel: position fields instead of tiles, and Tile-based switches it back', () => {
+    const p = setup({}, 83, 137)
+    // the entity of this test is free through its Transform
+    cleanup()
+    const entity = makeEntity('e1', { name: 'Elder', x: 83, y: 137, components: { Transform: { x: 83, y: 137, depth: 10, free: true } } })
+    renderWithEditor(<PropertiesPanel {...p} entities={[entity]} />, { activeMap: { width: 10, height: 8 } as any })
+    const seg = screen.getByRole('radiogroup', { name: 'Placement' })
+    expect(within(seg).getByRole('radio', { name: 'Free' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.queryByLabelText('Tile column')).toBeNull()
+    expect(screen.queryByTestId('pixel-readout')).toBeNull()
+    const x = screen.getAllByLabelText('Position X')[0]
+    fireEvent.change(x, { target: { value: '90' } })
+    fireEvent.keyDown(x, { key: 'Enter' })
+    expect(p.moveEntity).toHaveBeenLastCalledWith('e1', 90, 137)
+    const y = screen.getAllByLabelText('Position Y')[0]
+    fireEvent.change(y, { target: { value: '141' } })
+    fireEvent.keyDown(y, { key: 'Enter' })
+    expect(p.moveEntity).toHaveBeenLastCalledWith('e1', 83, 141)
+    fireEvent.click(within(seg).getByRole('radio', { name: 'Tile-based' }))
+    expect(p.setEntityPlacement).toHaveBeenCalledWith('e1', false)
   })
 })

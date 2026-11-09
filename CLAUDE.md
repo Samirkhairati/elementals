@@ -71,7 +71,8 @@ editor  --writes-->  project/maps/*.json (editor map format, tile index keyed)
 
 * An entity is a bag of **six components**: Transform, Sprite, Collider, Movement, Event, Tag. The game expands them into runtime components (`game/src/ecs/expand.ts`).
 * Tile = **32 px**. `Transform` is the **anchor**: bottom-centre of the entity's tile (`x = col*32+16`, `y = (row+1)*32`). Colliders are bottom-centred on the anchor
-  (default one tile); sprites draw with their pivot on the anchor. Grid snapping in the editor snaps to this anchor.
+  (default one tile); sprites draw with their pivot on the anchor. Entities are **tile-based** (default: always on that anchor, collider of whole tiles) or **free**
+  (`Transform.free: true`: any pixel, any collider size; nothing snaps); helpers in `shared/engine/placement.ts`, see docs/engine-design.md.
 * Events are state machines (states with conditions) whose body is a **node graph** (`shared/engine/graph.ts`, `docs/event-graph-spec.md`). New interpreter command:
   catalog entry in `shared/engine/commands.ts`, handler in `game/src/events/commands/*.ts`, test with `makeRig()`.
 * Characters (sprites) are v2 `CharacterDef`s in `project/database/characters/`; ids look like `characters/player`, `objects/chest`.

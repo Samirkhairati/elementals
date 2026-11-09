@@ -6,6 +6,7 @@ export * from './util.ts';
 export * from './commands.ts';
 export * from './graph.ts';
 export * from './components.ts';
+export * from './placement.ts';
 export * from './migrate.ts';
 export * from './triggers.ts';
 export * from './validate.ts';

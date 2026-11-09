@@ -37,6 +37,18 @@ answers one question about the entity:
 * Collider box is bottom-centred on the anchor, then shifted by `offsetX/offsetY` (+y is down).
 * Sprite is drawn with its pivot (asset `pivotX/pivotY`, default bottom-centre) on the anchor, then shifted
   by the Sprite `offsetX/offsetY`.
+* **Tile-based and free entities.** Both are the same six-component entity; `Transform.free` (boolean, default `false`) says
+  which kind it is. *Tile-based* (what every entity written before the flag is): the anchor is a tile anchor and the collider
+  covers whole tiles, so its edges lie on tile lines. A box `n` tiles wide is centred on the anchor, so an even `n` needs half
+  a tile of `offsetX` (`offsetX = 16 * (n - 1)` mod 32); `snapColliderToTiles` computes it. *Free*: any pixel position and any
+  collider width, height and offset (the schema bound is 1-4096 px); nothing snaps. Existing data is never migrated: a missing
+  flag reads as `false`, the exporter passes the field through, and `schemaVersion` stays 5. Helpers in `shared/engine/placement.ts`
+  (`isFreeEntity`, `snapAnchorToTile`, `snapColliderToTiles`, `setEntityFree`, `isTileAnchor`); validation warns (`off-grid`) about a
+  tile-based entity whose anchor is not on the grid, never about a free one. In the game `TransformComponent.free` keeps
+  `MovementSystem.snapTransformToGrid` from moving a free entity onto a tile, and `AIWanderSystem` wanders it around its own pixel.
+  Triggers are unchanged: `footprint()` already returns the tiles its pixel box touches, so a free entity's events fire for every
+  tile its box overlaps (a 10×10 box inside a tile still covers that whole tile for `playerEnter`), and solid colliders block by
+  their exact pixels (`SpatialSystem.isWalkable`).
 * **Default collider = one tile** (32×32, offset 0,0, solid). The old 16×8 default was a player "feet"
   box and looked wrong for placed objects. The editor offers "Fit to tile" and "Fit to sprite".
 
@@ -192,7 +204,12 @@ entity simply has no graphic until one is picked. `instantiatePrefab(prefab, { x
 * Every placed thing is visible and legible on the canvas: real sprite preview, a clear footprint
   (collider) outline, a label on hover/selection, an icon badge for entities with an Event or Movement,
   distinct colours for solid colliders vs trigger zones, handles only on the selected entity.
-* Everything snaps to the 32px grid by default; collider handles snap to 4px steps (Shift = free).
+* A tile-based entity always sits on the 32px grid (dragging, placing, the Tile fields) and its collider handles and numbers
+  snap to whole tiles (Shift = by the pixel); a free entity never snaps (position to the pixel, collider handles to 4px,
+  Shift = single pixels). The inspector's **Placement** switch converts one into the other: *Free* only sets the flag, *Tile-based*
+  moves the anchor onto its tile and rounds the collider to whole tiles (one undo step). New entities are made as either kind: the Entities panel's
+  add menu (Empty entity / Empty free entity / prefab lists) and the canvas right-click menu (New Tile Entity, New Free Entity, and a
+  prefab list for each; a free one is created on the exact pixel that was clicked).
 * Inspector = one card per component with a coloured header, consistent 8px spacing scale, schema-driven
   fields, and *custom editors* where a form is not enough: Sprite (asset picker + live preview + animation
   playback + pivot/offset gizmo), Collider (mini diagram + Fit buttons), Movement (controller-dependent

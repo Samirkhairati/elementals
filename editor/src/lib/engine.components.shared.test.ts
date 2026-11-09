@@ -78,7 +78,7 @@ describe('COMPONENT_TYPES / schemas', () => {
 
 describe('defaults', () => {
   it('match the design doc', () => {
-    expect(createDefaultComponent('Transform')).toEqual({ x: 0, y: 0, depth: 20 })
+    expect(createDefaultComponent('Transform')).toEqual({ x: 0, y: 0, depth: 20, free: false })
     expect(createDefaultComponent('Collider')).toEqual({ width: 32, height: 32, offsetX: 0, offsetY: 0, isSolid: true })
     expect(createDefaultComponent('Sprite')).toEqual({
       asset: '', facing: 'down', animation: '', animSpeed: 1, frame: 0, offsetX: 0, offsetY: 0, scale: 1, flipX: false, tint: '', opacity: 1, visible: true,
@@ -152,8 +152,8 @@ describe('normalizeProps', () => {
   it('fills missing keys and drops unknown ones', () => {
     expect(normalizeProps('Collider', { width: 48, bogus: 1 })).toEqual({ width: 48, height: 32, offsetX: 0, offsetY: 0, isSolid: true })
     expect(normalizeProps('Tag', undefined)).toEqual({ tag: 'entity', icon: '', color: '' })
-    expect(normalizeProps('Transform', null)).toEqual({ x: 0, y: 0, depth: 20 })
-    expect(normalizeProps('Transform', [1, 2])).toEqual({ x: 0, y: 0, depth: 20 })
+    expect(normalizeProps('Transform', null)).toEqual({ x: 0, y: 0, depth: 20, free: false })
+    expect(normalizeProps('Transform', [1, 2])).toEqual({ x: 0, y: 0, depth: 20, free: false })
   })
 
   it('coerces numbers, booleans and strings', () => {

@@ -182,6 +182,7 @@ export interface EditorBaseContextValue
   handleDeleteEntity: EntityManager['deleteEntity']
   handleRenameEntity: EntityManager['renameEntity']
   handleMoveEntity: EntityManager['moveEntity']
+  handleSetEntityPlacement: EntityManager['setEntityPlacement']
   handleReorderEntities: EntityManager['reorderEntities']
   handleAddComponent: EntityManager['addComponent']
   handleRemoveComponent: EntityManager['removeComponent']
