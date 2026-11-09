@@ -53,7 +53,7 @@ export function CreateMapDialog({
                 <Segmented<MapSizeUnit> aria-label="Size in" value={unit} options={[{ value: 'tiles', label: 'Tiles' }, { value: 'pixels', label: 'Resolution' }]} onChange={setUnit} />
                 <InfoTip>
                   A map is a picture-sized area with a grid of {TILE} px tiles over it for painting, collision and tile-based movement.
-                  Give its size as a number of tiles, or as a resolution in pixels (any size: the grid covers it). The tile size is {TILE} px for every map.
+                  Give its size as a number of tiles, or as a resolution in pixels (any size: the grid covers it).
                 </InfoTip>
               </div>
             )}
@@ -80,6 +80,13 @@ export function CreateMapDialog({
                 </div>
               </div>
             )}
+            <div className="flex flex-col gap-1">
+              <label className="ed-label flex items-center gap-1" htmlFor="new-map-tile-size">
+                Tile size (px)
+                <InfoTip>Every map uses {TILE} px tiles for now; other tile sizes are not supported yet.</InfoTip>
+              </label>
+              <Input id="new-map-tile-size" value={TILE} disabled readOnly className="w-24" />
+            </div>
             <div className="ed-hint" data-testid="new-map-size">{summary}</div>
           </div>
           <DialogFooter className="gap-2 sm:space-x-0">
