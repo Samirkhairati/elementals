@@ -214,3 +214,33 @@ export function tilesetImporter(data: DatabaseData): Importer {
       ),
   }
 }
+
+/**
+ * Pictures added straight from the map editor (uploaded, dropped or pasted into the picture browser): each goes into the
+ * graphics folder `folder` under a free name (`pasted`, `pasted-2`... for clipboard pictures), with no naming dialog.
+ */
+export async function importFilesInto(
+  files: File[],
+  folder: string,
+  existingIds: readonly string[],
+  importGraphic: (sourcePath: string, graphicId: string) => Promise<{ ok: true } | { ok: false; error: string }>
+): Promise<{ ok: true; ids: string[] } | { ok: false; error: string }> {
+  const dropped = await dropCandidates(looseFiles(files), { pasted: true, accept: ['png', 'gif'] })
+  if (!dropped.ok) return { ok: false, error: dropped.error || 'That is not a picture.' }
+  const taken = new Set(existingIds.filter((id) => folderOfId(id) === folder).map((id) => leafOfId(id).replace(/\.(png|gif)$/i, '').toLowerCase()))
+  const names = defaultRowNames(
+    dropped.candidates.map((c) => ({ ...c, pasted: true })),
+    'pasted',
+    () => taken
+  )
+  return withBulkImport(dropped.candidates.length, async () => {
+    const ids: string[] = []
+    for (const [i, c] of dropped.candidates.entries()) {
+      const id = joinId(folder, `${names[i]}.${c.ext ?? 'png'}`)
+      const r = await importGraphic(c.path, id)
+      if (!r.ok) return { ok: false as const, error: r.error }
+      ids.push(id)
+    }
+    return { ok: true as const, ids }
+  })
+}

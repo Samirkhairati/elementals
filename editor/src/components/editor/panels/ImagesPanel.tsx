@@ -23,7 +23,9 @@ import { ZoomPane } from '../ui/ZoomPane'
 import { ImageItemView } from '../sprites/ImageItemView'
 import { ScaleField } from './ScaleField'
 import { scaledSize } from '@/lib/imageScale'
-import { PicturePicker } from '../dialogs/PicturePicker'
+import { PicturePicker, type PictureImport } from '../dialogs/PicturePicker'
+import { importFilesInto } from '../database/importFlow'
+import { pastedFolder } from '@/lib/pictureTree'
 import { CropImageDialog } from '../dialogs/CropImageDialog'
 import { useShortcuts } from '@/hooks/useShortcuts'
 import { useEditorSelector, type EditorContextValue } from '../layout/EditorContext'
@@ -67,6 +69,8 @@ const selectImages = (c: EditorContextValue) => ({
   duplicateImage: c.duplicateImage,
   reorderImage: c.reorderImage,
   moveImageTo: c.moveImageTo,
+  mapName: c.activeMap?.name ?? null,
+  importGraphic: c.importGraphic,
 })
 
 const NO_ASSETS = {}
@@ -356,6 +360,12 @@ export function ImagesPanel() {
     setPickerOpen(true)
   }
   const openGroup = groups.find((g) => g.id === ctx.openImageGroupId) ?? null
+  // New pictures from the picker (uploaded, dropped, pasted) are filed under pasted/<map name> and placed straight away.
+  const importTo = pastedFolder(ctx.mapName)
+  const importPictures: PictureImport = async (files) => {
+    const r = await importFilesInto(files, importTo, ctx.graphics.map((g) => g.id), ctx.importGraphic)
+    return r.ok ? { ok: true, picks: r.ids.map((graphicId) => ({ graphicId })) } : r
+  }
 
   return (
     <div className="flex w-full flex-col gap-3 text-left" data-testid="images-panel">
@@ -372,11 +382,13 @@ export function ImagesPanel() {
           <PicturePicker
             open={pickerOpen}
             onOpenChange={setPickerOpen}
-            title="Add an image: pick a sprite or a picture"
+            title={openGroup ? `Add a picture to ${openGroup.name}` : 'Add a picture'}
             sprites={ctx.spriteList}
             graphics={stillGraphics(ctx.graphics)}
             images={ctx.graphicImages}
             onPick={ctx.startImagePlacement}
+            onImport={importPictures}
+            importTo={importTo}
           />
         </div>
         <ContextMenu>
