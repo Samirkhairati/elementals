@@ -99,6 +99,17 @@ describe('ResizeMapDialog', () => {
     expect(onClose).toHaveBeenCalled()
   })
 
+  it('Snap to tiles is on; turning it off switches to Pixels, choosing Tiles turns it back on', () => {
+    setup()
+    const snap = screen.getByRole('switch', { name: 'Snap to tiles' })
+    expect(snap).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(snap)
+    expect(snap).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getByRole('radio', { name: 'Pixels' })).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(screen.getByRole('radio', { name: 'Tiles' }))
+    expect(snap).toHaveAttribute('aria-checked', 'true')
+  })
+
   it('renders nothing for a null map', () => {
     render(<ResizeMapDialog map={null} tilesets={[]} onClose={vi.fn()} onConfirm={vi.fn()} />)
     expect(screen.queryByRole('dialog')).toBeNull()

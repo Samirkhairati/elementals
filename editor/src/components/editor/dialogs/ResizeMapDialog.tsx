@@ -3,7 +3,7 @@ import { AlertTriangle, RotateCcw } from 'lucide-react'
 import type { TilesetData } from '@/types/editor'
 import type { SpriteAssetInfo } from '../../../../../shared/engine/types'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
-import { InfoTip, NumberField, Segmented } from '../ui/controls'
+import { InfoTip, NumberField, Segmented, Toggle } from '../ui/controls'
 import { ResizePreview } from './ResizePreview'
 import { TILE_SIZE } from '../../../../../shared/engine/constants'
 import {
@@ -56,6 +56,8 @@ function ResizeBody({ map, tilesets, spriteAssets, onClose, onConfirm }: Props &
   const [unit, setUnit] = useState<Unit>(wholeTiles ? 'tiles' : 'pixels')
   // Always pixels inside; the Tiles view shows and takes them in tiles.
   const [edges, setEdges] = useState<ResizeEdges>(NO_RESIZE)
+  // Handles snap to whole tiles; off, the right and bottom ones stop on any pixel (a size in pixels, so Pixels).
+  const [snap, setSnap] = useState(true)
   const problem = resizeProblem(map, edges)
   const next = resizedSize(map, edges)
   const loss = useMemo(() => (problem ? null : resizeLoss(map, edges)), [map, edges, problem])
@@ -73,8 +75,13 @@ function ResizeBody({ map, tilesets, spriteAssets, onClose, onConfirm }: Props &
     if (axis === 'width') setEdges((e) => ({ ...e, right: px - before.width - e.left }))
     else setEdges((e) => ({ ...e, bottom: px - before.height - e.top }))
   }
+  const whole = (s: { width: number; height: number }) => s.width % TILE_SIZE === 0 && s.height % TILE_SIZE === 0
+  // Tiles while both sizes are whole tiles, pixels otherwise.
+  const tileText = inTiles && whole(before) && whole(next)
   const sizeText = (s: { width: number; height: number }) =>
-    inTiles ? `${s.width / TILE_SIZE} × ${s.height / TILE_SIZE}` : `${s.width} × ${s.height}`
+    tileText ? `${s.width / TILE_SIZE} × ${s.height / TILE_SIZE}` : `${s.width} × ${s.height}`
+  const roundToTiles = () =>
+    setEdges((e) => ({ ...e, right: Math.round((before.width + e.left + e.right) / TILE_SIZE) * TILE_SIZE - before.width - e.left, bottom: Math.round((before.height + e.top + e.bottom) / TILE_SIZE) * TILE_SIZE - before.height - e.top }))
 
   return (
     <form
@@ -88,7 +95,7 @@ function ResizeBody({ map, tilesets, spriteAssets, onClose, onConfirm }: Props &
           Resize “{map.name}”
           <InfoTip>
             Drag the edges or corners of the frame, or type the size. Scroll or use the buttons to zoom the preview, and drag the background to move it.
-            The left and top edges move in whole tiles ({TILE_SIZE} px) so painted tiles stay on the grid; the right and bottom ones can stop on any pixel in Pixels.
+            The handles snap to whole tiles; turn Snap to tiles off and the right and bottom edges stop on any pixel. The left and top edges always move in whole tiles ({TILE_SIZE} px) so painted tiles stay on the grid.
             Pictures and entities are never removed: what ends up outside the map stays there. Only painted tiles that fall off are cropped.
           </InfoTip>
         </DialogTitle>
@@ -101,7 +108,7 @@ function ResizeBody({ map, tilesets, spriteAssets, onClose, onConfirm }: Props &
           tilesets={tilesets}
           spriteAssets={spriteAssets}
           size={{ width: before.width / TILE_SIZE, height: before.height / TILE_SIZE }}
-          step={inTiles ? 1 : 1 / TILE_SIZE}
+          step={snap ? 1 : 1 / TILE_SIZE}
           edges={{ left: edges.left / TILE_SIZE, top: edges.top / TILE_SIZE, right: edges.right / TILE_SIZE, bottom: edges.bottom / TILE_SIZE }}
           onEdgesChange={(e) => setEdges({ left: Math.round(e.left) * TILE_SIZE, top: Math.round(e.top) * TILE_SIZE, right: Math.round(e.right * TILE_SIZE), bottom: Math.round(e.bottom * TILE_SIZE) })}
         />
@@ -113,18 +120,37 @@ function ResizeBody({ map, tilesets, spriteAssets, onClose, onConfirm }: Props &
             options={[{ value: 'tiles', label: 'Tiles' }, { value: 'pixels', label: 'Pixels' }]}
             onChange={(u) => {
               setUnit(u)
-              // Tiles only take whole tiles: round the free edges to the grid.
-              if (u === 'tiles') setEdges((e) => ({ ...e, right: Math.round((before.width + e.left + e.right) / TILE_SIZE) * TILE_SIZE - before.width - e.left, bottom: Math.round((before.height + e.top + e.bottom) / TILE_SIZE) * TILE_SIZE - before.height - e.top }))
+              // Tiles only take whole tiles: round the free edges to the grid, and snap the handles.
+              if (u === 'tiles') {
+                setSnap(true)
+                roundToTiles()
+              }
             }}
           />
+          <label className="flex items-center gap-2 text-xs">
+            <Toggle
+              aria-label="Snap to tiles"
+              checked={snap}
+              onChange={(on) => {
+                setSnap(on)
+                // Off the grid is a size in pixels.
+                if (!on && inTiles) setUnit('pixels')
+              }}
+            />
+            Snap to tiles
+            <InfoTip>
+              On, dragging an edge stops on whole tiles. Off, the right and bottom edges stop on any pixel; the left and top
+              edges still move in whole tiles so painted tiles stay on the grid. Typed sizes are never snapped.
+            </InfoTip>
+          </label>
           <div className="rounded-md border border-border p-2 text-xs">
             <div className="text-muted-foreground">Size</div>
             <div className="mt-0.5 text-sm font-medium" data-testid="resize-size">
-              {inTiles && !wholeTiles ? `${before.width} × ${before.height} px` : sizeText(before)} <span className="text-muted-foreground">→</span>{' '}
-              <span className={problem ? 'text-red-400' : undefined}>{inTiles && !wholeTiles && unchanged ? `${next.width} × ${next.height} px` : sizeText(next)}</span>{' '}
-              <span className="text-xs font-normal text-muted-foreground">{inTiles ? 'tiles' : 'px'}</span>
+              {sizeText(before)} <span className="text-muted-foreground">→</span>{' '}
+              <span className={problem ? 'text-red-400' : undefined}>{sizeText(next)}</span>{' '}
+              <span className="text-xs font-normal text-muted-foreground">{tileText ? 'tiles' : 'px'}</span>
             </div>
-            {!inTiles && <div className="mt-0.5 text-muted-foreground" data-testid="resize-grid">{tilesFor(next.width)} × {tilesFor(next.height)} tiles of {TILE_SIZE} px</div>}
+            {!tileText && <div className="mt-0.5 text-muted-foreground" data-testid="resize-grid">{tilesFor(next.width)} × {tilesFor(next.height)} tiles of {TILE_SIZE} px</div>}
           </div>
 
           <div className="grid grid-cols-2 gap-2">
