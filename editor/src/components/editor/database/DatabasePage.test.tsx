@@ -330,6 +330,140 @@ describe('Graphics', () => {
     expect(await screen.findByRole('status')).toHaveTextContent('Moved chest.png')
   })
 
+  describe('picking several pictures and folders', () => {
+    const dt = () => {
+      const data = new Map<string, string>()
+      return { setData: (k: string, v: string) => data.set(k, v), getData: (k: string) => data.get(k) ?? '', effectAllowed: '', dropEffect: '' }
+    }
+    // the list may be re-rendered by a click (the open picture goes to the URL), so look it up afresh each time
+    const rowOf = (_tree: HTMLElement, text: string) => within(screen.getByRole('tree')).getByText(text).closest('button') as HTMLElement
+    const folderRow = (tree: HTMLElement, name: string) => within(tree).getByRole('treeitem', { name }).querySelector('.ed-row') as HTMLElement
+
+    beforeEach(() => {
+      const record = (name: string, result: unknown = { success: true }) => (...args: unknown[]) => { calls.push([name, ...args]); return Promise.resolve(result) }
+      install({
+        renameGraphic: record('renameGraphic', { success: true, id: 'x' }),
+        deleteGraphic: record('deleteGraphic'),
+        deleteGraphicFolder: record('deleteGraphicFolder'),
+        moveGraphicFolder: record('moveGraphicFolder', { success: true, folderId: 'x' }),
+        saveCharacter: (id: string, d: CharacterDef) => { calls.push(['saveCharacter', id, d]); return Promise.resolve({ success: true, character: { id, def: d, images: {} } }) },
+        saveMap: record('saveMap'),
+      })
+    })
+
+    it('Ctrl/Cmd+click adds pictures to the selection, and a plain click starts over', async () => {
+      renderAt('/database?table=graphics')
+      const tree = await screen.findByRole('tree')
+      fireEvent.click(rowOf(tree, 'orphan.png'))
+      await waitFor(() => expect(rowOf(tree, 'orphan.png')).toHaveAttribute('data-selected', 'true'))
+      fireEvent.click(rowOf(tree, 'walk.png'), { ctrlKey: true })
+      expect(await screen.findByTestId('library-selection')).toHaveTextContent('2 pictures selected')
+      fireEvent.click(rowOf(tree, 'walk.png'), { metaKey: true })
+      expect(screen.queryByTestId('library-selection')).toBeNull()
+      fireEvent.click(rowOf(tree, 'orphan.png'), { ctrlKey: true })
+      fireEvent.click(rowOf(tree, 'chest.png'), { ctrlKey: true })
+      expect(screen.getByTestId('library-selection')).toHaveTextContent('2 pictures selected')
+      fireEvent.click(rowOf(tree, 'chest.png'))
+      expect(screen.queryByTestId('library-selection')).toBeNull()
+    })
+
+    it('Shift+click takes every row from the last click, folders included', async () => {
+      renderAt('/database?table=graphics')
+      const tree = await screen.findByRole('tree')
+      fireEvent.click(within(tree).getByRole('treeitem', { name: 'props' }).querySelector('.ed-row button') as HTMLElement, { ctrlKey: true })
+      fireEvent.click(rowOf(tree, 'orphan.png'), { shiftKey: true })
+      // props folder, its two pictures in between (chest, orphan)
+      expect(await screen.findByTestId('library-selection')).toHaveTextContent('2 pictures and 1 folder selected')
+    })
+
+    it('Delete asks once for everything picked, refuses while one is in use, and deletes pictures and folders', async () => {
+      renderAt('/database?table=graphics')
+      const tree = await screen.findByRole('tree')
+      fireEvent.click(rowOf(tree, 'chest.png'), { ctrlKey: true })
+      fireEvent.click(rowOf(tree, 'orphan.png'), { ctrlKey: true })
+      fireEvent.keyDown(rowOf(tree, 'orphan.png'), { key: 'Delete' })
+      const blocked = await screen.findByRole('dialog')
+      expect(within(blocked).getByTestId('delete-blocked')).toBeInTheDocument()
+      expect(within(blocked).getByRole('button', { name: /Delete/ })).toBeDisabled()
+      fireEvent.click(within(blocked).getByRole('button', { name: /Cancel/ }))
+
+      // chest is out; the folder `sprites` (with walk.png) goes along with orphan
+      fireEvent.click(rowOf(tree, 'chest.png'), { ctrlKey: true })
+      fireEvent.click(within(tree).getByRole('treeitem', { name: 'sprites' }).querySelector('.ed-row button') as HTMLElement, { ctrlKey: true })
+      fireEvent.click(screen.getByRole('button', { name: 'Delete selected' }))
+      const dialog = await screen.findByRole('dialog')
+      expect(calls.some((c) => c[0] === 'deleteGraphic')).toBe(false)
+      fireEvent.click(within(dialog).getByRole('button', { name: /Delete/ }))
+      await waitFor(() => expect(calls).toContainEqual(['deleteGraphic', 'props/orphan.png']))
+      await waitFor(() => expect(calls).toContainEqual(['deleteGraphicFolder', 'sprites']))
+    })
+
+    it('right-clicking a picked picture deletes everything picked', async () => {
+      renderAt('/database?table=graphics')
+      const tree = await screen.findByRole('tree')
+      fireEvent.click(rowOf(tree, 'orphan.png'), { ctrlKey: true })
+      fireEvent.click(rowOf(tree, 'walk.png'), { ctrlKey: true })
+      fireEvent.contextMenu(rowOf(tree, 'walk.png'))
+      fireEvent.click(await screen.findByText('Delete 2 pictures…'))
+      const dialog = await screen.findByRole('dialog')
+      expect(within(dialog).getByText('2 pictures')).toBeInTheDocument()
+    })
+
+    it('dragging one of the picked pictures onto a folder moves them all, rewriting what uses them', async () => {
+      renderAt('/database?table=graphics')
+      const tree = await screen.findByRole('tree')
+      fireEvent.click(rowOf(tree, 'chest.png'), { ctrlKey: true })
+      fireEvent.click(rowOf(tree, 'orphan.png'), { ctrlKey: true })
+      const transfer = dt()
+      fireEvent.dragStart(rowOf(tree, 'orphan.png'), { dataTransfer: transfer })
+      const target = folderRow(tree, 'sprites')
+      fireEvent.dragOver(target, { dataTransfer: transfer })
+      fireEvent.drop(target, { dataTransfer: transfer })
+      await waitFor(() => expect(calls).toContainEqual(['renameGraphic', 'props/chest.png', 'sprites/chest.png']))
+      expect(calls).toContainEqual(['renameGraphic', 'props/orphan.png', 'sprites/orphan.png'])
+      expect(calls.some((c) => c[0] === 'saveCharacter')).toBe(true)
+      expect(await screen.findByRole('status')).toHaveTextContent('Moved 2 pictures')
+    })
+
+    it('a picked folder moves with the pictures picked beside it, and what is inside it is not moved twice', async () => {
+      renderAt('/database?table=graphics')
+      const tree = await screen.findByRole('tree')
+      fireEvent.click(within(tree).getByRole('treeitem', { name: 'sprites' }).querySelector('.ed-row button') as HTMLElement, { ctrlKey: true })
+      fireEvent.click(rowOf(tree, 'walk.png'), { ctrlKey: true })
+      fireEvent.click(rowOf(tree, 'orphan.png'), { ctrlKey: true })
+      const transfer = dt()
+      fireEvent.dragStart(rowOf(tree, 'orphan.png'), { dataTransfer: transfer })
+      const target = folderRow(tree, 'props')
+      fireEvent.dragOver(target, { dataTransfer: transfer })
+      fireEvent.drop(target, { dataTransfer: transfer })
+      await waitFor(() => expect(calls).toContainEqual(['moveGraphicFolder', 'sprites', 'props']))
+      expect(calls.filter((c) => c[0] === 'renameGraphic')).toEqual([])
+    })
+
+    it('a folder cannot be dropped into itself', async () => {
+      renderAt('/database?table=graphics')
+      const tree = await screen.findByRole('tree')
+      fireEvent.click(within(tree).getByRole('treeitem', { name: 'sprites' }).querySelector('.ed-row button') as HTMLElement, { ctrlKey: true })
+      fireEvent.click(rowOf(tree, 'orphan.png'), { ctrlKey: true })
+      const transfer = dt()
+      fireEvent.dragStart(rowOf(tree, 'orphan.png'), { dataTransfer: transfer })
+      const inside = folderRow(tree, 'sprites/a')
+      fireEvent.dragOver(inside, { dataTransfer: transfer })
+      fireEvent.drop(inside, { dataTransfer: transfer })
+      await new Promise((r) => setTimeout(r, 20))
+      expect(calls.filter((c) => c[0] === 'moveGraphicFolder' || c[0] === 'renameGraphic')).toEqual([])
+    })
+
+    it('Escape clears the selection', async () => {
+      renderAt('/database?table=graphics')
+      const tree = await screen.findByRole('tree')
+      fireEvent.click(rowOf(tree, 'orphan.png'), { ctrlKey: true })
+      fireEvent.click(rowOf(tree, 'walk.png'), { ctrlKey: true })
+      fireEvent.keyDown(rowOf(tree, 'walk.png'), { key: 'Escape' })
+      expect(screen.queryByTestId('library-selection')).toBeNull()
+    })
+  })
+
   describe('replacing a picture', () => {
     const clip = (files: File[]) => ({ clipboardData: { types: ['Files'], files, items: files.map((f) => ({ kind: 'file', getAsFile: () => f })) } })
 
@@ -448,12 +582,12 @@ describe('Graphics', () => {
       expect(screen.getByTestId('import-target')).toHaveTextContent('Importing into props')
     })
 
-    it('reports files that are not PNGs instead of opening an empty import', async () => {
+    it('reports files that are not PNG or GIF images instead of opening an empty import', async () => {
       install({ getPathForFile: (f: File) => `/dropped/${f.name}` })
       renderAt('/database?table=graphics')
       const target = (await screen.findByRole('button', { name: /^props/ })).closest('section, li') as HTMLElement
       fireEvent.drop(target, { dataTransfer: { types: ['Files'], files: [new File(['x'], 'notes.txt', { type: 'text/plain' })] } })
-      expect(await screen.findByText('Only PNG images can be imported.')).toBeInTheDocument()
+      expect(await screen.findByText('Only PNG and GIF images can be imported.')).toBeInTheDocument()
       expect(screen.queryByRole('dialog')).toBeNull()
     })
 
@@ -504,6 +638,145 @@ describe('Graphics', () => {
       expect(screen.queryByRole('dialog')).toBeNull()
     })
 
+    describe('GIF animations', () => {
+      const gifPick = () => Promise.resolve({ success: true, files: [{ sourcePath: '/tmp/boss.gif', defaultName: 'boss', ext: 'gif', previewUrl: PNG }, { sourcePath: '/tmp/rock.png', defaultName: 'rock', ext: 'png', previewUrl: PNG }] })
+
+      it('Graphics takes a GIF next to PNGs and keeps its extension in the id', async () => {
+        const imported: [string, string][] = []
+        install({
+          pickImageFiles: gifPick,
+          importGraphic: (src: string, id: string) => { imported.push([src, id]); return Promise.resolve({ success: true, graphic: graphic(id), image: PNG }) },
+        })
+        renderAt('/database?table=graphics')
+        fireEvent.click(await screen.findByRole('button', { name: /Import…/ }))
+        const dialog = await screen.findByRole('dialog')
+        expect(within(dialog).getByRole('heading', { name: 'Import 2 pictures' })).toBeInTheDocument()
+        expect(within(dialog).getByLabelText('Name for boss.gif')).toHaveValue('boss')
+        expect(within(dialog).getByText('.gif')).toBeInTheDocument()
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Import 2 pictures' }))
+        await waitFor(() => expect(imported).toEqual([['/tmp/boss.gif', 'boss.gif'], ['/tmp/rock.png', 'rock.png']]))
+      })
+
+      it('a GIF dropped from the OS is accepted by Graphics', async () => {
+        install({ getPathForFile: (f: File) => `/dropped/${f.name}` })
+        renderAt('/database?table=graphics')
+        const target = (await screen.findByRole('button', { name: /^props/ })).closest('section, li') as HTMLElement
+        fireEvent.drop(target, { dataTransfer: { types: ['Files'], files: [new File(['x'], 'flame.gif', { type: 'image/gif' })] } })
+        const dialog = await screen.findByRole('dialog')
+        expect(within(dialog).getByLabelText('Name for flame.gif')).toHaveValue('flame')
+      })
+
+      it('Tilesets leave GIFs out and say why', async () => {
+        install({ pickImageFiles: gifPick })
+        renderAt('/database?table=tilesets')
+        fireEvent.click(await screen.findByRole('button', { name: /Import…/ }))
+        const dialog = await screen.findByRole('dialog')
+        expect(within(dialog).getByRole('heading', { name: 'Import 1 tileset' })).toBeInTheDocument()
+        expect(within(dialog).queryByLabelText('Name for boss.gif')).toBeNull()
+        expect(await screen.findByText('1 GIF animation left out: they can only be imported into Graphics.')).toBeInTheDocument()
+      })
+
+      it('a GIF dropped on Tilesets is refused with the reason', async () => {
+        install({ getPathForFile: (f: File) => `/dropped/${f.name}` })
+        renderAt('/database?table=tilesets')
+        const root = await screen.findByTestId('import-target')
+        const zone = root.closest('div')!.parentElement!.querySelector('[class*="min-h-[50vh]"]') as HTMLElement
+        fireEvent.drop(zone, { dataTransfer: { types: ['Files'], files: [new File(['x'], 'flame.gif', { type: 'image/gif' })] } })
+        expect(await screen.findByText('GIF animations can only be imported into Graphics.')).toBeInTheDocument()
+        expect(screen.queryByRole('dialog')).toBeNull()
+      })
+
+      it('the detail of a GIF graphic shows its frames, its speed and a preview', async () => {
+        install({
+          getCharacters: () => Promise.resolve({ success: true, characters: [], images: { 'props/boss.gif': PNG }, folders: [], graphicFolders: ['props'], warnings: [], graphics: [{ ...graphic('props/boss.gif', 48, 24), gif: { frames: 3, frameWidth: 16, frameHeight: 24, delaysMs: [50, 50, 50] } }] }),
+        })
+        renderAt('/database?table=graphics&id=props/boss.gif')
+        const detail = await screen.findByTestId('graphic-detail')
+        expect(detail).toHaveTextContent('GIF · 3 frames of 16×24 px · about 20 fps')
+        expect(within(detail).getByTestId('gif-preview')).toBeInTheDocument()
+      })
+    })
+
+    describe('a whole folder', () => {
+      const folderPick = (...files: [string, string][]) => () => Promise.resolve({ success: true, skipped: 0, truncated: false, files: files.map(([dir, name]) => ({ sourcePath: `/pick/${dir}/${name}.png`, dir, defaultName: name, previewUrl: PNG })) })
+
+      it('Import folder… keeps the folders of the chosen one under the folder clicked last', async () => {
+        const imported: string[] = []
+        install({
+          pickImageFolder: folderPick(['Trees', 'oak'], ['Trees/old oak', 'elm'], ['Trees/old oak', 'oak']),
+          importGraphic: (_src: string, id: string) => { imported.push(id); return Promise.resolve({ success: true, graphic: graphic(id), image: PNG }) },
+        })
+        renderAt('/database?table=graphics')
+        fireEvent.click(await screen.findByRole('button', { name: /^props/ }))
+        fireEvent.click(screen.getByRole('button', { name: /Import folder…/ }))
+        const dialog = await screen.findByRole('dialog')
+        expect(within(dialog).getByRole('heading', { name: 'Import 3 pictures' })).toBeInTheDocument()
+        // the same name in two folders is fine; both sit under the destination
+        expect(within(dialog).queryByText('Used twice in this import.')).toBeNull()
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Import 3 pictures' }))
+        await waitFor(() => expect(imported).toEqual(['props/Trees/oak.png', 'props/Trees/old-oak/elm.png', 'props/Trees/old-oak/oak.png']))
+      })
+
+      it('holds the game-asset sync back while the folder goes in, and runs it once afterwards', async () => {
+        const order: string[] = []
+        install({
+          pickImageFolder: folderPick(['Trees', 'oak'], ['Trees', 'elm'], ['Trees', 'pine']),
+          beginBulkImport: () => { order.push('begin'); return Promise.resolve({ success: true }) },
+          endBulkImport: () => { order.push('end'); return Promise.resolve({ success: true }) },
+          importGraphic: (_src: string, id: string) => { order.push(id); return Promise.resolve({ success: true, graphic: graphic(id), image: PNG }) },
+        })
+        renderAt('/database?table=graphics')
+        fireEvent.click(await screen.findByRole('button', { name: /Import folder…/ }))
+        const dialog = await screen.findByRole('dialog')
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Import 3 pictures' }))
+        await waitFor(() => expect(order.at(-1)).toBe('end'))
+        expect(order[0]).toBe('begin')
+        expect(order.filter((x) => x === 'begin' || x === 'end')).toHaveLength(2)
+        expect(order).toHaveLength(5)
+      })
+
+      it('still catches a name that clashes inside one folder, or with a picture already in it', async () => {
+        install({ pickImageFolder: folderPick(['Stuff', 'rock'], ['Stuff', 'Rock'], ['props', 'chest']) })
+        renderAt('/database?table=graphics')
+        fireEvent.click(await screen.findByRole('button', { name: /Import folder…/ }))
+        const dialog = await screen.findByRole('dialog')
+        expect(within(dialog).getAllByText('Used twice in this import.')).toHaveLength(2)
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Leave out Rock.png' }))
+        // Stuff/ is new but props/chest.png exists, so the name has to change
+        expect(within(dialog).getByText('Already exists here.')).toBeInTheDocument()
+        expect(within(dialog).getByRole('button', { name: 'Import 2 pictures' })).toBeDisabled()
+        fireEvent.change(within(dialog).getByLabelText('Name for chest.png'), { target: { value: 'chest-2' } })
+        expect(within(dialog).getByRole('button', { name: 'Import 2 pictures' })).toBeEnabled()
+      })
+
+      it('says when a folder has no pictures', async () => {
+        install({ pickImageFolder: () => Promise.resolve({ success: false, error: 'That folder has no PNG images in it.' }) })
+        renderAt('/database?table=graphics')
+        fireEvent.click(await screen.findByRole('button', { name: /Import folder…/ }))
+        expect(await screen.findByRole('alert')).toHaveTextContent('no PNG images')
+      })
+
+      it('dropping a folder from the OS imports everything in it with its structure', async () => {
+        const imported: string[] = []
+        install({
+          getPathForFile: (f: File) => `/dropped/${f.name}`,
+          importGraphic: (_src: string, id: string) => { imported.push(id); return Promise.resolve({ success: true, graphic: graphic(id), image: PNG }) },
+        })
+        renderAt('/database?table=graphics')
+        const target = (await screen.findByRole('button', { name: /^props/ })).closest('section, li') as HTMLElement
+        const png = (name: string) => new File(['x'], name, { type: name.endsWith('.png') ? 'image/png' : 'text/plain' })
+        const file = (name: string) => ({ name, isFile: true, isDirectory: false, file: (ok: (f: File) => void) => ok(png(name)) })
+        const dir = (name: string, children: unknown[]) => ({ name, isFile: false, isDirectory: true, createReader: () => { let done = false; return { readEntries: (ok: (e: unknown[]) => void) => { const b = done ? [] : children; done = true; ok(b) } } } })
+        const tree = dir('My Rocks', [file('big.png'), dir('small', [file('pebble.png')]), file('readme.txt')])
+        fireEvent.drop(target, { dataTransfer: { files: [], types: ['Files'], items: [{ kind: 'file', webkitGetAsEntry: () => tree }] } })
+        const dialog = await screen.findByRole('dialog')
+        expect(within(dialog).getByRole('heading', { name: 'Import 2 pictures' })).toBeInTheDocument()
+        expect(within(dialog).getByLabelText('Destination folder')).toHaveValue('props')
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Import 2 pictures' }))
+        await waitFor(() => expect(imported).toEqual(['props/My-Rocks/big.png', 'props/My-Rocks/small/pebble.png']))
+      })
+    })
+
     it('keeps the files that failed in the dialog with the reason', async () => {
       install({
         pickImageFiles: picked('a', 'b'),
@@ -552,6 +825,24 @@ describe('Tilesets', () => {
     await waitFor(() => expect(imported).toEqual([['/tmp/IMG_1.png', 'forest', null, 'forest'], ['/tmp/grass.png', 'grass-2', null, 'grass-2']]))
   })
 
+  it('Import folder… files tilesets into the same folders, and a name has to be free in every folder', async () => {
+    const imported: unknown[][] = []
+    install({
+      pickImageFolder: () => Promise.resolve({ success: true, skipped: 0, truncated: false, files: [
+        { sourcePath: '/p/a.png', dir: 'Town', defaultName: 'roofs', previewUrl: PNG },
+        { sourcePath: '/p/b.png', dir: 'Town/old', defaultName: 'roofs', previewUrl: PNG },
+      ] }),
+      importTileset: (...args: unknown[]) => { imported.push(args); return Promise.resolve({ success: true, tileset: { name: String(args[1]), fileName: `${String(args[3])}.png`, folderPath: args[2], dataUrl: PNG } }) },
+    })
+    renderAt('/database?table=tilesets')
+    fireEvent.click(await screen.findByRole('button', { name: /Import folder…/ }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getAllByText('Used twice in this import.')).toHaveLength(2)
+    fireEvent.change(within(dialog).getAllByRole('textbox', { name: /^Name for/ })[1], { target: { value: 'roofs-old' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Import 2 tilesets' }))
+    await waitFor(() => expect(imported).toEqual([['/p/a.png', 'roofs', 'Town', 'roofs'], ['/p/b.png', 'roofs-old', 'Town/old', 'roofs-old']]))
+  })
+
   it('a tileset shows the maps that paint with it, and the viewer has the tile grid', async () => {
     renderAt('/database?table=tilesets&id=grass.png')
     const detail = await screen.findByTestId('tileset-detail')
@@ -590,6 +881,30 @@ describe('Tilesets', () => {
     fireEvent.dragOver(row, { dataTransfer })
     fireEvent.drop(row, { dataTransfer })
     await waitFor(() => expect(calls).toContainEqual(['moveTileset', 'grass.png', null, 'Outside']))
+    expect(calls.some((c) => c[0] === 'saveMap')).toBe(false)
+  })
+
+  it('picking several tilesets: dragging moves them all, Delete asks once and refuses while a map paints with one', async () => {
+    renderAt('/database?table=tilesets')
+    const tree = await screen.findByRole('tree')
+    const rowOf = (text: string) => within(tree).getByText(text).closest('button') as HTMLElement
+    fireEvent.click(rowOf('grass'), { ctrlKey: true })
+    fireEvent.click(rowOf('lonely'), { ctrlKey: true })
+    expect(await screen.findByTestId('library-selection')).toHaveTextContent('2 tilesets selected')
+
+    fireEvent.keyDown(rowOf('lonely'), { key: 'Delete' })
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByTestId('delete-blocked')).toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('button', { name: /Cancel/ }))
+
+    const data = new Map<string, string>()
+    const dataTransfer = { setData: (k: string, v: string) => data.set(k, v), getData: (k: string) => data.get(k) ?? '', effectAllowed: '', dropEffect: '' }
+    const row = within(tree).getByRole('treeitem', { name: 'Outside' }).querySelector('.ed-row') as HTMLElement
+    fireEvent.dragStart(rowOf('lonely'), { dataTransfer })
+    fireEvent.dragOver(row, { dataTransfer })
+    fireEvent.drop(row, { dataTransfer })
+    await waitFor(() => expect(calls).toContainEqual(['moveTileset', 'grass.png', null, 'Outside']))
+    expect(calls).toContainEqual(['moveTileset', 'lonely.png', null, 'Outside'])
     expect(calls.some((c) => c[0] === 'saveMap')).toBe(false)
   })
 

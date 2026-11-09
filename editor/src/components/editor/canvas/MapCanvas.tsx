@@ -1,3 +1,4 @@
+import { withPlacement } from '@/lib/placementKind'
 import type { SelectMode } from '@/lib/imageSelection'
 import type { ImageDrag } from './konva/imageDrag'
 import React, { useCallback, useMemo, useRef } from 'react'
@@ -78,6 +79,9 @@ interface MapCanvasProps {
   /** Image layers */
   pendingImage?: ImagePick | null
   commitImagePlacement?: (x: number, y: number) => void
+  /** The picture whose resize handles show on the canvas (Images panel › Resize), and what a corner drag applies. */
+  resizingImageId?: string | null
+  resizeImage?: (layerId: string, imageId: string, change: { scale: number; x: number; y: number }) => void
   cancelImagePlacement?: () => void
   selectedImageId?: string | null
   setSelectedImageId?: (id: string | null) => void
@@ -132,6 +136,8 @@ export function MapCanvas({
   selectedLayerIds = [],
   pendingImage = null,
   commitImagePlacement,
+  resizingImageId = null,
+  resizeImage,
   cancelImagePlacement,
   selectedImageId = null,
   setSelectedImageId,
@@ -317,7 +323,6 @@ export function MapCanvas({
                 setSelectedEntityId={setSelectedEntityId || (() => {})}
                 moveEntity={moveEntity || (() => {})}
                 activeMap={activeMap}
-                snapToGrid={snapToGrid}
                 snapEntityPos={snapEntityPos}
                 onRightClickEntity={handleRightClickEntity}
                 showEntities={showEntities}
@@ -365,6 +370,8 @@ export function MapCanvas({
                 spriteAssets={spriteAssets}
                 placing={placingAnything}
                 dragRef={imageDrag}
+                resizingImageId={resizingImageId}
+                resizeImage={resizeImage}
               />
 
               {/* What the entities listen to (picking, dragging, right-click): above the picture handles, so an entity over a picture is the one you get */}
@@ -376,7 +383,6 @@ export function MapCanvas({
                 setSelectedEntityId={setSelectedEntityId || (() => {})}
                 moveEntity={moveEntity || (() => {})}
                 activeMap={activeMap}
-                snapToGrid={snapToGrid}
                 snapEntityPos={snapEntityPos}
                 onRightClickEntity={handleRightClickEntity}
                 showEntities={showEntities}
@@ -395,7 +401,6 @@ export function MapCanvas({
                 setSelectedEntityId={setSelectedEntityId || (() => {})}
                 moveEntity={moveEntity || (() => {})}
                 activeMap={activeMap}
-                snapToGrid={snapToGrid}
                 snapEntityPos={snapEntityPos}
                 showEntities={showEntities}
                 entityFolders={entityFolders}
@@ -416,7 +421,6 @@ export function MapCanvas({
               <KonvaGhostEntity
                 pendingPlacement={pendingPlacement}
                 pointerPos={stagePointerPos}
-                snapToGrid={snapToGrid}
                 snapEntityPos={snapEntityPos}
                 spriteAssets={spriteAssets}
               />
@@ -444,7 +448,7 @@ export function MapCanvas({
       <CanvasContextMenu
         menuState={contextMenuState}
         onClose={closeContextMenu}
-        onCreateEntity={(name, x, y, comps) => createEntity?.(name, x, y, comps)}
+        onCreateEntity={(name, x, y, comps, free) => createEntity?.(name, x, y, withPlacement(comps, free === true))}
         onDuplicateEntity={duplicateEntity}
         onDeleteEntity={deleteEntity}
         onSetAreaColor={(id, color) => {

@@ -144,6 +144,32 @@ describe('channels end to end (real temp project)', () => {
       expect(fs.existsSync(path.join(repo, 'game', 'public', 'synced.txt'))).toBe(true);
     });
 
+    it('a bulk import syncs once at the end instead of after every file', async () => {
+      const { repo, project } = repoWithScript();
+      const channels = createProjectChannels(project);
+      const synced = path.join(repo, 'game', 'public', 'synced.txt');
+      const png = path.join(repo, 'pic.png');
+      fs.writeFileSync(png, makePng(8, 8));
+      await channels['begin-bulk-import']();
+      const first = (await channels['import-graphic'](png, 'a.png')) as { success: boolean; assets?: unknown };
+      const second = (await channels['import-graphic'](png, 'b.png')) as { success: boolean; assets?: unknown };
+      expect(first).toMatchObject({ success: true });
+      expect(second.assets).toBeUndefined();
+      expect(fs.existsSync(synced)).toBe(false);
+      expect(await channels['end-bulk-import']()).toMatchObject({ success: true, assets: { written: 1 } });
+      expect(fs.existsSync(synced)).toBe(true);
+      // back to a sync per change afterwards
+      expect(await channels['import-graphic'](png, 'c.png')).toMatchObject({ success: true, assets: { written: 1 } });
+    });
+
+    it('a bulk import that changed nothing does not run the sync', async () => {
+      const { repo, project } = repoWithScript();
+      const channels = createProjectChannels(project);
+      await channels['begin-bulk-import']();
+      expect(await channels['end-bulk-import']()).toEqual({ success: true });
+      expect(fs.existsSync(path.join(repo, 'game', 'public', 'synced.txt'))).toBe(false);
+    });
+
     it('a failed import is not synced and stays a failure', async () => {
       const { repo, project } = repoWithScript();
       const res = (await createProjectChannels(project)['import-graphic'](path.join(repo, 'nope.png'), 'x.png')) as { success: boolean; assets?: unknown };

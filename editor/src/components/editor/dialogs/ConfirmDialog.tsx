@@ -7,10 +7,12 @@ interface ConfirmDialogProps {
   description: string
   onClose: () => void
   onConfirm: () => void
+  /** The red button's label ('Delete' by default). */
+  confirmLabel?: string
 }
 
 /** "Delete this layer / entity / ...?": Enter deletes, Esc cancels (Radix closes on Esc, DialogContent presses the marked button on Enter). */
-export function ConfirmDialog({ open, title, description, onClose, onConfirm }: ConfirmDialogProps) {
+export function ConfirmDialog({ open, title, description, onClose, onConfirm, confirmLabel = 'Delete' }: ConfirmDialogProps) {
   const confirm = () => {
     onConfirm()
     onClose()
@@ -28,7 +30,7 @@ export function ConfirmDialog({ open, title, description, onClose, onConfirm }: 
         }}
       >
         <DangerHeader title={title} description={description} />
-        <ConfirmFooter onCancel={onClose} onConfirm={confirm} confirmLabel="Delete" />
+        <ConfirmFooter onCancel={onClose} onConfirm={confirm} confirmLabel={confirmLabel} />
       </DialogContent>
     </Dialog>
   )

@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 import { thumbFrame } from '@/lib/characterThumb'
 import type { CharacterDef } from '../../../../../shared/engine/characters'
 import { sheetFrameRect } from '../../../../../shared/engine/characters'
+import type { GraphicInfo } from '../../../../../shared/engine/graphics'
 import { IconButton } from '../ui/controls'
 
 export type ViewMode = 'list' | 'tiles'
@@ -52,6 +53,19 @@ export function ImageThumb({ url, size, className }: { url?: string; size: numbe
   )
 }
 
+/** A graphic's picture in a square box: a GIF shows its first frame (the library holds it as a sheet of frames), anything else scaled to fit. */
+export function GraphicThumb({ graphic, url, size }: { graphic?: GraphicInfo; url?: string; size: number }) {
+  if (!graphic?.gif || !url) return <ImageThumb url={url} size={size} />
+  const { frameWidth: w, frameHeight: h } = graphic.gif
+  const fit = Math.min((size - 4) / w, (size - 4) / h)
+  const zoom = fit >= 1 ? Math.floor(fit) : fit
+  return (
+    <span className="ed-checker flex shrink-0 items-center justify-center overflow-hidden rounded-sm" style={{ width: size, height: size }} aria-hidden data-testid="gif-thumb">
+      <span style={{ width: w * zoom, height: h * zoom, backgroundImage: `url(${url})`, backgroundSize: `${graphic.width * zoom}px ${graphic.height * zoom}px`, backgroundPosition: '0 0', imageRendering: 'pixelated' }} />
+    </span>
+  )
+}
+
 /** The idle frame of a character, centred in a square box. */
 export function CharacterThumb({ def, images, sizes, size }: { def: CharacterDef; images: Record<string, string>; sizes: Record<string, { width: number; height: number }>; size: number }) {
   const shown = thumbFrame(def)
@@ -71,7 +85,7 @@ export function CharacterThumb({ def, images, sizes, size }: { def: CharacterDef
 }
 
 /** One entry in the tile view: a picture over its name. */
-export function Tile({ selected, title, name, hint, thumb, badge, onClick, dragProps }: { selected: boolean; title?: string; name: string; hint?: React.ReactNode; thumb: React.ReactNode; badge?: React.ReactNode; onClick: () => void; dragProps?: React.HTMLAttributes<HTMLButtonElement> }) {
+export function Tile({ selected, title, name, hint, thumb, badge, onClick, dragProps }: { selected: boolean; title?: string; name: string; hint?: React.ReactNode; thumb: React.ReactNode; badge?: React.ReactNode; onClick: (e: React.MouseEvent) => void; dragProps?: React.HTMLAttributes<HTMLButtonElement> }) {
   return (
     <button
       type="button"

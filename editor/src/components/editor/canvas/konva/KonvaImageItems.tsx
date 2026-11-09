@@ -11,6 +11,7 @@ import type { SelectMode } from '@/lib/imageSelection'
 import type { ImageDrag } from './imageDrag'
 import { applyAxisLock, guideLines, type Axis, type AxisLock } from '@/lib/axisLock'
 import { setStageCursor } from '../canvasUtils'
+import { KonvaImageResize } from './KonvaImageResize'
 
 const NO_ASSETS: Record<string, SpriteAssetInfo> = {}
 const NO_LAYERS: Layer[] = []
@@ -49,6 +50,9 @@ interface KonvaImageItemsProps {
   placing?: boolean
   /** Written while an image is dragged so the layer that draws it can follow the mouse (see KonvaTilemapLayer). */
   dragRef?: React.MutableRefObject<ImageDrag | null>
+  /** The picture of the active layer whose resize handles are showing (the Images panel's Resize button), if any. */
+  resizingImageId?: string | null
+  resizeImage?: (layerId: string, imageId: string, change: { scale: number; x: number; y: number }) => void
 }
 
 /** Pick/drag handles and the selection frame for the images of the active image layer (and of the other image layers when the toolbar lock is off). */
@@ -66,6 +70,8 @@ export const KonvaImageItems = React.memo(function KonvaImageItems({
   spriteAssets = NO_ASSETS,
   placing = false,
   dragRef,
+  resizingImageId = null,
+  resizeImage,
 }: KonvaImageItemsProps) {
   // Other layers first (bottom-up), the active layer last: what is on top is picked first, and the active layer wins.
   const layers = useMemo(() => [...otherLayers.filter((l) => l.type === 'image' && l.visible && !l.locked && l.id !== layer?.id).reverse(), ...(layer && layer.type === 'image' && layer.visible ? [layer] : [])], [otherLayers, layer])
@@ -94,6 +100,8 @@ export const KonvaImageItems = React.memo(function KonvaImageItems({
           place={place}
           assets={spriteAssets}
           dragRef={dragRef}
+          resizingImageId={l.id === layer?.id ? resizingImageId : null}
+          resizeImage={resizeImage}
         />
       ))}
     </Group>
@@ -114,6 +122,8 @@ function ImageLayerHandles({
   place,
   assets,
   dragRef,
+  resizingImageId,
+  resizeImage,
 }: {
   layer: Layer
   active: boolean
@@ -128,8 +138,11 @@ function ImageLayerHandles({
   place: (item: ImageItem, x: number, y: number) => { x: number; y: number }
   assets: Record<string, SpriteAssetInfo>
   dragRef?: React.MutableRefObject<ImageDrag | null>
+  resizingImageId?: string | null
+  resizeImage?: (layerId: string, imageId: string, change: { scale: number; x: number; y: number }) => void
 }) {
   const items = useMemo(() => sortedImages(layer.images), [layer.images])
+  const resizing = active && interactive && resizingImageId && resizeImage ? items.find((i) => i.id === resizingImageId) : undefined
   // Picking an image of another layer makes that layer the active one (which clears the selection, so select after).
   // Ctrl/Cmd+click adds or removes a picture from the picked set (Shift+click is the canvas's own gesture).
   const pick = (id: string, mode: SelectMode = 'replace') => {
@@ -156,6 +169,7 @@ function ImageLayerHandles({
           dragRef={dragRef}
         />
       ))}
+      {resizing && resizeImage && <KonvaImageResize key={resizing.id} item={resizing} assets={assets} dragRef={dragRef} onResize={(change) => resizeImage(layer.id, resizing.id, change)} />}
     </Group>
   )
 }
@@ -217,7 +231,9 @@ function ImageHandle({
       }}
       onDragMove={(e) => {
         e.cancelBubble = true
-        const locked = applyAxisLock(lockRef.current, e.evt.shiftKey, e.target.x(), e.target.y())
+        // Shift keeps it in the row or column it started from, whenever Shift goes down during the drag.
+        const from = lockRef.current ?? (e.evt.shiftKey ? { originX: item.x, originY: item.y, axis: null } : null)
+        const locked = applyAxisLock(from, e.evt.shiftKey, e.target.x(), e.target.y())
         lockRef.current = locked.lock
         setAxis(locked.lock?.axis ?? null)
         const p = place(item, locked.x, locked.y)

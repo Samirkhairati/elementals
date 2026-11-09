@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { PRESET_FOLDERS, PRESET_LABELS, newCharacter, slugify, suggestGrid, type Preset } from '@/lib/characterEdit'
+import { PRESET_FOLDERS, PRESET_LABELS, gifFps, newCharacter, newGifCharacter, slugify, suggestGrid, type Preset } from '@/lib/characterEdit'
 import { isValidCharacterId } from '../../../../../../shared/engine/graphics'
 import { GraphicField } from './GraphicField'
 import { Field, Segmented, TextField } from '../../ui/controls'
@@ -11,6 +11,7 @@ const PRESET_HELP: Record<Preset, string> = {
   actor: 'Four directions, with idle and walk animations ready to use. Pick this for people and anything that walks around.',
   prop: 'One still picture, like a sign or a rock. It can still be given animations later.',
   animated: 'A strip of frames that loops, like a flower or a flame. Events can play its other animations.',
+  gif: 'A GIF that loops, like an animated flame or a creature. Its frames are read from the file, so there is nothing to cut. Pick a GIF from Graphics (import one there).',
 }
 
 interface Props {
@@ -29,14 +30,17 @@ export function NewCharacterWizard({ data, open, onOpenChange, onCreated }: Prop
   const [idEdit, setIdEdit] = useState<string | null>(null)
   const [error, setError] = useState('')
   const graphic = graphics.find((g) => g.id === image)
-  const grid = graphic ? suggestGrid(preset, graphic.width, graphic.height) : null
+  // A GIF preset takes a GIF graphic; every other preset takes a picture of frames.
+  const wantsGif = preset === 'gif'
+  const fits = !!graphic && !!graphic.gif === wantsGif
+  const grid = graphic && !wantsGif ? suggestGrid(preset, graphic.width, graphic.height) : null
   const folder = PRESET_FOLDERS[preset]
   const id = idEdit ?? `${folder}/${slugify(name, 'new')}`
   const idError = useMemo(() => (!isValidCharacterId(id) ? 'Use letters, digits, “-”, “_” and “/”.' : characters[id] ? 'A sprite with this id already exists.' : ''), [id, characters])
 
   const create = async () => {
-    if (!graphic) return
-    const def = newCharacter(preset, name, graphic.id, graphic)
+    if (!graphic || !fits) return
+    const def = wantsGif ? newGifCharacter(name, graphic) : newCharacter(preset, name, graphic.id, graphic)
     const r = await data.sprites.saveCharacter(id, def)
     if (!r.ok) return setError(r.error)
     onOpenChange(false)
@@ -51,15 +55,15 @@ export function NewCharacterWizard({ data, open, onOpenChange, onCreated }: Prop
           <DialogDescription id="new-character-desc" className="ed-hint">Pick a picture, say what it is and give it a name. You can change everything afterwards.</DialogDescription>
         </DialogHeader>
 
-        <Field label="Picture" stack info="The picture file this sprite is cut from. Images live in Graphics (import new ones there).">
-          <GraphicField aria-label="Picture" value={image} graphics={graphics} images={images} onChange={setImage} />
+        <Field label={wantsGif ? 'GIF' : 'Picture'} stack info={wantsGif ? 'The GIF this sprite plays. GIFs live in Graphics (import new ones there).' : 'The picture file this sprite is cut from. Images live in Graphics (import new ones there).'}>
+          <GraphicField aria-label="Picture" kind={wantsGif ? 'gif' : 'sheet'} value={fits ? image : ''} graphics={graphics} images={images} onChange={setImage} />
         </Field>
-        {graphic && (
+        {graphic && fits && (
           <div className="flex items-center gap-3 rounded border border-border bg-card/30 p-2">
             {images[graphic.id] && <img src={images[graphic.id]} alt="Chosen picture" className="ed-checker max-h-24 max-w-[40%] shrink-0 rounded border border-border object-contain" style={{ imageRendering: 'pixelated' }} />}
             <div className="flex min-w-0 flex-col gap-0.5">
               <span className="truncate text-ed-label text-foreground">{graphic.id}</span>
-              <span className="ed-hint">{graphic.width}×{graphic.height} px</span>
+              {graphic.gif ? <span className="ed-hint" data-testid="gif-suggestion">{graphic.gif.frames} frame{graphic.gif.frames === 1 ? '' : 's'} of {graphic.gif.frameWidth}×{graphic.gif.frameHeight} px, plays at about {gifFps(graphic)} fps.</span> : <span className="ed-hint">{graphic.width}×{graphic.height} px</span>}
               {grid && <span className="ed-hint" data-testid="grid-suggestion">Cut as {grid.columns}×{grid.rows} frames of {grid.frameWidth}×{grid.frameHeight} px.</span>}
             </div>
           </div>
@@ -67,7 +71,7 @@ export function NewCharacterWizard({ data, open, onOpenChange, onCreated }: Prop
 
         <Field label="It is a" stack>
           <div className="flex w-full flex-col gap-1.5">
-            <Segmented<Preset> className="w-full [&>button]:flex-1" aria-label="Preset" value={preset} options={(Object.keys(PRESET_LABELS) as Preset[]).map((p) => ({ value: p, label: PRESET_LABELS[p] }))} onChange={setPreset} />
+            <Segmented<Preset> className="w-full [&>button]:flex-1" aria-label="Preset" value={preset} options={(Object.keys(PRESET_LABELS) as Preset[]).map((p) => ({ value: p, label: PRESET_LABELS[p] }))} onChange={(p) => { setPreset(p); setError('') }} />
             <p className="ed-hint">{PRESET_HELP[preset]}</p>
           </div>
         </Field>
@@ -83,7 +87,7 @@ export function NewCharacterWizard({ data, open, onOpenChange, onCreated }: Prop
         {idError && <p role="alert" className="-mt-2 text-destructive">{idError}</p>}
         {error && <p role="alert" className="text-destructive">{error}</p>}
 
-        <ConfirmFooter tone="primary" note="Nothing is saved until you press Create." onCancel={() => onOpenChange(false)} onConfirm={() => void create()} confirmLabel="Create" disabled={!graphic || !!idError} />
+        <ConfirmFooter tone="primary" note="Nothing is saved until you press Create." onCancel={() => onOpenChange(false)} onConfirm={() => void create()} confirmLabel="Create" disabled={!fits || !!idError} />
       </DialogContent>
     </Dialog>
   )

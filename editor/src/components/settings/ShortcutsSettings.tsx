@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { RotateCcw, X } from 'lucide-react'
+import { ChevronDown, ChevronRight, RotateCcw, X } from 'lucide-react'
+import { ConfirmDialog } from '@/components/editor/dialogs/ConfirmDialog'
 import { InfoTip } from '@/components/editor/ui/controls'
 import { SHORTCUT_ACTIONS, comboFromEvent, findConflicts, formatCombo, isMac, resolveBindings, shortcutAction } from '@/lib/shortcuts'
 import { useShortcutStore } from '@/store/shortcutStore'
@@ -18,6 +19,8 @@ export function ShortcutsSettings() {
   const mac = isMac()
   const [recording, setRecording] = useState<string | null>(null)
   const [pending, setPending] = useState<Pending | null>(null)
+  const [closed, setClosed] = useState<Set<string>>(new Set())
+  const [confirmReset, setConfirmReset] = useState(false)
 
   useEffect(() => {
     if (!recording) return
@@ -61,10 +64,19 @@ export function ShortcutsSettings() {
             several keys. These are saved for this editor, not in the project.
           </InfoTip>
         </h2>
-        <button type="button" className="ed-btn" data-size="sm" onClick={resetAll} disabled={Object.keys(overrides).length === 0}>
+        <button type="button" className="ed-btn" data-size="sm" onClick={() => setConfirmReset(true)} disabled={Object.keys(overrides).length === 0}>
           <RotateCcw /> Reset all
         </button>
       </div>
+
+      <ConfirmDialog
+        open={confirmReset}
+        title="Reset all shortcuts?"
+        description={`Every shortcut you changed (${Object.keys(overrides).length}) goes back to its default. This cannot be undone.`}
+        confirmLabel="Reset all"
+        onClose={() => setConfirmReset(false)}
+        onConfirm={resetAll}
+      />
 
       {pending && (
         <div role="alert" className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
@@ -82,10 +94,24 @@ export function ShortcutsSettings() {
         </div>
       )}
 
-      {groups.map(group => (
+      {groups.map(group => {
+        const open = !closed.has(group)
+        const changed = SHORTCUT_ACTIONS.filter(a => a.group === group && a.id in overrides).length
+        return (
         <section key={group} className="rounded-lg border bg-card/40">
-          <h3 className="border-b px-4 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{group}</h3>
-          <ul>
+          <h3 className={open ? 'border-b' : ''}>
+            <button
+              type="button"
+              aria-expanded={open}
+              className="flex w-full items-center gap-2 px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground"
+              onClick={() => setClosed(s => { const n = new Set(s); if (n.has(group)) n.delete(group); else n.add(group); return n })}
+            >
+              {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+              <span className="flex-1">{group}</span>
+              {changed > 0 && <span className="font-normal normal-case tracking-normal">{changed} changed</span>}
+            </button>
+          </h3>
+          {open && <ul>
             {SHORTCUT_ACTIONS.filter(a => a.group === group).map(a => (
               <li key={a.id} className="flex items-center justify-between gap-3 px-4 py-1.5">
                 <span className="text-sm">{a.label}</span>
@@ -123,9 +149,10 @@ export function ShortcutsSettings() {
                 </span>
               </li>
             ))}
-          </ul>
+          </ul>}
         </section>
-      ))}
+        )
+      })}
     </div>
   )
 }

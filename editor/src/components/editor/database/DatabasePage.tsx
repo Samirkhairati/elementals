@@ -12,7 +12,7 @@ import { GraphicDetail, GraphicsBrowser, GraphicsToolbar } from './GraphicsTable
 import { MapDetail, MapsBrowser } from './MapsTable'
 import { TilesetDetail, TilesetsBrowser, TilesetsToolbar } from './TilesetsTable'
 import { ImportDialog } from './ImportDialog'
-import { dropCandidates, graphicImporter, pickCandidates, tilesetImporter, type Candidate, type ImportResult, type Importer } from './importFlow'
+import { acceptable, dropCandidates, graphicImporter, looseFiles, pickCandidates, pickFolderCandidates, tilesetImporter, type Candidate, type ImportResult, type Importer } from './importFlow'
 import type { LibraryControls, TableProps } from './shared'
 
 const ICONS: Record<string, LucideIcon> = { Image, Grid3x3, PersonStanding, ToggleLeft, Map: MapIcon, MessageSquareText, Bug, Package, Zap }
@@ -90,17 +90,29 @@ export function DatabasePage() {
       note: note?.tableId === table.id ? note : null,
       pick: async () => {
         const r = await pickCandidates()
-        if (r.ok) open(r.candidates, folder)
-        else if (!r.canceled) setNote({ tableId: table.id, ok: false, text: r.error })
+        if (r.ok) {
+          const kept = acceptable(r.candidates, importer.accepts)
+          if (kept.candidates.length > 0) open(kept.candidates, folder)
+          if (kept.left > 0) setNote({ tableId: table.id, ok: kept.candidates.length > 0, text: `${kept.left} GIF animation${kept.left === 1 ? '' : 's'} left out: they can only be imported into Graphics.` })
+        } else if (!r.canceled) setNote({ tableId: table.id, ok: false, text: r.error })
       },
-      dropFiles: async (files, into) => {
-        const r = await dropCandidates(files)
+      pickFolder: async () => {
+        const r = await pickFolderCandidates()
+        if (r.ok) {
+          const kept = acceptable(r.candidates, importer.accepts)
+          if (kept.candidates.length > 0) open(kept.candidates, folder)
+          const left = [r.skipped + kept.left > 0 ? `${r.skipped + kept.left} file${r.skipped + kept.left === 1 ? '' : 's'} that ${importer.accepts.includes('gif') ? 'are not PNG or GIF images' : 'are not PNGs'} were left out` : '', r.truncated ? 'the folder is too big to import in one go, so only the first part is listed' : ''].filter(Boolean)
+          if (left.length > 0) setNote({ tableId: table.id, ok: true, text: `${left.join('; ')}.` })
+        } else if (!r.canceled) setNote({ tableId: table.id, ok: false, text: r.error })
+      },
+      dropFiles: async (dropped, into) => {
+        const r = await dropCandidates(await dropped, { accept: importer.accepts })
         if (!r.ok) return r.error ? setNote({ tableId: table.id, ok: false, text: r.error }) : undefined
         setFolders((cur) => ({ ...cur, [table.id]: into }))
         open(r.candidates, into)
       },
       pasteFiles: async (files, into) => {
-        const r = await dropCandidates(files, { pasted: true })
+        const r = await dropCandidates(looseFiles(files), { pasted: true })
         if (!r.ok) return r.error ? setNote({ tableId: table.id, ok: false, text: r.error }) : undefined
         open(r.candidates, into)
       },

@@ -7,6 +7,8 @@ import {
   RUN_SPEED_MULTIPLIER,
   bindingCandidates,
   buildAnimationRegistrations,
+  buildCharacterManifest,
+  characterToSpriteMeta,
   buildClipRegistrations,
   clipAnimKey,
   clipFrameAt,
@@ -16,6 +18,9 @@ import {
   createDefaultComponent,
   effectiveFps,
   filesBySheetKey,
+  graphicUrl,
+  isGifGraphicId,
+  isValidGraphicId,
   legacyGraphicId,
   migrateCharacter,
   normalizeProps,
@@ -387,5 +392,45 @@ describe('Sprite.animSpeed', () => {
     expect(normalizeProps('Sprite', { animSpeed: 0 }).animSpeed).toBe(0)
     expect(normalizeProps('Sprite', { animSpeed: -1 }).animSpeed).toBe(0)
     expect(normalizeProps('Sprite', { animSpeed: 'fast' }).animSpeed).toBe(1)
+  })
+})
+
+describe('GIF sheets', () => {
+  const gifDef = (over: Partial<CharacterDef> = {}): CharacterDef => ({
+    version: 2, name: 'Boss', tags: [], facing: 'none', pivot: { x: 0.5, y: 1 },
+    sheets: { idle: { image: 'sprites/boss/idle.gif', frameWidth: 4, frameHeight: 3, margin: 0, spacing: 0 } },
+    clips: { idle: { sheet: 'idle', fps: 10, loop: true, directional: false, frames: [0, 1, 2] } },
+    bindings: { idle: 'idle' },
+    ...over,
+  })
+  // what a graphic reports for a 3-frame 4x3 GIF: the size of its sheet
+  const sizes = { 'sprites/boss/idle.gif': { width: 12, height: 3 } }
+
+  it('a .gif id is a valid graphic id, and the game loads the sheet generated from it', () => {
+    expect(isValidGraphicId('sprites/boss/idle.gif')).toBe(true)
+    expect(isGifGraphicId('a/b.GIF')).toBe(true)
+    expect(isGifGraphicId('a/b.png')).toBe(false)
+    expect(graphicUrl('sprites/boss/idle.gif')).toBe('graphics/sprites/boss/idle.gif.png')
+    expect(graphicUrl('sprites/hero/walk.png')).toBe('graphics/sprites/hero/walk.png')
+    expect(buildCharacterManifest([{ id: 'boss', def: gifDef() }]).characters[0].files).toEqual({ idle: 'graphics/sprites/boss/idle.gif.png' })
+  })
+
+  it('validates against the size of the sheet: its frames are cut like any other sheet', () => {
+    const ok = validateCharacter(gifDef(), { graphics: new Set(Object.keys(sizes)), imageSizes: sizes })
+    expect(ok.issues).toEqual([])
+    expect(sheetFrameRect(gifDef().sheets.idle, 2, 12)).toEqual({ x: 8, y: 0, w: 4, h: 3 })
+    const beyond = validateCharacter(gifDef({ clips: { idle: { sheet: 'idle', fps: 10, loop: true, directional: false, frames: [0, 3] } } }), { graphics: new Set(Object.keys(sizes)), imageSizes: sizes })
+    expect(beyond.issues.map((i) => i.code)).toContain('frame-beyond-sheet')
+  })
+
+  it('an entity that uses a GIF character sees an animated asset: its clip is an animation, the sheet is the GIF sheet', () => {
+    const meta = characterToSpriteMeta(gifDef())
+    expect(meta).toMatchObject({ kind: 'animated', frameWidth: 4, frameHeight: 3, sheet: 'idle.gif', animations: { idle: { frames: [0, 1, 2], fps: 10, loop: true } } })
+  })
+
+  it('the clip plays the frames in the GIF order at the chosen fps', () => {
+    const def = gifDef()
+    const [reg] = buildClipRegistrations('boss', def)
+    expect(reg).toMatchObject({ key: 'sprite:boss:idle', frames: [0, 1, 2], fps: 10, loop: true })
   })
 })

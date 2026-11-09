@@ -7,6 +7,59 @@ export function pngFilesOf(dt: DataTransfer | null): File[] {
 
 export const onlyPngs = (files: File[]): File[] => files.filter((f) => /\.png$/i.test(f.name) || f.type === 'image/png')
 
+/** Which kind of picture a file is (by its name or type): a GIF is an animation, anything else that is accepted a PNG. */
+export const imageKindOf = (file: File): 'png' | 'gif' | null => (/\.gif$/i.test(file.name) || file.type === 'image/gif' ? 'gif' : /\.png$/i.test(file.name) || file.type === 'image/png' ? 'png' : null)
+
+/** The files of the kinds in `accept` (PNGs only by default). */
+export const onlyImages = (files: File[], accept: readonly ('png' | 'gif')[] = ['png']): File[] => files.filter((f) => {
+  const kind = imageKindOf(f)
+  return kind !== null && accept.includes(kind)
+})
+
+/** A dropped file and the folder it sat in inside a dropped folder (`Trees/oak`, starting with the dropped folder's name; '' = dropped on its own). */
+export interface DroppedItem {
+  file: File
+  dir: string
+}
+
+const MAX_DROPPED = 5000
+const MAX_DEPTH = 12
+
+const readAll = (reader: FileSystemDirectoryReader): Promise<FileSystemEntry[]> =>
+  new Promise((resolve, reject) => {
+    const out: FileSystemEntry[] = []
+    const next = () => reader.readEntries((batch) => { if (batch.length === 0) resolve(out); else { out.push(...batch); next() } }, reject)
+    next()
+  })
+
+const fileOf = (entry: FileSystemFileEntry): Promise<File> => new Promise((resolve, reject) => entry.file(resolve, reject))
+
+/**
+ * The files of a drop with their folders: a dropped folder is walked (nested folders included), a plain file stands
+ * alone. Call it inside the drop event, because the browser only hands out the entries there; the walk then goes on
+ * asynchronously. Hidden files are skipped. Falls back to `dt.files` where folder entries are not available.
+ */
+export function readDrop(dt: DataTransfer | null): Promise<DroppedItem[]> {
+  if (!dt) return Promise.resolve([])
+  const entries = Array.from(dt.items ?? []).flatMap((item) => (item.kind === 'file' && typeof item.webkitGetAsEntry === 'function' ? [item.webkitGetAsEntry()] : []))
+  const plain = Array.from(dt.files ?? [])
+  if (entries.length === 0 || entries.some((e) => e === null)) return Promise.resolve(plain.map((file) => ({ file, dir: '' })))
+  const out: DroppedItem[] = []
+  const walk = async (entry: FileSystemEntry, dir: string, depth: number): Promise<void> => {
+    if (out.length >= MAX_DROPPED || entry.name.startsWith('.')) return
+    if (entry.isFile) out.push({ file: await fileOf(entry as FileSystemFileEntry), dir })
+    else if (entry.isDirectory && depth < MAX_DEPTH) {
+      const children = await readAll((entry as FileSystemDirectoryEntry).createReader())
+      children.sort((a, b) => a.name.localeCompare(b.name))
+      for (const child of children) await walk(child, child.isDirectory ? `${dir ? `${dir}/` : ''}${child.name}` : dir, depth + 1)
+    }
+  }
+  return (async () => {
+    for (const entry of entries as FileSystemEntry[]) await walk(entry, entry.isDirectory ? entry.name : '', 0)
+    return out
+  })()
+}
+
 /** True while the drag carries OS files (not an in-app drag of a tree row). */
 export function isFileDrag(dt: DataTransfer | null): boolean {
   return !!dt && Array.from(dt.types ?? []).includes('Files')

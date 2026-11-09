@@ -1,13 +1,13 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { imagePickName, type ImagePick } from '@/lib/graphicAssets'
 import { pasteImageItems, selectImages, type SelectMode } from '@/lib/imageSelection'
-import { expandLockedGroups, groupCopies, groupImages, moveItems, pruneGroups, ungroupImages } from '@/lib/imageGroups'
+import { createGroup, deleteGroup, expandLockedGroups, groupCopies, groupImages, moveItems, pruneGroups, setGroupOf, ungroupImages } from '@/lib/imageGroups'
 import { snapshot, useEditorClipboard } from '@/store/editorClipboard'
 import { nextImageName } from '@/lib/imageItems'
 import { Layer, LayerType, ImageItem, ImageGroup, TileSelection, ActiveTool, PaintMode, DebugInfo, MapData } from '@/types/editor'
 import { useSyncedState } from '@/hooks/useSyncedState'
 import { ARROW_DELTAS, nudgeStep } from '@/lib/imageNudge'
-import { setFolderFlag } from '@/lib/layerFolders'
+import { layersToCopy, placeLayerCopies, setFolderFlag } from '@/lib/layerFolders'
 import { clampEntitiesIndex, entitiesIndexAfterInsert, entitiesIndexAfterRemove, moveInDrawOrder, moveInDrawOrderTo, sortedImages } from '@/lib/layerOrder'
 
 interface UseLayerManagerOptions {
@@ -46,6 +46,12 @@ export function useLayerManager(options: UseLayerManagerOptions) {
   const pickedImageIds = useMemo(() => (selectedImageId ? [selectedImageId, ...extraImageIds.filter(id => id !== selectedImageId)] : []), [selectedImageId, extraImageIds])
   selectedImageIdRef.current = selectedImageId
   pickedImageIdsRef.current = pickedImageIds
+  /** The picture whose resize handles show on the canvas (Images panel › Resize); only while it is the one picture picked. */
+  const [resizingRaw, setResizingImageId] = useState<string | null>(null)
+  const resizingImageId = resizingRaw && resizingRaw === selectedImageId && extraImageIds.length === 0 ? resizingRaw : null
+  useEffect(() => {
+    if (resizingRaw && !resizingImageId) setResizingImageId(null)
+  }, [resizingRaw, resizingImageId])
   const [tileSelection, setTileSelection] = useState<TileSelection | null>(null)
   const [activeTool, setActiveTool] = useState<ActiveTool>('brush')
   const [paintMode, setPaintMode] = useState<PaintMode>('discontinuous')
@@ -314,107 +320,51 @@ export function useLayerManager(options: UseLayerManagerOptions) {
     [commitNewLayers]
   )
 
-  const handleDuplicateLayer = useCallback(
-    (id: string) => {
-      let createdId: string | null = null
-      let insertedAt = -1
+  /** Insert copies of `source` layers (new ids, "Name Copy") next to the layer `afterId`, at its depth (see placeLayerCopies), in one undo step, and pick the last. */
+  const insertLayerCopies = useCallback(
+    (source: readonly Layer[], afterId: string | null) => {
+      let placed: ReturnType<typeof placeLayerCopies> | null = null
       let countBefore = 0
       commitNewLayers(
         prev => {
-          const targetIndex = prev.findIndex(l => l.id === id)
-          if (targetIndex === -1) return prev
-          const targetLayer = prev[targetIndex]
-          const newLayer: Layer = {
-            ...targetLayer,
-            id: crypto.randomUUID(),
-            name: `${targetLayer.name} Copy`,
-            data: targetLayer.data ? JSON.parse(JSON.stringify(targetLayer.data)) : undefined,
-            images: targetLayer.images?.map(img => ({ ...img, id: crypto.randomUUID() })),
-          }
-          createdId = newLayer.id
-          const next = [...prev]
-          next.splice(targetIndex + 1, 0, newLayer)
-          insertedAt = targetIndex + 1
+          placed = placeLayerCopies(prev, source, afterId, () => crypto.randomUUID())
           countBefore = prev.length
-          return next
+          return placed.layers
         },
         () => {
-          if (createdId) setActiveLayerId(createdId)
-          if (insertedAt >= 0) shiftEntitiesIndex(k => entitiesIndexAfterInsert(k, insertedAt, countBefore))
+          const done = placed as ReturnType<typeof placeLayerCopies> | null
+          if (!done || done.count === 0) return
+          if (done.lastId) setActiveLayerId(done.lastId)
+          shiftEntitiesIndex(k => entitiesIndexAfterInsert(k, done.at, countBefore, done.count))
         }
       )
     },
     [commitNewLayers, setActiveLayerId, shiftEntitiesIndex]
   )
 
-  /** The layers that can be copied: tile and image layers (folders and the gameplay layers are one-per-map or structural). */
-  const copyableLayerIds = useCallback(
-    (ids: readonly string[]) => layersRef.current.filter(l => ids.includes(l.id) && (l.type === 'tile' || l.type === 'image')).map(l => l.id),
-    [layersRef]
-  )
-
-  /** Copy layers to the editor clipboard. */
+  /** Copy layers to the editor clipboard: tile and image layers, and folders with the layers they hold. */
   const copyLayers = useCallback(
     (ids: readonly string[]) => {
-      const wanted = copyableLayerIds(ids)
-      const list = layersRef.current.filter(l => wanted.includes(l.id))
+      const list = layersToCopy(layersRef.current, ids)
       if (list.length > 0) useEditorClipboard.getState().set({ kind: 'layers', layers: snapshot(list) })
       return list.length
     },
-    [copyableLayerIds, layersRef]
+    [layersRef]
   )
 
-  /** Insert copies of `source` layers (new ids, "Name Copy") above the layer `afterId`, in one undo step, and pick the last. */
-  const insertLayerCopies = useCallback(
-    (source: readonly Layer[], afterId: string | null) => {
-      let createdId: string | null = null
-      let insertedAt = -1
-      let countBefore = 0
-      commitNewLayers(
-        prev => {
-          if (source.length === 0) return prev
-          const taken = new Set(prev.map(l => l.name))
-          const copies = source.map(layer => {
-            let name = `${layer.name} Copy`
-            for (let n = 2; taken.has(name); n++) name = `${layer.name} Copy ${n}`
-            taken.add(name)
-            const { folderId: _folder, ...rest } = layer
-            return {
-              ...rest,
-              id: crypto.randomUUID(),
-              name,
-              data: layer.data ? JSON.parse(JSON.stringify(layer.data)) : undefined,
-              images: layer.images?.map(img => ({ ...img, id: crypto.randomUUID() })),
-            } as Layer
-          })
-          const at = afterId ? prev.findIndex(l => l.id === afterId) : -1
-          insertedAt = at === -1 ? prev.length : at + 1
-          countBefore = prev.length
-          createdId = copies[copies.length - 1].id
-          const next = [...prev]
-          next.splice(insertedAt, 0, ...copies)
-          return next
-        },
-        () => {
-          if (createdId) setActiveLayerId(createdId)
-          if (insertedAt >= 0) shiftEntitiesIndex(k => entitiesIndexAfterInsert(k, insertedAt, countBefore))
-        }
-      )
-    },
-    [commitNewLayers, setActiveLayerId, shiftEntitiesIndex]
-  )
-
-  /** Duplicate several layers at once (one undo step); the copies go above the highest of them. */
+  /** Duplicate several layers and folders at once (one undo step); the copies go below the lowest of them, at its depth. */
   const duplicateLayers = useCallback(
     (ids: readonly string[]) => {
-      const wanted = copyableLayerIds(ids)
-      const list = layersRef.current.filter(l => wanted.includes(l.id))
+      const list = layersToCopy(layersRef.current, ids)
       if (list.length === 0) return
       insertLayerCopies(list, list[list.length - 1].id)
     },
-    [copyableLayerIds, insertLayerCopies, layersRef]
+    [insertLayerCopies, layersRef]
   )
 
+  const handleDuplicateLayer = useCallback((id: string) => duplicateLayers([id]), [duplicateLayers])
+
+  /** Paste copied layers next to `afterId`, in its folder (see placeLayerCopies). */
   const pasteLayers = useCallback(
     (afterId: string | null) => {
       const content = useEditorClipboard.getState().content
@@ -573,14 +523,20 @@ export function useLayerManager(options: UseLayerManagerOptions) {
     [commitNewLayers, setSelectedImageId]
   )
 
-  /** Dropped in front of (`top`) or behind (`bottom`) another image: the whole move is one undo step. */
+  /**
+   * Dropped in front of (`top`) or behind (`bottom`) another image: the whole move is one undo step. The picture also joins the
+   * group of the one it was dropped on, or leaves its group when that one has none (that is how a picture is dragged out).
+   */
   const moveImageTo = useCallback(
     (layerId: string, imageId: string, targetId: string, position: 'top' | 'bottom') => {
       commitNewLayers(prev => {
         const index = prev.findIndex(l => l.id === layerId && l.type === 'image')
         if (index === -1) return prev
         const images = prev[index].images || []
-        const moved = moveInDrawOrderTo(images, imageId, targetId, position)
+        const ordered = moveInDrawOrderTo(images, imageId, targetId, position)
+        const targetGroup = images.find(i => i.id === targetId)?.groupId ?? null
+        const regrouped = setGroupOf({ images: ordered, groups: prev[index].groups ?? [] }, [imageId], targetGroup)
+        const moved = regrouped ? regrouped.images : ordered
         if (moved === images) return prev
         const next = [...prev]
         next[index] = { ...prev[index], images: moved }
@@ -713,7 +669,7 @@ export function useLayerManager(options: UseLayerManagerOptions) {
     [commitNewLayers]
   )
 
-  /** Put the picked pictures (at least two) into a new group and select its row. */
+  /** Put the picked pictures into a new group and select its row. */
   const groupPickedImages = useCallback(
     (layerId: string) => {
       const groupId = crypto.randomUUID()
@@ -725,6 +681,53 @@ export function useLayerManager(options: UseLayerManagerOptions) {
       )
     },
     [editGroups]
+  )
+
+  /** A new group: empty, or holding `ids` (taken out of their groups). Returns its id, so its name can open for typing. */
+  const createImageGroup = useCallback(
+    (layerId: string, ids: readonly string[] = []) => {
+      const groupId = crypto.randomUUID()
+      let made: string | null = null
+      editGroups(
+        layerId,
+        state => {
+          const r = ids.length > 0 ? groupImages(state, ids, groupId) : createGroup(state, groupId)
+          made = r ? r.groupId : null
+          return r
+        },
+        () => ids.length > 0 && setOpenImageGroupId(groupId)
+      )
+      return made
+    },
+    [editGroups]
+  )
+
+  /** Move pictures into a group, or out of their group with null (they stay where they are on the map and in the list). */
+  const setImagesGroup = useCallback(
+    (layerId: string, ids: readonly string[], groupId: string | null) => {
+      editGroups(layerId, state => setGroupOf(state, ids, groupId))
+    },
+    [editGroups]
+  )
+
+  /** Delete a group with every picture in it (an empty group just goes). */
+  const deleteImageGroup = useCallback(
+    (layerId: string, groupId: string) => {
+      let removed: string[] = []
+      editGroups(
+        layerId,
+        state => {
+          const r = deleteGroup(state, groupId)
+          removed = r.removed
+          return { images: r.images, groups: r.groups }
+        },
+        () => {
+          setOpenImageGroupId(current => (current === groupId ? null : current))
+          if (removed.some(id => pickedImageIdsRef.current.includes(id))) setSelectedImageId(null)
+        }
+      )
+    },
+    [editGroups, setSelectedImageId]
   )
 
   const ungroupImageGroup = useCallback(
@@ -891,12 +894,17 @@ export function useLayerManager(options: UseLayerManagerOptions) {
     startImagePlacement,
     cancelImagePlacement,
     selectedImageId,
+    resizingImageId,
+    setResizingImageId,
     setSelectedImageId,
     pickedImageIds,
     selectImage,
     openImageGroupId,
     selectImageGroup,
     groupPickedImages,
+    createImageGroup,
+    setImagesGroup,
+    deleteImageGroup,
     ungroupImageGroup,
     renameImageGroup,
     setImageGroupLocked,

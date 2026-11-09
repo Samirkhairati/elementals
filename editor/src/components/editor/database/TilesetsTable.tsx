@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Pencil, Trash2 } from 'lucide-react'
 import { folderOfId, joinId, leafOfId } from '@/lib/assetOps'
 import type { LibraryItem } from '@/lib/libraryTree'
+import { describeSelection, type LibrarySelection } from '@/lib/librarySelection'
 import { tilesetGrid } from '@/lib/databaseModel'
 import { TILE_SIZE } from '../../../../../shared/engine/constants'
 import { Badge, EdButton, Field } from '../ui/controls'
@@ -18,7 +19,7 @@ import type { LibraryControls, TableProps } from './shared'
 
 const FILE_STEM = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/
 
-type FolderDialog = { kind: 'new'; parent: string } | { kind: 'change'; folder: string } | { kind: 'delete'; folder: string } | null
+type FolderDialog = { kind: 'new'; parent: string } | { kind: 'many'; selection: LibrarySelection } | { kind: 'change'; folder: string } | { kind: 'delete'; folder: string } | null
 
 export function TilesetsBrowser({ data, query, selected, onSelect, mode, library }: TableProps) {
   const actions = tilesetActions(data)
@@ -29,7 +30,10 @@ export function TilesetsBrowser({ data, query, selected, onSelect, mode, library
   const [outcome, setOutcome] = useState<Outcome | null>(null)
 
   const move = async (drag: DragPayload, target: string) => {
-    if (drag.kind === 'item') {
+    if (drag.kind === 'many') {
+      const r = await actions.moveMany(drag, target)
+      if (r.message || r.error) setOutcome(r)
+    } else if (drag.kind === 'item') {
       const t = data.tilesets.find((x) => x.fileName === drag.key)
       if (!t || folderOfTileset(t) === target) return
       setOutcome(await actions.move(t, target))
@@ -57,12 +61,26 @@ export function TilesetsBrowser({ data, query, selected, onSelect, mode, library
         badge={(item) => (used[item.key] ? null : <Badge title="No map paints with this tileset">unused</Badge>)}
         hint={(item) => (used[item.key] ? undefined : 'unused')}
         onMove={(d, t) => void move(d, t)}
+        onDeleteMany={(selection) => setDialog({ kind: 'many', selection })}
+        noun="tileset"
         folderActions={{ onCreate: (parent) => setDialog({ kind: 'new', parent }), onRename: (folder) => setDialog({ kind: 'change', folder }), onDelete: (folder) => setDialog({ kind: 'delete', folder }) }}
         emptyText="No tilesets yet. Use Import…, or drop images here."
         library={library}
       />
       {dialog?.kind === 'new' && <NewTilesetFolder parent={dialog.parent} actions={actions} onDone={setOutcome} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'change' && <ChangeTilesetFolder folder={dialog.folder} actions={actions} onDone={setOutcome} onClose={() => setDialog(null)} />}
+      {dialog?.kind === 'many' && (
+        <DeleteDialog
+          open
+          title={`Delete ${describeSelection(dialog.selection, 'tileset')}?`}
+          subject={describeSelection(actions.topLevel(dialog.selection), 'tileset')}
+          description={`The files${dialog.selection.folders.length ? ' and folders' : ''} are removed from the project, ${actions.reached(dialog.selection).length} tileset${actions.reached(dialog.selection).length === 1 ? '' : 's'} in all. This cannot be undone.`}
+          guard={actions.deleteGuard(actions.reached(dialog.selection))}
+          blockedHint="Repaint those maps first, or leave the tilesets that are in use out of the selection."
+          onConfirm={async () => { const r = await actions.removeMany(dialog.selection); setOutcome(r); if (r.ok && actions.reached(dialog.selection).includes(selected)) onSelect(''); return r.error }}
+          onClose={() => setDialog(null)}
+        />
+      )}
       {dialog?.kind === 'delete' && <DeleteTilesetFolder folder={dialog.folder} actions={actions} onDone={setOutcome} onClose={() => setDialog(null)} />}
     </>
   )
@@ -208,7 +226,7 @@ export function TilesetsToolbar({ data, library }: { data: DatabaseData; onSelec
   return (
     <LibraryToolbar
       library={library}
-      info="Import copies PNGs into the project: pick several, drag them from your computer onto the list or onto a folder, or paste a copied picture or screenshot (Ctrl/Cmd+V). Each one gets a naming step first. They go into the folder you clicked last. The map editor lists what you add here and lets you pick it."
+      info="Import copies PNGs into the project: pick several, or pick a whole folder (the folders inside it are kept), drag files or folders from your computer onto the list or onto a folder, or paste a copied picture or screenshot (Ctrl/Cmd+V). Each one gets a naming step first. They go into the folder you clicked last. The map editor lists what you add here and lets you pick it. Ctrl/Cmd+click and Shift+click pick several tilesets and folders at once: drag them onto a folder to move them, or press Delete."
       newFolder={(onClose, parent) => <NewTilesetFolder parent={parent} actions={actions} onDone={() => undefined} onClose={onClose} />}
     />
   )

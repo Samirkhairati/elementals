@@ -27,7 +27,7 @@ function validMap(): any {
       { id: 'c', name: 'collisions', type: 'collision', visible: true, locked: false, data: { 0: { tilesetId: '__collision__', x: 0, y: 0 } } },
       { id: 'g', name: 'ground', type: 'tile', visible: true, locked: false, z: 1, data: { 5: { tilesetId: 'grass.png', x: 1, y: 1 } } },
     ],
-    entities: [{ id: 'e', name: 'E', x: 1, y: 2, components: { Transform: { x: 1, y: 2 }, Collider: { width: 32 } } }],
+    entities: [{ id: 'e', name: 'E', x: 16, y: 32, components: { Transform: { x: 16, y: 32 }, Collider: { width: 32 } } }],
   }
 }
 

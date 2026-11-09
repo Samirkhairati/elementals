@@ -25,7 +25,7 @@ import {
   type Handle,
   type Rect,
 } from '@/lib/entityVisuals'
-import { snapValue } from '@/lib/snapPref'
+import { snapColliderToTiles } from '../../../../../shared/engine/placement'
 import { drawResolvedSprite, resolveSprite, useSpriteImagesVersion } from '@/lib/spriteImages'
 import { ZoomControls } from '../ui/controls'
 
@@ -299,9 +299,9 @@ export function EntityViewport({
         ? moveRect(g.startRect, dx, dy, { step })
         : resizeRect(g.startRect, g.handle, dx, dy, { step, fromCenter: !!ev.altKey })
       if (!tiles) return free
-      // Magnet on: the size and the offset the drag produces are whole tiles (the same values the number fields accept).
-      const props = rectToColliderProps(free)
-      return colliderLocalRect({ width: snapValue(props.width, snapStep, snapStep), height: snapValue(props.height, snapStep, snapStep), offsetX: snapValue(props.offsetX, snapStep), offsetY: snapValue(props.offsetY, snapStep) })
+      // Tile snapping on: the size and the offset the drag produces are whole tiles, placed so the edges lie on tile lines
+      // (the same values the number fields accept).
+      return colliderLocalRect(snapColliderToTiles(rectToColliderProps(free)))
     }
     startGesture(
       { kind: 'collider', handle, startPointer: start, startRect },

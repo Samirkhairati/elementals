@@ -59,18 +59,43 @@ function pickPngs(): Promise<Result> {
     const input = document.createElement('input')
     input.type = 'file'
     input.multiple = true
-    input.accept = '.png,image/png'
+    input.accept = '.png,.gif,image/png,image/gif'
     input.addEventListener('cancel', () => resolve({ success: false, canceled: true }))
     input.addEventListener('change', async () => {
       const chosen = Array.from(input.files ?? [])
       if (chosen.length === 0) return resolve({ success: false, canceled: true })
-      const files: { sourcePath: string; defaultName: string; previewUrl: string }[] = []
+      const files: { sourcePath: string; defaultName: string; ext: 'png' | 'gif'; previewUrl: string }[] = []
       for (const file of chosen) {
         const staged = await stageUpload(file.name, new Uint8Array(await file.arrayBuffer()))
         if (!staged.success || typeof staged.sourcePath !== 'string') return resolve({ success: false, error: String(staged.error ?? `Could not read ${file.name}`) })
-        files.push({ sourcePath: staged.sourcePath, defaultName: file.name.replace(/\.[^.]+$/, ''), previewUrl: URL.createObjectURL(file) })
+        files.push({ sourcePath: staged.sourcePath, defaultName: file.name.replace(/\.[^.]+$/, ''), ext: /\.gif$/i.test(file.name) ? 'gif' : 'png', previewUrl: URL.createObjectURL(file) })
       }
       resolve({ success: true, files })
+    })
+    input.click()
+  })
+}
+
+/** Stand-in for the native folder picker: a `webkitdirectory` input, then stage every PNG below the chosen folder. */
+function pickPngFolder(): Promise<Result> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.webkitdirectory = true
+    input.addEventListener('cancel', () => resolve({ success: false, canceled: true }))
+    input.addEventListener('change', async () => {
+      const all = Array.from(input.files ?? [])
+      const chosen = all.filter((f) => /\.(png|gif)$/i.test(f.name) && !/(^|\/)\./.test(f.webkitRelativePath))
+      if (all.length === 0) return resolve({ success: false, canceled: true })
+      if (chosen.length === 0) return resolve({ success: false, error: 'That folder has no PNG or GIF images in it.' })
+      const files: { sourcePath: string; dir: string; defaultName: string; ext: 'png' | 'gif'; previewUrl: string }[] = []
+      for (const file of chosen) {
+        const staged = await stageUpload(file.name, new Uint8Array(await file.arrayBuffer()))
+        if (!staged.success || typeof staged.sourcePath !== 'string') return resolve({ success: false, error: String(staged.error ?? `Could not read ${file.name}`) })
+        const relative = file.webkitRelativePath || file.name
+        files.push({ sourcePath: staged.sourcePath, dir: relative.includes('/') ? relative.slice(0, relative.lastIndexOf('/')) : '', defaultName: file.name.replace(/\.[^.]+$/, ''), ext: /\.gif$/i.test(file.name) ? 'gif' : 'png', previewUrl: URL.createObjectURL(file) })
+      }
+      resolve({ success: true, files, skipped: all.length - chosen.length, truncated: false })
     })
     input.click()
   })
@@ -128,10 +153,13 @@ export function createBrowserElectronApi(): ElectronAPI {
     getCharacters: () => c('get-characters'),
     pickSpriteFile: () => pickPng(),
     pickImageFiles: () => pickPngs(),
+    pickImageFolder: () => pickPngFolder(),
     stageImage: (name: string, bytes: Uint8Array) => stageUpload(name, bytes),
     saveCharacter: (id: string, def: unknown) => c('save-character', id, def),
     renameCharacter: (id: string, newId: string) => c('rename-character', id, newId),
     deleteCharacter: (id: string) => c('delete-character', id),
+    beginBulkImport: () => c('begin-bulk-import'),
+    endBulkImport: () => c('end-bulk-import'),
     importGraphic: (sourcePath: string, graphicId: string) => c('import-graphic', sourcePath, graphicId),
     replaceGraphic: (sourcePath: string, graphicId: string) => c('replace-graphic', sourcePath, graphicId),
     renameGraphic: (id: string, newId: string) => c('rename-graphic', id, newId),

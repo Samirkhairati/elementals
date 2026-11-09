@@ -399,12 +399,25 @@ export function sortByDepth<T extends EntityLike>(entities: readonly T[]): T[] {
     .map((o) => o.e)
 }
 
+/** A free entity (`Transform.free`): any pixel position, any size; it is not tied to the tile it stands on. */
+export const isFreeEntityLike = (entity: Pick<EntityLike, 'components'>): boolean => entity.components.Transform?.free === true
+
+/** What a free entity without a collider occupies: a small box on its anchor, so it can still be picked and shown. */
+export const FREE_ANCHOR_BOX: Rect = { x: -8, y: -16, w: 16, h: 16 }
+
+/** The area of an entity relative to its anchor: its collider box; without one, its tile (a free entity: a small box). */
+export function entityAreaLocal(entity: Pick<EntityLike, 'components'>): Rect {
+  const collider = entity.components.Collider
+  if (collider) return colliderLocalRect(normalizeCollider(collider))
+  return isFreeEntityLike(entity) ? FREE_ANCHOR_BOX : TILE_RECT_LOCAL
+}
+
 /**
- * Bounds used for hover/selection frames: the sprite frame (when there is one) united with the tile
- * the entity stands on, in map space.
+ * Bounds used for hover/selection frames: the sprite frame (when there is one) united with the area the entity
+ * stands on (its tile, or for a free entity its collider), in map space.
  */
 export function entityBounds(entity: EntityLike, meta: SpriteAssetMeta | undefined): Rect {
-  const tile = translateRect(TILE_RECT_LOCAL, entity.x, entity.y)
+  const tile = translateRect(isFreeEntityLike(entity) ? entityAreaLocal(entity) : TILE_RECT_LOCAL, entity.x, entity.y)
   const sprite = entity.components.Sprite
   if (!sprite || !meta) return tile
   const local = spriteLocalRect(meta, sprite as Partial<SpriteLike>)

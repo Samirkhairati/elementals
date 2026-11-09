@@ -317,6 +317,20 @@ describe('MovementSystem lifecycle', () => {
     created.length = 0;
   });
 
+  it('a free entity is never snapped to the grid: a step starts from its own pixel', () => {
+    const { world, movement } = makeSystems();
+    const { e, grid, t } = addGridEntity(world, 4, 4);
+    t.free = true;
+    t.x = px(4) + 5;
+    t.y = py(4) - 6;
+    movement.snapTransformToGrid(t, e, world);
+    expect([t.x, t.y]).toEqual([px(4) + 5, py(4) - 6]);
+    grid.pendingDirection = Direction.RIGHT;
+    grid.holdDuration = 100;
+    world.update(16);
+    expect([grid.targetX, grid.targetY]).toEqual([px(5) + 5, py(4) - 6]);
+  });
+
   it('snapTransformToGrid aligns to the nearest walkable tile', () => {
     const { world, movement } = makeSystems();
     const { e, t } = addGridEntity(world, 4, 4);

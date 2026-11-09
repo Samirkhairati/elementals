@@ -118,20 +118,31 @@ describe('several layers at once', () => {
     expect(result.current.selectedLayerIds).toEqual(['B'])
   })
 
-  it('duplicateLayers copies tile layers above the highest one, with new ids and unique names', () => {
+  it('duplicateLayers puts the copies right below the lowest one, with new ids and unique names', () => {
     const { result } = setup(layers())
-    act(() => result.current.duplicateLayers(['A', 'B', 'F']))
+    act(() => result.current.duplicateLayers(['A', 'B']))
     expect(result.current.layers.map(l => l.name)).toEqual(['A', 'B', 'A Copy', 'B Copy', 'C', 'F'])
     expect(new Set(result.current.layers.map(l => l.id)).size).toBe(6)
   })
 
-  it('copyLayers + pasteLayers paste above the given layer, again with free names; folders are not copyable', () => {
+  it('copyLayers + pasteLayers paste below the given layer, again with free names; folders are copied too', () => {
     const { result } = setup(layers())
     act(() => result.current.copyLayers(['B', 'F']))
     act(() => result.current.pasteLayers('C'))
-    expect(result.current.layers.map(l => l.name)).toEqual(['A', 'B', 'C', 'B Copy', 'F'])
+    expect(result.current.layers.map(l => l.name)).toEqual(['A', 'B', 'C', 'B Copy', 'F Copy', 'F'])
     act(() => result.current.pasteLayers('C'))
     expect(result.current.layers.map(l => l.name)).toContain('B Copy 2')
+  })
+
+  it('a layer copied out of a folder is pasted back into that folder, and a copied folder brings its layers', () => {
+    const inFolder = [makeLayer('F', { type: 'folder', name: 'F' }), makeLayer('a', { name: 'a', folderId: 'F' }), makeLayer('b', { name: 'b', folderId: 'F' }), makeLayer('x', { name: 'x' })]
+    const { result } = setup(inFolder)
+    act(() => result.current.copyLayers(['a']))
+    act(() => result.current.pasteLayers('a'))
+    expect(result.current.layers.map(l => [l.name, l.folderId ?? null])).toEqual([['F', null], ['a', 'F'], ['a Copy', 'F'], ['b', 'F'], ['x', null]])
+    act(() => result.current.duplicateLayers(['F']))
+    const copy = result.current.layers.find(l => l.name === 'F Copy')!
+    expect(result.current.layers.filter(l => l.folderId === copy.id).map(l => l.name)).toEqual(['a Copy 2', 'a Copy Copy', 'b Copy'])
   })
 })
 
@@ -164,13 +175,13 @@ describe('groups of pictures', () => {
     return hook
   }
 
-  it('groups the picked pictures in one history step, selects the group row, and needs at least two', () => {
+  it('groups the picked pictures in one history step and selects the group row', () => {
     const { result, onCommitHistory } = setup([four()])
-    act(() => result.current.selectImage('I1', 'a', 'replace'))
-    onCommitHistory.mockClear()
     act(() => result.current.groupPickedImages('I1'))
     expect(layerOf(result).groups).toBeUndefined()
     expect(onCommitHistory).not.toHaveBeenCalled()
+    act(() => result.current.selectImage('I1', 'a', 'replace'))
+    onCommitHistory.mockClear()
     act(() => result.current.selectImage('I1', 'b', 'toggle'))
     act(() => result.current.groupPickedImages('I1'))
     const layer = layerOf(result)
@@ -267,12 +278,38 @@ describe('groups of pictures', () => {
     expect(layer.images!.filter(i => i.groupId === layer.groups![1].id)).toHaveLength(2)
   })
 
-  it('deleting every member removes the group; deleting some keeps it', () => {
+  it('deleting its pictures keeps the group (empty); deleting the group takes its pictures', () => {
     const { result } = groupedFirstTwo()
-    act(() => result.current.deleteImages('I1', ['a']))
+    act(() => result.current.deleteImages('I1', ['a', 'b']))
     expect(layerOf(result).groups).toHaveLength(1)
-    act(() => result.current.deleteImages('I1', ['b']))
-    expect(layerOf(result).groups).toBeUndefined()
+    const again = groupedFirstTwo()
+    const gid = layerOf(again.result).groups![0].id
+    act(() => again.result.current.deleteImageGroup('I1', gid))
+    expect(layerOf(again.result).groups).toBeUndefined()
+    expect(layerOf(again.result).images!.map(i => i.id)).toEqual(['c', 'd'])
+    expect(again.result.current.pickedImageIds).toEqual([])
+  })
+
+  it('an empty group can be made, filled, and pictures taken back out of it', () => {
+    const { result } = setup([four()])
+    let gid: string | null = null
+    act(() => { gid = result.current.createImageGroup('I1') })
+    expect(layerOf(result).groups).toEqual([{ id: gid, name: 'Group' }])
+    act(() => result.current.setImagesGroup('I1', ['c', 'd'], gid))
+    expect(layerOf(result).images!.filter(i => i.groupId === gid).map(i => i.id)).toEqual(['c', 'd'])
+    act(() => result.current.setImagesGroup('I1', ['d'], null))
+    expect(layerOf(result).images!.find(i => i.id === 'd')!.groupId).toBeUndefined()
+  })
+
+  it('dragging a picture in the list onto a loose one takes it out of its group; onto a member puts it in', () => {
+    const { result, onCommitHistory } = groupedFirstTwo()
+    const gid = layerOf(result).groups![0].id
+    onCommitHistory.mockClear()
+    act(() => result.current.moveImageTo('I1', 'a', 'd', 'top'))
+    expect(layerOf(result).images!.find(i => i.id === 'a')!.groupId).toBeUndefined()
+    expect(onCommitHistory).toHaveBeenCalledTimes(1)
+    act(() => result.current.moveImageTo('I1', 'c', 'b', 'bottom'))
+    expect(layerOf(result).images!.find(i => i.id === 'c')!.groupId).toBe(gid)
   })
 
   it('copy and paste into another image layer brings the group along as a new one', () => {

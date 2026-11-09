@@ -3,13 +3,15 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { RouterProvider, createMemoryHistory, createRootRoute, createRoute, createRouter } from '@tanstack/react-router'
 import type { CharacterDef } from '../../../../../../shared/engine/characters'
 import { validateCharacter } from '../../../../../../shared/engine/characters'
-import { newCharacter } from '@/lib/characterEdit'
+import { newCharacter, newGifCharacter } from '@/lib/characterEdit'
 import { chooseOption, installElectronAPI, uninstallElectronAPI } from '@/test/helpers'
 import { DatabasePage } from '../DatabasePage'
 
 const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
 const SIZE = { width: 128, height: 192 }
-const graphics = [{ id: 'sprites/hero/walk.png', ...SIZE, bytes: 1, mtimeMs: 0 }, { id: 'sprites/hero/run.png', ...SIZE, bytes: 1, mtimeMs: 0 }, { id: 'props/ball.png', width: 24, height: 24, bytes: 1, mtimeMs: 0 }]
+// a 3-frame GIF of 16×24 px, as the library reports it: the size is that of its sheet
+const GIF = { id: 'sprites/boss/idle.gif', width: 48, height: 24, bytes: 1, mtimeMs: 0, gif: { frames: 3, frameWidth: 16, frameHeight: 24, delaysMs: [50, 50, 50] } }
+const graphics = [{ id: 'sprites/hero/walk.png', ...SIZE, bytes: 1, mtimeMs: 0 }, { id: 'sprites/hero/run.png', ...SIZE, bytes: 1, mtimeMs: 0 }, { id: 'props/ball.png', width: 24, height: 24, bytes: 1, mtimeMs: 0 }, GIF]
 const images = Object.fromEntries(graphics.map((g) => [g.id, PNG]))
 
 function setup(def: CharacterDef = newCharacter('actor', 'Hero', 'sprites/hero/walk.png', SIZE), path = '/database?table=characters&id=characters/hero', maps: unknown[] = [], extra: Record<string, unknown> = {}) {
@@ -416,3 +418,104 @@ describe('rename and delete', () => {
     expect(written.entities[0].components.Event.states[0].graph.nodes[1].params.animation).toBe('stroll')
   })
 })
+
+describe('GIF animations', () => {
+  it('the wizard makes a looping GIF character that is valid, with nothing to cut', async () => {
+    const { saved } = setup()
+    fireEvent.click(await screen.findByRole('button', { name: /New sprite/ }))
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('radio', { name: 'GIF animation' }))
+    // only GIFs are offered for this preset, and a still picture is not
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Picture' }))
+    const picker = (await screen.findAllByRole('dialog')).at(-1) as HTMLElement
+    expect(within(picker).queryByTitle('props/ball.png')).toBeNull()
+    fireEvent.click(within(picker).getByTitle('sprites/boss/idle.gif'))
+    expect(within(dialog).getByTestId('gif-suggestion')).toHaveTextContent('3 frames of 16×24 px, plays at about 20 fps.')
+    expect(within(dialog).queryByTestId('grid-suggestion')).toBeNull()
+    fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'Boss' } })
+    fireEvent.blur(within(dialog).getByLabelText('Name'))
+    expect(within(dialog).getByLabelText('Id')).toHaveValue('animated/boss')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Create' }))
+    await waitFor(() => expect(saved).toHaveLength(1))
+    expect(saved[0].def.sheets.gif).toMatchObject({ image: 'sprites/boss/idle.gif', frameWidth: 16, frameHeight: 24 })
+    expect(saved[0].def.clips.idle).toMatchObject({ sheet: 'gif', frames: [0, 1, 2], fps: 20, loop: true, directional: false })
+    expect(saved[0].def.bindings).toEqual({ idle: 'idle' })
+    expect(validateCharacter(saved[0].def, { imageSizes: { [GIF.id]: GIF } })).toMatchObject({ ok: true })
+  })
+
+  it('a picture preset offers no GIFs, and switching preset forgets a picture of the other kind', async () => {
+    setup()
+    fireEvent.click(await screen.findByRole('button', { name: /New sprite/ }))
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Picture' }))
+    const picker = (await screen.findAllByRole('dialog')).at(-1) as HTMLElement
+    expect(within(picker).queryByTitle('sprites/boss/idle.gif')).toBeNull()
+    fireEvent.click(within(picker).getByTitle('props/ball.png'))
+    fireEvent.click(within(dialog).getByRole('radio', { name: 'GIF animation' }))
+    expect(within(dialog).queryByTestId('grid-suggestion')).toBeNull()
+    expect(within(dialog).getByRole('button', { name: 'Create' })).toBeDisabled()
+  })
+
+  it('Sheets: a sheet can switch to a GIF, which shows its frames and hides the cut; back to a spritesheet restores the cut', async () => {
+    const { saved } = setup()
+    await open()
+    fireEvent.click(screen.getByRole('radio', { name: 'Sheets' }))
+    const source = await screen.findByRole('radiogroup', { name: 'Source of walk' })
+    expect(within(source).getByRole('radio', { name: 'Spritesheet' })).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(within(source).getByRole('radio', { name: 'GIF' }))
+    const picker = (await screen.findAllByRole('dialog')).at(-1) as HTMLElement
+    expect(within(picker).queryByTitle('sprites/hero/run.png')).toBeNull()
+    fireEvent.click(within(picker).getByTitle('sprites/boss/idle.gif'))
+    expect(await screen.findByTestId('gif-info-walk')).toHaveTextContent('3 frames of 16×24 px, made to play at about 20 fps')
+    expect(screen.queryByLabelText('Columns of walk')).toBeNull()
+    expect(screen.queryByRole('button', { name: /Detect from picture/ })).toBeNull()
+    save()
+    await waitFor(() => expect(saved).toHaveLength(1))
+    expect(saved[0].def.sheets.walk).toMatchObject({ image: 'sprites/boss/idle.gif', frameWidth: 16, frameHeight: 24 })
+    expect(saved[0].def.clips.walk).toMatchObject({ directional: false, frames: [0, 1, 2], fps: 20 })
+    // back to a picture of frames
+    fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Source of walk' })).getByRole('radio', { name: 'Spritesheet' }))
+    const back = (await screen.findAllByRole('dialog')).at(-1) as HTMLElement
+    expect(within(back).queryByTitle('sprites/boss/idle.gif')).toBeNull()
+    fireEvent.click(within(back).getByTitle('sprites/hero/run.png'))
+    expect(await screen.findByLabelText('Columns of walk')).toBeInTheDocument()
+  })
+
+  it('Sheets: Add GIF… adds a sheet and an animation that plays it', async () => {
+    const { saved } = setup()
+    await open()
+    fireEvent.click(screen.getByRole('radio', { name: 'Sheets' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Add a GIF' }))
+    const picker = (await screen.findAllByRole('dialog')).at(-1) as HTMLElement
+    fireEvent.click(within(picker).getByTitle('sprites/boss/idle.gif'))
+    save()
+    await waitFor(() => expect(saved).toHaveLength(1))
+    expect(saved[0].def.sheets.gif).toMatchObject({ image: 'sprites/boss/idle.gif' })
+    expect(saved[0].def.clips.animation).toMatchObject({ sheet: 'gif', frames: [0, 1, 2] })
+  })
+
+  it('Animations: a GIF animation shows no frame picker, can be sped up, and goes back to the GIF’s speed', async () => {
+    const def = newGifCharacterDef()
+    const { saved } = setup(def, '/database?table=characters&id=characters/hero')
+    await open()
+    expect(screen.getByTestId('gif-frames')).toHaveTextContent('Plays all 3 frames of sprites/boss/idle.gif in order.')
+    expect(screen.queryByLabelText('Chosen frames')).toBeNull()
+    expect(screen.getByRole('switch', { name: 'Directional' })).toBeDisabled()
+    expect(screen.getByTestId('animation-preview')).toBeInTheDocument()
+    const fps = screen.getByRole('textbox', { name: 'FPS' })
+    fireEvent.change(fps, { target: { value: '5' } })
+    fireEvent.blur(fps)
+    save()
+    await waitFor(() => expect(saved).toHaveLength(1))
+    expect(saved[0].def.clips.idle.fps).toBe(5)
+    await waitFor(() => expect(screen.getByRole('button', { name: /Save/ })).toBeDisabled()) // the saved copy is the stored one now
+    fireEvent.click(screen.getByRole('button', { name: /Use the GIF’s speed \(20 fps\)/ }))
+    save()
+    await waitFor(() => expect(saved).toHaveLength(2))
+    expect(saved[1].def.clips.idle).toMatchObject({ fps: 20, frames: [0, 1, 2] })
+  })
+})
+
+function newGifCharacterDef(): CharacterDef {
+  return newGifCharacter('Boss', GIF)
+}

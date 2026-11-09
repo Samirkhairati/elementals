@@ -98,7 +98,6 @@ export function ScaleField({ scale, source, disabled, onApply, onDraft }: Props)
           )}
         </p>
       )}
-      <p className="ed-hint">Pixels stay sharp (nearest neighbour, nothing is blended). The game rounds the size to whole pixels.</p>
     </div>
   )
 }

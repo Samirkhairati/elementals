@@ -39,6 +39,8 @@ const SEGMENT = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/
 export const folderOfId = (id: string): string => (id.includes('/') ? id.slice(0, id.lastIndexOf('/')) : '')
 export const leafOfId = (id: string): string => id.slice(id.lastIndexOf('/') + 1)
 export const joinId = (folder: string, leaf: string): string => (folder ? `${folder}/${leaf}` : leaf)
+/** Two folder paths as one; either may be empty. */
+export const joinDirs = (a: string, b: string): string => (a && b ? `${a}/${b}` : a || b)
 
 /** Ids at or below `folder`. */
 export const idsUnder = (ids: readonly string[], folder: string): string[] => ids.filter((id) => id.startsWith(`${folder}/`))

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ImageGroup, ImageItem } from '@/types/editor'
-import { expandLockedGroups, groupCopies, groupImages, imageRows, moveItems, pruneGroups, ungroupImages, uniqueGroupName } from './imageGroups'
+import { createGroup, deleteGroup, expandLockedGroups, groupCopies, groupImages, imageRows, moveItems, pruneGroups, setGroupOf, ungroupImages, uniqueGroupName } from './imageGroups'
 
 const img = (id: string, groupId?: string, z?: number): ImageItem => ({ id, assetId: 'x', x: 0, y: 0, ...(groupId ? { groupId } : {}), ...(z !== undefined ? { z } : {}) })
 const state = (images: ImageItem[], groups: ImageGroup[] = []) => ({ images, groups })
@@ -15,20 +15,20 @@ describe('uniqueGroupName', () => {
 })
 
 describe('groupImages / ungroupImages', () => {
-  it('groups at least two pictures into a new group', () => {
+  it('groups one or more pictures into a new group', () => {
     const s = state([img('a'), img('b'), img('c')])
     const r = groupImages(s, ['a', 'c'], 'g1')!
     expect(r.groups).toEqual([{ id: 'g1', name: 'Group' }])
     expect(r.images.map((i) => i.groupId)).toEqual(['g1', undefined, 'g1'])
-    expect(groupImages(s, ['a'], 'g1')).toBeNull()
-    expect(groupImages(s, ['a', 'zzz'], 'g1')).toBeNull()
+    expect(groupImages(s, ['a'], 'g1')!.images[0].groupId).toBe('g1')
+    expect(groupImages(s, ['zzz'], 'g1')).toBeNull()
   })
 
-  it('takes pictures out of their old group, and a group left empty goes away', () => {
+  it('takes pictures out of their old group; the old group stays (empty)', () => {
     const s = state([img('a', 'old'), img('b', 'old'), img('c')], [{ id: 'old', name: 'Group' }])
     const r = groupImages(s, ['a', 'b', 'c'], 'new')!
-    expect(r.groups.map((g) => g.id)).toEqual(['new'])
-    expect(r.groups[0].name).toBe('Group 2') // the old name was taken when the new one was made
+    expect(r.groups.map((g) => g.id)).toEqual(['old', 'new'])
+    expect(r.groups[1].name).toBe('Group 2')
   })
 
   it('ungroup keeps every picture in place as a loose one, and drops the group', () => {
@@ -40,13 +40,45 @@ describe('groupImages / ungroupImages', () => {
 })
 
 describe('pruneGroups', () => {
-  it('drops empty groups and forgets groups that no longer exist, and returns the same object when nothing changed', () => {
-    const clean = state([img('a', 'g')], [{ id: 'g', name: 'G' }])
+  it('forgets groups that no longer exist, keeps empty ones, and returns the same object when nothing changed', () => {
+    const clean = state([img('a', 'g')], [{ id: 'g', name: 'G' }, { id: 'empty', name: 'E' }])
     expect(pruneGroups(clean)).toBe(clean)
     const dirty = state([img('a', 'gone'), img('b', 'g')], [{ id: 'g', name: 'G' }, { id: 'empty', name: 'E' }])
     const r = pruneGroups(dirty)
-    expect(r.groups.map((g) => g.id)).toEqual(['g'])
+    expect(r.groups.map((g) => g.id)).toEqual(['g', 'empty'])
     expect(r.images[0].groupId).toBeUndefined()
+  })
+})
+
+describe('free groups: create, move in and out, delete', () => {
+  it('a new group starts empty, with a free name', () => {
+    const r = createGroup(state([img('a')], [{ id: 'g', name: 'Group' }]), 'n')
+    expect(r.groups[1]).toEqual({ id: 'n', name: 'Group 2' })
+    expect(r.groupId).toBe('n')
+  })
+
+  it('pictures move into a group and back out of it', () => {
+    const s = state([img('a'), img('b', 'g')], [{ id: 'g', name: 'G' }])
+    const into = setGroupOf(s, ['a'], 'g')!
+    expect(into.images.map((i) => i.groupId)).toEqual(['g', 'g'])
+    const out = setGroupOf(into, ['b'], null)!
+    expect(out.images.map((i) => i.groupId)).toEqual(['g', undefined])
+    expect('groupId' in out.images[1]).toBe(false)
+    expect(out.groups).toHaveLength(1)
+    expect(setGroupOf(s, ['b'], 'g')).toBeNull()
+    expect(setGroupOf(s, ['a'], 'missing')).toBeNull()
+  })
+
+  it('deleting a group takes its pictures with it', () => {
+    const r = deleteGroup(state([img('a', 'g'), img('b')], [{ id: 'g', name: 'G' }]), 'g')
+    expect(r.images.map((i) => i.id)).toEqual(['b'])
+    expect(r.groups).toEqual([])
+    expect(r.removed).toEqual(['a'])
+  })
+
+  it('an empty group is listed on top', () => {
+    const rows = imageRows([img('a', undefined, 1)], [{ id: 'e1', name: 'E1' }, { id: 'e2', name: 'E2' }])
+    expect(rows.map((r) => (r.kind === 'item' ? r.item.id : `group:${r.group.id}`))).toEqual(['group:e2', 'group:e1', 'a'])
   })
 })
 

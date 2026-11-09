@@ -4,15 +4,17 @@
 
 import { useMemo, useRef, useState } from 'react'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu'
-import { ChevronDown, ChevronRight, FolderPlus, Pencil, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronRight, FolderPlus, Pencil, Trash2, X } from 'lucide-react'
 import { canMoveFolder } from '@/lib/assetOps'
-import { isFileDrag } from '@/lib/droppedFiles'
+import { isFileDrag, readDrop } from '@/lib/droppedFiles'
 import { buildLibraryTree, type FolderNode, type LibraryItem } from '@/lib/libraryTree'
+import { EMPTY_SELECTION, describeSelection, existingOnly, hasRow, rowRange, selectionOf, selectionSize, toggleRow, visibleRows, type LibrarySelection, type RowRef } from '@/lib/librarySelection'
 import { Tile } from './browse'
 import type { ViewMode } from './browse'
 import type { LibraryControls } from './shared'
 
-export type DragPayload = { kind: 'item'; key: string } | { kind: 'folder'; key: string }
+/** What is being dragged: one item, one folder, or everything picked (`many`). */
+export type DragPayload = { kind: 'item'; key: string } | { kind: 'folder'; key: string } | { kind: 'many'; items: string[]; folders: string[] }
 
 const DRAG_TYPE = 'application/x-elementals-library'
 
@@ -39,6 +41,10 @@ interface Props {
   folderActions: FolderActions
   /** Delete on the selected item, and Delete… in an item's right-click menu: the table opens its confirm dialog. */
   onDeleteItem?: (key: string) => void
+  /** Several things picked (Ctrl/Cmd+click, Shift+click) and dragged onto a folder or deleted: the table does the work. */
+  onDeleteMany?: (selection: LibrarySelection) => void
+  /** "picture" / "tileset", for the selection bar. */
+  noun?: string
   /** What to say when there is nothing at all. */
   emptyText: string
   /** Importing: the highlighted folder, and files dragged in from outside. */
@@ -53,7 +59,7 @@ const readDrag = (e: React.DragEvent): DragPayload | null => {
   }
 }
 
-export function LibraryBrowser({ items, folders, query, mode, selected, onSelect, thumb, badge, hint, onMove, folderActions, onDeleteItem, emptyText, library }: Props) {
+export function LibraryBrowser({ items, folders, query, mode, selected, onSelect, thumb, badge, hint, onMove, folderActions, onDeleteItem, onDeleteMany, noun = 'item', emptyText, library }: Props) {
   const tree = useMemo(() => buildLibraryTree(items, folders, query), [items, folders, query])
   const searching = query.trim() !== ''
   const [closed, setClosed] = useState<Set<string>>(new Set())
@@ -61,16 +67,57 @@ export function LibraryBrowser({ items, folders, query, mode, selected, onSelect
   // dataTransfer there. The state only drives the highlight, and is set after the drag has started (changing the DOM
   // inside dragstart makes Chromium cancel the drag).
   const dragRef = useRef<DragPayload | null>(null)
-  const chosen = useRef(false)
+  // The action picked in a right-click menu; it runs once the menu has closed.
+  const chosen = useRef<(() => void) | null>(null)
+  const [picked, setPicked] = useState<LibrarySelection>(EMPTY_SELECTION)
+  const anchor = useRef<RowRef | null>(null)
   const [dragging, setDragging] = useState<DragPayload | null>(null)
   const [dropTarget, setDropTarget] = useState<string | null>(null)
   const toggle = (path: string) => setClosed((s) => { const n = new Set(s); if (n.has(path)) n.delete(path); else n.add(path); return n })
   const isOpen = (path: string) => searching || !closed.has(path)
 
+  // What is picked, minus whatever has gone since (deleted, moved, filtered away by a rename).
+  const known = useMemo(() => {
+    const folderSet = new Set<string>()
+    for (const path of [...folders, ...items.map((i) => i.folder)]) {
+      const parts = path.split('/').filter(Boolean)
+      parts.forEach((_, i) => folderSet.add(parts.slice(0, i + 1).join('/')))
+    }
+    return { items: new Set(items.map((i) => i.key)), folders: folderSet }
+  }, [items, folders])
+  const multi = useMemo(() => existingOnly(picked, known.items, known.folders), [picked, known])
+  const many = selectionSize(multi) > 1
+  const isPicked = (row: RowRef) => hasRow(multi, row)
+  const clearPicked = () => { setPicked(EMPTY_SELECTION); anchor.current = null }
+
+  // Plain click: one thing, as before. Ctrl/Cmd+click adds or removes it; Shift+click takes everything from the last click to this one.
+  // Returns whether the click was a selection gesture (so a folder does not also open or close).
+  const pick = (row: RowRef, e: React.MouseEvent): boolean => {
+    if (e.shiftKey) {
+      const from = anchor.current ?? (selected ? ({ kind: 'item', key: selected } as RowRef) : null)
+      setPicked(selectionOf(rowRange(visibleRows(tree, isOpen), from, row)))
+      return true
+    }
+    if (e.ctrlKey || e.metaKey) {
+      // From the latest state, not this render's: two quick clicks must both count.
+      setPicked((cur) => {
+        const live = existingOnly(cur, known.items, known.folders)
+        const base = selectionSize(live) === 0 && selected && row.key !== selected ? toggleRow(EMPTY_SELECTION, { kind: 'item', key: selected }) : live
+        return toggleRow(base, row)
+      })
+      anchor.current = row
+      return true
+    }
+    if (selectionSize(multi) > 0) setPicked(EMPTY_SELECTION)
+    anchor.current = row
+    return false
+  }
+
   const accepts = (target: string): boolean => {
     const d = dragRef.current
     if (!d) return false
     if (d.kind === 'item') return true
+    if (d.kind === 'many') return d.folders.every((f) => target !== f && !target.startsWith(`${f}/`))
     return canMoveFolder(d.key, target)
   }
   // Handlers stop at the innermost folder, so dropping into a nested folder does not also count for its parents.
@@ -90,19 +137,25 @@ export function LibraryBrowser({ items, folders, query, mode, selected, onSelect
       e.stopPropagation()
       setDropTarget(null)
       if (library && isFileDrag(e.dataTransfer)) {
-        library.dropFiles(Array.from(e.dataTransfer.files), target === '' ? library.folder : target)
+        // The entries of a dropped folder can only be read right now; the walk itself continues after the event.
+        library.dropFiles(readDrop(e.dataTransfer), target === '' ? library.folder : target)
         return
       }
       const drag = dragRef.current ?? readDrag(e)
       const ok = !!drag && accepts(target)
       dragRef.current = null
       setDragging(null)
-      if (drag && ok) onMove(drag, target)
+      if (drag && ok) {
+        if (drag.kind === 'many') clearPicked()
+        onMove(drag, target)
+      }
     },
   })
-  const dragProps = (drag: DragPayload) => ({
+  const dragProps = (single: DragPayload) => ({
     draggable: true,
     onDragStart: (e: React.DragEvent) => {
+      // Dragging one of several picked rows takes all of them.
+      const drag: DragPayload = many && single.kind !== 'many' && isPicked(single) ? { kind: 'many', items: multi.items, folders: multi.folders } : single
       e.stopPropagation()
       e.dataTransfer.setData(DRAG_TYPE, JSON.stringify(drag))
       e.dataTransfer.effectAllowed = 'move'
@@ -115,13 +168,13 @@ export function LibraryBrowser({ items, folders, query, mode, selected, onSelect
       setDropTarget(null)
     },
   })
-  const isDragged = (kind: DragPayload['kind'], key: string) => dragging?.kind === kind && dragging.key === key
+  const isDragged = (kind: 'item' | 'folder', key: string) => !!dragging && (dragging.kind === 'many' ? (kind === 'item' ? dragging.items : dragging.folders).includes(key) : dragging.kind === kind && dragging.key === key)
 
   const folderRow = (node: FolderNode) => {
     const open = isOpen(node.path)
     return (
-      <div className="ed-row group" data-dim={isDragged('folder', node.path) ? 'true' : undefined} data-current={library?.folder === node.path ? 'true' : undefined} {...dragProps({ kind: 'folder', key: node.path })}>
-        <button type="button" className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-ed-label font-medium text-foreground" aria-expanded={open} aria-current={library?.folder === node.path ? 'true' : undefined} onClick={() => { library?.setFolder(node.path); toggle(node.path) }}>
+      <div className="ed-row group" data-selected={isPicked({ kind: 'folder', key: node.path }) ? 'true' : undefined} data-dim={isDragged('folder', node.path) ? 'true' : undefined} data-current={library?.folder === node.path ? 'true' : undefined} {...dragProps({ kind: 'folder', key: node.path })}>
+        <button type="button" className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-ed-label font-medium text-foreground" aria-expanded={open} aria-current={library?.folder === node.path ? 'true' : undefined} onClick={(e) => { if (pick({ kind: 'folder', key: node.path }, e)) return; library?.setFolder(node.path); toggle(node.path) }}>
           {open ? <ChevronDown className="text-muted-foreground" /> : <ChevronRight className="text-muted-foreground" />}
           <span className="min-w-0 flex-1 truncate">{node.name}</span>
           <span className="ed-hint tabular-nums opacity-70 group-hover:hidden">{countIn(node)}</span>
@@ -135,31 +188,33 @@ export function LibraryBrowser({ items, folders, query, mode, selected, onSelect
     )
   }
 
-  // Right-click: pick the item, then offer Delete… (the same confirm as the Delete button).
-  const withItemMenu = (item: LibraryItem, child: React.ReactElement) =>
-    onDeleteItem ? (
+  // Right-click: pick the item (unless it is one of the picked ones), then offer Delete… (the same confirm as the Delete button).
+  const withItemMenu = (item: LibraryItem, child: React.ReactElement) => {
+    if (!onDeleteItem) return child
+    const row: RowRef = { kind: 'item', key: item.key }
+    const all = many && isPicked(row) && !!onDeleteMany
+    return (
       <ContextMenu key={item.key}>
-        <ContextMenuTrigger asChild onContextMenu={() => onSelect(item.key)}>{child}</ContextMenuTrigger>
+        <ContextMenuTrigger asChild onContextMenu={() => { if (!(many && isPicked(row))) { clearPicked(); onSelect(item.key) } }}>{child}</ContextMenuTrigger>
         {/* Delete… opens its dialog once the menu has closed: opened earlier, the menu's focus trap pulls focus back from the dialog. */}
-        <ContextMenuContent className="w-44" onCloseAutoFocus={(e) => { if (chosen.current) { e.preventDefault(); chosen.current = false; onDeleteItem(item.key) } }}>
-          <ContextMenuItem className="text-red-400 focus:text-red-400 focus:bg-red-500/10" onClick={() => { chosen.current = true }}>
+        <ContextMenuContent className="w-52" onCloseAutoFocus={(e) => { const run = chosen.current; if (run) { e.preventDefault(); chosen.current = null; run() } }}>
+          <ContextMenuItem className="text-red-400 focus:text-red-400 focus:bg-red-500/10" onClick={() => { chosen.current = all ? () => onDeleteMany?.(multi) : () => onDeleteItem(item.key) }}>
             <Trash2 className="mr-2 h-3.5 w-3.5" />
-            Delete…
+            {all ? `Delete ${describeSelection(multi, noun)}…` : 'Delete…'}
           </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
-    ) : (
-      child
     )
+  }
 
   const itemRow = (item: LibraryItem) => withItemMenu(item, (
     <button
       key={item.key}
       type="button"
-      data-selected={selected === item.key ? 'true' : undefined}
+      data-selected={selected === item.key || isPicked({ kind: 'item', key: item.key }) ? 'true' : undefined}
       data-dim={isDragged('item', item.key) ? 'true' : undefined}
       className="ed-row flex h-auto w-full items-center gap-2 py-1 text-left text-ed-label"
-      onClick={() => onSelect(item.key)}
+      onClick={(e) => { if (!pick({ kind: 'item', key: item.key }, e)) onSelect(item.key) }}
       {...dragProps({ kind: 'item', key: item.key })}
     >
       {thumb(item, 26)}
@@ -196,11 +251,12 @@ export function LibraryBrowser({ items, folders, query, mode, selected, onSelect
           <div className="mb-1 flex items-center gap-1 group">
             <button
               type="button"
-              className="ed-section-title min-w-0 flex-1 truncate rounded-sm px-1 text-left data-[current=true]:bg-primary/20 data-[current=true]:text-foreground"
+              className="ed-section-title min-w-0 flex-1 truncate rounded-sm px-1 text-left data-[current=true]:bg-primary/20 data-[current=true]:text-foreground data-[selected=true]:ring-1 data-[selected=true]:ring-primary"
               data-current={library?.folder === node.path ? 'true' : undefined}
+              data-selected={isPicked({ kind: 'folder', key: node.path }) ? 'true' : undefined}
               aria-current={library?.folder === node.path ? 'true' : undefined}
               title="Imports and dropped files go into this folder"
-              onClick={() => library?.setFolder(node.path)}
+              onClick={(e) => { if (!pick({ kind: 'folder', key: node.path }, e)) library?.setFolder(node.path) }}
               {...dragProps({ kind: 'folder', key: node.path })}
             >{node.path}</button>
             <span className="flex items-center opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
@@ -212,7 +268,7 @@ export function LibraryBrowser({ items, folders, query, mode, selected, onSelect
         )}
         {node.items.length === 0 && node.path ? <p className="ed-hint mb-1">Empty</p> : (
           <div className="grid grid-cols-[repeat(auto-fill,minmax(76px,1fr))] gap-1.5">
-            {node.items.map((i) => withItemMenu(i, <Tile key={i.key} selected={selected === i.key} name={i.name} title={i.key} hint={hint?.(i)} thumb={thumb(i, 56)} badge={badge?.(i)} onClick={() => onSelect(i.key)} dragProps={dragProps({ kind: 'item', key: i.key })} />))}
+            {node.items.map((i) => withItemMenu(i, <Tile key={i.key} selected={selected === i.key || isPicked({ kind: 'item', key: i.key })} name={i.name} title={i.key} hint={hint?.(i)} thumb={thumb(i, 56)} badge={badge?.(i)} onClick={(e) => { if (!pick({ kind: 'item', key: i.key }, e)) onSelect(i.key) }} dragProps={dragProps({ kind: 'item', key: i.key })} />))}
           </div>
         )}
       </section>
@@ -228,15 +284,30 @@ export function LibraryBrowser({ items, folders, query, mode, selected, onSelect
       data-drop={dropTarget === '' ? 'true' : undefined}
       onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropTarget(null) }}
       onKeyDown={(e) => {
-        // Delete on the selected picture asks first, exactly like the Delete button. Typing in a field is left alone.
-        if (!onDeleteItem || (e.key !== 'Delete' && e.key !== 'Backspace')) return
         if ((e.target as HTMLElement).closest('input, textarea, [contenteditable="true"]')) return
+        if (e.key === 'Escape' && selectionSize(multi) > 0) { e.preventDefault(); clearPicked(); return }
+        if ((e.key === 'a' || e.key === 'A') && (e.ctrlKey || e.metaKey) && onDeleteMany) {
+          e.preventDefault()
+          setPicked(selectionOf(visibleRows(tree, isOpen)))
+          return
+        }
+        // Delete on the selected picture asks first, exactly like the Delete button. Typing in a field is left alone.
+        if (e.key !== 'Delete' && e.key !== 'Backspace') return
+        if (many && onDeleteMany) { e.preventDefault(); onDeleteMany(multi); return }
+        if (!onDeleteItem) return
         if (!selected || !items.some((i) => i.key === selected)) return
         e.preventDefault()
         onDeleteItem(selected)
       }}
       {...dropProps('')}
     >
+      {many && (
+        <div role="status" className="sticky top-0 z-10 flex items-center gap-2 rounded-md border border-primary/60 bg-card px-2 py-1 text-ed-label" data-testid="library-selection">
+          <span className="min-w-0 flex-1 truncate">{describeSelection(multi, noun)} selected</span>
+          {onDeleteMany && <button type="button" className="ed-iconbtn" data-tone="danger" title="Delete everything picked" aria-label="Delete selected" onClick={() => onDeleteMany(multi)}><Trash2 /></button>}
+          <button type="button" className="ed-iconbtn" title="Clear the selection (Esc)" aria-label="Clear selection" onClick={clearPicked}><X /></button>
+        </div>
+      )}
       {nothing ? <p className="ed-hint p-3">{emptyText}</p> : nothingFound ? <p className="ed-hint p-3">Nothing matches “{query}”.</p> : mode === 'tiles' ? <div className="flex flex-col gap-3">{renderTiles(tree)}</div> : renderList(tree, true)}
       {dragging && <p className="ed-hint pointer-events-none absolute inset-x-0 bottom-1 text-center">Drop on a folder, or on empty space for the top level</p>}
       {dropTarget !== null && !dragging && library && <p className="ed-hint pointer-events-none absolute inset-x-0 bottom-1 text-center">Drop to import into {dropTarget || library.folder || 'the top level'}</p>}

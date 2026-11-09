@@ -2,9 +2,11 @@
 // first (so the dialog can show what gets rewritten) and applied through lib/assetOps.
 
 import { allFolders, applyAssetPlan, canMoveFolder, folderChanges, folderOfId, graphicDeleteGuard, joinId, leafOfId, planGraphicChanges, summarizeReferences, type AssetPlan, type IdChange } from '@/lib/assetOps'
+import { describeSelection, topLevelOnly, type LibrarySelection } from '@/lib/librarySelection'
 import type { OpResult } from '@/lib/opResult'
 import type { DatabaseData } from './useDatabaseData'
 import { saveMapFile } from './mapIo'
+import { withBulkImport } from './importFlow'
 
 export interface Outcome {
   ok: boolean
@@ -57,6 +59,52 @@ export function graphicActions(data: DatabaseData) {
       return run(p, diskOp, `Moved folder ${leafOfId(newPath)}`)
     },
     canMoveFolder,
+
+    /** The pictures and folders picked, without what a picked folder already carries. */
+    topLevel: (sel: LibrarySelection): LibrarySelection => topLevelOnly(sel, folderOfId),
+    /** Every picture a selection reaches (the picked ones and everything inside the picked folders). */
+    reached: (sel: LibrarySelection): string[] => {
+      const top = topLevelOnly(sel, folderOfId)
+      return [...new Set([...top.items, ...top.folders.flatMap((f) => ids.filter((id) => id.startsWith(`${f}/`)))])]
+    },
+    /** Several pictures and folders into `target` at once: one plan, so sprites and maps are rewritten together. */
+    moveMany: async (sel: LibrarySelection, target: string): Promise<Outcome> => {
+      const top = topLevelOnly(sel, folderOfId)
+      const items = top.items.filter((id) => folderOfId(id) !== target)
+      const folders = top.folders.filter((f) => canMoveFolder(f, target))
+      if (items.length + folders.length === 0) return { ok: true, error: '', message: '' }
+      const changes = [...items.map((id) => ({ from: id, to: joinId(target, leafOfId(id)) })), ...folders.flatMap((f) => folderChanges(ids, f, joinId(target, leafOfId(f))))]
+      const diskOp = (): Promise<OpResult> =>
+        withBulkImport(2, async () => {
+          for (const id of items) {
+            const r = await data.sprites.renameGraphic(id, joinId(target, leafOfId(id)))
+            if (!r.ok) return r
+          }
+          for (const f of folders) {
+            const r = await data.sprites.moveGraphicFolder(f, target || null)
+            if (!r.ok) return r
+          }
+          return { ok: true } as OpResult
+        })
+      return run(plan(changes), diskOp, `Moved ${describeSelection({ items, folders }, 'picture')}`)
+    },
+    /** Deletes the pictures and folders picked (the caller has checked the guard). */
+    removeMany: async (sel: LibrarySelection): Promise<Outcome> => {
+      const top = topLevelOnly(sel, folderOfId)
+      const r = await withBulkImport(2, async (): Promise<OpResult> => {
+        for (const id of top.items) {
+          const done = await data.sprites.deleteGraphic(id)
+          if (!done.ok) return done
+        }
+        for (const f of top.folders) {
+          const done = await data.sprites.deleteGraphicFolder(f)
+          if (!done.ok) return done
+        }
+        return { ok: true }
+      })
+      await data.reload()
+      return r.ok ? { ok: true, error: '', message: `Deleted ${describeSelection(top, 'picture')}.` } : { ok: false, error: r.error, message: '' }
+    },
 
     deleteGuard: (targets: string[]) => graphicDeleteGuard(data.refs, targets),
     remove: async (id: string): Promise<Outcome> => {

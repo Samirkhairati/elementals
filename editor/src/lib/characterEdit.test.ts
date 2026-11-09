@@ -166,6 +166,6 @@ describe('characterKind', () => {
   })
 
   it('new characters of each preset go into their own folder', () => {
-    expect(PRESET_FOLDERS).toEqual({ actor: 'characters', prop: 'objects', animated: 'animated' })
+    expect(PRESET_FOLDERS).toEqual({ actor: 'characters', prop: 'objects', animated: 'animated', gif: 'animated' })
   })
 })

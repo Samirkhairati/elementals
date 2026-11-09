@@ -207,6 +207,31 @@ describe('KonvaEntities', () => {
     expect(moveEntity).toHaveBeenCalledWith('a', 144, 96)
   })
 
+  it('a free entity is dropped on the pixel (clamped to the map), never snapped to a tile', () => {
+    const moveEntity = vi.fn()
+    renderEntities([entity('f', 50, 61, { Transform: { x: 50, y: 61, depth: 10, free: true } })], { moveEntity, snapEntityPos: (x, y) => ({ x: Math.floor(x / 32) * 32 + 16, y: Math.ceil(y / 32) * 32 }) })
+    const drop = (x: number, y: number) => {
+      const target = { x: (v?: number) => (v === undefined ? x : undefined), y: (v?: number) => (v === undefined ? y : undefined), getStage: () => null }
+      nodes()[0].props.onDragEnd({ cancelBubble: false, target })
+    }
+    drop(150.4, 70.6)
+    expect(moveEntity).toHaveBeenLastCalledWith('f', 150, 71)
+    drop(-30, 99999)
+    expect(moveEntity).toHaveBeenLastCalledWith('f', 0, 640)
+  })
+
+  it('a free entity without a collider has a small area on its anchor, not a whole tile', () => {
+    renderEntities([entity('f', 50, 61, { Transform: { x: 50, y: 61, depth: 10, free: true } })])
+    runOverlay()
+    expect(drawn.footprint.mock.calls.map((c) => c.slice(1, 5))).toEqual([[42, 45, 16, 16]])
+  })
+
+  it('a free entity with a collider shows exactly that box, whatever its size', () => {
+    renderEntities([entity('f', 50, 61, { Transform: { x: 50, y: 61, depth: 10, free: true }, Collider: { width: 45, height: 13, offsetX: 3, offsetY: -2, isSolid: true } })])
+    runOverlay()
+    expect(drawn.footprint.mock.calls.map((c) => c.slice(1, 5))).toEqual([[30.5, 46, 45, 13]])
+  })
+
   it('double-clicking an entity with an Event opens its event editor; others do nothing', () => {
     const onOpenEvent = vi.fn()
     renderEntities([entity('ev', 16, 32, { Event: { states: [] } }), entity('plain', 48, 32)], { onOpenEvent })

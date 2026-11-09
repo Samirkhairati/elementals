@@ -3,7 +3,8 @@ import { Plus, Trash2, Wand2 } from 'lucide-react'
 import { FACINGS } from '../../../../../../shared/engine/constants'
 import type { Facing } from '../../../../../../shared/engine/types'
 import type { CharacterDef, PlaybackMode } from '../../../../../../shared/engine/characters'
-import { addClip, autoAssignRows, deleteClip, framesFor, renameClip, setDirectional, setFrames, setMirror, updateClip } from '@/lib/characterEdit'
+import { addClip, autoAssignRows, deleteClip, framesFor, gifClip, gifFps, renameClip, resetGifClip, setDirectional, setFrames, setMirror, sheetSource, updateClip } from '@/lib/characterEdit'
+import type { GraphicInfo } from '../../../../../../shared/engine/graphics'
 import { sheetGrid } from '../../../../../../shared/engine/sprites'
 import { Select } from '../../ui/fields'
 import { EdButton, Field, FieldRow, IconButton, InfoTip, NumberField, Section, Segmented, SliderNumber, TextField, Toggle } from '../../ui/controls'
@@ -18,6 +19,8 @@ interface Props {
   onChange: (def: CharacterDef) => void
   images: Record<string, string>
   sizes: Record<string, { width: number; height: number }>
+  /** The graphics library (a sheet cut from a GIF takes its frames and speed from the GIF's entry). */
+  graphics?: GraphicInfo[]
   /** Places that use each animation (map sprites, events, bindings). */
   clipCounts?: Record<string, number>
   onRenameClip?: (from: string, to: string) => void
@@ -25,7 +28,7 @@ interface Props {
   onOpenSheets?: () => void
 }
 
-export function AnimationsTab({ def, onChange, images, sizes, clipCounts = {}, onRenameClip, onOpenSheets }: Props) {
+export function AnimationsTab({ def, onChange, images, sizes, graphics = [], clipCounts = {}, onRenameClip, onOpenSheets }: Props) {
   const names = Object.keys(def.clips)
   const [selected, setSelected] = useState(names[0] ?? '')
   const [facing, setFacing] = useState<Facing>('down')
@@ -49,13 +52,17 @@ export function AnimationsTab({ def, onChange, images, sizes, clipCounts = {}, o
   const editFrames = (frames: number[]) => run(() => setFrames(def, current, clip.directional ? facing : null, frames))
   const shownFrames = clip ? framesFor(clip, clip.directional ? facing : null) : []
   const grid = sheet && size ? sheetGrid(sheet, size.width, size.height) : null
+  // An animation on a sheet cut from a GIF plays the GIF's frames: nothing to pick, only the speed to set.
+  const gif = sheet && sheetSource(sheet) === 'gif' ? graphics.find((g) => g.id === sheet.image) : undefined
+  const isGif = !!sheet && sheetSource(sheet) === 'gif'
+  const gifOf = (sheetKey: string) => graphics.find((g) => g.id === def.sheets[sheetKey]?.image && g.gif)
 
   return (
     <div className="flex min-h-0 gap-4" data-testid="animations-tab">
       <aside className="flex w-48 shrink-0 flex-col gap-1">
         <div className="flex items-center justify-between">
           <span className="ed-section-title">Animations ({names.length})</span>
-          <IconButton title="Add an animation" aria-label="Add animation" disabled={sheetKeys.length === 0} onClick={() => run(() => { const r = addClip(def, 'animation', sheetKeys[0]); setSelected(r.name); return r.def })}><Plus className="h-3.5 w-3.5" /></IconButton>
+          <IconButton title="Add an animation" aria-label="Add animation" disabled={sheetKeys.length === 0} onClick={() => run(() => { const r = addClip(def, 'animation', sheetKeys[0]); setSelected(r.name); const g = gifOf(sheetKeys[0]); return g ? resetGifClip(r.def, r.name, g) : r.def })}><Plus className="h-3.5 w-3.5" /></IconButton>
         </div>
         {names.length === 0 && <p className="ed-hint">No animations yet. Add one to choose its frames.</p>}
         <ul className="flex flex-col gap-0.5">
@@ -85,13 +92,24 @@ export function AnimationsTab({ def, onChange, images, sizes, clipCounts = {}, o
             <div className="flex items-center gap-1.5">
               <label className="ed-label" htmlFor="animation-sheet">Sheet</label>
               <InfoTip>The picture this animation takes its frames from.</InfoTip>
-              <Select id="animation-sheet" aria-label="Sheet" className="w-auto min-w-[110px]" value={clip.sheet} options={sheetKeys.map((k) => ({ value: k }))} onChange={(v) => run(() => updateClip(def, current, { sheet: v }))} />
+              <Select id="animation-sheet" aria-label="Sheet" className="w-auto min-w-[110px]" value={clip.sheet} options={sheetKeys.map((k) => ({ value: k }))} onChange={(v) => run(() => { const g = gifOf(v); return g ? { ...def, clips: { ...def.clips, [current]: gifClip(clip, v, g) } } : updateClip(def, current, { sheet: v }) })} />
             </div>
             <IconButton tone="danger" className="ml-auto" title="Delete this animation" aria-label="Delete animation" onClick={() => run(() => { const r = deleteClip(def, current); return r.def })}><Trash2 className="h-3.5 w-3.5" /></IconButton>
           </div>
 
           <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
-            <Card title="Frames" note={grid ? `${sheet.frameWidth}×${sheet.frameHeight} px · ${grid.columns}×${grid.rows} grid` : undefined} actions={onOpenSheets ? <EdButton size="sm" onClick={onOpenSheets} title="Change how this sheet is cut into frames">Edit cut…</EdButton> : undefined}>
+            <Card title={isGif ? 'GIF' : 'Frames'} note={isGif ? (gif?.gif ? `${gif.gif.frames} frame${gif.gif.frames === 1 ? '' : 's'} · ${gif.gif.frameWidth}×${gif.gif.frameHeight} px` : undefined) : grid ? `${sheet.frameWidth}×${sheet.frameHeight} px · ${grid.columns}×${grid.rows} grid` : undefined} actions={onOpenSheets ? <EdButton size="sm" onClick={onOpenSheets} title={isGif ? 'Change which GIF this sheet plays' : 'Change how this sheet is cut into frames'}>{isGif ? 'Edit GIF…' : 'Edit cut…'}</EdButton> : undefined}>
+              {isGif ? (
+                <div className="flex flex-col gap-2" data-testid="gif-frames">
+                  <p className="ed-hint">{gif?.gif ? `Plays all ${gif.gif.frames} frames of ${sheet.image} in order.` : 'This sheet’s GIF is missing.'} Set the speed under Playback; to play something else, use a spritesheet.</p>
+                  {gif && (
+                    <FieldRow>
+                      <EdButton size="sm" title={`Play every frame at ${gifFps(gif)} fps, as the GIF was made`} onClick={() => run(() => resetGifClip(def, current, gif))}>Use the GIF’s speed ({gifFps(gif)} fps)</EdButton>
+                      <InfoTip>Puts the speed back to what the GIF’s own frame delays add up to, and every frame back in the animation.</InfoTip>
+                    </FieldRow>
+                  )}
+                </div>
+              ) : <>
               {clip.directional && (
                 <FieldRow>
                   <Segmented<Facing> aria-label="Direction" value={facing} options={FACINGS.map((f) => ({ value: f, label: FACING_LABEL[f] }))} onChange={setFacing} />
@@ -116,6 +134,7 @@ export function AnimationsTab({ def, onChange, images, sizes, clipCounts = {}, o
                   {url && size ? <FramePicker url={url} sheet={sheet} size={size} frames={shownFrames} zoom={fitZoom(size.width, size.height, 460, 560, 3)} onChange={editFrames} /> : <p className="ed-hint">The sheet’s image is missing.</p>}
                 </>
               )}
+              </>}
             </Card>
 
             <div className="flex flex-col gap-4">
@@ -125,7 +144,7 @@ export function AnimationsTab({ def, onChange, images, sizes, clipCounts = {}, o
                   <Toggle aria-label="Loop" checked={clip.loop} onChange={(v) => run(() => updateClip(def, current, { loop: v }))} />
                 </Field>
                 <Field label="Directional" info="Turn on if this animation looks different when the sprite faces up, down, left or right. Leave off for things that look the same from every side, like a flower.">
-                  <Toggle aria-label="Directional" checked={clip.directional} disabled={def.facing === 'none'} onChange={(v) => run(() => setDirectional(def, current, v))} />
+                  <Toggle aria-label="Directional" checked={clip.directional} disabled={def.facing === 'none' || isGif} onChange={(v) => run(() => setDirectional(def, current, v))} />
                 </Field>
                 <Field label="FPS" info="Frames per second at normal speed. Higher is faster. Events and movement speed can speed it up or slow it down while the game runs.">
                   <SliderNumber label="FPS" value={clip.fps} min={1} max={60} step={1} onCommit={(v) => run(() => updateClip(def, current, { fps: Math.max(1, v) }))} />

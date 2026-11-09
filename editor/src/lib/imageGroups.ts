@@ -1,6 +1,7 @@
 // Groups of pictures inside one image layer: a group is a named set that is picked, duplicated and moved together. A locked
 // group is picked as a whole by a click on any member, until the group itself is the selected one (then a click picks a
-// single member). Editor view only: the exported map and the game know nothing about groups.
+// single member). Groups are made freely (empty ones too) and only go away when they are ungrouped or deleted; pictures
+// move in and out of them. Editor view only: the exported map and the game know nothing about groups.
 
 import type { ImageGroup, ImageItem } from '@/types/editor'
 import { sortedImages } from './layerOrder'
@@ -21,7 +22,7 @@ export function uniqueGroupName(base: string, taken: readonly string[]): string 
 /** Members of a group, in the layer's list order. */
 export const membersOf = (images: readonly ImageItem[], groupId: string): ImageItem[] => images.filter((i) => i.groupId === groupId)
 
-/** Groups that still have a member, and pictures whose group is gone no longer point at it. */
+/** Pictures whose group is gone no longer point at it (empty groups stay: they are made on purpose). */
 export function pruneGroups(state: GroupState): GroupState {
   const ids = new Set(state.groups.map((g) => g.id))
   const images: ImageItem[] = state.images.some((i) => i.groupId !== undefined && !ids.has(i.groupId))
@@ -31,18 +32,43 @@ export function pruneGroups(state: GroupState): GroupState {
         return rest
       })
     : state.images
-  const used = new Set(images.map((i) => i.groupId))
-  const groups = state.groups.filter((g) => used.has(g.id))
-  return images === state.images && groups.length === state.groups.length ? state : { images, groups }
+  return images === state.images ? state : { images, groups: state.groups }
+}
+
+/** A new, empty group ("Group", "Group 2", ...). */
+export function createGroup(state: GroupState, newId: string): GroupState & { groupId: string } {
+  const name = uniqueGroupName('Group', state.groups.map((g) => g.name))
+  return { images: state.images, groups: [...state.groups, { id: newId, name }], groupId: newId }
+}
+
+/** The pictures `ids` moved into `groupId`, or out of whatever group they are in (null). Null when nothing changes. */
+export function setGroupOf(state: GroupState, ids: readonly string[], groupId: string | null): GroupState | null {
+  if (groupId !== null && !state.groups.some((g) => g.id === groupId)) return null
+  const wanted = new Set(ids)
+  let changed = false
+  const images = state.images.map((i) => {
+    if (!wanted.has(i.id) || (i.groupId ?? null) === groupId) return i
+    changed = true
+    if (groupId !== null) return { ...i, groupId }
+    const { groupId: _out, ...rest } = i
+    return rest
+  })
+  return changed ? { images, groups: state.groups } : null
+}
+
+/** A group deleted together with its pictures. */
+export function deleteGroup(state: GroupState, groupId: string): GroupState & { removed: string[] } {
+  const removed = state.images.filter((i) => i.groupId === groupId).map((i) => i.id)
+  return { images: state.images.filter((i) => i.groupId !== groupId), groups: state.groups.filter((g) => g.id !== groupId), removed }
 }
 
 /**
- * Puts the pictures `ids` into one new group (taking them out of any group they were in; a group left empty goes away).
- * Needs at least two pictures; returns null otherwise.
+ * Puts the pictures `ids` into one new group (taking them out of any group they were in). Needs at least one picture;
+ * returns null otherwise.
  */
 export function groupImages(state: GroupState, ids: readonly string[], newId: string): (GroupState & { groupId: string }) | null {
   const wanted = new Set(ids)
-  if (state.images.filter((i) => wanted.has(i.id)).length < 2) return null
+  if (!state.images.some((i) => wanted.has(i.id))) return null
   const name = uniqueGroupName('Group', state.groups.map((g) => g.name))
   const images = state.images.map((i) => (wanted.has(i.id) ? { ...i, groupId: newId } : i))
   const next = pruneGroups({ images, groups: [...state.groups, { id: newId, name }] })
@@ -110,13 +136,14 @@ export type ImageRow = { kind: 'item'; item: ImageItem } | { kind: 'group'; grou
 
 /**
  * The rows of the pictures list, front first: a group is one row (with its members under it) where its frontmost member
- * is; everything else is a row of its own.
+ * is, an empty group sits on top (newest first); everything else is a row of its own.
  */
 export function imageRows(images: readonly ImageItem[], groups: readonly ImageGroup[]): ImageRow[] {
   const byId = new Map(groups.map((g) => [g.id, g]))
   const front = sortedImages([...images]).reverse()
   const done = new Set<string>()
-  const rows: ImageRow[] = []
+  const used = new Set(images.map((i) => i.groupId))
+  const rows: ImageRow[] = groups.filter((g) => !used.has(g.id)).reverse().map((group) => ({ kind: 'group', group, members: [] }))
   for (const item of front) {
     const group = item.groupId ? byId.get(item.groupId) : undefined
     if (!group) {

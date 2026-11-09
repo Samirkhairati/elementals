@@ -2,13 +2,15 @@ import fs from 'fs';
 import path from 'path';
 import { pathExists } from './folderOps.js';
 import { resolveStrictlyInside } from './pathSafety.js';
-import { assertPngFile } from './pngHeader.js';
 import {
   createCharacterFolder,
   deleteCharacterFolder,
+  assertGraphicSource,
+  graphicInfo,
   isValidGraphicId,
   moveCharacterFolder,
   renameCharacterFolder,
+  type GraphicInfo,
   type ImageCache,
 } from './characterStore.js';
 
@@ -19,7 +21,7 @@ import {
  */
 
 function graphicFile(graphicsDir: string, id: string): string {
-  if (!isValidGraphicId(id)) throw new Error('Graphic id must be a "/"-separated path of letters, digits, "_" and "-" ending in .png');
+  if (!isValidGraphicId(id)) throw new Error('Graphic id must be a "/"-separated path of letters, digits, "_" and "-" ending in .png or .gif');
   return resolveStrictlyInside(graphicsDir, [id]);
 }
 
@@ -41,15 +43,10 @@ export function renameGraphic(graphicsDir: string, cache: ImageCache, id: string
  * Puts another PNG in the place of an existing graphic: same id, so every sprite, crop and map that uses it keeps
  * working (they now draw the new picture). The old file is swapped atomically; nothing is left half written.
  */
-export function replaceGraphic(
-  graphicsDir: string,
-  cache: ImageCache,
-  sourcePath: string,
-  id: string
-): { graphic: { id: string; width: number; height: number; bytes: number; mtimeMs: number }; image: string } {
+export function replaceGraphic(graphicsDir: string, cache: ImageCache, sourcePath: string, id: string): { graphic: GraphicInfo; image: string } {
   const target = graphicFile(graphicsDir, id);
   if (!pathExists(target)) throw new Error(`Graphic "${id}" does not exist.`);
-  const size = assertPngFile(sourcePath, 'Graphic');
+  assertGraphicSource(sourcePath, id, 'Graphic');
   const temp = `${target}.${process.pid}.tmp`;
   try {
     fs.copyFileSync(sourcePath, temp);
@@ -58,8 +55,7 @@ export function replaceGraphic(
     fs.rmSync(temp, { force: true });
   }
   cache.invalidate(target);
-  const stat = fs.statSync(target);
-  return { graphic: { id, width: size.width, height: size.height, bytes: stat.size, mtimeMs: stat.mtimeMs }, image: cache.getDataUrl(target) };
+  return { graphic: graphicInfo(target, id, cache), image: cache.getDataUrl(target) };
 }
 
 export function deleteGraphic(graphicsDir: string, cache: ImageCache, id: string): void {

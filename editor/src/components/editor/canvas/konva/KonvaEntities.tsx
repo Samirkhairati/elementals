@@ -13,8 +13,9 @@ import { EntityData, EntityFolder, MapData } from '@/types/editor'
 import type { SpriteAssetInfo } from '../../../../../../shared/engine/types'
 import {
   entityBounds,
-  colliderLocalRect,
+  entityAreaLocal,
   entityIconName,
+  isFreeEntityLike,
   normalizeCollider,
   sortByDepth,
   summarizeEntity,
@@ -47,7 +48,6 @@ interface KonvaEntitiesProps {
   setSelectedEntityId: (id: string | null) => void
   moveEntity: (id: string, x: number, y: number) => void
   activeMap: MapData
-  snapToGrid?: boolean
   snapEntityPos?: (x: number, y: number) => { x: number; y: number }
   onRightClickEntity?: (entity: EntityData, clientX: number, clientY: number) => void
   showEntities?: boolean
@@ -78,6 +78,8 @@ interface EntityInfo {
   bounds: GeoRect
   /** The entity's area: its collider box, or the tile it stands on when it has no collider. */
   foot: GeoRect
+  /** A free entity: dragged pixel by pixel; a tile-based one always lands on a tile. */
+  free: boolean
   solid: boolean
   hasEvent: boolean
   controller: 'none' | 'player' | 'wander' | null
@@ -99,7 +101,8 @@ function buildInfo(entity: EntityData, assets: Record<string, SpriteAssetInfo>):
     id: entity.id,
     asset,
     bounds: translateRect(abs, -entity.x, -entity.y),
-    foot: colliderLocalRect(collider ?? normalizeCollider(null)),
+    foot: entityAreaLocal(entity),
+    free: isFreeEntityLike(entity),
     solid: collider ? collider.isSolid : true,
     hasEvent: sum.hasEvent,
     controller: sum.controller,
@@ -130,7 +133,6 @@ interface KonvaEntityNodeProps {
   draggable: boolean
   mapWidthPx: number
   mapHeightPx: number
-  snapToGrid: boolean
   snapEntityPos: (x: number, y: number) => { x: number; y: number }
   visuals: React.MutableRefObject<Visuals>
   setSelectedEntityId: (id: string | null) => void
@@ -148,7 +150,6 @@ const KonvaEntityNode = React.memo(function KonvaEntityNode({
   draggable,
   mapWidthPx,
   mapHeightPx,
-  snapToGrid,
   snapEntityPos,
   visuals,
   setSelectedEntityId,
@@ -170,7 +171,7 @@ const KonvaEntityNode = React.memo(function KonvaEntityNode({
   const clampSnap = (x: number, y: number) => {
     const bx = Math.max(0, Math.min(mapWidthPx, x))
     const by = Math.max(0, Math.min(mapHeightPx, y))
-    return snapToGrid ? snapEntityPos(bx, by) : { x: bx, y: by }
+    return info.free ? { x: Math.round(bx), y: Math.round(by) } : snapEntityPos(bx, by)
   }
 
   return (
@@ -303,7 +304,6 @@ export const KonvaEntities = React.memo(function KonvaEntities({
   setSelectedEntityId,
   moveEntity,
   activeMap,
-  snapToGrid = true,
   snapEntityPos = (x, y) => ({ x: Math.floor(x / 32) * 32 + 16, y: Math.floor((y - 16) / 32 + 1) * 32 }),
   onRightClickEntity,
   showEntities = true,
@@ -347,7 +347,6 @@ export const KonvaEntities = React.memo(function KonvaEntities({
             draggable
             mapWidthPx={mapWidthPx}
             mapHeightPx={mapHeightPx}
-            snapToGrid={snapToGrid}
             snapEntityPos={snapEntityPos}
             visuals={visuals}
             setSelectedEntityId={setSelectedEntityId}

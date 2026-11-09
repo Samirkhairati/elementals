@@ -127,6 +127,25 @@ describe('AIWanderSystem decision logic', () => {
     expect(wander.originX).toBe(px(7));
   });
 
+  it('a free entity wanders around the pixel it stands on and samples a step from that pixel', () => {
+    const world = new World();
+    const { e, transform, wander } = addNpc(world, { tx: 7, ty: 9, interval: 100 });
+    transform.free = true;
+    transform.x = px(7) + 5;
+    transform.y = py(9) - 7;
+    const w = walkability();
+    world.addSystem(new AIWanderSystem(w, seq(0, 0)));
+    world.update(0);
+    expect([wander.originX, wander.originY]).toEqual([px(7) + 5, py(9) - 7]);
+    world.update(100);
+    expect(w.isWalkable.mock.calls.map(([x, y, ignore]) => [x, y, ignore])).toEqual([
+      [px(7) + 5, py(9) - 7 - TS, e], // UP
+      [px(7) + 5, py(9) - 7 + TS, e], // DOWN
+      [px(7) + 5 - TS, py(9) - 7, e], // LEFT
+      [px(7) + 5 + TS, py(9) - 7, e], // RIGHT
+    ]);
+  });
+
   it('never picks a direction that leaves the radius around the home tile', () => {
     // radius 1, NPC sits on the right edge of its box: RIGHT must never be chosen
     for (const r of [0, 0.2, 0.34, 0.5, 0.67, 0.8, 0.99]) {

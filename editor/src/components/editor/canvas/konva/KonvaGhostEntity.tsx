@@ -10,7 +10,6 @@ import { drawAnchorCross, drawFootprint, drawLabel, drawPlaceholder } from './en
 interface KonvaGhostEntityProps {
   pendingPlacement: PendingEntityPlacement | null
   pointerPos: { x: number; y: number } | null
-  snapToGrid: boolean
   snapEntityPos: (x: number, y: number) => { x: number; y: number }
   spriteAssets?: Record<string, SpriteAssetInfo>
 }
@@ -21,7 +20,6 @@ const EMPTY: Record<string, SpriteAssetInfo> = {}
 export const KonvaGhostEntity = React.memo(function KonvaGhostEntity({
   pendingPlacement,
   pointerPos,
-  snapToGrid,
   snapEntityPos,
   spriteAssets = EMPTY,
 }: KonvaGhostEntityProps) {
@@ -33,7 +31,7 @@ export const KonvaGhostEntity = React.memo(function KonvaGhostEntity({
   const model = useMemo(() => {
     void imagesVersion
     if (!pendingPlacement) return null
-    const entity = { name: pendingPlacement.name, x: 0, y: 0, components: (components ?? {}) as Record<string, PropBag> }
+    const entity = { name: pendingPlacement.name, x: 0, y: 0, components: { ...(components ?? {}), Transform: { ...(components?.Transform ?? {}), free: pendingPlacement.free === true } } as Record<string, PropBag> }
     const bounds = entityBounds(entity, asset?.meta)
     const collider = components?.Collider ? normalizeCollider(components.Collider) : null
     return {
@@ -48,7 +46,9 @@ export const KonvaGhostEntity = React.memo(function KonvaGhostEntity({
 
   if (!pendingPlacement || !pointerPos || !model) return null
 
-  const target = snapToGrid ? snapEntityPos(pointerPos.x, pointerPos.y) : { x: Math.round(pointerPos.x), y: Math.round(pointerPos.y) }
+  // A tile-based entity always shows on the tile it would land on; a free one follows the pointer pixel by pixel.
+  const free = pendingPlacement.free === true
+  const target = free ? { x: Math.round(pointerPos.x), y: Math.round(pointerPos.y) } : snapEntityPos(pointerPos.x, pointerPos.y)
 
   return (
     <Shape
@@ -59,16 +59,18 @@ export const KonvaGhostEntity = React.memo(function KonvaGhostEntity({
       sceneFunc={(context, shape) => {
         const ctx = context._context as CanvasRenderingContext2D
         const s = shape.getStage()?.scaleX() || 1
-        // the tile it will occupy
-        ctx.beginPath()
-        ctx.rect(-16, -32, 32, 32)
-        ctx.fillStyle = 'rgba(96,165,250,0.12)'
-        ctx.fill()
-        ctx.lineWidth = 1 / s
-        ctx.strokeStyle = 'rgba(96,165,250,0.8)'
-        ctx.setLineDash([4 / s, 3 / s])
-        ctx.stroke()
-        ctx.setLineDash([])
+        if (!free) {
+          // the tile it will occupy
+          ctx.beginPath()
+          ctx.rect(-16, -32, 32, 32)
+          ctx.fillStyle = 'rgba(96,165,250,0.12)'
+          ctx.fill()
+          ctx.lineWidth = 1 / s
+          ctx.strokeStyle = 'rgba(96,165,250,0.8)'
+          ctx.setLineDash([4 / s, 3 / s])
+          ctx.stroke()
+          ctx.setLineDash([])
+        }
 
         ctx.save()
         ctx.globalAlpha = 0.7

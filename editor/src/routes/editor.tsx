@@ -1,3 +1,4 @@
+import { withPlacement } from '@/lib/placementKind'
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { graphicAssets } from '@/lib/graphicAssets'
 import { EntityData, Layer, LayerType, MapData } from '@/types/editor'
@@ -120,7 +121,7 @@ export function EditorPage() {
         entityPlacement.pendingPlacement.name,
         x,
         y,
-        entityPlacement.pendingPlacement.components
+        withPlacement(entityPlacement.pendingPlacement.components, entityPlacement.pendingPlacement.free === true)
       )
       entityPlacement.cancelPlacement()
     }
@@ -453,12 +454,17 @@ export function EditorPage() {
     startImagePlacement: layerManager.startImagePlacement,
     cancelImagePlacement: layerManager.cancelImagePlacement,
     selectedImageId: layerManager.selectedImageId,
+    resizingImageId: layerManager.resizingImageId,
+    setResizingImageId: layerManager.setResizingImageId,
     setSelectedImageId: layerManager.setSelectedImageId,
     pickedImageIds: layerManager.pickedImageIds,
     selectImage: layerManager.selectImage,
     openImageGroupId: layerManager.openImageGroupId,
     selectImageGroup: layerManager.selectImageGroup,
     groupPickedImages: layerManager.groupPickedImages,
+    createImageGroup: layerManager.createImageGroup,
+    setImagesGroup: layerManager.setImagesGroup,
+    deleteImageGroup: layerManager.deleteImageGroup,
     ungroupImageGroup: layerManager.ungroupImageGroup,
     renameImageGroup: layerManager.renameImageGroup,
     setImageGroupLocked: layerManager.setImageGroupLocked,
@@ -483,6 +489,8 @@ export function EditorPage() {
     handleCreateLayerOfType,
     handleRenameLayer: layerManager.handleRenameLayer,
     handleDuplicateLayer,
+    copyLayers: layerManager.copyLayers,
+    pasteLayers: layerManager.pasteLayers,
     updateLayers: layerManager.updateLayers,
     setEntitiesIndex: layerManager.setEntitiesIndex,
     activeLayerType: layerManager.activeLayerType,
@@ -507,6 +515,7 @@ export function EditorPage() {
     handleDeleteEntity: entityManager.deleteEntity,
     handleRenameEntity: entityManager.renameEntity,
     handleMoveEntity: entityManager.moveEntity,
+    handleSetEntityPlacement: entityManager.setEntityPlacement,
     handleReorderEntities: entityManager.reorderEntities,
     handleAddComponent: entityManager.addComponent,
     handleRemoveComponent: entityManager.removeComponent,
@@ -647,13 +656,13 @@ export function EditorPage() {
     handleSelectLayer, handleSelectLayerExtended, layerManager.toggleLayerVisibility,
     layerManager.selectedLayerIds, layerManager.justCreatedLayer, layerManager.pinSelection, layerManager.setPinSelection,
     layerManager.pendingImage, layerManager.startImagePlacement, layerManager.cancelImagePlacement,
-    layerManager.selectedImageId, layerManager.setSelectedImageId,
-    layerManager.pickedImageIds, layerManager.selectImage, layerManager.openImageGroupId, layerManager.selectImageGroup, layerManager.groupPickedImages, layerManager.ungroupImageGroup, layerManager.renameImageGroup, layerManager.setImageGroupLocked, layerManager.moveImages, layerManager.deleteImages, layerManager.duplicateImages, layerManager.placeMultiple, layerManager.copyImages, layerManager.pasteImages,
+    layerManager.selectedImageId, layerManager.setSelectedImageId, layerManager.resizingImageId, layerManager.setResizingImageId,
+    layerManager.pickedImageIds, layerManager.selectImage, layerManager.openImageGroupId, layerManager.selectImageGroup, layerManager.groupPickedImages, layerManager.createImageGroup, layerManager.setImagesGroup, layerManager.deleteImageGroup, layerManager.ungroupImageGroup, layerManager.renameImageGroup, layerManager.setImageGroupLocked, layerManager.moveImages, layerManager.deleteImages, layerManager.duplicateImages, layerManager.placeMultiple, layerManager.copyImages, layerManager.pasteImages,
     layerManager.addImage, layerManager.updateImage, layerManager.deleteImage, layerManager.duplicateImage, layerManager.reorderImage, layerManager.moveImageTo,
     layerManager.toggleLayerLock, layerManager.handleDeleteLayer,
     layerManager.handleReorderLayers, layerManager.toggleFolderCollapsed, layerManager.handleCreateLayer,
     handleCreateLayerOfType, layerManager.handleRenameLayer,
-    handleDuplicateLayer, layerManager.updateLayers, layerManager.setEntitiesIndex,
+    handleDuplicateLayer, layerManager.copyLayers, layerManager.pasteLayers, layerManager.updateLayers, layerManager.setEntitiesIndex,
     layerManager.activeTool, layerManager.paintMode, layerManager.setActiveTool,
     layerManager.setPaintMode, layerManager.tileSelection, layerManager.setTileSelection,
     layerManager.isPainting, layerManager.setIsPainting,
@@ -666,7 +675,7 @@ export function EditorPage() {
     entityManager.toggleEntityFolderExpanded, entityManager.toggleEntityVisibility,
     entityManager.moveEntityToFolder,
     entityManager.createEntity, entityManager.duplicateEntity, entityManager.deleteEntity,
-    entityManager.renameEntity, entityManager.moveEntity, entityManager.reorderEntities,
+    entityManager.renameEntity, entityManager.moveEntity, entityManager.setEntityPlacement, entityManager.reorderEntities,
     entityManager.addComponent, entityManager.removeComponent, entityManager.updateComponentProp,
     entityManager.updateComponentProps,
     // History

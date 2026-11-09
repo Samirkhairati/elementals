@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { ShortcutsSettings } from './ShortcutsSettings'
 import { useShortcutStore } from '@/store/shortcutStore'
@@ -52,5 +52,29 @@ describe('ShortcutsSettings', () => {
     render(<ShortcutsSettings />)
     fireEvent.click(screen.getByLabelText(/Remove .*Y from Redo/))
     expect(useShortcutStore.getState().overrides['edit.redo']).toEqual(['Mod+Shift+Z'])
+  })
+
+  it('Reset all asks first and only resets once confirmed', () => {
+    render(<ShortcutsSettings />)
+    record('Brush tool', 'q')
+    fireEvent.click(screen.getByRole('button', { name: /Reset all/ }))
+    expect(screen.getByRole('dialog').textContent).toContain('Reset all shortcuts?')
+    expect(useShortcutStore.getState().overrides['tool.brush']).toBeDefined()
+    fireEvent.click(screen.getByRole('button', { name: /Cancel/ }))
+    expect(useShortcutStore.getState().overrides['tool.brush']).toBeDefined()
+    fireEvent.click(screen.getByRole('button', { name: /Reset all/ }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Reset all/ }))
+    expect(useShortcutStore.getState().overrides).toEqual({})
+  })
+
+  it('each group collapses and opens again', () => {
+    render(<ShortcutsSettings />)
+    const group = screen.getAllByRole('button', { expanded: true })[0]
+    expect(screen.getByText('Undo')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /^Edit/i }))
+    expect(screen.queryByText('Undo')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /^Edit/i }))
+    expect(screen.getByText('Undo')).toBeTruthy()
+    void group
   })
 })

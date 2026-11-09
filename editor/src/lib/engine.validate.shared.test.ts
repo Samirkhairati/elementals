@@ -83,7 +83,7 @@ describe('validateEntity', () => {
   })
 
   it('partial props are fine (defaults fill the gaps)', () => {
-    expect(validateEntity({ id: 'a', name: 'a', x: 1, y: 2, components: { Transform: { x: 1, y: 2 }, Collider: { width: 32 } } })).toEqual([])
+    expect(validateEntity({ id: 'a', name: 'a', x: 16, y: 32, components: { Transform: { x: 16, y: 32 }, Collider: { width: 32 } } })).toEqual([])
   })
 
   it('warns about sprite assets that do not exist, only when the list is given', () => {

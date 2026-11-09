@@ -8,7 +8,7 @@ import { clipboardHasFiles, pastedPngs } from '@/lib/droppedFiles'
 import { EdButton, InfoTip } from '../ui/controls'
 import { ConfirmFooter } from '../dialogs/ConfirmParts'
 import { ImageThumb } from './browse'
-import { dropCandidates, pickCandidates, type Candidate } from './importFlow'
+import { acceptable, dropCandidates, looseFiles, pickCandidates, type Candidate, type ImageKind } from './importFlow'
 
 interface Props {
   id: string
@@ -40,11 +40,13 @@ function ReplaceBody({ id, current, onReplace, onClose }: Props) {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [over, setOver] = useState(false)
+  // A GIF is replaced by a GIF, a PNG by a PNG (the id keeps its extension).
+  const kind: ImageKind = /\.gif$/i.test(id) ? 'gif' : 'png'
   const pickedRef = useRef(picked)
   pickedRef.current = picked
 
   const take = async (files: File[], pasted = false) => {
-    const r = await dropCandidates(files.slice(0, 1), { pasted })
+    const r = await dropCandidates(looseFiles(files.slice(0, 1)), { pasted, accept: [kind] })
     if (!r.ok) return setError(r.error)
     setError('')
     setSize(null)
@@ -74,7 +76,11 @@ function ReplaceBody({ id, current, onReplace, onClose }: Props) {
 
   const choose = async () => {
     const r = await pickCandidates()
-    if (r.ok) { setError(''); setSize(null); setPicked(r.candidates[0]) } else if (!r.canceled) setError(r.error)
+    if (r.ok) {
+      const kept = acceptable(r.candidates, [kind])
+      if (kept.candidates.length === 0) return setError(`Choose a ${kind.toUpperCase()} image: this picture is a ${kind.toUpperCase()}.`)
+      setError(''); setSize(null); setPicked(kept.candidates[0])
+    } else if (!r.canceled) setError(r.error)
   }
 
   const submit = async () => {
@@ -86,7 +92,8 @@ function ReplaceBody({ id, current, onReplace, onClose }: Props) {
     else onClose()
   }
 
-  const note = sizeNote(current, size)
+  // A GIF's size is its frames' size, the current one is its whole sheet: they are not comparable.
+  const note = kind === 'gif' ? '' : sizeNote(current, size)
 
   return (
     <>

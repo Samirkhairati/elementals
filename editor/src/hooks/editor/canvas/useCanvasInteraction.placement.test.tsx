@@ -84,6 +84,22 @@ describe('placing a picture: Shift locks one axis', () => {
     expect(props.cancelImagePlacement).not.toHaveBeenCalled()
   })
 
+  it('after a picture is placed, Shift lines the next one up with it (same row or column)', () => {
+    const { hook, props, move, click } = setup()
+    move(64, 96)
+    click()
+    move(300, 110, true)
+    expect(hook.result.current.placementAxis).toBe('x')
+    expect(hook.result.current.stagePointerPos).toEqual({ x: 300, y: 96 })
+    click(true)
+    expect(props.commitImagePlacement).toHaveBeenLastCalledWith(300, 96)
+    // released and pressed again further down: the column of the last one
+    move(310, 400, false)
+    move(305, 420, true)
+    expect(hook.result.current.placementAxis).toBe('y')
+    expect(hook.result.current.stagePointerPos).toEqual({ x: 300, y: 420 })
+  })
+
   it('a plain click still places where the pointer is', () => {
     const { props, move, click } = setup()
     move(64, 96)

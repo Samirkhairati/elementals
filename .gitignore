@@ -3,3 +3,6 @@
 .agents/skills/frontend-design/SKILL.md
 skills-lock.json
 roadmaps/
+custom-assets/
+node_modules/
+issues-draft.json

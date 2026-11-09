@@ -2,12 +2,12 @@ import { useState } from 'react'
 import { Plus, Trash2, Wand2 } from 'lucide-react'
 import type { CharacterDef } from '../../../../../../shared/engine/characters'
 import type { GraphicInfo } from '../../../../../../shared/engine/graphics'
-import { addSheet, cutFromGrid, gridOf, removeSheet, sheetSummary, sheetUsers, updateSheet } from '@/lib/characterEdit'
+import { addGifAnimation, addSheet, cutFromGrid, gifFps, gifGraphics, gridOf, removeSheet, setSheetGif, setSheetPicture, sheetSource, sheetSummary, sheetUsers, stillGraphics, updateSheet, type SheetSource } from '@/lib/characterEdit'
 import { readImagePixels } from '@/lib/imagePixels'
 import { describeDetection, detectSheetGrid } from '@/lib/sheetDetect'
 import { PicturePicker } from '../../dialogs/PicturePicker'
 import { GraphicField } from './GraphicField'
-import { EdButton, Field, FieldRow, IconButton, InfoTip, NumberField, Section } from '../../ui/controls'
+import { EdButton, Field, FieldRow, IconButton, InfoTip, NumberField, Section, Segmented } from '../../ui/controls'
 import { PivotPicker } from './PivotPicker'
 import { SheetGridPreview } from './SheetGridPreview'
 
@@ -25,6 +25,9 @@ export function SheetsTab({ def, onChange, graphics, images = {} }: Props) {
   const sizeOf = (image: string) => graphics.find((g) => g.id === image)
   const [notes, setNotes] = useState<Record<string, string>>({})
   const [picking, setPicking] = useState(false)
+  const [pickingGif, setPickingGif] = useState(false)
+  // A sheet whose source is being switched: the picker for the new kind is open for it.
+  const [switching, setSwitching] = useState<{ key: string; to: SheetSource } | null>(null)
   const note = (key: string, text: string) => setNotes((n) => ({ ...n, [key]: text }))
 
   const detect = async (key: string) => {
@@ -51,24 +54,54 @@ export function SheetsTab({ def, onChange, graphics, images = {} }: Props) {
         const size = sizeOf(sheet.image)
         const grid = size ? gridOf(sheet, size) : null
         const users = sheetUsers(def, key)
+        const source = sheetSource(sheet)
+        const isGif = source === 'gif'
         return (
-          <Section key={key} title={key} summary={sheetSummary(sheet, size)} info="One picture and how it is cut into frames.">
-            <Field label="Image" info="The picture file this sheet is cut from. Images live in Graphics; you can pick one that other sprites already use.">
-              <GraphicField aria-label={`Image of ${key}`} value={sheet.image} missing={!sizeOf(sheet.image)} graphics={graphics} images={images} onChange={(v) => onChange(updateSheet(def, key, { image: v }))} />
+          <Section key={key} title={key} summary={isGif ? gifSummary(size) : sheetSummary(sheet, size)} info="One picture, or one GIF, and how it is cut into frames.">
+            <Field label="Source" info="A spritesheet is a picture of frames side by side that you cut into a grid. A GIF is an animation: its frames are read from the file, so there is nothing to cut, and its animation plays all of them (you set the speed).">
+              <Segmented<SheetSource>
+                aria-label={`Source of ${key}`}
+                value={source}
+                options={[{ value: 'sheet', label: 'Spritesheet' }, { value: 'gif', label: 'GIF' }]}
+                onChange={(to) => to !== source && setSwitching({ key, to })}
+              />
             </Field>
+            <Field label={isGif ? 'GIF' : 'Image'} info={isGif ? 'The GIF this sheet plays. GIFs live in Graphics (import one there); you can pick one that other sprites already use.' : 'The picture file this sheet is cut from. Images live in Graphics; you can pick one that other sprites already use.'}>
+              <GraphicField
+                aria-label={`Image of ${key}`}
+                value={sheet.image}
+                missing={!sizeOf(sheet.image)}
+                kind={source}
+                graphics={graphics}
+                images={images}
+                onChange={(v) => {
+                  const g = sizeOf(v)
+                  onChange(isGif && g ? setSheetGif(def, key, g) : updateSheet(def, key, { image: v }))
+                }}
+              />
+            </Field>
+            {isGif && size?.gif && (
+              <p className="ed-hint" data-testid={`gif-info-${key}`}>
+                {size.gif.frames} frame{size.gif.frames === 1 ? '' : 's'} of {size.gif.frameWidth}×{size.gif.frameHeight} px, made to play at about {gifFps(size)} fps. Its animations play every frame; set their speed in Animations.
+              </p>
+            )}
+            {isGif && size && !size.gif && <p role="alert" className="text-destructive">This is not a GIF graphic.</p>}
             {size && images[sheet.image] && (
               <div className="flex flex-wrap items-start gap-3">
                 <SheetGridPreview url={images[sheet.image]} sheet={sheet} size={size} />
                 <div className="flex min-w-[200px] flex-1 flex-col gap-2">
-                  <FieldRow>
-                    <EdButton size="sm" onClick={() => void detect(key)}><Wand2 /> Detect from picture</EdButton>
-                    <InfoTip>{CUT_INFO}</InfoTip>
-                  </FieldRow>
+                  {!isGif && (
+                    <FieldRow>
+                      <EdButton size="sm" onClick={() => void detect(key)}><Wand2 /> Detect from picture</EdButton>
+                      <InfoTip>{CUT_INFO}</InfoTip>
+                    </FieldRow>
+                  )}
                   {notes[key] && <p role="status" className="ed-hint" data-testid={`detect-note-${key}`}>{notes[key]}</p>}
-                  <p className="ed-hint">Each box is one frame; the number is what animations use to refer to it.</p>
+                  <p className="ed-hint">{isGif ? 'The frames of the GIF in order, side by side. The number is what animations use to refer to a frame.' : 'Each box is one frame; the number is what animations use to refer to it.'}</p>
                 </div>
               </div>
             )}
+            {!isGif && <>
             <FieldRow>
               <span className="text-ed-label">Columns × Rows</span>
               <NumberField aria-label={`Columns of ${key}`} size="xs" min={1} value={grid?.columns ?? 1} onCommit={(c) => size && onChange(updateSheet(def, key, cutFromGrid(size, c, grid?.rows || 1, sheet.margin, sheet.spacing)))} />
@@ -84,7 +117,9 @@ export function SheetsTab({ def, onChange, graphics, images = {} }: Props) {
               <NumberField aria-label={`Frame height of ${key}`} size="sm" min={1} unit="px" value={sheet.frameHeight} onCommit={(v) => onChange(updateSheet(def, key, { frameHeight: v }))} />
               <InfoTip>The width and height of one frame in pixels. Calculated from columns and rows; change it only if the image has odd sizes.</InfoTip>
             </FieldRow>
-            <Section title="Advanced" summary={`margin ${sheet.margin} · spacing ${sheet.spacing}`} defaultOpen={false}>
+            </>}
+            <Section title="Advanced" summary={isGif ? 'pivot' : `margin ${sheet.margin} · spacing ${sheet.spacing}`} defaultOpen={false}>
+              {!isGif && (
               <FieldRow>
                 <span className="text-ed-label">Margin</span>
                 <NumberField aria-label={`Margin of ${key}`} size="xs" min={0} value={sheet.margin} onCommit={(v) => onChange(updateSheet(def, key, { margin: v }))} />
@@ -93,6 +128,7 @@ export function SheetsTab({ def, onChange, graphics, images = {} }: Props) {
                 <NumberField aria-label={`Spacing of ${key}`} size="xs" min={0} value={sheet.spacing} onCommit={(v) => onChange(updateSheet(def, key, { spacing: v }))} />
                 <InfoTip>Empty pixels between neighbouring frames.</InfoTip>
               </FieldRow>
+              )}
               <FieldRow>
                 <span className="text-ed-label">Pivot override</span>
                 <PivotPicker value={sheet.pivot ?? def.pivot} onChange={(p) => onChange(updateSheet(def, key, { pivot: p }))} />
@@ -109,9 +145,28 @@ export function SheetsTab({ def, onChange, graphics, images = {} }: Props) {
       })}
       <FieldRow>
         <EdButton size="sm" aria-label="Add a sheet" onClick={() => setPicking(true)}><Plus /> Add sheet…</EdButton>
-        <PicturePicker open={picking} onOpenChange={setPicking} tabs={['graphics']} title="Add a sheet: choose a picture" graphics={graphics} images={images} onPick={(p) => { const g = p.graphicId ? sizeOf(p.graphicId) : undefined; if (g) onChange(addSheet(def, g.id, g, 'sheet').def) }} />
-        <span className="ed-hint">Pick a picture from Graphics (import new ones in the Graphics table).</span>
+        <PicturePicker open={picking} onOpenChange={setPicking} tabs={['graphics']} title="Add a sheet: choose a picture" graphics={stillGraphics(graphics)} images={images} onPick={(p) => { const g = p.graphicId ? sizeOf(p.graphicId) : undefined; if (g) onChange(addSheet(def, g.id, g, 'sheet').def) }} />
+        <EdButton size="sm" aria-label="Add a GIF" onClick={() => setPickingGif(true)}><Plus /> Add GIF…</EdButton>
+        <PicturePicker open={pickingGif} onOpenChange={setPickingGif} tabs={['graphics']} title="Add a GIF animation: choose a GIF" graphics={gifGraphics(graphics)} images={images} onPick={(p) => { const g = p.graphicId ? sizeOf(p.graphicId) : undefined; if (g?.gif) onChange(addGifAnimation(def, g).def) }} />
+        <PicturePicker
+          open={switching !== null}
+          onOpenChange={(o) => !o && setSwitching(null)}
+          tabs={['graphics']}
+          title={switching?.to === 'gif' ? 'Play a GIF: choose a GIF' : 'Use a spritesheet: choose a picture'}
+          graphics={switching?.to === 'gif' ? gifGraphics(graphics) : stillGraphics(graphics)}
+          images={images}
+          onPick={(p) => {
+            const g = p.graphicId ? sizeOf(p.graphicId) : undefined
+            if (g && switching) onChange(switching.to === 'gif' ? setSheetGif(def, switching.key, g) : setSheetPicture(def, switching.key, g))
+          }}
+        />
+        <span className="ed-hint">Pick a picture or a GIF from Graphics (import new ones in the Graphics table).</span>
       </FieldRow>
     </div>
   )
+}
+
+/** "3 frames of 64×48 px" for a collapsed GIF sheet. */
+function gifSummary(size?: GraphicInfo): string {
+  return size?.gif ? `GIF · ${size.gif.frames} frame${size.gif.frames === 1 ? '' : 's'} of ${size.gif.frameWidth}×${size.gif.frameHeight} px` : 'GIF'
 }

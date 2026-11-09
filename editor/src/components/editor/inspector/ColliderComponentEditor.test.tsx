@@ -1,20 +1,23 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- tests build partial editor contexts and entity props */
 import React from 'react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, screen } from '@testing-library/react'
 import { ColliderComponentEditor } from './ColliderComponentEditor'
 import { renderWithEditor, assetMap, characterMeta, makeAsset } from '@/test/editorContext'
-import { setSnapToTile } from '@/lib/snapPref'
 
 const hero = makeAsset('characters/hero', characterMeta()) // 32x48 frame, pivot bottom-centre
 
 const col = (over: Record<string, any> = {}) => ({ width: 32, height: 32, offsetX: 0, offsetY: 0, isSolid: true, ...over })
 
+const FREE = { x: 0, y: 0, depth: 20, free: true }
+const TILE = { x: 16, y: 32, depth: 20, free: false }
+
+/** A free entity by default (any size, snapping to 4px while dragging); pass `{ Transform: TILE }` for a tile-based one. */
 function setup(value = col(), components: Record<string, any> = {}) {
   const onChange = vi.fn()
   const onChangeMany = vi.fn()
   renderWithEditor(
-    <ColliderComponentEditor entityId="e1" value={value} components={{ Collider: value, ...components }} onChange={onChange} onChangeMany={onChangeMany} />,
+    <ColliderComponentEditor entityId="e1" value={value} components={{ Collider: value, Transform: FREE, ...components }} onChange={onChange} onChangeMany={onChangeMany} />,
     { spriteAssets: assetMap(hero), spriteList: [hero] },
   )
   return { onChange, onChangeMany }
@@ -140,19 +143,22 @@ describe('ColliderComponentEditor', () => {
     expect(onChangeMany).toHaveBeenCalledWith({ width: 32, height: 32, offsetX: 8, offsetY: -4 })
   })
 
-  describe('magnet (snap to tiles)', () => {
-    afterEach(() => setSnapToTile(false))
-    const magnet = () => screen.getByRole('button', { name: 'Snap to tiles' })
+  describe('tile-based entity', () => {
+    const tile = { Transform: TILE }
 
-    it('starts off, and dragging then snaps to 4px as before', () => {
-      setup()
-      expect(magnet()).toHaveAttribute('aria-pressed', 'false')
+    it('says which kind it is and has no magnet to switch', () => {
+      setup(col(), tile)
+      expect(screen.getByTitle('Snaps to whole tiles')).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Snap to tiles' })).toBeNull()
     })
 
-    it('with the magnet on, dragging the body moves in whole tiles and Shift places freely', () => {
-      const { onChangeMany } = setup()
-      fireEvent.click(magnet())
-      expect(magnet()).toHaveAttribute('aria-pressed', 'true')
+    it('a free entity says so', () => {
+      setup()
+      expect(screen.getByTitle('Any size and position; nothing snaps')).toBeInTheDocument()
+    })
+
+    it('dragging the body moves in whole tiles and Shift places by the pixel', () => {
+      const { onChangeMany } = setup(col(), tile)
       const { ax, ay, z } = geo()
       fireEvent.mouseDown(screen.getByTestId('collider-body'), { clientX: ax, clientY: ay - 16 * z, button: 0 })
       fireEvent.mouseUp(window, { clientX: ax + 40 * z, clientY: ay - 16 * z + 20 * z })
@@ -162,31 +168,56 @@ describe('ColliderComponentEditor', () => {
       expect(onChangeMany).toHaveBeenLastCalledWith({ width: 32, height: 32, offsetX: 10, offsetY: 0 })
     })
 
-    it('with the magnet on, the number fields commit whole tiles and sizes never snap to nothing', () => {
-      const { onChange } = setup()
-      fireEvent.click(magnet())
+    it('resizing to two tiles wide keeps the edges on tile lines (half a tile of offset)', () => {
+      const { onChangeMany } = setup(col(), tile)
+      const { ax, ay, z } = geo()
+      fireEvent.mouseDown(screen.getByTestId('handle-e'), { clientX: ax + 16 * z, clientY: ay - 16 * z, button: 0 })
+      fireEvent.mouseUp(window, { clientX: ax + 48 * z, clientY: ay - 16 * z })
+      expect(onChangeMany).toHaveBeenCalledWith({ width: 64, height: 32, offsetX: 16, offsetY: 0 })
+    })
+
+    it('the number fields commit whole tiles, sizes never snap to nothing, and the whole area follows', () => {
+      const { onChangeMany } = setup(col(), tile)
       const w = screen.getByLabelText('Width')
       fireEvent.change(w, { target: { value: '40' } })
       fireEvent.blur(w)
-      expect(onChange).toHaveBeenLastCalledWith('width', 32)
+      expect(onChangeMany).toHaveBeenLastCalledWith({ width: 32, height: 32, offsetX: 0, offsetY: 0 })
       fireEvent.change(w, { target: { value: '70' } })
       fireEvent.blur(w)
-      expect(onChange).toHaveBeenLastCalledWith('width', 64)
+      expect(onChangeMany).toHaveBeenLastCalledWith({ width: 64, height: 32, offsetX: 16, offsetY: 0 })
       const h = screen.getByLabelText('Height')
       fireEvent.change(h, { target: { value: '3' } })
       fireEvent.blur(h)
-      expect(onChange).toHaveBeenLastCalledWith('height', 32)
+      expect(onChangeMany).toHaveBeenLastCalledWith({ width: 32, height: 32, offsetX: 0, offsetY: 0 })
       const ox = screen.getByLabelText('Offset X')
       fireEvent.change(ox, { target: { value: '50' } })
       fireEvent.blur(ox)
-      expect(onChange).toHaveBeenLastCalledWith('offsetX', 64)
+      expect(onChangeMany).toHaveBeenLastCalledWith({ width: 32, height: 32, offsetX: 64, offsetY: 0 })
     })
 
-    it('the arrow keys step by a tile while the magnet is on', () => {
-      const { onChange } = setup()
-      fireEvent.click(magnet())
+    it('the arrow keys step by a tile', () => {
+      const { onChangeMany } = setup(col(), tile)
       fireEvent.keyDown(screen.getByLabelText('Offset X'), { key: 'ArrowUp' })
-      expect(onChange).toHaveBeenLastCalledWith('offsetX', 32)
+      expect(onChangeMany).toHaveBeenLastCalledWith({ width: 32, height: 32, offsetX: 32, offsetY: 0 })
+    })
+
+    it('"Fit to sprite" rounds the sprite frame to whole tiles', () => {
+      const { onChangeMany } = setup(col({ width: 64 }), { ...tile, Sprite: { ...withSprite.Sprite } })
+      fireEvent.click(screen.getByRole('button', { name: /Fit to sprite/ }))
+      expect(onChangeMany).toHaveBeenCalledWith({ width: 32, height: 64, offsetX: 0, offsetY: 0 })
+    })
+  })
+
+  describe('free entity', () => {
+    it('takes any size and offset from the number fields, one prop at a time', () => {
+      const { onChange, onChangeMany } = setup()
+      const w = screen.getByLabelText('Width')
+      fireEvent.change(w, { target: { value: '45' } })
+      fireEvent.blur(w)
+      expect(onChange).toHaveBeenLastCalledWith('width', 45)
+      expect(onChangeMany).not.toHaveBeenCalled()
+      fireEvent.keyDown(screen.getByLabelText('Offset X'), { key: 'ArrowUp' })
+      expect(onChange).toHaveBeenLastCalledWith('offsetX', 1)
     })
   })
 

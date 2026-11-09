@@ -36,6 +36,12 @@ export interface TransformProps {
   y: number;
   /** Draw order. Higher draws on top. Characters default to 20, objects to 10, flat triggers to 5. */
   depth: number;
+  /**
+   * Free entity: it may sit at any pixel position and its Collider (and sprite) may have any size and offset.
+   * Off (the default, and what every entity written before this flag has): a tile-based entity, whose anchor is
+   * the bottom-centre of a tile (`x = col*32+16`, `y = (row+1)*32`) and whose collider covers whole tiles.
+   */
+  free: boolean;
 }
 
 export interface SpriteProps {

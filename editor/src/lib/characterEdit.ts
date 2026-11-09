@@ -6,8 +6,10 @@ import type { Facing } from '../../../shared/engine/types'
 import type { CharacterDef, ClipDef, FacingMode, PivotDef, SheetDef } from '../../../shared/engine/characters'
 import { sheetGrid } from '../../../shared/engine/sprites'
 import { cloneJson } from '../../../shared/engine/util'
+import { isGifGraphicId, type GraphicInfo } from '../../../shared/engine/graphics'
+import { suggestedGifFps } from '../../../shared/gifSheet'
 
-export type Preset = 'actor' | 'prop' | 'animated'
+export type Preset = 'actor' | 'prop' | 'animated' | 'gif'
 
 /** What a character is for lists and pickers: a person-like actor (four facings), a still object, or a prop that animates. */
 export type CharacterKind = 'actor' | 'object' | 'animated'
@@ -21,9 +23,9 @@ export function characterKind(def: Pick<CharacterDef, 'facing' | 'clips'>): Char
 }
 
 /** Folder a new character of this preset goes into by default (ids stay editable). */
-export const PRESET_FOLDERS: Record<Preset, string> = { actor: 'characters', prop: 'objects', animated: 'animated' }
+export const PRESET_FOLDERS: Record<Preset, string> = { actor: 'characters', prop: 'objects', animated: 'animated', gif: 'animated' }
 
-export const PRESET_LABELS: Record<Preset, string> = { actor: 'Actor (4 directions)', prop: 'Object (one picture)', animated: 'Animated prop' }
+export const PRESET_LABELS: Record<Preset, string> = { actor: 'Actor (4 directions)', prop: 'Object (one picture)', animated: 'Animated prop', gif: 'GIF animation' }
 
 export interface GridSuggestion {
   columns: number
@@ -74,6 +76,7 @@ export function newCharacter(preset: Preset, name: string, image: string, size: 
       bindings: { idle: 'idle', walk: 'walk' },
     }
   }
+  if (preset === 'gif') throw new Error('A GIF character is made with newGifCharacter')
   if (preset === 'animated') {
     const frames = Array.from({ length: grid.columns * grid.rows }, (_, i) => i)
     return {
@@ -86,6 +89,94 @@ export function newCharacter(preset: Preset, name: string, image: string, size: 
     }
   }
   return { ...base, profile: 'prop', facing: 'none', sheets: { sheet }, clips: {}, bindings: {}, still: { sheet: 'sheet', frame: 0 } }
+}
+
+/**
+ * A new character that plays a GIF: one looping animation, bound to idle (and so to walking too), so a map entity that
+ * uses it plays the GIF without anything else to set. The id stays with the caller.
+ */
+export function newGifCharacter(name: string, graphic: GraphicInfo): CharacterDef {
+  return {
+    version: 2,
+    name: name.trim() || 'New sprite',
+    tags: [],
+    profile: 'prop',
+    facing: 'none',
+    pivot: { x: 0.5, y: 1 },
+    sheets: { gif: gifSheet(graphic) },
+    clips: { idle: gifClip(undefined, 'gif', graphic) },
+    bindings: { idle: 'idle' },
+    still: { sheet: 'gif', frame: 0 },
+  }
+}
+
+// ── GIFs ────────────────────────────────────────────────────────────────────────────────────────
+// A GIF is a sheet whose picture is a .gif graphic (shared/engine/graphics.ts): its frames are laid out as a grid, so a
+// clip on it is an ordinary clip over frames 0..n-1; only the fps comes from the GIF (its delays), and the author can change it.
+
+export type SheetSource = 'sheet' | 'gif'
+
+/** Whether a sheet is cut from a GIF or from a picture of frames. */
+export const sheetSource = (sheet: Pick<SheetDef, 'image'>): SheetSource => (isGifGraphicId(sheet.image) ? 'gif' : 'sheet')
+
+/** The GIF graphics of a library (an animation can only be a sheet's picture, never a still one). */
+export const gifGraphics = (graphics: readonly GraphicInfo[]): GraphicInfo[] => graphics.filter((g) => !!g.gif)
+/** The still pictures of a library (a GIF is left out). */
+export const stillGraphics = (graphics: readonly GraphicInfo[]): GraphicInfo[] => graphics.filter((g) => !g.gif)
+
+/** Frame numbers 0..n-1 of a GIF graphic, the frames of its clip. */
+export const gifFrames = (graphic: GraphicInfo): number[] => Array.from({ length: graphic.gif?.frames ?? 1 }, (_, i) => i)
+
+/** The fps that plays a GIF at the speed it was made for. */
+export const gifFps = (graphic: GraphicInfo): number => suggestedGifFps(graphic.gif?.delaysMs ?? [])
+
+/** A sheet cut from a GIF: the frame size is the GIF's, nothing else to cut. */
+export function gifSheet(graphic: GraphicInfo): SheetDef {
+  return { image: graphic.id, frameWidth: graphic.gif?.frameWidth ?? graphic.width, frameHeight: graphic.gif?.frameHeight ?? graphic.height, margin: 0, spacing: 0 }
+}
+
+/**
+ * Switches a sheet to a GIF: the picture becomes the GIF and the cut its frame size. The animations that use the sheet
+ * play all its frames from now on (a GIF has nothing else to choose), at the GIF's own fps; they stop being directional.
+ */
+export function setSheetGif(def: CharacterDef, key: string, graphic: GraphicInfo): CharacterDef {
+  const next = cloneJson(def)
+  next.sheets[key] = { ...gifSheet(graphic), ...(next.sheets[key].pivot ? { pivot: next.sheets[key].pivot } : {}) }
+  for (const [name, clip] of Object.entries(next.clips)) if (clip.sheet === key) next.clips[name] = gifClip(clip, key, graphic)
+  return next
+}
+
+/** Switches a sheet back to a picture of frames: a cut suggested from its size (the animations keep their frame numbers). */
+export function setSheetPicture(def: CharacterDef, key: string, graphic: GraphicInfo): CharacterDef {
+  const grid = suggestGrid(def.facing === 'four' ? 'actor' : 'prop', graphic.width, graphic.height)
+  const next = cloneJson(def)
+  next.sheets[key] = { image: graphic.id, frameWidth: grid.frameWidth, frameHeight: grid.frameHeight, margin: 0, spacing: 0, ...(next.sheets[key].pivot ? { pivot: next.sheets[key].pivot } : {}) }
+  return next
+}
+
+/** A clip over a GIF sheet: every frame in order, the GIF's speed, looping unless it was set otherwise. */
+export function gifClip(from: Partial<ClipDef> | undefined, sheetKey: string, graphic: GraphicInfo): ClipDef {
+  const clip: ClipDef = { sheet: sheetKey, fps: gifFps(graphic), loop: from?.loop ?? true, directional: false, frames: gifFrames(graphic) }
+  if (from?.mode) clip.mode = from.mode
+  if (from?.followSpeed) clip.followSpeed = from.followSpeed
+  return clip
+}
+
+/** Adds a sheet for a GIF and an animation that plays it (a character can have several GIF animations). */
+export function addGifAnimation(def: CharacterDef, graphic: GraphicInfo, name = 'animation'): { def: CharacterDef; sheet: string; clip: string } {
+  const sheet = uniqueKey(def.sheets, 'gif')
+  const clip = uniqueKey(def.clips, name)
+  const next = cloneJson(def)
+  next.sheets[sheet] = gifSheet(graphic)
+  next.clips[clip] = gifClip(undefined, sheet, graphic)
+  return { def: next, sheet, clip }
+}
+
+/** Makes an animation play all the frames of its GIF again, at the GIF's speed (after the author changed them). */
+export function resetGifClip(def: CharacterDef, name: string, graphic: GraphicInfo): CharacterDef {
+  const next = cloneJson(def)
+  next.clips[name] = gifClip(next.clips[name], next.clips[name].sheet, graphic)
+  return next
 }
 
 // ── sheets ──────────────────────────────────────────────────────────────────────────────────────

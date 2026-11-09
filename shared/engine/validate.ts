@@ -8,6 +8,7 @@ import { isFacing } from './constants.ts';
 import { isEventTrigger, isLegacyTrigger } from './triggers.ts';
 import { isLegacyComponentType } from './migrate.ts';
 import { isRecord } from './util.ts';
+import { isTileAnchor } from './placement.ts';
 
 /** `[2, 'then', 0]` -> `commands[2].branches.then[0]`. */
 export function formatCommandPath(path: (string | number)[], root = 'commands'): string {
@@ -108,6 +109,10 @@ export function validateEntity(entity: unknown, ctx: ValidationContext = {}): En
       }
     }
 
+    // A tile-based entity belongs on the grid; one that is not should be made free (or snapped).
+    if (type === 'Transform' && hasPosition && props.free !== true && !isTileAnchor(entity.x as number, entity.y as number)) {
+      add('warning', 'off-grid', `Tile-based entity at (${String(entity.x)}, ${String(entity.y)}) is not on the 32px tile grid; snap it, or make it a free entity`, base);
+    }
     if (type === 'Sprite' && typeof props.asset === 'string' && props.asset !== '' && ctx.spriteIds && !ctx.spriteIds.includes(props.asset)) {
       add('warning', 'dangling-sprite', `Sprite asset "${props.asset}" does not exist`, `${base}.asset`);
     }
