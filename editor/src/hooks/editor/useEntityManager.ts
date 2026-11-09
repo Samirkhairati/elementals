@@ -246,6 +246,45 @@ export function useEntityManager(options: UseEntityManagerOptions) {
     [commitNewEntities]
   )
 
+  /** Put copies of `entities` on the map (one undo step), a little down-right of where they were, and pick the last. */
+  const pasteEntities = useCallback(
+    (entities: readonly EntityData[]) => {
+      let last: string | null = null
+      commitNewEntities(
+        prev => {
+          if (entities.length === 0) return prev
+          const taken = new Set(prev.map(e => e.name))
+          const copies = entities.map(source => {
+            let name = `${source.name} Copy`
+            for (let n = 2; taken.has(name); n++) name = `${source.name} Copy ${n}`
+            taken.add(name)
+            const copy: EntityData = {
+              ...source,
+              id: crypto.randomUUID(),
+              name,
+              x: source.x + 16,
+              y: source.y + 16,
+              visible: source.visible !== false,
+              folder: source.folder || null,
+              components: cloneEntity(source as any, true).components as EntityData['components'],
+            }
+            if (copy.components.Transform) {
+              copy.components.Transform.x = copy.x
+              copy.components.Transform.y = copy.y
+            }
+            return copy
+          })
+          last = copies[copies.length - 1].id
+          return [...prev, ...copies]
+        },
+        () => {
+          if (last) setSelectedEntityId(last)
+        }
+      )
+    },
+    [commitNewEntities]
+  )
+
   const deleteEntity = useCallback(
     (id: string) => {
       commitNewEntities(
@@ -429,6 +468,7 @@ export function useEntityManager(options: UseEntityManagerOptions) {
     moveEntityToFolder,
     createEntity,
     duplicateEntity,
+    pasteEntities,
     deleteEntity,
     renameEntity,
     moveEntity,

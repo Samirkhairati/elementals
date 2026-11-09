@@ -207,7 +207,7 @@ describe('useLayerManager: Entities row position', () => {
     })
     const images = result.current.manager.layers[0].images!
     expect(images).toHaveLength(2)
-    expect(images[1]).toMatchObject({ graphicId: 'sky/sheet.png', crop: { x: 1, y: 2, w: 3, h: 4 }, x: 96, y: 128, name: 'sky/sheet.png 2' })
+    expect(images[1]).toMatchObject({ graphicId: 'sky/sheet.png', crop: { x: 1, y: 2, w: 3, h: 4 }, x: 96, y: 128, name: 'sheet 2' })
     expect(copyId).toBe(images[1].id)
     expect(images[1].id).not.toBe(id)
     expect(result.current.manager.selectedImageId).toBe(copyId)

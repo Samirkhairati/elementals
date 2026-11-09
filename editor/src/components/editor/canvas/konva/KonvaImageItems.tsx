@@ -6,6 +6,7 @@ import { drawResolvedSprite, useSpriteImagesVersion } from '@/lib/spriteImages'
 import { flippedItemBounds, resolveImageItem, snapImageAnchor } from '@/lib/imageItems'
 import { sortedImages } from '@/lib/layerOrder'
 import type { ImagePick } from '@/lib/graphicAssets'
+import type { SelectMode } from '@/lib/imageSelection'
 import { setStageCursor } from '../canvasUtils'
 
 const NO_ASSETS: Record<string, SpriteAssetInfo> = {}
@@ -19,6 +20,9 @@ interface KonvaImageItemsProps {
   activateLayer?: (layerId: string) => void
   selectedImageId: string | null
   setSelectedImageId: (id: string | null) => void
+  /** Everything picked (Ctrl/Cmd+click adds or removes a picture); falls back to `selectedImageId` alone. */
+  pickedImageIds?: readonly string[]
+  selectImage?: (layerId: string, imageId: string, mode: SelectMode) => void
   moveImage: (layerId: string, imageId: string, x: number, y: number) => void
   snapToGrid: boolean
   spriteAssets?: Record<string, SpriteAssetInfo>
@@ -35,6 +39,8 @@ export const KonvaImageItems = React.memo(function KonvaImageItems({
   activateLayer,
   selectedImageId,
   setSelectedImageId,
+  pickedImageIds,
+  selectImage,
   moveImage,
   snapToGrid,
   spriteAssets = NO_ASSETS,
@@ -59,6 +65,8 @@ export const KonvaImageItems = React.memo(function KonvaImageItems({
           active={l.id === layer?.id}
           interactive={!l.locked && !placing}
           selectedImageId={selectedImageId}
+          pickedImageIds={pickedImageIds}
+          selectImage={selectImage}
           activateLayer={activateLayer}
           setSelectedImageId={setSelectedImageId}
           moveImage={moveImage}
@@ -76,6 +84,8 @@ function ImageLayerHandles({
   active,
   interactive,
   selectedImageId,
+  pickedImageIds,
+  selectImage,
   activateLayer,
   setSelectedImageId,
   moveImage,
@@ -87,6 +97,8 @@ function ImageLayerHandles({
   active: boolean
   interactive: boolean
   selectedImageId: string | null
+  pickedImageIds?: readonly string[]
+  selectImage?: (layerId: string, imageId: string, mode: SelectMode) => void
   activateLayer?: (layerId: string) => void
   setSelectedImageId: (id: string | null) => void
   moveImage: (layerId: string, imageId: string, x: number, y: number) => void
@@ -96,10 +108,13 @@ function ImageLayerHandles({
 }) {
   const items = useMemo(() => sortedImages(layer.images), [layer.images])
   // Picking an image of another layer makes that layer the active one (which clears the selection, so select after).
-  const pick = (id: string) => {
+  // Ctrl/Cmd+click adds or removes a picture from the picked set (Shift+click is the canvas's own gesture).
+  const pick = (id: string, mode: SelectMode = 'replace') => {
     if (!active) activateLayer?.(layer.id)
-    setSelectedImageId(id)
+    if (active && selectImage) selectImage(layer.id, id, mode)
+    else setSelectedImageId(id)
   }
+  const picked = pickedImageIds ?? (selectedImageId ? [selectedImageId] : [])
   return (
     <Group>
       {items.map((item) => (
@@ -108,7 +123,7 @@ function ImageLayerHandles({
           item={item}
           layerId={layer.id}
           assets={assets}
-          selected={active && item.id === selectedImageId}
+          selected={active && picked.includes(item.id)}
           interactive={interactive}
           place={place}
           pick={pick}
@@ -137,7 +152,7 @@ function ImageHandle({
   selected: boolean
   interactive: boolean
   place: (item: ImageItem, x: number, y: number) => { x: number; y: number }
-  pick: (id: string) => void
+  pick: (id: string, mode?: SelectMode) => void
   moveImage: (layerId: string, imageId: string, x: number, y: number) => void
   dragRef?: React.MutableRefObject<{ id: string; x: number; y: number } | null>
 }) {
@@ -155,12 +170,13 @@ function ImageHandle({
         // Shift + left is the secondary button's gesture (see the canvas): it is left to the canvas.
         if (e.evt.button === 0 && !e.evt.shiftKey) {
           e.cancelBubble = true
-          pick(item.id)
+          pick(item.id, e.evt.metaKey || e.evt.ctrlKey ? 'toggle' : 'replace')
         }
       }}
       onDragStart={(e) => {
         e.cancelBubble = true
-        pick(item.id)
+        // A Ctrl/Cmd+click that turns into a drag keeps the picked set; a plain drag picks the dragged picture.
+        if (!selected) pick(item.id)
         if (dragRef) dragRef.current = { id: item.id, x: item.x, y: item.y }
         setStageCursor(e.target.getStage(), 'grabbing')
       }}

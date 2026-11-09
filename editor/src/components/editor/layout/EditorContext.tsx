@@ -79,6 +79,12 @@ export interface EditorBaseContextValue
       | 'cancelImagePlacement'
       | 'selectedImageId'
       | 'setSelectedImageId'
+      | 'pickedImageIds'
+      | 'selectImage'
+      | 'deleteImages'
+      | 'duplicateImages'
+      | 'copyImages'
+      | 'pasteImages'
       | 'addImage'
       | 'updateImage'
       | 'deleteImage'
@@ -155,7 +161,7 @@ export interface EditorBaseContextValue
   // Layers (wrapped to also move focus / clear entity selection)
   setActiveLayerId: (layerId: string | null) => void
   /** Plain click selects one layer; `additive` (Ctrl/Cmd+click) toggles it in the multi-selection. */
-  selectLayer: (layerId: string, additive?: boolean) => void
+  selectLayer: (layerId: string, additive?: boolean | 'range') => void
   handleCreateLayerOfType: (type: LayerType, folderId?: string) => void
   handleDuplicateLayer: (id: string) => void
   toggleFolderCollapsed: (id: string) => void
