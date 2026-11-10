@@ -98,7 +98,7 @@ export class Game extends Scene {
     this.aiWanderSystem = new AIWanderSystem(this.spatialSystem);
     this.routeSystem = new RouteSystem();
     this.animationSystem = new AnimationSystem();
-    this.renderBridgeSystem = new RenderBridgeSystem(this);
+    this.renderBridgeSystem = new RenderBridgeSystem(this, this.imageLayers.ySort);
     this.characters = new CharacterLoader(spriteRegistry, phaserLoaderPort(this));
 
     // Event runtime: state/states/interpreters + the system that decides when they start

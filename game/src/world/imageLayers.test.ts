@@ -1,4 +1,3 @@
-import { sortDepth } from "@/ecs/depth";
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { convertEditorMapToTiled } from "@shared/mapExport.ts";
@@ -151,13 +150,15 @@ describe("ImageLayerRenderer", () => {
     const { scene, added } = fakeScene({ [key]: sky });
     const r = new ImageLayerRenderer(scene, realSprites);
     r.show(exported([{ id: "a", graphicId: "images/sky.png", x: 40, y: 64 }, { id: "b", graphicId: "images/sky.png", x: 40, y: 96, ySort: false }], { ySort: true }), { ySortDepth: 20 });
-    expect(added[0].depth).toBeCloseTo(sortDepth(20, 64));
     expect(added[0].depth).toBeGreaterThan(20);
     expect(added[0].depth).toBeLessThan(21);
+    // A character above its anchor is behind it, one below is in front of it.
+    expect(r.ySort.entityDepth(20, 40)).toBeLessThan(added[0].depth);
+    expect(r.ySort.entityDepth(20, 70)).toBeGreaterThan(added[0].depth);
     expect(added[1].depth).toBe(5);
   });
 
-  it("y-sorted pictures of one layer keep the layer's order: a later, higher-standing picture is lifted to the lowest anchor so far", () => {
+  it("y-sorted pictures keep the layer's draw order, whatever their y: only the characters move between them", () => {
     const { scene, added } = fakeScene({ [key]: sky });
     const r = new ImageLayerRenderer(scene, realSprites);
     r.show(
@@ -169,11 +170,15 @@ describe("ImageLayerRenderer", () => {
       { ySortDepth: 20 },
     );
     const [a, b, c] = added.map((i) => i.depth);
-    expect(a).toBeCloseTo(sortDepth(20, 200));
-    expect(b).toBeCloseTo(sortDepth(20, 200));
-    expect(c).toBeCloseTo(sortDepth(20, 300));
-    expect(a).toBeLessThanOrEqual(b);
-    expect(b).toBeLessThanOrEqual(c);
+    expect(a).toBeLessThan(b);
+    expect(b).toBeLessThan(c);
+    expect(a).toBeGreaterThan(20);
+    expect(c).toBeLessThan(21);
+    // A character stands in front of / behind each picture by comparing its own y with that picture's.
+    expect(r.ySort.entityDepth(20, 250)).toBeGreaterThan(b); // below a (200) and b (50), above... behind c (300)
+    expect(r.ySort.entityDepth(20, 250)).toBeLessThan(c);
+    expect(r.ySort.entityDepth(20, 120)).toBeLessThan(a); // behind a (200), so behind b too
+    expect(r.ySort.entityDepth(20, 400)).toBeGreaterThan(c);
   });
 
   it("crops are frames of the one picture texture: each distinct crop is added once, never a copy of the picture", () => {
