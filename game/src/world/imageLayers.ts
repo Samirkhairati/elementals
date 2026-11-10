@@ -27,6 +27,8 @@ export interface ImageObjectDef {
   opacity: number;
   /** Draws among the characters by its anchor's y instead of at the layer's depth (resolved by the exporter). */
   ySort: boolean;
+  /** Index of its layer in the map's layer list: y-sorted pictures keep their order inside one layer. */
+  layer: number;
 }
 
 type Rec = Record<string, unknown>;
@@ -46,7 +48,7 @@ const num = (v: unknown, fallback: number): number => (typeof v === "number" && 
 export function readImageObjects(raw: unknown): ImageObjectDef[] {
   const layers = isRecord(raw) && Array.isArray(raw.layers) ? raw.layers : [];
   const out: ImageObjectDef[] = [];
-  for (const layer of layers) {
+  for (const [layerIndex, layer] of layers.entries()) {
     if (!isRecord(layer) || layer.type !== "objectgroup" || layer.visible === false) continue;
     const layerProps = propsOf(layer);
     if (layerProps.kind !== "image") continue;
@@ -74,6 +76,7 @@ export function readImageObjects(raw: unknown): ImageObjectDef[] {
         flipY: p.flipY === true,
         opacity: Math.min(1, Math.max(0, num(p.opacity, 1))),
         ySort: p.ySort === true,
+        layer: layerIndex,
       });
     }
   }
@@ -150,15 +153,26 @@ export class ImageLayerRenderer {
 
   /**
    * Draws a map's image layers. `ySortDepth` is the depth the characters stand at (the map's player depth): a y-sorted
-   * picture sorts with them by how far down its anchor is, exactly like a character's feet.
+   * picture sorts with them by how far down its anchor is, like a character's feet, so a character walks in front of
+   * or behind it. Y-sorting only decides that: the pictures of one layer never reorder among themselves, so each one
+   * sorts by the lowest anchor reached so far in the layer's own draw order (a later picture never slips behind an
+   * earlier one just because it stands higher up).
    */
   show(raw: unknown, options: { ySortDepth?: number } = {}): void {
     this.clear();
     const ySortDepth = options.ySortDepth ?? 20;
+    // Per layer: the deepest (largest) anchor y of the y-sorted pictures drawn so far.
+    const reached = new Map<number, number>();
     for (const def of readImageObjects(raw)) {
       const image = def.graphic ? this.picture(def) : this.sprite(def);
       if (!image) continue;
-      image.setDepth(def.ySort ? sortDepth(ySortDepth, def.y) : def.depth);
+      let depth = def.depth;
+      if (def.ySort) {
+        const y = Math.max(def.y, reached.get(def.layer) ?? -Infinity);
+        reached.set(def.layer, y);
+        depth = sortDepth(ySortDepth, y);
+      }
+      image.setDepth(depth);
       image.setAlpha(def.opacity);
       image.setFlip(def.flipX, def.flipY);
       if (def.scale !== 1) {

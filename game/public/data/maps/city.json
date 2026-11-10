@@ -108,6 +108,11 @@
               "name": "graphic",
               "type": "string",
               "value": "images/city-exports/props/middle-pole.png"
+            },
+            {
+              "name": "ySort",
+              "type": "bool",
+              "value": true
             }
           ]
         },
@@ -126,6 +131,11 @@
               "name": "graphic",
               "type": "string",
               "value": "images/city-exports/props/cycle.png"
+            },
+            {
+              "name": "ySort",
+              "type": "bool",
+              "value": true
             }
           ]
         },
@@ -144,6 +154,11 @@
               "name": "graphic",
               "type": "string",
               "value": "images/city-exports/props/pump.png"
+            },
+            {
+              "name": "ySort",
+              "type": "bool",
+              "value": true
             }
           ]
         },
@@ -162,6 +177,11 @@
               "name": "graphic",
               "type": "string",
               "value": "images/city-exports/props/postbox.png"
+            },
+            {
+              "name": "ySort",
+              "type": "bool",
+              "value": true
             }
           ]
         },
@@ -180,6 +200,11 @@
               "name": "graphic",
               "type": "string",
               "value": "images/city-exports/props/crate.png"
+            },
+            {
+              "name": "ySort",
+              "type": "bool",
+              "value": true
             }
           ]
         },
@@ -198,6 +223,11 @@
               "name": "graphic",
               "type": "string",
               "value": "images/city-exports/props/left-pole.png"
+            },
+            {
+              "name": "ySort",
+              "type": "bool",
+              "value": true
             }
           ]
         },
@@ -216,6 +246,11 @@
               "name": "graphic",
               "type": "string",
               "value": "images/city-exports/props/left-fence.png"
+            },
+            {
+              "name": "ySort",
+              "type": "bool",
+              "value": true
             }
           ]
         },
@@ -234,6 +269,11 @@
               "name": "graphic",
               "type": "string",
               "value": "images/city-exports/props/down-fence.png"
+            },
+            {
+              "name": "ySort",
+              "type": "bool",
+              "value": true
             }
           ]
         }
@@ -277,6 +317,11 @@
               "name": "graphic",
               "type": "string",
               "value": "images/city-exports/decorations/tall-grass/stairs-grass.png"
+            },
+            {
+              "name": "ySort",
+              "type": "bool",
+              "value": true
             }
           ]
         },
@@ -295,6 +340,11 @@
               "name": "graphic",
               "type": "string",
               "value": "images/city-exports/decorations/tall-grass/back-grass.png"
+            },
+            {
+              "name": "ySort",
+              "type": "bool",
+              "value": true
             }
           ]
         },
@@ -313,6 +363,11 @@
               "name": "graphic",
               "type": "string",
               "value": "images/city-exports/decorations/tall-grass/front-grass.png"
+            },
+            {
+              "name": "ySort",
+              "type": "bool",
+              "value": true
             }
           ]
         }
@@ -356,6 +411,11 @@
               "name": "graphic",
               "type": "string",
               "value": "images/city-exports/buildings/pit/pit-back.png"
+            },
+            {
+              "name": "ySort",
+              "type": "bool",
+              "value": true
             }
           ]
         },
@@ -374,6 +434,11 @@
               "name": "graphic",
               "type": "string",
               "value": "images/city-exports/buildings/pit/orange-fence.png"
+            },
+            {
+              "name": "ySort",
+              "type": "bool",
+              "value": true
             }
           ]
         },
@@ -392,6 +457,11 @@
               "name": "graphic",
               "type": "string",
               "value": "images/city-exports/buildings/pit/subway.png"
+            },
+            {
+              "name": "ySort",
+              "type": "bool",
+              "value": true
             }
           ]
         }
@@ -435,6 +505,11 @@
               "name": "graphic",
               "type": "string",
               "value": "images/city-exports/buildings/buildings-right/top-up.png"
+            },
+            {
+              "name": "ySort",
+              "type": "bool",
+              "value": true
             }
           ]
         },
@@ -453,6 +528,11 @@
               "name": "graphic",
               "type": "string",
               "value": "images/city-exports/buildings/buildings-right/top-left.png"
+            },
+            {
+              "name": "ySort",
+              "type": "bool",
+              "value": true
             }
           ]
         },
@@ -471,6 +551,11 @@
               "name": "graphic",
               "type": "string",
               "value": "images/city-exports/buildings/buildings-right/top-right.png"
+            },
+            {
+              "name": "ySort",
+              "type": "bool",
+              "value": true
             }
           ]
         },
@@ -489,6 +574,11 @@
               "name": "graphic",
               "type": "string",
               "value": "images/city-exports/buildings/buildings-right/rightmost.png"
+            },
+            {
+              "name": "ySort",
+              "type": "bool",
+              "value": true
             }
           ]
         },
@@ -507,6 +597,11 @@
               "name": "graphic",
               "type": "string",
               "value": "images/city-exports/buildings/buildings-right/tata.png"
+            },
+            {
+              "name": "ySort",
+              "type": "bool",
+              "value": true
             }
           ]
         },
@@ -525,6 +620,11 @@
               "name": "graphic",
               "type": "string",
               "value": "images/city-exports/buildings/buildings-right/fridge.png"
+            },
+            {
+              "name": "ySort",
+              "type": "bool",
+              "value": true
             }
           ]
         },
@@ -543,6 +643,11 @@
               "name": "graphic",
               "type": "string",
               "value": "images/city-exports/buildings/buildings-right/bluehut.png"
+            },
+            {
+              "name": "ySort",
+              "type": "bool",
+              "value": true
             }
           ]
         },
@@ -561,6 +666,11 @@
               "name": "graphic",
               "type": "string",
               "value": "images/city-exports/buildings/buildings-right/chicken.png"
+            },
+            {
+              "name": "ySort",
+              "type": "bool",
+              "value": true
             }
           ]
         }
@@ -604,6 +714,11 @@
               "name": "graphic",
               "type": "string",
               "value": "images/city-exports/buildings/left/left-background.png"
+            },
+            {
+              "name": "ySort",
+              "type": "bool",
+              "value": true
             }
           ]
         },
@@ -622,6 +737,11 @@
               "name": "graphic",
               "type": "string",
               "value": "images/city-exports/buildings/left/oldbrown-side.png"
+            },
+            {
+              "name": "ySort",
+              "type": "bool",
+              "value": true
             }
           ]
         },
@@ -640,6 +760,11 @@
               "name": "graphic",
               "type": "string",
               "value": "images/city-exports/buildings/left/movie.png"
+            },
+            {
+              "name": "ySort",
+              "type": "bool",
+              "value": true
             }
           ]
         },
@@ -658,6 +783,11 @@
               "name": "graphic",
               "type": "string",
               "value": "images/city-exports/buildings/left/ramen.png"
+            },
+            {
+              "name": "ySort",
+              "type": "bool",
+              "value": true
             }
           ]
         },
@@ -676,6 +806,11 @@
               "name": "graphic",
               "type": "string",
               "value": "images/city-exports/buildings/left/coffee.png"
+            },
+            {
+              "name": "ySort",
+              "type": "bool",
+              "value": true
             }
           ]
         },
@@ -694,6 +829,11 @@
               "name": "graphic",
               "type": "string",
               "value": "images/city-exports/buildings/left/oldbrown.png"
+            },
+            {
+              "name": "ySort",
+              "type": "bool",
+              "value": true
             }
           ]
         },
@@ -712,6 +852,11 @@
               "name": "graphic",
               "type": "string",
               "value": "images/city-exports/buildings/left/princess.png"
+            },
+            {
+              "name": "ySort",
+              "type": "bool",
+              "value": true
             }
           ]
         },
@@ -730,6 +875,11 @@
               "name": "graphic",
               "type": "string",
               "value": "images/city-exports/buildings/left/right-background.png"
+            },
+            {
+              "name": "ySort",
+              "type": "bool",
+              "value": true
             }
           ]
         }
@@ -773,6 +923,11 @@
               "name": "graphic",
               "type": "string",
               "value": "images/city-exports/buildings/left/leftmost-building.png"
+            },
+            {
+              "name": "ySort",
+              "type": "bool",
+              "value": true
             }
           ]
         }
