@@ -58,4 +58,23 @@ describe("YSortField", () => {
     // Below both it is in front of both.
     expect(f.entityDepth(20, 350)).toBeGreaterThan(f.pictureDepth(1));
   });
+
+  it("only the pictures a character overlaps on screen decide: in front of one building, behind an earlier one far away", () => {
+    const f = new YSortField();
+    // Drawn in this order: a far-left building (anchor 537), then a building on the right (anchor 369).
+    f.set(20, [537, 369], [
+      { left: 0, top: 100, right: 150, bottom: 537 },
+      { left: 400, top: 36, right: 560, bottom: 369 },
+    ]);
+    const p = [0, 1].map((i) => f.pictureDepth(i));
+    // Below the right building (y 400) and overlapping only it: in front of it, though the far one is drawn first.
+    const nearRight = { left: 450, top: 368, right: 480, bottom: 400 };
+    expect(f.entityDepth(20, 400, nearRight)).toBeGreaterThan(p[1]);
+    // Above its anchor (y 300), inside it: behind it.
+    expect(f.entityDepth(20, 300, { left: 450, top: 268, right: 480, bottom: 300 })).toBeLessThan(p[1]);
+    // Overlapping the far-left building above its anchor: behind it.
+    expect(f.entityDepth(20, 450, { left: 50, top: 418, right: 80, bottom: 450 })).toBeLessThan(p[0]);
+    // Touching neither: plain y order against all of them, as without boxes.
+    expect(f.entityDepth(20, 450, { left: 250, top: 418, right: 280, bottom: 450 })).toBe(f.entityDepth(20, 450));
+  });
 });

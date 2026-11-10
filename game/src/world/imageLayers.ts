@@ -6,7 +6,7 @@
 import { normalizeProps } from "@shared/engine/index.ts";
 import type { SpriteRegistry } from "@/data/spriteRegistry";
 import { buildSpriteComponents } from "@/sprites/spriteState";
-import { YSortField } from "@/ecs/depth";
+import { YSortField, type DepthRect } from "@/ecs/depth";
 
 export interface ImageObjectDef {
   name: string;
@@ -104,6 +104,9 @@ export interface ImageObject {
   width: number;
   height: number;
   setOrigin(x: number, y: number): unknown;
+  /** Phaser's origin (default: picture bottom-centre), for the box the y-sorting tests characters against. */
+  originX?: number;
+  originY?: number;
   setDepth(depth: number): unknown;
   setAlpha(alpha: number): unknown;
   setFlip(x: boolean, y: boolean): unknown;
@@ -161,24 +164,32 @@ export class ImageLayerRenderer {
   show(raw: unknown, options: { ySortDepth?: number } = {}): void {
     this.clear();
     const ySortDepth = options.ySortDepth ?? 20;
-    const sorted: { image: ImageObject; def: ImageObjectDef }[] = [];
+    const sorted: { image: ImageObject; def: ImageObjectDef; box: DepthRect }[] = [];
     for (const def of readImageObjects(raw)) {
       const image = def.graphic ? this.picture(def) : this.sprite(def);
       if (!image) continue;
       image.setDepth(def.depth);
-      if (def.ySort) sorted.push({ image, def });
       image.setAlpha(def.opacity);
       image.setFlip(def.flipX, def.flipY);
+      let w = image.width;
+      let h = image.height;
       if (def.scale !== 1) {
         const size = displaySize(image.width, image.height, def.scale);
         image.setDisplaySize(size.w, size.h);
+        w = size.w;
+        h = size.h;
+      }
+      if (def.ySort) {
+        const left = def.x - (image.originX ?? 0.5) * w;
+        const top = def.y - (image.originY ?? 1) * h;
+        sorted.push({ image, def, box: { left, top, right: left + w, bottom: top + h } });
       }
       this.shown.push(image);
     }
     // The y-sorted pictures in the order the layers draw them (z, then file order), each at a fixed depth in the
     // characters' band, so only the characters move between them.
     sorted.sort((a, b) => a.def.depth - b.def.depth);
-    this.ySort.set(ySortDepth, sorted.map((s) => s.def.y));
+    this.ySort.set(ySortDepth, sorted.map((s) => s.def.y), sorted.map((s) => s.box));
     sorted.forEach((s, i) => s.image.setDepth(this.ySort.pictureDepth(i)));
   }
 

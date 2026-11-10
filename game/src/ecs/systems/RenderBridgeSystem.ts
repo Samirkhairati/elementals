@@ -11,7 +11,16 @@ import { completeClip } from "@/sprites/animatorOps";
 const ANIMATION_COMPLETE = "animationcomplete";
 
 export { sortDepth } from "../depth";
-import { YSortField } from "../depth";
+import { YSortField, type DepthRect } from "../depth";
+
+/** The box a sprite covers on the map (its display size around its origin). */
+function spriteBox(sprite: GameObjects.Sprite): DepthRect {
+  const w = sprite.displayWidth;
+  const h = sprite.displayHeight;
+  const left = sprite.x - sprite.originX * w;
+  const top = sprite.y - sprite.originY * h;
+  return { left, top, right: left + w, bottom: top + h };
+}
 
 /**
  * Mirrors ECS Transform + Sprite (+ Animator) onto Phaser sprites.
@@ -62,7 +71,7 @@ export class RenderBridgeSystem extends System {
       if (!sprite) {
         sprite = this.scene.add.sprite(x, y, spriteComp.texture, spriteComp.frame);
         sprite.setOrigin(spriteComp.originX, spriteComp.originY);
-        sprite.setDepth(this.ySort.entityDepth(transform.depth, transform.y));
+        sprite.setDepth(this.ySort.entityDepth(transform.depth, transform.y, spriteBox(sprite)));
         sprite.setVisible(spriteComp.visible);
         sprite.setAlpha(spriteComp.alpha);
         sprite.setFlipX(flipX);
@@ -83,7 +92,7 @@ export class RenderBridgeSystem extends System {
 
       // Value-checked synchronization to avoid dirtying Phaser transform when unchanged
       if (sprite.x !== x || sprite.y !== y) sprite.setPosition(x, y);
-      const depth = this.ySort.entityDepth(transform.depth, transform.y);
+      const depth = this.ySort.entityDepth(transform.depth, transform.y, spriteBox(sprite));
       if (sprite.depth !== depth) sprite.setDepth(depth);
       if (sprite.visible !== spriteComp.visible) sprite.setVisible(spriteComp.visible);
       if (sprite.alpha !== spriteComp.alpha) sprite.setAlpha(spriteComp.alpha);
