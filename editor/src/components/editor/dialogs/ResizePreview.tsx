@@ -195,12 +195,17 @@ export function ResizePreview({ map, tilesets, spriteAssets, edges, onEdgesChang
     fill(0, 0, geo.width, geo.height, 'rgba(10,10,14,0.68)')
     ctx.restore()
     ctx.fillStyle = 'rgba(239,68,68,0.6)'
+    // Painted tiles move by whole tiles (the nearest one when an edge is off the grid) and are kept while still inside.
+    const dc = Math.round(edges.left)
+    const dr = Math.round(edges.top)
+    const newCols = Math.max(1, Math.ceil(rect.x1 - rect.x0 - 1e-9))
+    const newRows = Math.max(1, Math.ceil(rect.y1 - rect.y0 - 1e-9))
     for (let i = 0; i < occupied.length; i++) {
       if (!occupied[i]) continue
       const x = i % map.width
       const y = Math.floor(i / map.width)
       // Kept when the new tile grid (whole tiles covering the new frame) still has the cell.
-      if (x >= rect.x0 && x < Math.ceil(rect.x1 - 1e-9) && y >= rect.y0 && y < Math.ceil(rect.y1 - 1e-9)) continue
+      if (x + dc >= 0 && x + dc < newCols && y + dr >= 0 && y + dr < newRows) continue
       ctx.fillRect(sx(x), sy(y), s, s)
     }
 
@@ -210,7 +215,7 @@ export function ResizePreview({ map, tilesets, spriteAssets, edges, onEdgesChang
     ctx.lineWidth = 1
     ctx.strokeRect(sx(0) + 0.5, sy(0) + 0.5, geo.width * s, geo.height * s)
     ctx.setLineDash([])
-  }, [map, geo.width, geo.height, view, size, rect.x0, rect.y0, rect.x1, rect.y1, occupied, images, version, spriteAssets, spriteVersion])
+  }, [map, geo.width, geo.height, view, size, rect.x0, rect.y0, rect.x1, rect.y1, occupied, images, version, spriteAssets, spriteVersion, edges.left, edges.top])
 
   const startDrag = (handle: Handle) => (e: React.PointerEvent) => {
     e.preventDefault()

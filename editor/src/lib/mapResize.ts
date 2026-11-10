@@ -1,22 +1,24 @@
 import type { EntityData, Layer, MapData } from '@/types/editor'
 import { TILE_SIZE } from '../../../shared/engine/constants'
 import { mapPixelSize } from '../../../shared/mapSize'
+import { translatePoints } from '../../../shared/collisionShapes'
 
 /**
  * Pure model of "resize map", in pixels. A map is a size in pixels (any size: `pixelWidth` / `pixelHeight`, or whole
  * tiles when those are absent) over a grid of 32 px tiles that covers it. Each edge grows (positive) or crops
- * (negative) that side. The left and top edges move in whole tiles so painted tiles stay on the grid; the right and
- * bottom edges can stop on any pixel. Tile (x, y) of the old map becomes (x + left/32, y + top/32), and every pixel
- * position (entity anchors, image-layer items) moves by (left, top).
+ * (negative) that side, by any whole number of pixels. Every pixel position (entity anchors, image-layer items,
+ * collision shapes) moves by (left, top). Painted tiles cannot sit between grid lines, so tile (x, y) of the old map
+ * becomes (x + round(left/32), y + round(top/32)): with an edge on a whole tile (the usual case) they move exactly,
+ * otherwise they land on the nearest tile.
  *
  * Nothing placed is ever removed: pictures and entities that end up outside the map stay where they are (outside).
  * Only painted tiles that fall off the new tile grid are cropped.
  */
 
 export interface ResizeEdges {
-  /** Pixels; a multiple of the tile size. */
+  /** Pixels. */
   left: number
-  /** Pixels; a multiple of the tile size. */
+  /** Pixels. */
   top: number
   /** Pixels. */
   right: number
@@ -42,6 +44,9 @@ export function resizedSize(map: Pick<MapData, 'width' | 'height' | 'pixelWidth'
   return { width: px.width + e.left + e.right, height: px.height + e.top + e.bottom }
 }
 
+/** How many whole tiles painted tiles move for an edge shift in pixels (exact when it is a multiple of the tile size). */
+export const tileShift = (px: number): number => Math.round(px / TILE_SIZE)
+
 /** Tiles needed to cover a pixel size. */
 export const tilesFor = (px: number): number => Math.max(1, Math.ceil(px / TILE_SIZE))
 
@@ -50,7 +55,6 @@ export function resizeProblem(map: Pick<MapData, 'width' | 'height' | 'pixelWidt
   for (const v of [e.left, e.top, e.right, e.bottom]) {
     if (!Number.isInteger(v)) return 'Sizes must be whole pixels.'
   }
-  if (e.left % TILE_SIZE !== 0 || e.top % TILE_SIZE !== 0) return `The left and top edges move in whole tiles (${TILE_SIZE} px), so painted tiles stay on the grid.`
   const { width, height } = resizedSize(map, e)
   if (width < 1 || height < 1) return 'The map must keep at least 1 × 1 pixels.'
   if (tilesFor(width) > MAX_MAP_SIZE || tilesFor(height) > MAX_MAP_SIZE) return `A map can be at most ${MAX_MAP_SIZE * TILE_SIZE} × ${MAX_MAP_SIZE * TILE_SIZE} pixels (${MAX_MAP_SIZE} × ${MAX_MAP_SIZE} tiles).`
@@ -70,8 +74,8 @@ export function resizeLoss(map: ResizableMap, e: ResizeEdges): ResizeLoss {
   const size = resizedSize(map, e)
   const newW = tilesFor(size.width)
   const newH = tilesFor(size.height)
-  const dc = e.left / TILE_SIZE
-  const dr = e.top / TILE_SIZE
+  const dc = tileShift(e.left)
+  const dr = tileShift(e.top)
   const loss: ResizeLoss = { layers: [], tiles: 0 }
   for (const layer of map.layers) {
     let tiles = 0
@@ -105,8 +109,8 @@ export function occupiedCells(map: ResizableMap): Uint8Array {
 
 function shiftLayer(layer: Layer, map: ResizableMap, e: ResizeEdges, newW: number, newH: number): Layer {
   const next: Layer = { ...layer }
-  const dc = e.left / TILE_SIZE
-  const dr = e.top / TILE_SIZE
+  const dc = tileShift(e.left)
+  const dr = tileShift(e.top)
   if (layer.data) {
     const data: NonNullable<Layer['data']> = {}
     for (const [key, tile] of Object.entries(layer.data)) {
@@ -118,6 +122,7 @@ function shiftLayer(layer: Layer, map: ResizableMap, e: ResizeEdges, newW: numbe
     next.data = data
   }
   if (layer.images) next.images = layer.images.map((item) => ({ ...item, x: item.x + e.left, y: item.y + e.top }))
+  if (layer.shapes) next.shapes = layer.shapes.map((s) => ({ ...s, points: translatePoints(s.points, e.left, e.top) }))
   return next
 }
 

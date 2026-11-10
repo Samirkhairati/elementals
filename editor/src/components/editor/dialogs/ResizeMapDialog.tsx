@@ -56,7 +56,7 @@ function ResizeBody({ map, tilesets, spriteAssets, onClose, onConfirm }: Props &
   const [unit, setUnit] = useState<Unit>(wholeTiles ? 'tiles' : 'pixels')
   // Always pixels inside; the Tiles view shows and takes them in tiles.
   const [edges, setEdges] = useState<ResizeEdges>(NO_RESIZE)
-  // Handles snap to whole tiles; off, the right and bottom ones stop on any pixel (a size in pixels, so Pixels).
+  // Handles snap to whole tiles; off, every edge stops on any pixel (a size in pixels, so Pixels).
   const [snap, setSnap] = useState(true)
   const problem = resizeProblem(map, edges)
   const next = resizedSize(map, edges)
@@ -67,8 +67,8 @@ function ResizeBody({ map, tilesets, spriteAssets, onClose, onConfirm }: Props &
   const shown = (px: number) => (inTiles ? px / TILE_SIZE : px)
   const fromShown = (v: number, key: keyof ResizeEdges) => {
     if (inTiles) return Math.round(v) * TILE_SIZE
-    // Left and top move in whole tiles so painted tiles stay on the grid.
-    return key === 'left' || key === 'top' ? Math.round(v / TILE_SIZE) * TILE_SIZE : Math.round(v)
+    // With Snap to tiles on, the left and top edges still move in whole tiles; off, every edge takes any pixel.
+    return snap && (key === 'left' || key === 'top') ? Math.round(v / TILE_SIZE) * TILE_SIZE : Math.round(v)
   }
   const setSize = (axis: 'width' | 'height', value: number) => {
     const px = inTiles ? Math.round(value) * TILE_SIZE : Math.round(value)
@@ -81,7 +81,7 @@ function ResizeBody({ map, tilesets, spriteAssets, onClose, onConfirm }: Props &
   const sizeText = (s: { width: number; height: number }) =>
     tileText ? `${s.width / TILE_SIZE} × ${s.height / TILE_SIZE}` : `${s.width} × ${s.height}`
   const roundToTiles = () =>
-    setEdges((e) => ({ ...e, right: Math.round((before.width + e.left + e.right) / TILE_SIZE) * TILE_SIZE - before.width - e.left, bottom: Math.round((before.height + e.top + e.bottom) / TILE_SIZE) * TILE_SIZE - before.height - e.top }))
+    setEdges((e) => ({ left: Math.round(e.left / TILE_SIZE) * TILE_SIZE, top: Math.round(e.top / TILE_SIZE) * TILE_SIZE, right: Math.round((before.width + e.left + e.right) / TILE_SIZE) * TILE_SIZE - before.width - e.left, bottom: Math.round((before.height + e.top + e.bottom) / TILE_SIZE) * TILE_SIZE - before.height - e.top }))
 
   return (
     <form
@@ -95,7 +95,7 @@ function ResizeBody({ map, tilesets, spriteAssets, onClose, onConfirm }: Props &
           Resize “{map.name}”
           <InfoTip>
             Drag the edges or corners of the frame, or type the size. Scroll or use the buttons to zoom the preview, and drag the background to move it.
-            The handles snap to whole tiles; turn Snap to tiles off and the right and bottom edges stop on any pixel. The left and top edges always move in whole tiles ({TILE_SIZE} px) so painted tiles stay on the grid.
+            The handles snap to whole tiles; turn Snap to tiles off and every edge stops on any pixel.
             Pictures and entities are never removed: what ends up outside the map stays there. Only painted tiles that fall off are cropped.
           </InfoTip>
         </DialogTitle>
@@ -110,7 +110,7 @@ function ResizeBody({ map, tilesets, spriteAssets, onClose, onConfirm }: Props &
           size={{ width: before.width / TILE_SIZE, height: before.height / TILE_SIZE }}
           step={snap ? 1 : 1 / TILE_SIZE}
           edges={{ left: edges.left / TILE_SIZE, top: edges.top / TILE_SIZE, right: edges.right / TILE_SIZE, bottom: edges.bottom / TILE_SIZE }}
-          onEdgesChange={(e) => setEdges({ left: Math.round(e.left) * TILE_SIZE, top: Math.round(e.top) * TILE_SIZE, right: Math.round(e.right * TILE_SIZE), bottom: Math.round(e.bottom * TILE_SIZE) })}
+          onEdgesChange={(e) => setEdges({ left: Math.round(e.left * TILE_SIZE), top: Math.round(e.top * TILE_SIZE), right: Math.round(e.right * TILE_SIZE), bottom: Math.round(e.bottom * TILE_SIZE) })}
         />
 
         <div className="flex max-h-[420px] flex-col gap-3 overflow-y-auto pr-1">
@@ -120,7 +120,7 @@ function ResizeBody({ map, tilesets, spriteAssets, onClose, onConfirm }: Props &
             options={[{ value: 'tiles', label: 'Tiles' }, { value: 'pixels', label: 'Pixels' }]}
             onChange={(u) => {
               setUnit(u)
-              // Tiles only take whole tiles: round the free edges to the grid, and snap the handles.
+              // Tiles only take whole tiles: round every edge to the grid, and snap the handles.
               if (u === 'tiles') {
                 setSnap(true)
                 roundToTiles()
@@ -139,8 +139,9 @@ function ResizeBody({ map, tilesets, spriteAssets, onClose, onConfirm }: Props &
             />
             Snap to tiles
             <InfoTip>
-              On, dragging an edge stops on whole tiles. Off, the right and bottom edges stop on any pixel; the left and top
-              edges still move in whole tiles so painted tiles stay on the grid. Typed sizes are never snapped.
+              On, dragging an edge stops on whole tiles. Off, every edge stops on any pixel. Painted tiles always sit on the
+              tile grid, so when the left or top edge is off the grid they move by the nearest whole tile while pictures,
+              entities and collision shapes move by the exact pixels. Typed sizes are never snapped.
             </InfoTip>
           </label>
           <div className="rounded-md border border-border p-2 text-xs">
@@ -167,14 +168,14 @@ function ResizeBody({ map, tilesets, spriteAssets, onClose, onConfirm }: Props &
           <div className="grid grid-cols-2 gap-2">
             {SIDES.map(({ key, label }) => (
               <div key={key} className="flex flex-col gap-1">
-                <label className="ed-label" title={`Positive adds ${unit} on that side, negative crops them${!inTiles && (key === 'left' || key === 'top') ? ` (whole tiles of ${TILE_SIZE} px)` : ''}`}>
+                <label className="ed-label" title={`Positive adds ${unit} on that side, negative crops them${!inTiles && snap && (key === 'left' || key === 'top') ? ` (whole tiles of ${TILE_SIZE} px)` : ''}`}>
                   {label}
                 </label>
                 <NumberField
                   aria-label={`${label} (${unit})`}
                   min={inTiles ? -MAX_MAP_SIZE : -MAX_MAP_SIZE * TILE_SIZE}
                   max={inTiles ? MAX_MAP_SIZE : MAX_MAP_SIZE * TILE_SIZE}
-                  step={!inTiles && (key === 'left' || key === 'top') ? TILE_SIZE : 1}
+                  step={!inTiles && snap && (key === 'left' || key === 'top') ? TILE_SIZE : 1}
                   integer
                   value={shown(edges[key])}
                   onCommit={(v) => setEdges((cur) => ({ ...cur, [key]: fromShown(v, key) }))}

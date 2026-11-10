@@ -28,6 +28,8 @@ describe('fitView', () => {
 describe('edgesFromDrag', () => {
   it('drags the west edge outwards (grow) and inwards (crop), snapping to tiles', () => {
     expect(edgesFromDrag('w', -2.4, 3, map, none)).toEqual({ ...none, left: 2 })
+    // no snapping (a step of one pixel): the left and top edges stop on pixels too
+    expect(edgesFromDrag('nw', -2.5, -1.25, map, none, 1 / 32)).toEqual({ ...none, left: 2.5, top: 1.25 })
     expect(edgesFromDrag('w', 3.6, 3, map, none)).toEqual({ ...none, left: -4 })
   })
 

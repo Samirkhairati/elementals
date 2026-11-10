@@ -55,9 +55,8 @@ export const toWorldX = (v: ResizeView, px: number) => (px - v.originX) / v.scal
 export const toWorldY = (v: ResizeView, py: number) => (py - v.originY) / v.scale
 
 /**
- * The edges after dragging `handle` to the world position (wx, wy). The left and top edges snap to whole tiles; the
- * right and bottom ones to `step` (1 = whole tiles, 1/32 = whole pixels). The rectangle keeps between `step` and
- * MAX_MAP_SIZE tiles on each axis.
+ * The edges after dragging `handle` to the world position (wx, wy). Every edge snaps to `step` tiles (1 = whole
+ * tiles, 1/32 = whole pixels, i.e. no snapping). The rectangle keeps between `step` and MAX_MAP_SIZE tiles on each axis.
  */
 export function edgesFromDrag(
   handle: Handle,
@@ -73,10 +72,11 @@ export function edgesFromDrag(
     movingIsMin
       ? Math.max(fixed - MAX_MAP_SIZE, Math.min(fixed - min, v))
       : Math.min(fixed + MAX_MAP_SIZE, Math.max(fixed + min, v))
-  // An edge that moves in whole tiles keeps at least one tile; the free ones at least one step.
-  if (handle.includes('w')) r.x0 = Math.floor(clamp(snap(wx, 1), r.x1, true, 1))
+  // The far edge may be a fraction (a map that is not whole tiles), so a clamped near edge is brought back onto the step.
+  const near = (v: number) => (step >= 1 ? Math.floor(v) : Math.round(v / step) * step)
+  if (handle.includes('w')) r.x0 = near(clamp(snap(wx, step), r.x1, true, step))
   if (handle.includes('e')) r.x1 = clamp(snap(wx, step), r.x0, false, step)
-  if (handle.includes('n')) r.y0 = Math.floor(clamp(snap(wy, 1), r.y1, true, 1))
+  if (handle.includes('n')) r.y0 = near(clamp(snap(wy, step), r.y1, true, step))
   if (handle.includes('s')) r.y1 = clamp(snap(wy, step), r.y0, false, step)
   const fix = (v: number) => Math.round(v * 1e6) / 1e6
   return { left: fix(0 - r.x0), top: fix(0 - r.y0), right: fix(r.x1 - map.width), bottom: fix(r.y1 - map.height) }

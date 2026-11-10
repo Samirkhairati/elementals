@@ -48,7 +48,8 @@ describe('resizedSize / resizeProblem', () => {
     expect(resizeProblem(m, edges({ top: -3 }))).toMatch(/at least/)
     expect(resizeProblem(m, edges({ right: 600 }))).toMatch(/at most/)
     expect(resizeProblem(m, px({ right: 1.5 }))).toMatch(/whole/)
-    expect(resizeProblem(m, px({ left: 5 }))).toMatch(/whole tiles/)
+    expect(resizeProblem(m, px({ left: 5 }))).toBeNull()
+    expect(resizeProblem(m, px({ left: 1.5 }))).toMatch(/whole pixels/)
     expect(resizeProblem(m, px({ right: 5, bottom: -7 }))).toBeNull()
     expect(resizeProblem(m, edges({ left: 1, right: -1 }))).toBeNull()
   })
@@ -81,6 +82,16 @@ describe('applyResize', () => {
     expect(out.entities![0]).toMatchObject({ x: 80 + 64, y: 64 + 32 })
     expect(out.entities![0].components.Transform).toMatchObject({ x: 80 + 64, y: 64 + 32 })
     expect(out.layers[1].images![0]).toMatchObject({ x: 16 + 64, y: 96 + 32 })
+  })
+
+  it('moves collision shapes by the exact pixels, and off-grid shifts put tiles on the nearest tile', () => {
+    const m = makeMap()
+    m.layers.push({ id: 'p', name: 'Walls', type: 'polygons', visible: true, locked: false, shapes: [{ id: 's', closed: false, points: [{ x: 10, y: 20 }, { x: 50, y: 20 }] }] } as never)
+    const out = applyResize(m, px({ left: 40, top: 10 }))
+    expect(out.layers[out.layers.length - 1].shapes![0].points).toEqual([{ x: 50, y: 30 }, { x: 90, y: 30 }])
+    expect(out.entities![0]).toMatchObject({ x: 80 + 40, y: 64 + 10 })
+    // 40 px = 1.25 tiles -> 1 tile; 10 px -> 0 tiles: (0,0) stays at row 0, column 1 -> width 4 + ceil(40/32)
+    expect(out.layers[0].data![1]).toEqual(tile(1))
   })
 
   it('cropping drops only the tiles that fall off; pictures and entities stay (outside the map if need be)', () => {

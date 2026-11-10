@@ -65,11 +65,20 @@ describe('ResizeMapDialog', () => {
     expect(onConfirm).toHaveBeenCalledWith({ left: 0, top: 0, right: 12, bottom: 0 })
   })
 
-  it('in Pixels the left edge still moves in whole tiles', () => {
+  it('in Pixels with Snap to tiles on, the left edge still moves in whole tiles', () => {
     setup()
     fireEvent.click(screen.getByRole('radio', { name: 'Pixels' }))
     type('Left (pixels)', '40')
     expect(screen.getByTestId('resize-size')).toHaveTextContent('→ 160 × 96 px')
+  })
+
+  it('with Snap to tiles off, the left edge takes any pixel', () => {
+    const { onConfirm } = setup()
+    fireEvent.click(screen.getByRole('switch', { name: 'Snap to tiles' }))
+    type('Left (pixels)', '40')
+    expect(screen.getByTestId('resize-size')).toHaveTextContent('→ 168 × 96 px')
+    fireEvent.click(screen.getByRole('button', { name: 'Resize' }))
+    expect(onConfirm).toHaveBeenCalledWith({ left: 40, top: 0, right: 0, bottom: 0 })
   })
 
   it('the preview zooms with its buttons', () => {
