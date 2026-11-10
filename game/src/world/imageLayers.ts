@@ -6,7 +6,7 @@
 import { normalizeProps } from "@shared/engine/index.ts";
 import type { SpriteRegistry } from "@/data/spriteRegistry";
 import { buildSpriteComponents } from "@/sprites/spriteState";
-import { sortDepth } from "@/ecs/depth";
+import { YSortField } from "@/ecs/depth";
 
 export interface ImageObjectDef {
   name: string;
@@ -27,8 +27,6 @@ export interface ImageObjectDef {
   opacity: number;
   /** Draws among the characters by its anchor's y instead of at the layer's depth (resolved by the exporter). */
   ySort: boolean;
-  /** Index of its layer in the map's layer list: y-sorted pictures keep their order inside one layer. */
-  layer: number;
 }
 
 type Rec = Record<string, unknown>;
@@ -48,7 +46,7 @@ const num = (v: unknown, fallback: number): number => (typeof v === "number" && 
 export function readImageObjects(raw: unknown): ImageObjectDef[] {
   const layers = isRecord(raw) && Array.isArray(raw.layers) ? raw.layers : [];
   const out: ImageObjectDef[] = [];
-  for (const [layerIndex, layer] of layers.entries()) {
+  for (const layer of layers) {
     if (!isRecord(layer) || layer.type !== "objectgroup" || layer.visible === false) continue;
     const layerProps = propsOf(layer);
     if (layerProps.kind !== "image") continue;
@@ -76,7 +74,6 @@ export function readImageObjects(raw: unknown): ImageObjectDef[] {
         flipY: p.flipY === true,
         opacity: Math.min(1, Math.max(0, num(p.opacity, 1))),
         ySort: p.ySort === true,
-        layer: layerIndex,
       });
     }
   }
@@ -149,30 +146,27 @@ export class ImageLayerRenderer {
   clear(): void {
     for (const image of this.shown) image.destroy();
     this.shown = [];
+    this.ySort.clear();
   }
 
+  /** Where characters stand among the y-sorted pictures (share it with the RenderBridgeSystem). */
+  public readonly ySort = new YSortField();
+
   /**
-   * Draws a map's image layers. `ySortDepth` is the depth the characters stand at (the map's player depth): a y-sorted
-   * picture sorts with them by how far down its anchor is, like a character's feet, so a character walks in front of
-   * or behind it. Y-sorting only decides that: the pictures of one layer never reorder among themselves, so each one
-   * sorts by the lowest anchor reached so far in the layer's own draw order (a later picture never slips behind an
-   * earlier one just because it stands higher up).
+   * Draws a map's image layers. `ySortDepth` is the depth the characters stand at (the map's player depth). Every
+   * picture keeps its place in the draw order of its layer (and of the layers, by z); y-sorting only decides, per
+   * picture, whether a character is in front of it or behind it, by comparing the character's y with that picture's
+   * anchor y (see `YSortField`).
    */
   show(raw: unknown, options: { ySortDepth?: number } = {}): void {
     this.clear();
     const ySortDepth = options.ySortDepth ?? 20;
-    // Per layer: the deepest (largest) anchor y of the y-sorted pictures drawn so far.
-    const reached = new Map<number, number>();
+    const sorted: { image: ImageObject; def: ImageObjectDef }[] = [];
     for (const def of readImageObjects(raw)) {
       const image = def.graphic ? this.picture(def) : this.sprite(def);
       if (!image) continue;
-      let depth = def.depth;
-      if (def.ySort) {
-        const y = Math.max(def.y, reached.get(def.layer) ?? -Infinity);
-        reached.set(def.layer, y);
-        depth = sortDepth(ySortDepth, y);
-      }
-      image.setDepth(depth);
+      image.setDepth(def.depth);
+      if (def.ySort) sorted.push({ image, def });
       image.setAlpha(def.opacity);
       image.setFlip(def.flipX, def.flipY);
       if (def.scale !== 1) {
@@ -181,6 +175,11 @@ export class ImageLayerRenderer {
       }
       this.shown.push(image);
     }
+    // The y-sorted pictures in the order the layers draw them (z, then file order), each at a fixed depth in the
+    // characters' band, so only the characters move between them.
+    sorted.sort((a, b) => a.def.depth - b.def.depth);
+    this.ySort.set(ySortDepth, sorted.map((s) => s.def.y));
+    sorted.forEach((s, i) => s.image.setDepth(this.ySort.pictureDepth(i)));
   }
 
   private picture(def: ImageObjectDef): ImageObject | null {
