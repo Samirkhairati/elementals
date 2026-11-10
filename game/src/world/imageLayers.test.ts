@@ -157,6 +157,25 @@ describe("ImageLayerRenderer", () => {
     expect(added[1].depth).toBe(5);
   });
 
+  it("y-sorted pictures of one layer keep the layer's order: a later, higher-standing picture is lifted to the lowest anchor so far", () => {
+    const { scene, added } = fakeScene({ [key]: sky });
+    const r = new ImageLayerRenderer(scene, realSprites);
+    r.show(
+      exported([
+        { id: "a", graphicId: "images/sky.png", x: 0, y: 200 },
+        { id: "b", graphicId: "images/sky.png", x: 0, y: 50 },
+        { id: "c", graphicId: "images/sky.png", x: 0, y: 300 },
+      ], { ySort: true }),
+      { ySortDepth: 20 },
+    );
+    const [a, b, c] = added.map((i) => i.depth);
+    expect(a).toBeCloseTo(sortDepth(20, 200));
+    expect(b).toBeCloseTo(sortDepth(20, 200));
+    expect(c).toBeCloseTo(sortDepth(20, 300));
+    expect(a).toBeLessThanOrEqual(b);
+    expect(b).toBeLessThanOrEqual(c);
+  });
+
   it("crops are frames of the one picture texture: each distinct crop is added once, never a copy of the picture", () => {
     const { scene, added, frames } = fakeScene({ [key]: sky });
     const r = new ImageLayerRenderer(scene, realSprites);
