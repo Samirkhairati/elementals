@@ -35,7 +35,20 @@ describe("YSortField", () => {
     expect([...depths].sort((a, b) => a - b)).toEqual(depths);
   });
 
-  it("pictures in draw order never reorder; a character goes behind the first picture it should be behind", () => {
+  it("one picture whose y disagrees with the draw order does not decide for the ones drawn after it", () => {
+    const f = new YSortField();
+    // A low-standing picture drawn early (y 784), then buildings (y 300, 400) and a prop (y 735), drawn later.
+    f.set(20, [784, 300, 400, 735]);
+    const p = [0, 1, 2, 3].map((i) => f.pictureDepth(i));
+    // At y 500 it is below both buildings (in front of them) though it is above the early picture: in front of the
+    // buildings wins over being behind the early picture, which is wrong for it alone.
+    expect(f.entityDepth(20, 500)).toBeGreaterThan(p[2]);
+    expect(f.entityDepth(20, 500)).toBeLessThan(p[3]);
+    // Below everything: in front of all.
+    expect(f.entityDepth(20, 900)).toBeGreaterThan(p[3]);
+  });
+
+  it("pictures in draw order never reorder; with a tie a character goes behind the earliest picture it should be behind", () => {
     const f = new YSortField();
     // Drawn in this order: a building (y 300), then a bush that stands higher up (y 100).
     f.set(20, [300, 100]);
