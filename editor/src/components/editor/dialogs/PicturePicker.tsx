@@ -37,6 +37,8 @@ interface Props {
   importTo?: string
   /** Extra content under the grid (an import form, for example). */
   footer?: React.ReactNode
+  /** How many GIF animations the library has that this picker does not offer as pictures (they are sprites, see the note on the Pictures tab). */
+  gifsLeftOut?: number
 }
 
 /** Graphics matching `query` (id), sorted, grouped by folder. */
@@ -51,7 +53,7 @@ export function groupGraphics(graphics: readonly GraphicInfo[], query: string): 
  * animated props) and, where the caller can add them, new pictures (uploaded, dropped or pasted). Pictures and sprites
  * are browsed as tiles beside their folder tree, with search. Used wherever the editor asks "which picture?".
  */
-export function PicturePicker({ open, onOpenChange, tabs = ['graphics', 'sprites'], title = 'Choose a picture', sprites = [], graphics = [], images = {}, value, onPick, onImport, importTo, footer }: Props) {
+export function PicturePicker({ open, onOpenChange, tabs = ['graphics', 'sprites'], title = 'Choose a picture', sprites = [], graphics = [], images = {}, value, onPick, onImport, importTo, footer, gifsLeftOut = 0 }: Props) {
   const allTabs = useMemo(() => (onImport && !tabs.includes('new') ? [...tabs, 'new' as const] : tabs), [tabs, onImport])
   const [tab, setTab] = useState<PictureTab>(allTabs[0])
   const [query, setQuery] = useState('')
@@ -185,6 +187,14 @@ export function PicturePicker({ open, onOpenChange, tabs = ['graphics', 'sprites
             )}
             {current === 'graphics' && (
               <>
+                {gifsLeftOut > 0 && (
+                  <div className="mb-2 flex items-center gap-1 text-ed-label text-muted-foreground" data-testid="gifs-left-out">
+                    {gifsLeftOut} GIF animation{gifsLeftOut === 1 ? '' : 's'} not listed here
+                    <InfoTip>
+                      A GIF is an animation, so it is added as a sprite, not as a picture. In Database › Characters choose New, pick the GIF animation preset and the GIF, then add it from the Sprites tab.
+                    </InfoTip>
+                  </div>
+                )}
                 {graphicGroups.length === 0 && (
                   <div className="ed-empty py-8">
                     {graphics.length === 0 ? (onImport ? 'No pictures yet. Add one on the New tab.' : 'No pictures yet. Import one in Database › Graphics.') : query ? `No picture matches “${query}”.` : 'No pictures in this folder.'}

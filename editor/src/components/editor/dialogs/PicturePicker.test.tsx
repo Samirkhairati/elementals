@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { GraphicInfo } from '../../../../../shared/engine/graphics'
 import { assetMap, characterMeta, makeAsset, objectMeta } from '@/test/editorContext'
 import { groupGraphics, PicturePicker } from './PicturePicker'
@@ -28,6 +28,17 @@ describe('PicturePicker', () => {
     const tabs = screen.getByRole('radiogroup', { name: 'Kind of picture' })
     expect(within(tabs).getAllByRole('radio').map((r) => r.textContent)).toEqual(['Pictures · 4', 'Sprites · 2'])
     expect(within(tabs).getByRole('radio', { name: /Pictures/ })).toHaveAttribute('aria-checked', 'true')
+  })
+
+  it('says how many GIF animations it leaves out, and nothing when there are none', () => {
+    const { unmount } = render(<PicturePicker open onOpenChange={vi.fn()} graphics={graphics} gifsLeftOut={2} onPick={vi.fn()} />)
+    expect(screen.getByTestId('gifs-left-out')).toHaveTextContent('2 GIF animations not listed here')
+    unmount()
+    render(<PicturePicker open onOpenChange={vi.fn()} graphics={graphics} gifsLeftOut={1} onPick={vi.fn()} />)
+    expect(screen.getByTestId('gifs-left-out')).toHaveTextContent('1 GIF animation not listed here')
+    cleanup()
+    render(<PicturePicker open onOpenChange={vi.fn()} graphics={graphics} onPick={vi.fn()} />)
+    expect(screen.queryByTestId('gifs-left-out')).toBeNull()
   })
 
   it('picking a sprite reports its asset id and closes', () => {

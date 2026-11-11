@@ -385,6 +385,7 @@ export function ImagesPanel() {
             title={openGroup ? `Add a picture to ${openGroup.name}` : 'Add a picture'}
             sprites={ctx.spriteList}
             graphics={stillGraphics(ctx.graphics)}
+            gifsLeftOut={ctx.graphics.length - stillGraphics(ctx.graphics).length}
             images={ctx.graphicImages}
             onPick={ctx.startImagePlacement}
             onImport={importPictures}
