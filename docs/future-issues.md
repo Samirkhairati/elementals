@@ -53,3 +53,5 @@ Things that work today but will need attention later. Add an entry whenever you 
 
 - **What:** only tile and image layers can sit in a layer folder; `polygons` layers stay loose in the list.
 - **Idea:** allow them in `lib/layerFolders.ts` and the schema's folder check.
+- **Game debug handle drives a private method**: the browser checks for warps call `scene.warpPlayer(...)` (private) through `window.__game`. A small public `warp()` on `GameDebugHandle` would let a test or script do it without reaching into the scene.
+- **Previews of a map have no per-pixel hit test**: the warp picker's free position is any pixel, including ones inside a solid building. Nothing warns; a "walkable" overlay from the collision shapes would.

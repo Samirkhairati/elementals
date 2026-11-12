@@ -197,6 +197,21 @@ describe('validateCommands', () => {
     expect(codes([mk('warp', { map: 'town', x: 99, y: 99 })], { mapIds: ['town'] })).toEqual([])
   })
 
+  it('a free warp (pixels) is checked against the map size in pixels; the bottom and right edge count as inside', () => {
+    const ctx = { mapIds: ['town'], mapSizes: { town: { width: 30, height: 20 } } } // 960 x 640 px
+    expect(codes([mk('warp', { map: 'town', x: 700, y: 500, free: true })], ctx)).toEqual([])
+    expect(codes([mk('warp', { map: 'town', x: 960, y: 640, free: true })], ctx)).toEqual([])
+    expect(codes([mk('warp', { map: 'town', x: 961, y: 10, free: true })], ctx)).toEqual(['error:warp-out-of-bounds'])
+    expect(codes([mk('warp', { map: 'town', x: 10, y: 641, free: true })], ctx)).toEqual(['error:warp-out-of-bounds'])
+    // the same numbers are far outside as tiles
+    expect(codes([mk('warp', { map: 'town', x: 700, y: 500 })], ctx)).toEqual(['error:warp-out-of-bounds'])
+  })
+
+  it('a warp says in its summary whether the position is a tile or pixels', () => {
+    expect(summarizeCommand(mk('warp', { map: 'town', x: 3, y: 4 }))).toContain('(3, 4)')
+    expect(summarizeCommand(mk('warp', { map: 'town', x: 117, y: 141, free: true }))).toContain('(117, 141 px)')
+  })
+
   it('reports unknown command types with path and id', () => {
     const issues = validateCommands([mk('wait'), { id: 'q', type: 'teleport', params: {} }])
     expect(issues).toEqual([{ commandId: 'q', path: [1], severity: 'error', code: 'unknown-command', message: 'Unknown command type "teleport"' }])

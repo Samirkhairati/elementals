@@ -78,9 +78,11 @@ export interface EntityOps {
 
 export interface WarpRequest {
   map: string;
-  /** Tile coordinates. */
+  /** Tile coordinates, or pixels (the anchor: where the feet stand) when `free`. */
   x: number;
   y: number;
+  /** Set (true) only for a pixel position; absent = a tile. */
+  free?: boolean;
   facing?: Facing;
   fade: boolean;
 }

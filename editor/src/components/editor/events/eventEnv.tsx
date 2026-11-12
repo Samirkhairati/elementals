@@ -16,7 +16,7 @@ export interface EventEnv {
   /** Maps of the project; `id` is the file name without `.json`. The size is what a warp is checked against. */
   maps: { id: string; name: string; width?: number; height?: number }[]
   /** What the warp tile picker needs to draw a map; hosts without it (tests) show no preview. */
-  mapPreview?: { getMap: (id: string) => MapData | undefined; tilesets: TilesetData[] }
+  mapPreview?: { getMap: (id: string) => MapData | undefined; tilesets: TilesetData[]; /** Sprites and pictures by `imagePickKey`, so placed pictures are drawn. */ spriteAssets?: Record<string, SpriteAssetInfo> }
   sprites: { id: string; name: string; kind: SpriteKind }[]
   /** Common events of the project (`callCommonEvent` targets). */
   commonEvents?: { id: string; name: string }[]
@@ -64,6 +64,7 @@ const selectEnvInputs = (c: EditorContextValue) => ({
   stages: c.stages,
   maps: c.maps,
   tilesets: c.tilesets,
+  spriteAssets: c.spriteAssets,
   entities: c.entities,
   commonEvents: c.commonEvents,
   spriteList: c.spriteList,
@@ -98,7 +99,7 @@ function ContextBackedEnv({ entityId, children }: { entityId: string; children: 
       variables: c.variables,
       stages: c.stages,
       maps: c.maps.map((m) => ({ id: mapIdOf(m.fileName), name: m.name || mapIdOf(m.fileName), width: m.width, height: m.height })),
-      mapPreview: { getMap: (id) => c.maps.find((m) => mapIdOf(m.fileName) === id), tilesets: c.tilesets },
+      mapPreview: { getMap: (id) => c.maps.find((m) => mapIdOf(m.fileName) === id), tilesets: c.tilesets, spriteAssets: c.spriteAssets },
       sprites: c.spriteList.map((s) => ({ id: s.id, name: s.meta.name || s.id, kind: s.meta.kind })),
       entities: c.entities.map((e) => ({ id: e.id, name: e.name })),
       commonEvents: (c.commonEvents ?? []).map((e) => ({ id: e.id, name: e.name })),

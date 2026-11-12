@@ -6,6 +6,7 @@ import React, { useState } from 'react'
 import { Plus, Trash2, X } from 'lucide-react'
 import type { ChoiceOption, Command, CommandTarget, Condition, FieldDef, RouteStep } from '../../../../../shared/engine/types'
 import { getCommandDef, isFieldVisible } from '../../../../../shared/engine/commands'
+import { anchorToTile, tileToAnchor } from '../../../../../shared/engine/constants'
 import { ConditionsEditor } from './ConditionsEditor'
 import { ChoicesEditor, RouteEditor } from './RouteChoicesEditors'
 import { WarpTilePicker } from './WarpTilePicker'
@@ -183,19 +184,34 @@ function FieldControl({ field, command, params, onPatch, id }: FieldControlProps
       return <TargetPicker id={id} value={raw as CommandTarget | undefined} onChange={set} />
     case 'position': {
       const [kx, ky] = field.keys ?? ['x', 'y']
-      const tileX = asNumber(params[kx] ?? def?.defaultParams[kx])
-      const tileY = asNumber(params[ky] ?? def?.defaultParams[ky])
+      const px = asNumber(params[kx] ?? def?.defaultParams[kx])
+      const py = asNumber(params[ky] ?? def?.defaultParams[ky])
+      // A position that can be a free pixel (the warp's player feet) has a switch for it: Snap to tiles on = a tile.
+      const freeKey = field.freeKey
+      const free = !!freeKey && params[freeKey] === true
+      const snapSwitch = (snap: boolean) => {
+        if (!freeKey || snap === !free) return
+        // Keep the spot: a tile becomes its anchor pixel, a pixel becomes the tile it is in.
+        if (snap) {
+          const { col, row } = anchorToTile(px, py)
+          onPatch({ [kx]: col, [ky]: row, [freeKey]: false })
+        } else {
+          const a = tileToAnchor(Math.max(0, Math.round(px)), Math.max(0, Math.round(py)))
+          onPatch({ [kx]: a.x, [ky]: a.y, [freeKey]: true })
+        }
+      }
       return (
         <div className="space-y-2">
-          {command.type === 'warp' && <WarpTilePicker mapId={asString(params.map)} x={tileX} y={tileY} onPick={(col, row) => onPatch({ [kx]: col, [ky]: row })} />}
+          {freeKey && <CheckRow checked={!free} onChange={snapSwitch} label="Snap to tiles" help="On: the player arrives on a tile. Off: on any pixel of the map, where the player's feet will be (click the preview or type the pixels)." />}
+          {command.type === 'warp' && <WarpTilePicker mapId={asString(params.map)} x={px} y={py} free={free} onPick={(x, y) => onPatch({ [kx]: x, [ky]: y })} />}
           <div className="grid grid-cols-2 gap-2">
             <label className="flex flex-col gap-1 text-[11px] text-muted-foreground">
-              <span className="whitespace-nowrap">Column (x)</span>
-              <DraftNumber aria-label="Tile column" min={0} step={1} value={tileX} onCommit={(v) => onPatch({ [kx]: Math.round(v) })} />
+              <span className="whitespace-nowrap">{free ? 'X (px)' : 'Column (x)'}</span>
+              <DraftNumber aria-label={free ? 'Pixel x' : 'Tile column'} min={0} step={1} value={px} onCommit={(v) => onPatch({ [kx]: Math.round(v) })} />
             </label>
             <label className="flex flex-col gap-1 text-[11px] text-muted-foreground">
-              <span className="whitespace-nowrap">Row (y)</span>
-              <DraftNumber aria-label="Tile row" min={0} step={1} value={tileY} onCommit={(v) => onPatch({ [ky]: Math.round(v) })} />
+              <span className="whitespace-nowrap">{free ? 'Y (px)' : 'Row (y)'}</span>
+              <DraftNumber aria-label={free ? 'Pixel y' : 'Tile row'} min={0} step={1} value={py} onCommit={(v) => onPatch({ [ky]: Math.round(v) })} />
             </label>
           </div>
         </div>

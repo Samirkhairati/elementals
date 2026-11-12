@@ -108,6 +108,14 @@ export function hydrateMapEntities(world: World, defs: unknown, expandContext?: 
   return { entities, problems };
 }
 
+/** Where a warp puts the player: a tile, or (a free warp) the exact pixel of the feet in `anchor`, with its tile in col/row. */
+export interface SpawnAt {
+  col: number;
+  row: number;
+  anchor?: { x: number; y: number };
+  facing?: Facing;
+}
+
 /**
  * Spawns the player. Without `at` it stands at the centre of the map (the original behaviour); `at`
  * places it on a tile (warps, `?map=` starts) with an optional facing.
@@ -118,13 +126,17 @@ export function spawnPlayer(
   world: World,
   mapSize: { width: number; height: number },
   tileSize: number,
-  at?: { col: number; row: number; facing?: Facing },
+  at?: SpawnAt,
   depth?: number,
 ): PlayerSpawn {
   const centred = at === undefined;
   let x = Math.floor(mapSize.width / 2) * tileSize + tileSize / 2;
   let y = (Math.floor(mapSize.height / 2) + 1) * tileSize;
-  if (at) {
+  if (at?.anchor) {
+    // A free warp: that pixel, kept on the map (the map's bottom and right edge count as inside).
+    x = Math.min(Math.max(0, at.anchor.x), mapSize.width * tileSize);
+    y = Math.min(Math.max(0, at.anchor.y), mapSize.height * tileSize);
+  } else if (at) {
     const col = Math.min(Math.max(0, Math.trunc(at.col)), Math.max(0, mapSize.width - 1));
     const row = Math.min(Math.max(0, Math.trunc(at.row)), Math.max(0, mapSize.height - 1));
     ({ x, y } = tileToAnchor(col, row));

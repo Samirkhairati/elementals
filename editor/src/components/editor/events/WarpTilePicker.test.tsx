@@ -2,7 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import type { MapData } from '@/types/editor'
 import { EventEnvProvider } from './eventEnv'
-import { WarpTilePicker, previewCellSize, tileAt } from './WarpTilePicker'
+import type { SpriteAssetInfo } from '../../../../../shared/engine/types'
+import { WarpTilePicker, pixelAt, previewCellSize, tileAt } from './WarpTilePicker'
+import * as scenery from '@/lib/mapScenery'
 import { makeEnv } from './eventTestUtils'
 
 const town: MapData = { name: 'Town', fileName: 'town.json', folderPath: null, width: 10, height: 8, layers: [], entities: [] }
@@ -32,6 +34,18 @@ describe('tileAt', () => {
   })
 })
 
+describe('pixelAt', () => {
+  const rect = { left: 100, top: 50, width: 200, height: 160 } // a 10x8 map (320x256 px) shown at 200x160
+
+  it('maps a pointer position to whole map pixels, edges included, and outside to null', () => {
+    expect(pixelAt(town, 100, 50, rect)).toEqual({ x: 0, y: 0 })
+    expect(pixelAt(town, 200, 130, rect)).toEqual({ x: 160, y: 128 })
+    expect(pixelAt(town, 300, 210, rect)).toEqual({ x: 320, y: 256 })
+    expect(pixelAt(town, 99, 100, rect)).toBeNull()
+    expect(pixelAt(town, 150, 211, rect)).toBeNull()
+  })
+})
+
 describe('WarpTilePicker', () => {
   beforeEach(() => {
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null) // jsdom has no canvas
@@ -57,6 +71,33 @@ describe('WarpTilePicker', () => {
     expect(onPick).toHaveBeenCalledWith(2, 3)
     fireEvent.mouseLeave(surface)
     expect(screen.queryByTestId('warp-hover-tile')).toBeNull()
+  })
+
+  it('with Snap to tiles off it hovers and picks exact pixels, and marks the pixel the warp goes to', () => {
+    const onPick = vi.fn()
+    render(
+      <EventEnvProvider value={makeEnv({ mapPreview: { getMap: () => town, tilesets: [] } })}>
+        <WarpTilePicker mapId="town" x={40} y={96} free onPick={onPick} />
+      </EventEnvProvider>,
+    )
+    const surface = screen.getByTestId('warp-tile-picker').querySelector('.cursor-crosshair') as HTMLElement
+    expect(screen.getByTestId('warp-selected-point')).toHaveStyle({ left: '20px' }) // 40 px * 20/32 = 25, minus half the 10 px ring
+    expect(screen.queryByTestId('warp-selected-tile')).toBeNull()
+    expect(screen.getByText('Warps to (40, 96) px')).toBeInTheDocument()
+    fireEvent.mouseMove(surface, { clientX: 100, clientY: 80 })
+    expect(screen.getByText('Click to warp to (160, 128) px')).toBeInTheDocument()
+    fireEvent.click(surface, { clientX: 100, clientY: 80 })
+    expect(onPick).toHaveBeenCalledWith(160, 128)
+  })
+
+  it('flags a pixel position outside the map', () => {
+    render(
+      <EventEnvProvider value={makeEnv({ mapPreview: { getMap: () => town, tilesets: [] } })}>
+        <WarpTilePicker mapId="town" x={400} y={10} free onPick={() => {}} />
+      </EventEnvProvider>,
+    )
+    expect(screen.queryByTestId('warp-selected-point')).toBeNull()
+    expect(screen.getByText(/outside this 320×256 px map/)).toBeInTheDocument()
   })
 
   it('marks the current warp tile and flags one outside the map', () => {
@@ -115,3 +156,24 @@ describe('WarpTilePicker drawing', () => {
   })
 })
 
+
+describe('WarpTilePicker pictures', () => {
+  afterEach(() => vi.restoreAllMocks())
+
+  it('draws the destination map through the shared scenery with the pictures available, so a map made of pictures is not blank', () => {
+    const ctx = new Proxy({ imageSmoothingEnabled: true, imageSmoothingQuality: 'low', lineWidth: 0 } as Record<string, unknown>, { get: (t, k: string) => (k in t ? t[k] : () => {}), set: (t, k: string, v) => ((t[k] = v), true) })
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx as unknown as CanvasRenderingContext2D)
+    const draw = vi.spyOn(scenery, 'drawMapScenery').mockReturnValue([])
+    const spriteAssets = { 'graphic:city/wall.png': {} as SpriteAssetInfo }
+    const pictures: MapData = { ...town, layers: [{ id: 'l', name: 'wall', type: 'image', visible: true, locked: false, images: [{ id: 'i', graphicId: 'city/wall.png', x: 64, y: 96 }] }] }
+    render(
+      <EventEnvProvider value={makeEnv({ mapPreview: { getMap: () => pictures, tilesets: [], spriteAssets } })}>
+        <WarpTilePicker mapId="town" x={0} y={0} onPick={() => {}} />
+      </EventEnvProvider>,
+    )
+    expect(draw).toHaveBeenCalled()
+    const [, mapArg, options] = draw.mock.calls[0]
+    expect(mapArg).toBe(pictures)
+    expect(options.assets).toBe(spriteAssets)
+  })
+})

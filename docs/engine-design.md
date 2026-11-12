@@ -162,7 +162,7 @@ logs and skips it until the system exists)
   ● `setMoveSpeed` {target, speed}; ● `setMovementMode` {target, mode}; ● `faceTowards` {target, other}.
 
 **Map / screen**
-* ● `warp` {map, x, y, facing?, fade}; ● `fadeScreen` {mode: in|out, ms}; ● `shakeScreen` {power, ms};
+* ● `warp` {map, x, y, free?, facing?, fade}; ● `fadeScreen` {mode: in|out, ms}; ● `shakeScreen` {power, ms};
 * ○ `tintScreen`, ○ `setWeather`.
 
 **Audio**
@@ -181,7 +181,7 @@ Parameter details as built (`shared/engine/commands.ts` is authoritative):
   while `cancel` is `'branch'`. Changing options keeps old branches (reported as `orphan-branch` warnings) so no commands
   are lost silently.
 * `setVariable`: `id`, `op`, `operand`, plus `value` (const), `sourceId` (variable) or `min`/`max` (random).
-* `warp`: `map`, `x`, `y` (tile coordinates), `facing` (`''` = keep), `fade`. `moveRoute.steps` is `{ type, value? }[]`
+* `warp`: `map`, `x`, `y` (tile coordinates; with `free: true` they are **pixels**, the exact spot of the player's feet, bottom and right map edge included; the editor's **Snap to tiles** switch sets it and converts the spot between the two), `facing` (`''` = keep), `fade`. `moveRoute.steps` is `{ type, value? }[]`
   (`turn` takes a facing, `wait` ms, `speed` px/s). `conditional.conditions` is a `Condition[]`.
 * Validation (`validateGraph`; `validateCommands` remains only for un-migrated command trees): unknown commands, wrong types, dangling switch/variable/map/sprite/entity references
   (only when the id lists are given), `breakLoop` outside a loop, empty/duplicate choices and duplicate ids are errors; unset

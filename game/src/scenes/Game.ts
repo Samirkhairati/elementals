@@ -1,5 +1,5 @@
 import { Scene } from "phaser";
-import { tileToAnchor, type Facing } from "@shared/engine/index.ts";
+import { anchorToTile, tileToAnchor } from "@shared/engine/index.ts";
 import { GAME_CONSTANTS } from "@/constants/game";
 import { settingsStore } from "@/core/SettingsStore";
 import { gameState } from "@/core/GameState";
@@ -29,6 +29,7 @@ import {
   hydrateMapEntities,
   spawnPlayer,
   type Entity,
+  type SpawnAt,
 } from "@/ecs";
 import { legacyInteractableEntities } from "@/ecs/legacyInteractables";
 import { TransformComponent } from "@/ecs/components/TransformComponent";
@@ -51,10 +52,16 @@ export interface GameDebugHandle {
   runtime: EventRuntime;
   triggers: TriggerSystem;
   spawn(defs: unknown[]): Entity[];
-  switchMap(mapId: string, spawn?: { col: number; row: number; facing?: Facing }): void;
+  switchMap(mapId: string, spawn?: SpawnAt): void;
 }
 
 const FOLLOW_OFFSET_Y = 24;
+
+/** Where a warp request puts the player: its tile, plus the exact pixel for a free warp. */
+function spawnAt(request: WarpRequest): SpawnAt {
+  if (!request.free) return { col: request.x, row: request.y, facing: request.facing };
+  return { ...anchorToTile(request.x, request.y), anchor: { x: request.x, y: request.y }, facing: request.facing };
+}
 
 export class Game extends Scene {
   private mapSystem!: MapSystem;
@@ -209,7 +216,7 @@ export class Game extends Scene {
    * Everything event-related of the old map is cancelled first; global switches/variables and self
    * switches persist, the new map's events pick their states from them.
    */
-  private switchMap(mapKey: string, spawn?: { col: number; row: number; facing?: Facing }) {
+  private switchMap(mapKey: string, spawn?: SpawnAt) {
     if (!MAPS.some((m) => m.key === mapKey)) {
       console.warn(`[Game] unknown map "${mapKey}"`);
       return;
@@ -287,7 +294,7 @@ export class Game extends Scene {
   /** `warp` command: same map = move the player, other map = load it (this cancels the running events). */
   private async warpPlayer(request: WarpRequest): Promise<void> {
     const never = new AbortController().signal;
-    const spawn = { col: request.x, row: request.y, facing: request.facing };
+    const spawn = spawnAt(request);
     const mapKey = this.mapKeyFor(request.map);
     if (!mapKey) {
       console.warn(`[Game] warp: unknown map "${request.map}"`);
@@ -311,10 +318,10 @@ export class Game extends Scene {
   }
 
   /** Same-map warp: moves the player to a tile without reloading the map (NPCs keep their state). */
-  private teleportPlayer(spawn: { col: number; row: number; facing?: Facing }) {
+  private teleportPlayer(spawn: SpawnAt) {
     const player = this.playerEntity;
     if (player === undefined) return;
-    const { x, y } = tileToAnchor(spawn.col, spawn.row);
+    const { x, y } = spawn.anchor ?? tileToAnchor(spawn.col, spawn.row);
     const transform = this.world.getComponent(player, TransformComponent);
     if (!transform) return;
     transform.x = x;

@@ -145,15 +145,18 @@ export interface DrawSpriteOptions {
   /** Mirror the whole sprite around the anchor, horizontally and/or vertically (use with a sprite resolved without `flipX`). */
   mirrorX?: boolean
   mirrorY?: boolean
+  /** Smooth the picture when it is scaled (small previews of big pictures); the default keeps pixel art crisp. */
+  smooth?: boolean
 }
 
-/** Paints a resolved sprite pixel-perfectly (no smoothing), honouring flip, opacity and tint. */
+/** Paints a resolved sprite pixel-perfectly (no smoothing unless `smooth`), honouring flip, opacity and tint. */
 export function drawResolvedSprite(ctx: CanvasRenderingContext2D, r: ResolvedSprite, opts: DrawSpriteOptions) {
   const { src, dest } = r
   const dx = opts.anchorX + dest.x
   const dy = opts.anchorY + dest.y
   ctx.save()
-  ctx.imageSmoothingEnabled = false
+  ctx.imageSmoothingEnabled = !!opts.smooth
+  if (opts.smooth) ctx.imageSmoothingQuality = 'high'
   if (opts.opacity !== undefined && opts.opacity < 1) ctx.globalAlpha *= Math.max(0, opts.opacity)
   const source: CanvasImageSource = (opts.tint ? tintedSource(r.img, src, opts.tint) : null) ?? r.img
   const sx = source === r.img ? src.x : 0

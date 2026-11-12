@@ -122,3 +122,7 @@ Right-click a map > **Resize…** opens a crop-style dialog: the map is drawn sm
 
 The logic is pure: `editor/src/lib/mapResize.ts` (`applyResize`, `resizeLoss`; edges in pixels) and `mapResizeView.ts` (preview geometry in tiles, fractions allowed). Tile `(x, y)` becomes `(x + round(left/32), y + round(top/32))`; tile-layer indexes are rebuilt for the new width; entity anchors, image-layer items and collision shapes move by `(left, top)` pixels (tiles by `round(left/32)`, `round(top/32)`). Map connections are not part of this yet; when they exist (they sit on map
 edges) they should hook into `applyResize` / `resizeLoss`.
+
+## Map previews
+
+The resize dialog and the warp destination picker draw a small picture of a map. Both go through `editor/src/lib/mapScenery.ts` (`drawMapScenery`): visible tile layers and the pictures of visible image layers, bottom layer first. `LAYER_SCENERY` there says, for every layer type, whether it is drawn, so a new layer type fails to compile until someone decides. Do not paint map layers in a component: a copy once missed image layers and the preview of the city map (all pictures) was blank, twice.

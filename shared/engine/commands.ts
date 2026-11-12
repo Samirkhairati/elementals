@@ -13,7 +13,7 @@ import type {
   SummaryContext,
   ValidationContext,
 } from './types.ts';
-import { COMPARISON_OPS, ROUTE_STEP_TYPES, SELF_SWITCH_KEYS, facingOptions, isFacing } from './constants.ts';
+import { COMPARISON_OPS, ROUTE_STEP_TYPES, SELF_SWITCH_KEYS, TILE_SIZE, facingOptions, isFacing } from './constants.ts';
 import { newId } from './ids.ts';
 import { cloneJson, isRecord } from './util.ts';
 
@@ -531,17 +531,17 @@ export const COMMAND_CATALOG: Record<string, CommandDef> = {
     type: 'warp',
     label: 'Warp',
     category: 'map',
-    description: 'Move the player to a tile on this or another map.',
+    description: 'Move the player to a tile (or any pixel) on this or another map.',
     icon: 'door-open',
     params: [
       { key: 'map', label: 'Map', kind: 'map', required: true },
-      { key: 'position', label: 'Tile', kind: 'position', keys: ['x', 'y'], help: 'Destination tile (column, row).' },
+      { key: 'position', label: 'Position', kind: 'position', keys: ['x', 'y'], freeKey: 'free', help: 'Destination: a tile (column, row), or with Snap to tiles off any pixel (where the player\'s feet will be).' },
       { key: 'facing', label: 'Facing after', kind: 'select', options: [{ label: 'Keep current', value: '' }, ...facingOptions()] },
       { key: 'fade', label: 'Fade screen', kind: 'boolean' },
     ],
-    defaultParams: { map: '', x: 0, y: 0, facing: '', fade: true },
+    defaultParams: { map: '', x: 0, y: 0, free: false, facing: '', fade: true },
     status: 'implemented',
-    summarize: (p, ctx) => `Warp to ${named(ctx?.mapName, str(p.map))} (${num(p.x)}, ${num(p.y)})`,
+    summarize: (p, ctx) => `Warp to ${named(ctx?.mapName, str(p.map))} (${num(p.x)}, ${num(p.y)}${p.free === true ? ' px' : ''})`,
   }),
   fadeScreen: def({
     type: 'fadeScreen',
@@ -1078,8 +1078,15 @@ export function validateCommandParams(
   if (cmd.type === 'warp' && typeof params.map === 'string') {
     const size = ctx.mapSizes?.[params.map];
     const { x, y } = params;
-    if (size && typeof x === 'number' && typeof y === 'number' && (x < 0 || y < 0 || x >= size.width || y >= size.height)) {
-      report('error', 'warp-out-of-bounds', `Tile (${x}, ${y}) is outside the map (${size.width}×${size.height} tiles)`);
+    if (size && typeof x === 'number' && typeof y === 'number') {
+      if (params.free === true) {
+        // A free warp is in pixels; the map's bottom and right edge count as inside (feet stand on the tile edge).
+        const w = size.width * TILE_SIZE;
+        const h = size.height * TILE_SIZE;
+        if (x < 0 || y < 0 || x > w || y > h) report('error', 'warp-out-of-bounds', `Position (${x}, ${y}) px is outside the map (${w}×${h} px)`);
+      } else if (x < 0 || y < 0 || x >= size.width || y >= size.height) {
+        report('error', 'warp-out-of-bounds', `Tile (${x}, ${y}) is outside the map (${size.width}×${size.height} tiles)`);
+      }
     }
   }
 

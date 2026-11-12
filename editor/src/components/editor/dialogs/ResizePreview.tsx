@@ -2,9 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Maximize, Minus, Plus } from 'lucide-react'
 import type { TilesetData } from '@/types/editor'
 import type { SpriteAssetInfo } from '../../../../../shared/engine/types'
-import { drawResolvedSprite, useSpriteImagesVersion } from '@/lib/spriteImages'
-import { resolveImageItem } from '@/lib/imageItems'
-import { sortedImages } from '@/lib/layerOrder'
+import { useSpriteImagesVersion } from '@/lib/spriteImages'
+import { drawMapScenery } from '@/lib/mapScenery'
 import { TILE_SIZE, anchorToTile } from '../../../../../shared/engine/constants'
 import { occupiedCells, type ResizableMap, type ResizeEdges } from '@/lib/mapResize'
 import {
@@ -131,38 +130,13 @@ export function ResizePreview({ map, tilesets, spriteAssets, edges, onEdgesChang
     fill(rect.x0, rect.y0, rect.x1, rect.y1, 'rgba(120,120,140,0.14)')
     fill(0, 0, geo.width, geo.height, 'rgba(0,0,0,0.35)')
 
-    // Placed pictures that could not be drawn yet (or have no asset) stay as markers.
-    const unresolved: { x: number; y: number }[] = []
-
-    // Layers bottom first (the layer list is top first): tiles, and placed pictures at their real size.
-    for (const layer of [...map.layers].reverse()) {
-      if (!layer.visible) continue
-      if (layer.type === 'image') {
-        const k = s / TILE_SIZE
-        for (const it of sortedImages(layer.images)) {
-          const resolved = spriteAssets ? resolveImageItem(it, spriteAssets) : null
-          if (!resolved) {
-            unresolved.push(it)
-            continue
-          }
-          ctx.save()
-          ctx.translate(sx(0), sy(0))
-          ctx.scale(k, k)
-          drawResolvedSprite(ctx, resolved, { anchorX: it.x, anchorY: it.y, opacity: it.opacity, mirrorX: it.flipX, mirrorY: it.flipY })
-          ctx.restore()
-        }
-        continue
-      }
-      if (layer.type !== 'tile') continue
-      for (const [key, tile] of Object.entries(layer.data ?? {})) {
-        const img = images.get(tile.tilesetId)
-        if (!img || !img.complete || img.naturalWidth === 0) continue
-        const idx = Number(key)
-        const x = sx(idx % map.width)
-        const y = sy(Math.floor(idx / map.width))
-        ctx.drawImage(img, tile.x * TILE_SIZE, tile.y * TILE_SIZE, TILE_SIZE, TILE_SIZE, x, y, s + 0.5, s + 0.5)
-      }
-    }
+    // Layers bottom first: tiles, and placed pictures at their real size (the same drawing the warp preview uses).
+    ctx.save()
+    ctx.translate(sx(0), sy(0))
+    ctx.scale(s / TILE_SIZE, s / TILE_SIZE)
+    // Half a screen pixel of bleed per tile, so zoomed tiles leave no seams.
+    const unresolved = drawMapScenery(ctx, map, { tileImages: images, assets: spriteAssets, bleed: (0.5 * TILE_SIZE) / s })
+    ctx.restore()
 
     // Entities (amber) and placed pictures (blue) as small markers.
     const marker = (px: number, py: number, color: string) => {

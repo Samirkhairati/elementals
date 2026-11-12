@@ -430,6 +430,12 @@ describe('screen and map commands', () => {
     expect(rig.maps.warps[0]).toEqual({ map: 'city', x: 2, y: 3, facing: undefined, fade: true });
   });
 
+  it('a free warp asks for a pixel position (whole pixels); a tile warp never sets the flag', async () => {
+    await rig.runCommands([cmd('warp', { map: 'city', x: 117.4, y: 141.6, free: true, facing: 'down', fade: false }), cmd('warp', { map: 'city', x: 2, y: 3, free: false })])!.done;
+    expect(rig.maps.warps[0]).toEqual({ map: 'city', x: 117, y: 142, free: true, facing: 'down', fade: false });
+    expect(rig.maps.warps[1]).not.toHaveProperty('free');
+  });
+
   it('fadeScreen and shakeScreen go to the UI (shake power is clamped to 1..10)', async () => {
     await rig.runCommands([
       cmd('fadeScreen', { mode: 'out', ms: 300 }),

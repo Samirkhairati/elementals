@@ -326,11 +326,12 @@ describe('ParamForm: every FieldKind has a real control', () => {
     expect(within(field('Target')).getByRole('button', { name: /Missing: gone/ })).toBeInTheDocument()
   })
 
-  it('position: column and row fields with a hint', () => {
+  it('position: column and row fields, and the Snap to tiles switch with its hint', () => {
     const { onPatch } = setup(cmd('w', 'warp', { map: 'town', x: 1, y: 2 }))
-    expect(screen.queryByText('Destination tile (column, row).')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: /^About / }))
-    expect(screen.getByRole('tooltip')).toHaveTextContent('Destination tile (column, row).')
+    expect(screen.queryByText(/On: the player arrives on a tile/)).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'About Snap to tiles' }))
+    expect(screen.getByRole('tooltip')).toHaveTextContent('On: the player arrives on a tile.')
+    expect(screen.getByRole('checkbox', { name: 'Snap to tiles' })).toBeChecked()
     const col = screen.getByRole('spinbutton', { name: 'Tile column' })
     const row = screen.getByRole('spinbutton', { name: 'Tile row' })
     expect(col).toHaveValue('1')
@@ -341,6 +342,21 @@ describe('ParamForm: every FieldKind has a real control', () => {
     fireEvent.change(row, { target: { value: '9.4' } })
     fireEvent.blur(row)
     expect(onPatch).toHaveBeenLastCalledWith({ y: 9 })
+  })
+
+  it('position: Snap to tiles off turns the tile into the pixel of its anchor', () => {
+    const tile = setup(cmd('w', 'warp', { map: 'town', x: 3, y: 4 }))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Snap to tiles' }))
+    expect(tile.onPatch).toHaveBeenCalledWith({ x: 3 * 32 + 16, y: 5 * 32, free: true })
+  })
+
+  it('position: a free position shows pixels, and Snap to tiles on turns it into the tile that holds it', () => {
+    const free = setup(cmd('w', 'warp', { map: 'town', x: 117, y: 141, free: true }))
+    expect(screen.getByRole('checkbox', { name: 'Snap to tiles' })).not.toBeChecked()
+    expect(screen.getByRole('spinbutton', { name: 'Pixel x' })).toHaveValue('117')
+    expect(screen.getByRole('spinbutton', { name: 'Pixel y' })).toHaveValue('141')
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Snap to tiles' }))
+    expect(free.onPatch).toHaveBeenCalledWith({ x: 3, y: 4, free: false })
   })
 
   it('sound and item: text with sensible placeholders', () => {

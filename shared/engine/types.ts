@@ -284,7 +284,7 @@ export type FieldKind =
   | 'commonEvent' // common event picker
   | 'stageValue' // a value of the stage chosen in the param named by `stageKey`
   | 'target' // CommandTarget picker
-  | 'position' // map position picker (x,y tile) — params use {x,y}
+  | 'position' // map position picker — params use {x,y}: a tile (column, row), or pixels when the field's `freeKey` param is true
   | 'sound'
   | 'item'
   | 'route' // move-route steps editor
@@ -311,6 +311,8 @@ export interface FieldDef {
    * `key` is then only an identifier for the field.
    */
   keys?: string[];
+  /** `position` fields: the boolean param that turns the position from tile (column, row) into pixels (the anchor, bottom-centre of whatever stands there). Missing or false = tiles. */
+  freeKey?: string;
   /** The value is an array of the kind (e.g. `item` with `multiple` = a list of item ids). */
   multiple?: boolean;
   /** `stageValue` fields: the param holding the stage id whose values are offered. */

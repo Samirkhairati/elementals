@@ -61,6 +61,26 @@ describe('spawnPlayer', () => {
   });
 });
 
+describe('spawnPlayer at a warp position', () => {
+  it('a tile puts the feet at the tile anchor', () => {
+    const w = new World();
+    expect(spawnPlayer(w, { width: 20, height: 15 }, 32, { col: 3, row: 4 })).toMatchObject({ x: 3 * 32 + 16, y: 5 * 32 });
+  });
+
+  it('a free position puts the feet on that exact pixel', () => {
+    const w = new World();
+    const spawn = spawnPlayer(w, { width: 20, height: 15 }, 32, { col: 3, row: 4, anchor: { x: 117, y: 141 } });
+    expect([spawn.x, spawn.y]).toEqual([117, 141]);
+    expect(w.getComponent(spawn.entity, TransformComponent)).toMatchObject({ x: 117, y: 141 });
+  });
+
+  it('a free position outside the map is kept on it (the bottom and right edge count as inside)', () => {
+    const w = new World();
+    expect(spawnPlayer(w, { width: 20, height: 15 }, 32, { col: 0, row: 0, anchor: { x: -50, y: 9999 } })).toMatchObject({ x: 0, y: 15 * 32 });
+    expect(spawnPlayer(w, { width: 20, height: 15 }, 32, { col: 0, row: 0, anchor: { x: 9999, y: 10 } })).toMatchObject({ x: 20 * 32, y: 10 });
+  });
+});
+
 describe('hydrateMapEntities', () => {
   it('hydrates a well-formed entity', () => {
     const w = new World();

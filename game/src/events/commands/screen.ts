@@ -1,17 +1,20 @@
 import { registerCommandHandler } from "./registry";
 import { bool, facing, num, str } from "./params";
 
-/** warp: map id = map file base name; x,y are tile coordinates; `facing` '' keeps the current one. */
+/** warp: map id = map file base name; x,y are tile coordinates, or pixels (the player's feet) when `free`; `facing` '' keeps the current one. */
 registerCommandHandler("warp", async (cmd, rt) => {
   const p = cmd.params;
   const map = str(p, "map");
   if (!map) return rt.ctx.warn("[Event] warp without a map; skipped");
   if (!rt.ctx.maps.hasMap(map)) return rt.ctx.warn(`[Event] warp: unknown map "${map}"; skipped`);
+  const free = bool(p, "free", false);
   await rt.guard(
     rt.ctx.maps.warp({
       map,
-      x: Math.trunc(num(p, "x", 0)),
-      y: Math.trunc(num(p, "y", 0)),
+      // pixels may be fractions of a pixel in the data; whole pixels are enough for a position
+      x: free ? Math.round(num(p, "x", 0)) : Math.trunc(num(p, "x", 0)),
+      y: free ? Math.round(num(p, "y", 0)) : Math.trunc(num(p, "y", 0)),
+      ...(free ? { free: true } : {}),
       facing: facing(p, "facing"),
       fade: bool(p, "fade", true),
     }),
