@@ -137,6 +137,10 @@ describe('golden: the real manifest plans exactly what the v1 code planned', () 
   const registry = new SpriteRegistry();
   const result = registry.load(raw);
   const plan = planSpriteLoads(registry.all());
+  // The fixtures cover the characters that existed when the v1 code was retired. A sprite the author adds later (a GIF, a new
+  // NPC) must not break this comparison, so it only looks at those.
+  const v1Ids = new Set(v1.map((s) => s.id));
+  const knownPlan = planSpriteLoads(registry.all().filter((e) => v1Ids.has(e.id)));
 
   it('loads every committed character', () => {
     expect(result.skipped).toEqual([]);
@@ -152,14 +156,14 @@ describe('golden: the real manifest plans exactly what the v1 code planned', () 
       })),
     );
     const byKey = (l: Array<{ textureKey: string }>) => Object.fromEntries(l.map((x) => [x.textureKey, x]));
-    expect(byKey(plan.sheets)).toEqual(byKey(expected));
+    expect(byKey(knownPlan.sheets)).toEqual(byKey(expected));
   });
 
   it('same animation keys, texture keys, frames, fps and loop', () => {
     const expected = v1.flatMap((s) => buildAnimationRegistrations(s.id, s.meta));
     const byKey = (l: Array<{ key: string }>) => Object.fromEntries(l.map((x) => [x.key, x]));
-    expect(plan.animations).toHaveLength(expected.length);
-    expect(byKey(plan.animations)).toEqual(byKey(expected));
+    expect(knownPlan.animations).toHaveLength(expected.length);
+    expect(byKey(knownPlan.animations)).toEqual(byKey(expected));
   });
 });
 
