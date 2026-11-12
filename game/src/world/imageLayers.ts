@@ -7,6 +7,7 @@ import { normalizeProps } from "@shared/engine/index.ts";
 import type { SpriteRegistry } from "@/data/spriteRegistry";
 import { buildSpriteComponents } from "@/sprites/spriteState";
 import { YSortField, type DepthRect } from "@/ecs/depth";
+import { finiteOr as num, isRecord, rawLayers, tiledProps } from "./tiledRaw";
 
 export interface ImageObjectDef {
   name: string;
@@ -29,31 +30,17 @@ export interface ImageObjectDef {
   ySort: boolean;
 }
 
-type Rec = Record<string, unknown>;
-const isRecord = (v: unknown): v is Rec => typeof v === "object" && v !== null && !Array.isArray(v);
-
-/** Tiled custom properties (`[{ name, value }]`) as a plain object. */
-function propsOf(owner: unknown): Rec {
-  const out: Rec = {};
-  const list = isRecord(owner) ? owner.properties : undefined;
-  if (Array.isArray(list)) for (const p of list) if (isRecord(p) && typeof p.name === "string") out[p.name] = p.value;
-  return out;
-}
-
-const num = (v: unknown, fallback: number): number => (typeof v === "number" && Number.isFinite(v) ? v : fallback);
-
 /** Every image of every visible image layer of a raw (exported) map, in draw order (layers in file order, items as exported). */
 export function readImageObjects(raw: unknown): ImageObjectDef[] {
-  const layers = isRecord(raw) && Array.isArray(raw.layers) ? raw.layers : [];
   const out: ImageObjectDef[] = [];
-  for (const layer of layers) {
+  for (const layer of rawLayers(raw)) {
     if (!isRecord(layer) || layer.type !== "objectgroup" || layer.visible === false) continue;
-    const layerProps = propsOf(layer);
+    const layerProps = tiledProps(layer);
     if (layerProps.kind !== "image") continue;
     const depth = num(layerProps.z, 0);
     for (const obj of Array.isArray(layer.objects) ? layer.objects : []) {
       if (!isRecord(obj) || obj.visible === false) continue;
-      const p = propsOf(obj);
+      const p = tiledProps(obj);
       const graphic = typeof p.graphic === "string" && p.graphic !== "" ? p.graphic : undefined;
       const sprite = !graphic && typeof p.sprite === "string" && p.sprite !== "" ? p.sprite : undefined;
       if (!graphic && !sprite) continue;

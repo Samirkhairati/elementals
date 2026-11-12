@@ -5,6 +5,7 @@ import {
   type EngineEntity,
   type MovementProps,
   type SpriteProps,
+  isRecord,
 } from "@shared/engine/index.ts";
 import { spriteRegistry, type SpriteRegistry } from "@/data/spriteRegistry";
 import { buildSpriteComponents } from "@/sprites/spriteState";
@@ -27,9 +28,6 @@ export function defaultExpandContext(): ExpandContext {
   return { sprites: spriteRegistry, warn: (m) => console.warn(m) };
 }
 
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return v !== null && typeof v === "object" && !Array.isArray(v);
-}
 
 /** Runtime components for the Movement component (by controller). `facing` is the Sprite's initial facing. */
 export function expandMovement(props: MovementProps, facing: SpriteProps["facing"]): unknown[] {

@@ -1,4 +1,4 @@
-import { normalizeDatabase, parseCommonManifest, type CommonEvent, type GameDatabase } from "@shared/engine/index.ts";
+import { isRecord, normalizeDatabase, parseCommonManifest, type CommonEvent, type GameDatabase } from "@shared/engine/index.ts";
 
 export interface TilesetEntry {
   /** Tiled tileset name; also the Phaser texture key. */
@@ -7,9 +7,6 @@ export interface TilesetEntry {
   file: string;
 }
 
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return typeof v === "object" && v !== null && !Array.isArray(v);
-}
 
 /** Parses `data/tilesets.json` defensively (unusable entries are dropped, duplicates keep the first). */
 export function parseTilesetManifest(raw: unknown): TilesetEntry[] {

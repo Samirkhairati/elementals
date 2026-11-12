@@ -3,24 +3,13 @@
 // Read whether or not the layer is visible.
 
 import { cleanPoints, isUsableShape, type CollisionShape } from "@shared/collisionShapes.ts";
-
-type Rec = Record<string, unknown>;
-const isRecord = (v: unknown): v is Rec => typeof v === "object" && v !== null && !Array.isArray(v);
-const num = (v: unknown, fallback: number): number => (typeof v === "number" && Number.isFinite(v) ? v : fallback);
-
-function propsOf(owner: unknown): Rec {
-  const out: Rec = {};
-  const list = isRecord(owner) ? owner.properties : undefined;
-  if (Array.isArray(list)) for (const p of list) if (isRecord(p) && typeof p.name === "string") out[p.name] = p.value;
-  return out;
-}
+import { finiteOr as num, isRecord, rawLayers, tiledProps } from "./tiledRaw";
 
 /** Every usable collision shape of a raw map, in world pixels. */
 export function readCollisionShapes(raw: unknown): CollisionShape[] {
-  const layers = isRecord(raw) && Array.isArray(raw.layers) ? raw.layers : [];
   const out: CollisionShape[] = [];
-  layers.forEach((layer, li) => {
-    if (!isRecord(layer) || layer.type !== "objectgroup" || propsOf(layer).kind !== "collision") return;
+  rawLayers(raw).forEach((layer, li) => {
+    if (!isRecord(layer) || layer.type !== "objectgroup" || tiledProps(layer).kind !== "collision") return;
     const layerId = layer.id ?? li;
     const ox = num(layer.offsetx, 0);
     const oy = num(layer.offsety, 0);

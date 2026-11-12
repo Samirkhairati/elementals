@@ -1,6 +1,6 @@
 import type { World } from "./World";
 import type { Entity } from "./Entity";
-import { migrateEntity, tileToAnchor, type EngineEntity, type Facing } from "@shared/engine/index.ts";
+import { isRecord, migrateEntity, tileToAnchor, type EngineEntity, type Facing } from "@shared/engine/index.ts";
 import { PlayerPrefab } from "./prefabs/PlayerPrefab";
 import { expandEntity, defaultExpandContext, type ExpandContext } from "./expand";
 
@@ -31,9 +31,6 @@ export interface PlayerSpawn {
   y: number;
 }
 
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return v !== null && typeof v === "object" && !Array.isArray(v);
-}
 
 /**
  * Old maps used to show the entity's name when an `Interactable` had nothing to say. The migrated Event

@@ -5,6 +5,7 @@ import {
   validateSpriteMeta,
   type CharacterDef,
   type SpriteAssetMeta,
+  isRecord,
 } from "@shared/engine/index.ts";
 
 /** A loaded character: its v2 definition and the URL of each sheet (by sheet key). */
@@ -20,9 +21,6 @@ export interface SpriteRegistryLoadResult {
   skipped: { id: string; reason: string }[];
 }
 
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return typeof v === "object" && v !== null && !Array.isArray(v);
-}
 
 /**
  * Runtime lookup of the characters listed in `data/sprites.json` (written by `npm run assets:sync`).

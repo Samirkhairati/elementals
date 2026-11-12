@@ -7,6 +7,7 @@ import { COMPONENT_TYPES } from './engine/components.ts'
 import { LEGACY_COMPONENT_TYPES, listLegacyComponents, migrateEntity } from './engine/migrate.ts'
 import type { EntityLike } from './engine/migrate.ts'
 import { validateEntity } from './engine/validate.ts'
+import { isRecord } from './engine/util.ts'
 import { minPoints } from './collisionShapes.ts'
 
 /** Mirrors `LayerType` in editor/src/types/editor.ts (checked at compile time by the editor tests). */
@@ -24,9 +25,6 @@ const TILED_LAYER_TYPES = ['tilelayer', 'objectgroup']
 
 type Rec = Record<string, unknown>
 
-function isRecord(v: unknown): v is Rec {
-  return typeof v === 'object' && v !== null && !Array.isArray(v)
-}
 function isInt(v: unknown): v is number {
   return typeof v === 'number' && Number.isInteger(v)
 }

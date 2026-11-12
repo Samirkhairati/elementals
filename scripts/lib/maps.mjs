@@ -9,6 +9,10 @@ import { fileURLToPath } from 'node:url'
 import { convertEditorMapToTiled, serializeTiledMap } from '../../shared/mapExport.ts'
 import { validateEditorMap, validateTiledMap } from '../../shared/mapSchema.ts'
 import { readPngSize } from '../../shared/png.ts'
+import { atomicWriteFile } from './atomicWrite.mjs'
+
+// Re-exported: the writes below go through it, and the tests exercise it from here.
+export { atomicWriteFile }
 
 export const STATUS = Object.freeze({
   IN_SYNC: 'IN_SYNC',
@@ -241,19 +245,6 @@ export function checkMaps({ mapsDir, tilesetsDir, gameDir }) {
 }
 
 // ── write ──────────────────────────────────────────────────────────────────
-
-/** Writes `content` to `target` through a temp file in the same directory + rename. */
-export function atomicWriteFile(target, content) {
-  fs.mkdirSync(path.dirname(target), { recursive: true })
-  const tmp = `${target}.${process.pid}.${Date.now()}.tmp`
-  try {
-    fs.writeFileSync(tmp, content, { encoding: 'utf8', flag: 'wx' })
-    fs.renameSync(tmp, target)
-  } catch (e) {
-    fs.rmSync(tmp, { force: true })
-    throw e
-  }
-}
 
 /**
  * Decides and performs the writes for `--write`.

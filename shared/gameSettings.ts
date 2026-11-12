@@ -4,6 +4,8 @@
 // whatever they read with `normalizeGameSettings`, so a hand-edited or old file can never break either side.
 // Pure: no DOM or Node imports.
 
+import { isRecord } from './engine/util.ts'
+
 export interface DisplaySettings {
   /** How many tiles fit across the screen; the height follows at 16:9. */
   visibleTilesX: number
@@ -158,7 +160,6 @@ export const GAME_SETTINGS_SCHEMA: SettingCategory[] = [
 ]
 
 type Bag = Record<string, unknown>
-const isRecord = (v: unknown): v is Bag => typeof v === 'object' && v !== null && !Array.isArray(v)
 
 /** The settings of a fresh project. */
 export function defaultGameSettings(): GameSettings {

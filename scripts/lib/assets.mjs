@@ -38,6 +38,7 @@ import {
   validateCharacterSet,
   validateDatabaseStrict,
 } from './assets-validate.mjs'
+import { atomicWriteFile } from './atomicWrite.mjs'
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
 
@@ -346,19 +347,6 @@ export function planSync({ projectDir, publicDir, force = false }) {
 }
 
 // ── applying ───────────────────────────────────────────────────────────────
-
-/** Writes `content` to `target` through a temp file in the same directory + rename. */
-export function atomicWriteFile(target, content) {
-  fs.mkdirSync(path.dirname(target), { recursive: true })
-  const tmp = `${target}.${process.pid}.${Date.now()}.tmp`
-  try {
-    fs.writeFileSync(tmp, content, { flag: 'wx' })
-    fs.renameSync(tmp, target)
-  } catch (e) {
-    fs.rmSync(tmp, { force: true })
-    throw e
-  }
-}
 
 function pruneEmptyDirs(root, start) {
   for (let d = start; d !== root && d.startsWith(root + path.sep); d = path.dirname(d)) {

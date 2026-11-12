@@ -1,9 +1,6 @@
-import { tileToAnchor } from "@shared/engine/index.ts";
+import { isRecord, tileToAnchor } from "@shared/engine/index.ts";
 import { GAME_CONSTANTS } from "@/constants/game";
 
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return v !== null && typeof v === "object" && !Array.isArray(v);
-}
 
 /**
  * Converts the objects of a legacy Tiled `interactables` object layer into editor-format entities that
