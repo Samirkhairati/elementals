@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { clampZoom, fitScale, focusView, stepZoom, type FocusRect } from '@/lib/zoom'
+import { trackWindowPan } from '@/lib/windowDrag'
 import { ZoomControls } from './controls'
 
 interface ZoomPaneProps {
@@ -121,22 +122,15 @@ export function ZoomPane({ width, height, children, toolbar, maxFit = 8, hint, c
     const el = scroller.current
     if (!el || (e.button !== 0 && e.button !== 1)) return
     e.preventDefault()
-    let lx = e.clientX
-    let ly = e.clientY
     setPanning(true)
-    const move = (ev: MouseEvent) => {
-      el.scrollLeft -= ev.clientX - lx
-      el.scrollTop -= ev.clientY - ly
-      lx = ev.clientX
-      ly = ev.clientY
-    }
-    const up = () => {
-      setPanning(false)
-      window.removeEventListener('mousemove', move)
-      window.removeEventListener('mouseup', up)
-    }
-    window.addEventListener('mousemove', move)
-    window.addEventListener('mouseup', up)
+    trackWindowPan(
+      e,
+      (dx, dy) => {
+        el.scrollLeft -= dx
+        el.scrollTop -= dy
+      },
+      { onEnd: () => setPanning(false) },
+    )
   }
 
   const overflows = width * zoom > box.w || height * zoom > box.h

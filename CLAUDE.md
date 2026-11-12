@@ -99,10 +99,15 @@ editor  --writes-->  project/maps/*.json (editor map format, tile index keyed)
   (`components/editor/layout/EditorContext.tsx`); Dockview panels read slices through `useEditorSelector` in `layout/dockview/PanelWrappers.tsx`.
   Adding editor state means: manager hook -> `EditorContext` type -> the `contextValue` object **and its deps array** in `editor.tsx` -> a wrapper selector.
 * Pure logic lives in `src/lib/` (`paintOps`, `layerOrder`, `layerSelection`, `history`, ...) and is unit-tested; hooks are thin wrappers around it. Alias `@/` = `editor/src`.
-* **Dialogs**: Esc closes (Radix). Enter presses the button marked `data-dialog-confirm` (handled once in `components/ui/dialog.tsx`; fields inside a `<form>`, buttons and text areas keep their own Enter). Confirm dialogs use `ConfirmFooter`/`DangerHeader` (`dialogs/ConfirmParts.tsx`): the Delete button takes focus and shows its key. Inline "Delete anyway / Cancel" boxes mount `<ConfirmKeys>` (`ui/ConfirmKeys.tsx`). New dialogs: mark the confirm button.
+* **Dialogs**: Esc closes (Radix). Enter presses the button marked `data-dialog-confirm` (handled once in `components/ui/dialog.tsx`; fields inside a `<form>`, buttons and text areas keep their own Enter). Confirm dialogs use `ConfirmFooter`/`DangerHeader` (`dialogs/ConfirmParts.tsx`): the Delete button takes focus and shows its key. Inline "Delete anyway / Cancel" boxes are `<InlineConfirm>` (`ui/InlineConfirm.tsx`, which mounts `<ConfirmKeys>`). New dialogs: mark the confirm button.
 * **Help text goes in an info icon**: explanations, how-it-works notes and tips are an `InfoTip` (`ui/controls.tsx`, the little "i" that opens on click, or `info=` on `Field`/`Section`) next to the label or title they explain, never a standing paragraph (`ed-hint`) in the layout. Only state ("No images yet", errors, live readouts) stays as visible text.
 * UI conventions: `ed-*` classes in `src/index.css` (rows, badges, buttons), controls in `components/editor/ui/controls.tsx`, native `title` attributes as tooltips,
   lucide icons. Canvas is react-konva (`components/editor/canvas/konva/`).
+* **Reuse before writing** (each replaced several hand-written copies): a small 2D canvas is set up with `prepareCanvas` and thumbnails fit with
+  `fitZoom`/`centredRect` (`lib/canvas2d.ts`); a map preview draws through `drawMapScenery` (`lib/mapScenery.ts`); a mouse drag that leaves the
+  element uses `trackWindowDrag`/`trackWindowPan` (`lib/windowDrag.ts`); a hand-made popover closes with `useDismiss` (`hooks/useDismiss.ts`); a
+  CSS-transform preview pans and zooms with `usePanZoom`. Game code reading raw map JSON uses `game/src/world/tiledRaw.ts`; `isRecord` comes
+  from `shared/engine/util.ts`; scripts write files with `scripts/lib/atomicWrite.mjs`.
 
 ### Layers and the canvas
 

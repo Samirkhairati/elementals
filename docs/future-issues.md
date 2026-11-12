@@ -55,3 +55,13 @@ Things that work today but will need attention later. Add an entry whenever you 
 - **Idea:** allow them in `lib/layerFolders.ts` and the schema's folder check.
 - **Game debug handle drives a private method**: the browser checks for warps call `scene.warpPlayer(...)` (private) through `window.__game`. A small public `warp()` on `GameDebugHandle` would let a test or script do it without reaching into the scene.
 - **Previews of a map have no per-pixel hit test**: the warp picker's free position is any pixel, including ones inside a solid building. Nothing warns; a "walkable" overlay from the collision shapes would.
+
+## Code health (from the November 2026 review)
+
+The shared helpers listed under "Reuse before writing" in CLAUDE.md came out of this review. What it left for later, biggest first:
+
+- **Very large modules:** `editor/src/hooks/editor/useLayerManager.ts` (~1040 lines: layers, folders, clipboard, image items, groups in one hook), `layout/dockview/useDockviewLayout.ts` (~840), `panels/ImagesPanel.tsx` (~780), `routes/editor.tsx` (~770). **Idea:** split `useLayerManager` by concern (folders, clipboard, image items) into pure `lib/` modules first (most of the maths already is), keeping the hook as the thin wrapper.
+- **The editor context is wired by hand:** a new piece of state goes into the `EditorContext` type, the `contextValue` object and its deps array in `editor.tsx`, and a selector. Forgetting the deps array gives stale panels with no error. **Idea:** build the value from the manager hooks' return objects (one `useMemo` per manager) so there is no long deps array to keep in step.
+- **Lint warnings:** about 90 (`npm run lint`, no errors), mostly `no-explicit-any` in older files (Phaser adapters, `useEntityPlacement`, the tilemap code) plus a few unused imports and empty `catch {}` blocks in `useDragResize`. **Idea:** fix them file by file when touching one, then make warnings fail `verify`.
+- **Tile size written as 32:** `TilesetPreview.tsx` and `ActiveSelectionPanel.tsx` use the literal `32` (cells, grid background) instead of `TILE_SIZE`. Harmless while tiles are 32 px; see "One tile size" above.
+- **`useDragResize`'s two handles** (section above / below) are near copies of each other; one function with a direction would do.

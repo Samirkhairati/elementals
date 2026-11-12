@@ -4,6 +4,7 @@ import type { TilesetData } from '@/types/editor'
 import type { SpriteAssetInfo } from '../../../../../shared/engine/types'
 import { useSpriteImagesVersion } from '@/lib/spriteImages'
 import { drawMapScenery } from '@/lib/mapScenery'
+import { prepareCanvas } from '@/lib/canvas2d'
 import { TILE_SIZE, anchorToTile } from '../../../../../shared/engine/constants'
 import { occupiedCells, type ResizableMap, type ResizeEdges } from '@/lib/mapResize'
 import {
@@ -108,14 +109,8 @@ export function ResizePreview({ map, tilesets, spriteAssets, edges, onEdgesChang
   const zoomBy = (factor: number) => setCustom(zoomViewAt(view, factor, size.w / 2, size.h / 2))
 
   useEffect(() => {
-    const canvas = canvasRef.current
-    const ctx = canvas?.getContext?.('2d')
-    if (!canvas || !ctx) return
-    const dpr = window.devicePixelRatio || 1
-    canvas.width = Math.round(size.w * dpr)
-    canvas.height = Math.round(size.h * dpr)
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-    ctx.clearRect(0, 0, size.w, size.h)
+    const ctx = canvasRef.current && prepareCanvas(canvasRef.current, size.w, size.h)
+    if (!ctx) return
     ctx.imageSmoothingEnabled = false
 
     const sx = (x: number) => toScreenX(view, x)

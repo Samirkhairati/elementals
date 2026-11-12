@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react'
 import type { Facing, SpriteAssetInfo, SpriteAssetMeta } from '../../../../../shared/engine/types'
 import { drawResolvedSprite, resolveSprite, useSpriteImagesVersion } from '@/lib/spriteImages'
+import { centredRect, fitZoom, prepareCanvas } from '@/lib/canvas2d'
 
 interface SpriteMiniPreviewProps {
   asset: SpriteAssetInfo
@@ -19,21 +20,12 @@ export function SpriteMiniPreview({ asset, meta, facing = 'down', animation = ''
   const ref = useRef<HTMLCanvasElement>(null)
   const version = useSpriteImagesVersion()
   useEffect(() => {
-    const canvas = ref.current
-    if (!canvas) return
-    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1
-    canvas.width = Math.round(size * dpr)
-    canvas.height = Math.round(size * dpr)
-    const ctx = canvas.getContext('2d')
+    const ctx = ref.current && prepareCanvas(ref.current, size, size)
     if (!ctx) return
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-    ctx.clearRect(0, 0, size, size)
     const useAsset = meta ? { ...asset, meta } : asset
     const r = resolveSprite(useAsset, { facing, animation, frame }, tick)
     if (!r) return
-    const fit = Math.min((size - 4) / r.src.w, (size - 4) / r.src.h)
-    const scale = fit >= 1 ? Math.floor(fit) : fit
-    const dest = { x: (size - r.src.w * scale) / 2, y: (size - r.src.h * scale) / 2, w: r.src.w * scale, h: r.src.h * scale }
+    const dest = centredRect(r.src.w, r.src.h, fitZoom(r.src.w, r.src.h, size), size)
     drawResolvedSprite(ctx, { ...r, dest }, { anchorX: 0, anchorY: 0 })
   }, [asset, meta, facing, animation, frame, tick, size, version])
   return <canvas ref={ref} className="ed-pixelated ed-checker rounded-sm" style={{ width: size, height: size }} aria-hidden />

@@ -6,6 +6,7 @@ import React, { useContext, useEffect, useLayoutEffect, useRef, useState } from 
 import { createPortal } from 'react-dom'
 import { Check, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useDismiss } from '@/hooks/useDismiss'
 import { hexToHsv, hsvToHex, normalizeHex } from '@/lib/color'
 import { PortalContainerContext } from '../../ui/portal-container'
 
@@ -48,27 +49,7 @@ function useAnchoredPopover(open: boolean, anchor: React.RefObject<HTMLElement |
     setPos(flip ? { ...common, bottom: c.bottom - r.top + 4 } : { ...common, top: r.bottom - c.top + 4 })
   }, [open, anchor, wanted, inDialog])
 
-  useEffect(() => {
-    if (!open) return
-    const down = (e: PointerEvent) => {
-      const t = e.target as Node
-      if (!popover.current?.contains(t) && !anchor.current?.contains(t)) close()
-    }
-    const key = (e: KeyboardEvent) => e.key === 'Escape' && close()
-    const scroll = (e: Event) => {
-      if (!popover.current?.contains(e.target as Node)) close()
-    }
-    window.addEventListener('pointerdown', down, true)
-    window.addEventListener('keydown', key, true)
-    window.addEventListener('resize', close)
-    window.addEventListener('scroll', scroll, true)
-    return () => {
-      window.removeEventListener('pointerdown', down, true)
-      window.removeEventListener('keydown', key, true)
-      window.removeEventListener('resize', close)
-      window.removeEventListener('scroll', scroll, true)
-    }
-  }, [open, anchor, popover, close])
+  useDismiss(open, [popover, anchor], close, { onResize: true, onScroll: 'outside' })
 
   return pos
 }

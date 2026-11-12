@@ -12,6 +12,7 @@ import { LibraryBrowser, type DragPayload } from './LibraryBrowser'
 import { ChangeDialog, DeleteDialog, NameDialog } from './LibraryDialogs'
 import { LibraryToolbar } from './LibraryToolbar'
 import { ReferencesSection } from './ReferencesSection'
+import { StatusLine } from './StatusLine'
 import { FOLDER_NAME, type Outcome } from './graphicActions'
 import { folderOfTileset, stemOf, tilesetActions, type TilesetActions } from './tilesetActions'
 import type { DatabaseData } from './useDatabaseData'
@@ -39,17 +40,15 @@ export function TilesetsBrowser({ data, query, selected, onSelect, mode, library
       setOutcome(await actions.move(t, target))
     } else {
       if (!actions.canMoveFolder(drag.key, target)) return
-      const next = joinId(target, leafOfId(drag.key))
       const r = await actions.moveFolder(drag.key, target)
       setOutcome(r)
       if (r.ok && selected && data.tilesets.find((t) => t.fileName === selected && folderOfTileset(t).startsWith(drag.key))) onSelect(selected)
-      void next
     }
   }
 
   return (
     <>
-      {outcome && (outcome.ok ? <p role="status" className="ed-hint px-1 pb-1">{outcome.message}</p> : <p role="alert" className="px-1 pb-1 text-destructive">{outcome.error}</p>)}
+      <StatusLine outcome={outcome} className="px-1 pb-1" />
       <LibraryBrowser
         items={items}
         folders={actions.folders}
@@ -159,7 +158,7 @@ export function TilesetDetail({ data, id, onSelect }: { data: DatabaseData; id: 
           <EdButton size="sm" variant="danger" onClick={() => setDialog('delete')}><Trash2 /> Delete</EdButton>
         </span>
       </div>
-      {outcome && <p role={outcome.ok ? 'status' : 'alert'} className={outcome.ok ? 'ed-hint' : 'text-destructive'}>{outcome.ok ? outcome.message : outcome.error}</p>}
+      <StatusLine outcome={outcome} />
 
       <div className="flex min-h-[320px] flex-1 flex-col">
         {size ? <ImageViewer key={id} url={tileset.dataUrl} width={size.w} height={size.h} alt={tileset.name} tileSize={TILE_SIZE} /> : <p className="ed-hint">Loading…</p>}

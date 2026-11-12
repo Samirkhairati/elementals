@@ -16,15 +16,10 @@ import { ChangeDialog, DeleteDialog, NameDialog } from './LibraryDialogs'
 import { LibraryToolbar } from './LibraryToolbar'
 import { ReferencesSection } from './ReferencesSection'
 import { ReplaceGraphicDialog } from './ReplaceGraphicDialog'
+import { StatusLine } from './StatusLine'
 import { FOLDER_NAME, graphicActions, type Outcome } from './graphicActions'
 import type { DatabaseData } from './useDatabaseData'
 import type { LibraryControls, TableProps } from './shared'
-
-/** A line that says what the last action did (or why it failed). */
-function StatusLine({ outcome }: { outcome: Outcome | null }) {
-  if (!outcome) return null
-  return outcome.ok ? <p role="status" className="ed-hint px-1 pb-1">{outcome.message}</p> : <p role="alert" className="px-1 pb-1 text-destructive">{outcome.error}</p>
-}
 
 type FolderDialog = { kind: 'new'; parent: string } | { kind: 'item'; id: string } | { kind: 'many'; selection: LibrarySelection } | { kind: 'change'; folder: string } | { kind: 'delete'; folder: string } | null
 
@@ -64,7 +59,7 @@ export function GraphicsBrowser({ data, query, selected, onSelect, mode, library
 
   return (
     <>
-      <StatusLine outcome={outcome} />
+      <StatusLine outcome={outcome} className="px-1 pb-1" />
       <LibraryBrowser
         items={items}
         folders={actions.folders}
@@ -201,7 +196,7 @@ export function GraphicDetail({ data, id, onSelect }: { data: DatabaseData; id: 
           <EdButton size="sm" variant="danger" onClick={() => setDialog('delete')}><Trash2 /> Delete</EdButton>
         </span>
       </div>
-      {outcome && <p role={outcome.ok ? 'status' : 'alert'} className={outcome.ok ? 'ed-hint' : 'text-destructive'}>{outcome.ok ? outcome.message : outcome.error}</p>}
+      <StatusLine outcome={outcome} />
 
       {graphic.gif && images[id] && <GifPreview graphic={graphic} url={images[id]} />}
 

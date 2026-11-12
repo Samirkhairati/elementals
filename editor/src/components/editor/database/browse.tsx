@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { LayoutGrid, List } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { thumbFrame } from '@/lib/characterThumb'
+import { fitZoom } from '@/lib/canvas2d'
 import type { CharacterDef } from '../../../../../shared/engine/characters'
 import { sheetFrameRect } from '../../../../../shared/engine/characters'
 import type { GraphicInfo } from '../../../../../shared/engine/graphics'
@@ -57,8 +58,7 @@ export function ImageThumb({ url, size, className }: { url?: string; size: numbe
 export function GraphicThumb({ graphic, url, size }: { graphic?: GraphicInfo; url?: string; size: number }) {
   if (!graphic?.gif || !url) return <ImageThumb url={url} size={size} />
   const { frameWidth: w, frameHeight: h } = graphic.gif
-  const fit = Math.min((size - 4) / w, (size - 4) / h)
-  const zoom = fit >= 1 ? Math.floor(fit) : fit
+  const zoom = fitZoom(w, h, size)
   return (
     <span className="ed-checker flex shrink-0 items-center justify-center overflow-hidden rounded-sm" style={{ width: size, height: size }} aria-hidden data-testid="gif-thumb">
       <span style={{ width: w * zoom, height: h * zoom, backgroundImage: `url(${url})`, backgroundSize: `${graphic.width * zoom}px ${graphic.height * zoom}px`, backgroundPosition: '0 0', imageRendering: 'pixelated' }} />
@@ -75,8 +75,7 @@ export function CharacterThumb({ def, images, sizes, size }: { def: CharacterDef
   const box = 'ed-checker flex shrink-0 items-center justify-center overflow-hidden rounded-sm'
   if (!shown || !sheet || !url || !image) return <span className={box} style={{ width: size, height: size }} aria-hidden />
   const r = sheetFrameRect(sheet, shown.frame, image.width)
-  const fit = Math.min((size - 4) / r.w, (size - 4) / r.h)
-  const zoom = fit >= 1 ? Math.floor(fit) : fit
+  const zoom = fitZoom(r.w, r.h, size)
   return (
     <span className={box} style={{ width: size, height: size }} aria-hidden data-testid="character-thumb">
       <span style={{ width: r.w * zoom, height: r.h * zoom, backgroundImage: `url(${url})`, backgroundSize: `${image.width * zoom}px ${image.height * zoom}px`, backgroundPosition: `-${r.x * zoom}px -${r.y * zoom}px`, imageRendering: 'pixelated' }} />

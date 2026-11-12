@@ -1,4 +1,7 @@
-import { useState, useRef, useCallback } from 'react'
+import { useRef, useCallback } from 'react'
+import { usePanZoom } from '@/hooks/usePanZoom'
+import { trackWindowDrag } from '@/lib/windowDrag'
+import { getBoundingBox } from '../canvas/canvasUtils'
 import { TilesetData, TileSelection, CopiedTile, Pos } from '@/types/editor'
 
 interface TilesetPreviewProps {
@@ -17,14 +20,6 @@ interface TilesetPreviewProps {
   activeLayerType?: string | null
 }
 
-function getTilesetSelectionBox(start: Pos | null, current: Pos | null) {
-  if (!start || !current) return null
-  const minX = Math.min(start.x, current.x)
-  const minY = Math.min(start.y, current.y)
-  const maxX = Math.max(start.x, current.x)
-  const maxY = Math.max(start.y, current.y)
-  return { minX, minY, maxX, maxY, width: maxX - minX + 1, height: maxY - minY + 1 }
-}
 
 export function TilesetPreview({
   activeTileset,
@@ -41,9 +36,7 @@ export function TilesetPreview({
   isDisabled,
   activeLayerType,
 }: TilesetPreviewProps) {
-  const [zoom, setZoom] = useState(1)
-  const [pan, setPan] = useState({ x: 0, y: 0 })
-  const [isPanning, setIsPanning] = useState(false)
+  const { zoom, isPanning, transform, onWheel, onMouseDown } = usePanZoom()
 
   const imageContainerRef = useRef<HTMLDivElement | null>(null)
   const dragStartRef = useRef<Pos | null>(null)
@@ -69,7 +62,7 @@ export function TilesetPreview({
   const commitSelection = useCallback((endPos?: Pos) => {
     const start = dragStartRef.current || tilesetSelectionStart
     const current = endPos || tilesetSelectionCurrent || start
-    const box = getTilesetSelectionBox(start, current)
+    const box = getBoundingBox(start, current)
     if (box && activeTileset && tilesetDimensions) {
       const maxTilesX = Math.floor(tilesetDimensions.width / 32)
       const maxTilesY = Math.floor(tilesetDimensions.height / 32)
@@ -154,76 +147,27 @@ export function TilesetPreview({
     setTilesetSelectionStart(coords)
     setTilesetSelectionCurrent(coords)
 
-    const handleWindowMouseMove = (moveEvent: MouseEvent) => {
-      const moveCoords = getClampedTileCoords(moveEvent.clientX, moveEvent.clientY)
-      if (moveCoords) {
-        setTilesetSelectionCurrent(moveCoords)
-        setHoverTile(moveCoords)
-      }
-    }
-
-    const handleWindowMouseUp = (upEvent: MouseEvent) => {
-      const endCoords = getClampedTileCoords(upEvent.clientX, upEvent.clientY)
-      commitSelection(endCoords || undefined)
-      window.removeEventListener('mousemove', handleWindowMouseMove)
-      window.removeEventListener('mouseup', handleWindowMouseUp)
-    }
-
-    window.addEventListener('mousemove', handleWindowMouseMove)
-    window.addEventListener('mouseup', handleWindowMouseUp)
-  }
-
-  const box = getTilesetSelectionBox(tilesetSelectionStart, tilesetSelectionCurrent)
-
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault()
-    if (e.ctrlKey || e.metaKey) {
-      const zoomSensitivity = 0.003
-      setZoom(prev => Math.min(Math.max(0.1, prev * Math.exp(-e.deltaY * zoomSensitivity)), 5))
-    } else {
-      setPan(prev => ({
-        x: prev.x - e.deltaX,
-        y: prev.y - e.deltaY,
-      }))
-    }
-  }
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.button === 1) {
-      setIsPanning(true)
-      const startX = e.clientX
-      const startY = e.clientY
-      let lastX = startX
-      let lastY = startY
-
-      const handleGlobalMouseMove = (moveEvent: MouseEvent) => {
-        const dx = moveEvent.clientX - lastX
-        const dy = moveEvent.clientY - lastY
-        lastX = moveEvent.clientX
-        lastY = moveEvent.clientY
-        setPan(prev => ({ x: prev.x + dx, y: prev.y + dy }))
-      }
-
-      const handleGlobalMouseUp = (upEvent: MouseEvent) => {
-        if (upEvent.button === 1) {
-          setIsPanning(false)
-          window.removeEventListener('mousemove', handleGlobalMouseMove)
-          window.removeEventListener('mouseup', handleGlobalMouseUp)
+    trackWindowDrag({
+      move: (moveEvent) => {
+        const moveCoords = getClampedTileCoords(moveEvent.clientX, moveEvent.clientY)
+        if (moveCoords) {
+          setTilesetSelectionCurrent(moveCoords)
+          setHoverTile(moveCoords)
         }
-      }
-
-      window.addEventListener('mousemove', handleGlobalMouseMove)
-      window.addEventListener('mouseup', handleGlobalMouseUp)
-    }
+      },
+      up: (upEvent) => commitSelection(getClampedTileCoords(upEvent.clientX, upEvent.clientY) || undefined),
+    })
   }
+
+  const box = getBoundingBox(tilesetSelectionStart, tilesetSelectionCurrent)
 
   return (
     <div
       className={`w-full h-full overflow-hidden flex items-center justify-center ${isPanning ? 'cursor-grabbing' : ''}`}
-      onWheel={handleWheel}
-      onMouseDown={handleMouseDown}
+      onWheel={onWheel}
+      onMouseDown={onMouseDown}
     >
-      <div style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: 'center' }}>
+      <div style={{ transform, transformOrigin: 'center' }}>
         <div
           ref={imageContainerRef}
           className="relative inline-block border shadow-sm cursor-crosshair select-none"

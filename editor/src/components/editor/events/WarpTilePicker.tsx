@@ -7,6 +7,7 @@ import { TILE_SIZE } from '../../../../../shared/engine/constants'
 import { useTilesetImages } from '@/hooks/editor/useTilesetImages'
 import { drawResolvedSprite, resolveSprite, useSpriteImagesVersion } from '@/lib/spriteImages'
 import { drawMapScenery } from '@/lib/mapScenery'
+import { prepareCanvas } from '@/lib/canvas2d'
 import type { MapData } from '@/types/editor'
 import { useEventEnv } from './eventEnv'
 
@@ -63,20 +64,14 @@ export function WarpTilePicker({ mapId, x, y, free = false, onPick }: Props) {
   const height = map ? map.height * cell : 0
 
   useEffect(() => {
-    const canvas = canvasRef.current
-    const ctx = canvas?.getContext('2d')
-    if (!map || !canvas || !ctx) return
-    // Draw at the screen's pixel density, so nothing is stretched (a plain canvas looks soft on retina screens).
+    const ctx = map && canvasRef.current ? prepareCanvas(canvasRef.current, width, height) : null
+    if (!map || !ctx) return
     const dpr = window.devicePixelRatio || 1
-    canvas.width = Math.max(1, Math.round(width * dpr))
-    canvas.height = Math.max(1, Math.round(height * dpr))
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     const k = cell / TILE_SIZE
     // Shrinking a 32 px tile to a few pixels: smooth it properly. Smoothing off would drop pixels and look noisy; at
     // full size (or larger) keep the pixel art sharp.
     ctx.imageSmoothingEnabled = cell < TILE_SIZE
     ctx.imageSmoothingQuality = 'high'
-    ctx.clearRect(0, 0, width, height)
     ctx.fillStyle = '#16181d'
     ctx.fillRect(0, 0, width, height)
 

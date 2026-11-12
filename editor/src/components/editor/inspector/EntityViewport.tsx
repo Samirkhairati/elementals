@@ -27,6 +27,8 @@ import {
 } from '@/lib/entityVisuals'
 import { snapColliderToTiles } from '../../../../../shared/engine/placement'
 import { drawResolvedSprite, resolveSprite, useSpriteImagesVersion } from '@/lib/spriteImages'
+import { prepareCanvas } from '@/lib/canvas2d'
+import { trackWindowPan } from '@/lib/windowDrag'
 import { ZoomControls } from '../ui/controls'
 
 export const VIEWPORT_HEIGHT = 200
@@ -174,21 +176,7 @@ export function EntityViewport({
     if (!(e.button === 1 || (e.button === 0 && e.altKey))) return
     e.preventDefault()
     e.stopPropagation()
-    let lx = e.clientX
-    let ly = e.clientY
-    const move = (ev: MouseEvent) => {
-      const dx = ev.clientX - lx
-      const dy = ev.clientY - ly
-      lx = ev.clientX
-      ly = ev.clientY
-      setPan((p) => ({ x: p.x + dx, y: p.y + dy }))
-    }
-    const up = () => {
-      window.removeEventListener('mousemove', move)
-      window.removeEventListener('mouseup', up)
-    }
-    window.addEventListener('mousemove', move)
-    window.addEventListener('mouseup', up)
+    trackWindowPan(e, (dx, dy) => setPan((p) => ({ x: p.x + dx, y: p.y + dy })))
   }
 
   const effSprite = useMemo(() => {
@@ -206,16 +194,8 @@ export function EntityViewport({
 
   // ── draw the sprite ───────────────────────────────────────────────────────
   useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1
-    canvas.width = Math.round(width * dpr)
-    canvas.height = Math.round(height * dpr)
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-    ctx.clearRect(0, 0, width, height)
-    if (!frameInfo || !effSprite) return
+    const ctx = canvasRef.current && prepareCanvas(canvasRef.current, width, height)
+    if (!ctx || !frameInfo || !effSprite) return
     ctx.save()
     ctx.translate(ax, ay)
     ctx.scale(zoom, zoom)

@@ -4,6 +4,7 @@ import type { ImageItem } from '@/types/editor'
 import { itemSourceSize, resolveImageItem } from '@/lib/imageItems'
 import { scaledSize } from '@/lib/imageScale'
 import { drawResolvedSprite, useSpriteImagesVersion } from '@/lib/spriteImages'
+import { centredRect, fitZoom, prepareCanvas } from '@/lib/canvas2d'
 
 interface Props {
   item: Pick<ImageItem, 'assetId' | 'graphicId' | 'crop'>
@@ -28,26 +29,18 @@ export const ImageItemView = React.memo(function ImageItemView({ item, assets, s
   const ch = item.crop?.h
   const unscaled = itemSourceSize(item, assets)
   const source = unscaled && scaledSize(unscaled, itemScale)
-  const fit = source ? Math.min((size - 4) / source.w, (size - 4) / source.h) : 1
-  const scale = zoom ?? (fit >= 1 ? Math.floor(fit) : fit)
+  const scale = zoom ?? (source ? fitZoom(source.w, source.h, size) : 1)
   const width = zoom && source ? Math.max(1, Math.round(source.w * zoom)) : size
   const height = zoom && source ? Math.max(1, Math.round(source.h * zoom)) : size
 
   useEffect(() => {
-    const canvas = ref.current
-    if (!canvas) return
-    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1
-    canvas.width = Math.round(width * dpr)
-    canvas.height = Math.round(height * dpr)
-    const ctx = canvas.getContext?.('2d')
+    const ctx = ref.current && prepareCanvas(ref.current, width, height)
     if (!ctx) return
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-    ctx.clearRect(0, 0, width, height)
     const crop = cx === undefined ? undefined : { x: cx, y: cy!, w: cw!, h: ch! }
     const resolved = resolveImageItem({ assetId, graphicId, crop, scale: itemScale }, assets)
     if (!resolved) return
     const { w, h } = scaledSize(resolved.src, itemScale)
-    const dest = { x: (width - w * scale) / 2, y: (height - h * scale) / 2, w: w * scale, h: h * scale }
+    const dest = centredRect(w, h, scale, width, height)
     drawResolvedSprite(ctx, { ...resolved, dest }, { anchorX: 0, anchorY: 0 })
   }, [assetId, graphicId, cx, cy, cw, ch, assets, itemScale, width, height, scale, version])
 

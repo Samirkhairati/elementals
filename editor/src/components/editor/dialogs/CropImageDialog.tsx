@@ -6,6 +6,7 @@ import { useRef, useState } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import type { ImageCrop } from '@/types/editor'
 import { clampCrop, cropFromPoints, dragCrop, effectiveCrop, isWholeCrop, storedCrop, wholeCrop, type CropHandle, type PictureSize } from '@/lib/cropRect'
+import { trackWindowDrag } from '@/lib/windowDrag'
 import { EdButton, NumberField } from '../ui/controls'
 import { ZoomPane } from '../ui/ZoomPane'
 import { ConfirmFooter } from './ConfirmParts'
@@ -109,16 +110,12 @@ function CropStage({ url, size, zoom, crop, onChange }: StageProps) {
     const toPicture = (cx: number, cy: number) => ({ x: (cx - rect.left) / zoom, y: (cy - rect.top) / zoom })
     const origin = toPicture(e.clientX, e.clientY)
     const start = crop
-    const move = (ev: MouseEvent) => {
-      const p = toPicture(ev.clientX, ev.clientY)
-      onChange(handle === 'new' ? cropFromPoints(origin, p, size) : dragCrop(start, handle, p.x - origin.x, p.y - origin.y, size))
-    }
-    const up = () => {
-      window.removeEventListener('mousemove', move)
-      window.removeEventListener('mouseup', up)
-    }
-    window.addEventListener('mousemove', move)
-    window.addEventListener('mouseup', up)
+    trackWindowDrag({
+      move: (ev) => {
+        const p = toPicture(ev.clientX, ev.clientY)
+        onChange(handle === 'new' ? cropFromPoints(origin, p, size) : dragCrop(start, handle, p.x - origin.x, p.y - origin.y, size))
+      },
+    })
   }
 
   return (

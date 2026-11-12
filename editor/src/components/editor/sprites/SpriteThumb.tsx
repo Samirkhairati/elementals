@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react'
 import type { SpriteAssetInfo } from '../../../../../shared/engine/types'
 import { drawResolvedSprite, resolveSprite, useSpriteImagesVersion } from '@/lib/spriteImages'
+import { centredRect, fitZoom, prepareCanvas } from '@/lib/canvas2d'
 
 interface SpriteThumbProps {
   asset: SpriteAssetInfo | undefined
@@ -14,22 +15,13 @@ export const SpriteThumb = React.memo(function SpriteThumb({ asset, size = 32, c
   const version = useSpriteImagesVersion()
 
   useEffect(() => {
-    const canvas = ref.current
-    if (!canvas) return
-    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1
-    canvas.width = Math.round(size * dpr)
-    canvas.height = Math.round(size * dpr)
-    const ctx = canvas.getContext('2d')
+    const ctx = ref.current && prepareCanvas(ref.current, size, size)
     if (!ctx) return
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-    ctx.clearRect(0, 0, size, size)
     const resolved = resolveSprite(asset, { facing: 'down', animation: '', frame: 0 }, 0)
     if (!resolved) return
     const { w, h } = resolved.src
-    const fit = Math.min((size - 4) / w, (size - 4) / h)
-    const scale = fit >= 1 ? Math.floor(fit) : fit
     // Centre the frame in the box (pivot-independent: this is a thumbnail, not an in-game placement).
-    const dest = { x: (size - w * scale) / 2, y: (size - h * scale) / 2, w: w * scale, h: h * scale }
+    const dest = centredRect(w, h, fitZoom(w, h, size), size)
     drawResolvedSprite(ctx, { ...resolved, dest }, { anchorX: 0, anchorY: 0 })
   }, [asset, size, version])
 

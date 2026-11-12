@@ -1,7 +1,7 @@
-import { useState } from 'react'
 import { Pin, PinOff } from 'lucide-react'
 import { CopiedTile, TileSelection, TilesetData } from '@/types/editor'
 import { IconButton } from '../ui/controls'
+import { usePanZoom } from '@/hooks/usePanZoom'
 
 interface ActiveSelectionPanelProps {
   tileSelection: TileSelection | null
@@ -49,9 +49,7 @@ function SelectionCell({ tile, dx, dy, tilesets }: { tile: CopiedTile; dx: numbe
 }
 
 export function ActiveSelectionPanel({ tileSelection, tilesets, pinned = false, onTogglePin }: ActiveSelectionPanelProps) {
-  const [zoom, setZoom] = useState(1)
-  const [pan, setPan] = useState({ x: 0, y: 0 })
-  const [isPanning, setIsPanning] = useState(false)
+  const { isPanning, transform, onWheel, onMouseDown } = usePanZoom()
 
   const header = (
     <div className="flex h-row shrink-0 items-center gap-1 border-b border-border/60 px-2" data-testid="selection-header">
@@ -90,55 +88,15 @@ export function ActiveSelectionPanel({ tileSelection, tilesets, pinned = false, 
   // Layers overlap in the preview the way they do on the map: the bottom layer first, the top one last.
   const overlap = tileSelection.layers && tileSelection.layers.length > 1 ? tileSelection.layers.slice().reverse().map((part) => part.tiles) : [tileSelection.tiles]
 
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault()
-    if (e.ctrlKey || e.metaKey) {
-      const zoomSensitivity = 0.003
-      setZoom(prev => Math.min(Math.max(0.1, prev * Math.exp(-e.deltaY * zoomSensitivity)), 5))
-    } else {
-      setPan(prev => ({
-        x: prev.x - e.deltaX,
-        y: prev.y - e.deltaY,
-      }))
-    }
-  }
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.button === 1) {
-      setIsPanning(true)
-      let lastX = e.clientX
-      let lastY = e.clientY
-
-      const handleGlobalMouseMove = (moveEvent: MouseEvent) => {
-        const dx = moveEvent.clientX - lastX
-        const dy = moveEvent.clientY - lastY
-        lastX = moveEvent.clientX
-        lastY = moveEvent.clientY
-        setPan(prev => ({ x: prev.x + dx, y: prev.y + dy }))
-      }
-
-      const handleGlobalMouseUp = (upEvent: MouseEvent) => {
-        if (upEvent.button === 1) {
-          setIsPanning(false)
-          window.removeEventListener('mousemove', handleGlobalMouseMove)
-          window.removeEventListener('mouseup', handleGlobalMouseUp)
-        }
-      }
-
-      window.addEventListener('mousemove', handleGlobalMouseMove)
-      window.addEventListener('mouseup', handleGlobalMouseUp)
-    }
-  }
-
   return (
     <>
       {header}
       <div
         className={`min-h-0 w-full flex-1 overflow-hidden flex items-center justify-center ${isPanning ? 'cursor-grabbing' : ''}`}
-        onWheel={handleWheel}
-        onMouseDown={handleMouseDown}
+        onWheel={onWheel}
+        onMouseDown={onMouseDown}
       >
-        <div style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: 'center' }}>
+        <div style={{ transform, transformOrigin: 'center' }}>
           <div
             className="relative border shadow-sm"
             data-testid="selection-preview"

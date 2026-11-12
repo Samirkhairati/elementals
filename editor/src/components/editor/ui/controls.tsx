@@ -6,6 +6,7 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Info, Magnet, Maximize, Minus, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useDismiss } from '@/hooks/useDismiss'
 import { MAX_ZOOM, MIN_ZOOM, sliderToZoom, zoomLabel, zoomToSlider } from '@/lib/zoom'
 
 // ── Field row ───────────────────────────────────────────────────────────────────────────────────
@@ -59,25 +60,7 @@ export function InfoTip({ children, label = 'More info', className }: { children
     setPos({ left, top: r.bottom + 6 })
   }, [open])
 
-  useEffect(() => {
-    if (!open) return
-    const close = () => setOpen(false)
-    const down = (e: PointerEvent) => {
-      const t = e.target as Node
-      if (!bubble.current?.contains(t) && !button.current?.contains(t)) close()
-    }
-    const key = (e: KeyboardEvent) => e.key === 'Escape' && close()
-    window.addEventListener('pointerdown', down, true)
-    window.addEventListener('keydown', key, true)
-    window.addEventListener('resize', close)
-    window.addEventListener('scroll', close, true)
-    return () => {
-      window.removeEventListener('pointerdown', down, true)
-      window.removeEventListener('keydown', key, true)
-      window.removeEventListener('resize', close)
-      window.removeEventListener('scroll', close, true)
-    }
-  }, [open])
+  useDismiss(open, [bubble, button], () => setOpen(false), { onResize: true, onScroll: 'any' })
 
   return (
     <>

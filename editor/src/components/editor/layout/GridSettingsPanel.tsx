@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react'
+import { useRef } from 'react'
+import { useDismiss } from '@/hooks/useDismiss'
 import { RotateCcw } from 'lucide-react'
 import { EdButton, Field, InfoTip, NumberField } from '@/components/editor/ui/controls'
 import { GRID_MAX, GRID_MIN, isDefaultGrid } from '@/lib/grid'
@@ -13,18 +14,7 @@ export function GridSettingsPanel({ at, onClose }: { at: { left: number; top: nu
   const { setGrid, resetGrid } = useGridStore.getState()
   const box = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    const down = (e: PointerEvent) => {
-      if (!box.current?.contains(e.target as Node)) onClose()
-    }
-    const key = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    window.addEventListener('pointerdown', down, true)
-    window.addEventListener('keydown', key, true)
-    return () => {
-      window.removeEventListener('pointerdown', down, true)
-      window.removeEventListener('keydown', key, true)
-    }
-  }, [onClose])
+  useDismiss(true, [box], onClose)
 
   return (
     <div

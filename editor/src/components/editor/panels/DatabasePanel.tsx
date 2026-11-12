@@ -7,7 +7,7 @@ import type { EventGraph, StageDef, SwitchDef, VariableDef } from '../../../../.
 import { cn } from '@/lib/utils'
 import { countAccess, countEvents, describeRefs, scanCommonEventUsage, scanDatabaseUsage, type UsageMap, type UsageRef } from '@/lib/databaseUsage'
 import { CommonEventDialog } from '../events/CommonEventDialog'
-import { ConfirmKeys } from '../ui/ConfirmKeys'
+import { InlineConfirm } from '../ui/InlineConfirm'
 
 export interface DatabasePanelProps {
   switches: SwitchDef[]
@@ -323,8 +323,7 @@ function Section({ kind, title, rows, usage, query, onAdd, onRename, onInitial, 
                   {isConfirming && (
                     <tr>
                       <td colSpan={kind === 'variable' ? 4 : 3} className="px-1 pb-2">
-                        <div role="alertdialog" aria-label={`Delete ${row.name}?`} className="rounded border border-amber-500/40 bg-amber-500/10 p-2">
-                          <ConfirmKeys onConfirm={() => { setConfirming(null); onRemove(row.id) }} onCancel={() => setConfirming(null)} />
+                        <InlineConfirm label={`Delete ${row.name}?`} onConfirm={() => { setConfirming(null); onRemove(row.id) }} onCancel={() => setConfirming(null)}>
                           <p className="text-[11px] text-amber-300">
                             “{row.name}” is used by {events} {events === 1 ? 'event' : 'events'}. They will show an error until you pick something else.
                           </p>
@@ -335,23 +334,7 @@ function Section({ kind, title, rows, usage, query, onAdd, onRename, onInitial, 
                               </li>
                             ))}
                           </ul>
-                          <div className="mt-1.5 flex gap-1">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setConfirming(null)
-                                onRemove(row.id)
-                              }}
-                              className="h-6 rounded border border-red-500/40 bg-red-500/10 px-2 text-[11px] text-red-400 hover:bg-red-500/20"
-                              autoFocus
-                            >
-                              Delete anyway
-                            </button>
-                            <button type="button" onClick={() => setConfirming(null)} className="h-6 rounded border border-border px-2 text-[11px] hover:bg-accent">
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
+                        </InlineConfirm>
                       </td>
                     </tr>
                   )}
@@ -507,28 +490,11 @@ function StagesSection({ stages, usage, query, onAdd, onRename, onRemove, onAddV
                         </ul>
                       )}
                       {isConfirming && (
-                        <div role="alertdialog" aria-label={`Delete ${stage.name}?`} className="mt-1 rounded border border-amber-500/40 bg-amber-500/10 p-2">
-                          <ConfirmKeys onConfirm={() => { setConfirming(null); onRemove(stage.id) }} onCancel={() => setConfirming(null)} />
+                        <InlineConfirm label={`Delete ${stage.name}?`} className="mt-1" onConfirm={() => { setConfirming(null); onRemove(stage.id) }} onCancel={() => setConfirming(null)}>
                           <p className="text-[11px] text-amber-300">
                             “{stage.name}” is used by {events} {events === 1 ? 'event' : 'events'}. They will show an error until you pick something else.
                           </p>
-                          <div className="mt-1.5 flex gap-1">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setConfirming(null)
-                                onRemove(stage.id)
-                              }}
-                              className="h-6 rounded border border-red-500/40 bg-red-500/10 px-2 text-[11px] text-red-400 hover:bg-red-500/20"
-                              autoFocus
-                            >
-                              Delete anyway
-                            </button>
-                            <button type="button" onClick={() => setConfirming(null)} className="h-6 rounded border border-border px-2 text-[11px] hover:bg-accent">
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
+                        </InlineConfirm>
                       )}
                     </li>
                   )
@@ -743,23 +709,14 @@ function CommonEventsSection({
                   </button>
                 </div>
                 {confirming === row.id && (
-                  <div role="alertdialog" className="mt-1 rounded border border-amber-500/40 bg-amber-500/10 p-1.5 text-[11px]">
-                    <ConfirmKeys onConfirm={() => { onRemove(row.id); setConfirming(null) }} onCancel={() => setConfirming(null)} />
+                  <InlineConfirm label={`Delete ${row.name}?`} className="mt-1 p-1.5" onConfirm={() => { onRemove(row.id); setConfirming(null) }} onCancel={() => setConfirming(null)}>
                     <p>Still called from:</p>
                     <ul className="ml-3 list-disc">
                       {callers.map((c) => (
                         <li key={c}>{c}</li>
                       ))}
                     </ul>
-                    <div className="mt-1 flex gap-1">
-                      <button type="button" autoFocus onClick={() => { onRemove(row.id); setConfirming(null) }} className="rounded bg-red-600 px-2 py-0.5 text-white">
-                        Delete anyway
-                      </button>
-                      <button type="button" onClick={() => setConfirming(null)} className="rounded border border-border px-2 py-0.5">
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
+                  </InlineConfirm>
                 )}
               </li>
             )
