@@ -15,6 +15,8 @@ export class Boot extends Scene {
     this.load.json(MANIFEST_KEYS.tilesets, MANIFEST_URLS.tilesets);
     this.load.json(MANIFEST_KEYS.common, MANIFEST_URLS.common);
     this.load.json(MANIFEST_KEYS.settings, MANIFEST_URLS.settings);
+    this.load.json(MANIFEST_KEYS.looks, MANIFEST_URLS.looks);
+    this.load.json(MANIFEST_KEYS.shaders, MANIFEST_URLS.shaders);
     this.load.on("loaderror", (file: { key: string; url: string }) => {
       console.error(`[Boot] failed to load "${file.key}" (${file.url})`);
     });

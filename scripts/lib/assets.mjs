@@ -12,6 +12,8 @@
 //   data/settings.json                  the game settings (project/game-settings.json, cleaned; the defaults without one)
 //   data/common.json                    the common events (project/common/<id>.json), sorted by id
 //   data/tilesets.json                  every tileset PNG the game has (name = file stem)
+//   data/looks.json                     the look profiles (project/looks.json, cleaned; the default profiles without one)
+//   data/shaders.json + shaders/<id>.frag  the user shaders of looks (project/shaders/**/*.frag)
 //
 // Planning (planSync) is pure: it reads, validates and compares, and never writes. applyPlan writes.
 // Output is deterministic (sorted, no timestamps) so `--check` can guard committed output against drift.
@@ -25,6 +27,7 @@ import { deflateSync } from 'node:zlib'
 import { readPngSize } from '../../shared/png.ts'
 import { gifSheetFile } from '../../shared/gifSheet.ts'
 import { normalizeGameSettings } from '../../shared/gameSettings.ts'
+import { cleanLooksFile } from '../../shared/look/schema.ts'
 import {
   buildCharacterManifest,
   buildCommonManifest,
@@ -55,6 +58,7 @@ export const GRAPHICS_OUT = 'graphics'
 export const CHARACTERS_SRC = 'database/characters'
 export const GRAPHICS_SRC = 'graphics'
 export const TILESETS_OUT = 'graphics/tilesets'
+export const SHADERS_DIR = 'shaders'
 
 export function defaultPaths() {
   const gameDir = path.join(REPO_ROOT, 'game')
@@ -314,7 +318,35 @@ export function planSync({ projectDir, publicDir, force = false }) {
     add(`${TILESETS_OUT}/${t.name}.png`, 'tileset', fs.readFileSync(t.full), { protectExisting: true })
   }
 
+  // looks: the profiles the game knows (the author's saved presets stay in the editor)
+  let looksRaw = null
+  const looksBytes = readIfExists(path.join(projectDir, 'looks.json'))
+  if (looksBytes !== null) {
+    try {
+      looksRaw = JSON.parse(looksBytes.toString('utf8'))
+    } catch (e) {
+      errors.push(`looks.json: not valid JSON: ${e.message}`)
+    }
+  }
+  const looks = cleanLooksFile(looksRaw)
+  add('data/looks.json', 'manifest', toJson({ version: 1, profiles: looks.profiles, ...(looks.start ? { start: looks.start } : {}) }))
+
+  // user shaders: every project/shaders/**/*.frag (small text files, all of them)
+  const shaderEntries = []
+  const shadersSrc = path.join(projectDir, SHADERS_DIR)
+  for (const full of listFilesDeep(shadersSrc, (f) => f.endsWith('.frag'))) {
+    const id = posix(path.relative(shadersSrc, full)).replace(/\.frag$/, '')
+    shaderEntries.push({ id, file: `${SHADERS_DIR}/${id}.frag` })
+    add(`${SHADERS_DIR}/${id}.frag`, 'shader', fs.readFileSync(full))
+  }
+  shaderEntries.sort((a, b) => byName(a.id, b.id))
+  for (const full of listFilesDeep(path.join(publicDir, SHADERS_DIR), (f) => f.endsWith('.frag'))) {
+    const rel = posix(path.relative(publicDir, full))
+    if (!expected.has(rel)) actions.push({ rel, kind: 'shader', status: STATUS.STALE, content: null })
+  }
+
   // manifests
+  add('data/shaders.json', 'manifest', toJson({ version: 1, shaders: shaderEntries }))
   add('data/characters.json', 'manifest', toJson(buildCharacterManifest(chars.characters)))
   add('data/database.json', 'manifest', toJson(database))
   add('data/settings.json', 'manifest', toJson(settings))
@@ -404,6 +436,8 @@ Generates what the game loads from the authored project data:
   game/public/data/settings.json            game settings (project/game-settings.json)
   game/public/data/common.json              common events (project/common/<id>.json)
   game/public/data/tilesets.json            every tileset PNG the game has
+  game/public/data/looks.json               look profiles (project/looks.json)
+  game/public/data/shaders.json             user shaders of looks (project/shaders/**/*.frag -> game/public/shaders/)
 
   --check            (default) report drift; exit 1 when generated output is missing or stale
   --write            write missing / changed output and remove stale generated graphics

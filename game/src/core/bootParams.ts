@@ -7,6 +7,8 @@ export interface BootParams {
   map?: string;
   /** `?debug=1` - debug HUD, grid and a `window.__game` handle for the console. */
   debug: boolean;
+  /** `?look=<profile>` - the look profile to start in (night, sunset, ...); `?look=off` shows no looks. */
+  look?: string;
 }
 
 const TRUTHY = new Set(["", "1", "true", "yes", "on"]);
@@ -17,10 +19,12 @@ export function parseBootParams(search: string): BootParams {
   const renderer = (params.get("renderer") ?? "auto").toLowerCase();
   const map = params.get("map")?.trim();
   const debugRaw = params.get("debug");
+  const look = params.get("look")?.trim();
   return {
     renderer: renderer === "canvas" || renderer === "webgl" ? renderer : "auto",
     map: map ? map : undefined,
     debug: debugRaw !== null && TRUTHY.has(debugRaw.toLowerCase()),
+    ...(look ? { look } : {}),
   };
 }
 

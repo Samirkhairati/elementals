@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "profiles": [
+    {
+      "id": "day",
+      "name": "Day"
+    },
+    {
+      "id": "sunset",
+      "name": "Sunset"
+    },
+    {
+      "id": "night",
+      "name": "Night"
+    }
+  ]
+}

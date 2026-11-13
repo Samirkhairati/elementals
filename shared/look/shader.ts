@@ -218,9 +218,18 @@ export function lookUniforms(look: CompiledLook, at: LookPlacement): UniformValu
   ]
 }
 
-/** The subject mapping of a picture drawn in the box (x, y, w, h), flipped or not: its own pixels, as drawn. */
-export function pictureSubject(box: { x: number; y: number; w: number; h: number }, flipX = false, flipY = false): LookPlacement['subject'] {
-  return { ox: flipX ? box.x + box.w : box.x, oy: flipY ? box.y + box.h : box.y, sx: flipX ? -1 : 1, sy: flipY ? -1 : 1 }
+/**
+ * The subject mapping of a picture drawn in the box (x, y, w, h) of map pixels, flipped or not: its own pixels
+ * (`own` = the picture's size before scaling), so its masks follow the picture when it is flipped or scaled.
+ */
+export function pictureSubject(box: { x: number; y: number; w: number; h: number }, own: { w: number; h: number }, flipX = false, flipY = false): LookPlacement['subject'] {
+  const kx = own.w / Math.max(1e-6, box.w)
+  const ky = own.h / Math.max(1e-6, box.h)
+  return { ox: flipX ? box.x + box.w : box.x, oy: flipY ? box.y + box.h : box.y, sx: flipX ? -kx : kx, sy: flipY ? -ky : ky }
 }
+
+/** The inverse of a subject mapping: subject pixels -> map pixels. */
+export const subjectToWorld = (s: LookPlacement['subject'], x: number, y: number): { x: number; y: number } => ({ x: s.ox + x / s.sx, y: s.oy + y / s.sy })
+export const worldToSubject = (s: LookPlacement['subject'], x: number, y: number): { x: number; y: number } => ({ x: (x - s.ox) * s.sx, y: (y - s.oy) * s.sy })
 
 export const WORLD_SUBJECT: LookPlacement['subject'] = { ox: 0, oy: 0, sx: 1, sy: 1 }

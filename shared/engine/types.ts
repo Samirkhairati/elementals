@@ -282,6 +282,7 @@ export type FieldKind =
   | 'variable' // global variable picker
   | 'stage' // global stage picker
   | 'commonEvent' // common event picker
+  | 'lookProfile' // a look profile of project/looks.json (time of day, ...)
   | 'stageValue' // a value of the stage chosen in the param named by `stageKey`
   | 'target' // CommandTarget picker
   | 'position' // map position picker — params use {x,y}: a tile (column, row), or pixels when the field's `freeKey` param is true

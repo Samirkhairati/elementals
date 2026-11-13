@@ -8,6 +8,8 @@ import type { SpriteRegistry } from "@/data/spriteRegistry";
 import { buildSpriteComponents } from "@/sprites/spriteState";
 import { YSortField, type DepthRect } from "@/ecs/depth";
 import { finiteOr as num, isRecord, rawLayers, tiledProps } from "./tiledRaw";
+import { parseLookProp } from "@/look/readLooks";
+import type { LookSet } from "@shared/look/types.ts";
 
 export interface ImageObjectDef {
   name: string;
@@ -28,6 +30,9 @@ export interface ImageObjectDef {
   opacity: number;
   /** Draws among the characters by its anchor's y instead of at the layer's depth (resolved by the exporter). */
   ySort: boolean;
+  /** The picture's own look and its layer's (docs/looks.md). */
+  look?: LookSet;
+  layerLook?: LookSet;
 }
 
 /** Every image of every visible image layer of a raw (exported) map, in draw order (layers in file order, items as exported). */
@@ -38,6 +43,7 @@ export function readImageObjects(raw: unknown): ImageObjectDef[] {
     const layerProps = tiledProps(layer);
     if (layerProps.kind !== "image") continue;
     const depth = num(layerProps.z, 0);
+    const layerLook = parseLookProp(layerProps.look);
     for (const obj of Array.isArray(layer.objects) ? layer.objects : []) {
       if (!isRecord(obj) || obj.visible === false) continue;
       const p = tiledProps(obj);
@@ -61,11 +67,14 @@ export function readImageObjects(raw: unknown): ImageObjectDef[] {
         flipY: p.flipY === true,
         opacity: Math.min(1, Math.max(0, num(p.opacity, 1))),
         ySort: p.ySort === true,
+        ...lookFields(parseLookProp(p.look), layerLook),
       });
     }
   }
   return out;
 }
+
+const lookFields = (look: LookSet | undefined, layerLook: LookSet | undefined) => ({ ...(look ? { look } : {}), ...(layerLook ? { layerLook } : {}) });
 
 /** Picture files a map's image layers use (each once, however many crops). */
 export const imagePictureIds = (raw: unknown): string[] => [...new Set(readImageObjects(raw).flatMap((o) => (o.graphic ? [o.graphic] : [])))].sort();
@@ -119,6 +128,8 @@ export interface ImageSceneLike {
  */
 export class ImageLayerRenderer {
   private shown: ImageObject[] = [];
+  /** Every drawn image with what it was made from (the looks read these). */
+  private drawn: { image: ImageObject; def: ImageObjectDef }[] = [];
   private readonly scene: ImageSceneLike;
   private readonly sprites: SpriteRegistry;
   private readonly warn: (message: string) => void;
@@ -133,9 +144,15 @@ export class ImageLayerRenderer {
     return this.shown.length;
   }
 
+  /** The images of the map shown last, with their definitions. */
+  get items(): readonly { image: ImageObject; def: ImageObjectDef }[] {
+    return this.drawn;
+  }
+
   clear(): void {
     for (const image of this.shown) image.destroy();
     this.shown = [];
+    this.drawn = [];
     this.ySort.clear();
   }
 
@@ -172,6 +189,7 @@ export class ImageLayerRenderer {
         sorted.push({ image, def, box: { left, top, right: left + w, bottom: top + h } });
       }
       this.shown.push(image);
+      this.drawn.push({ image, def });
     }
     // The y-sorted pictures in the order the layers draw them (z, then file order), each at a fixed depth in the
     // characters' band, so only the characters move between them.

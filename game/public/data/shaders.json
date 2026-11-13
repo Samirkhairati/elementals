@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "shaders": [
+    {
+      "id": "samples/bloom",
+      "file": "shaders/samples/bloom.frag"
+    },
+    {
+      "id": "samples/chromatic-aberration",
+      "file": "shaders/samples/chromatic-aberration.frag"
+    },
+    {
+      "id": "samples/crt",
+      "file": "shaders/samples/crt.frag"
+    },
+    {
+      "id": "samples/dither",
+      "file": "shaders/samples/dither.frag"
+    },
+    {
+      "id": "samples/drop-shadow",
+      "file": "shaders/samples/drop-shadow.frag"
+    },
+    {
+      "id": "samples/fireflies",
+      "file": "shaders/samples/fireflies.frag"
+    },
+    {
+      "id": "samples/god-rays",
+      "file": "shaders/samples/god-rays.frag"
+    },
+    {
+      "id": "samples/heat-haze",
+      "file": "shaders/samples/heat-haze.frag"
+    },
+    {
+      "id": "samples/hologram",
+      "file": "shaders/samples/hologram.frag"
+    },
+    {
+      "id": "samples/outline",
+      "file": "shaders/samples/outline.frag"
+    },
+    {
+      "id": "samples/pixelate",
+      "file": "shaders/samples/pixelate.frag"
+    },
+    {
+      "id": "samples/rain",
+      "file": "shaders/samples/rain.frag"
+    },
+    {
+      "id": "samples/sharpen",
+      "file": "shaders/samples/sharpen.frag"
+    },
+    {
+      "id": "samples/snow",
+      "file": "shaders/samples/snow.frag"
+    },
+    {
+      "id": "samples/water-ripple",
+      "file": "shaders/samples/water-ripple.frag"
+    }
+  ]
+}

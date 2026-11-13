@@ -220,7 +220,7 @@ export function cleanComponent(v: unknown): MaskComponent | undefined {
   }
 }
 
-const compactComponent = (c: Record<string, unknown>) => compact(c) as MaskComponent
+const compactComponent = (c: Record<string, unknown>) => compact(c) as unknown as MaskComponent
 
 function cleanMask(v: unknown): LookMask | undefined {
   if (!isRecord(v)) return undefined

@@ -573,6 +573,22 @@ export const COMMAND_CATALOG: Record<string, CommandDef> = {
     status: 'implemented',
     summarize: (p) => `Shake screen (power ${num(p.power, 3)}, ${num(p.ms)} ms)`,
   }),
+  setLookProfile: def({
+    type: 'setLookProfile',
+    label: 'Set Look Profile',
+    category: 'map',
+    description: 'Switch every look to another profile (time of day, weather...), with a gradual transition.',
+    icon: 'sun-moon',
+    params: [
+      { key: 'profile', label: 'Profile', kind: 'lookProfile', required: true },
+      { key: 'ms', label: 'Transition', kind: 'number', unit: 'ms', min: 0, max: 60000, step: 100 },
+      { key: 'wait', label: 'Wait for it', kind: 'boolean', help: 'Pause this event until the transition ends.' },
+    ],
+    defaultParams: { profile: '', ms: 1000, wait: false },
+    yields: true,
+    status: 'implemented',
+    summarize: (p) => `Look profile → ${str(p.profile, '?')}${num(p.ms) > 0 ? ` over ${num(p.ms)} ms` : ''}${p.wait === true ? ', wait' : ''}`,
+  }),
   tintScreen: def({
     type: 'tintScreen',
     label: 'Tint Screen',
@@ -957,6 +973,9 @@ function validateField(field: FieldDef, params: Record<string, unknown>, ctx: Va
       return;
     case 'color':
       if (typeof v !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(v)) bad('must be a #rrggbb colour');
+      return;
+    case 'lookProfile':
+      if (typeof v !== 'string') bad('must be a profile id');
       return;
     case 'stageValue': {
       if (typeof v !== 'string') return bad('must be an id');

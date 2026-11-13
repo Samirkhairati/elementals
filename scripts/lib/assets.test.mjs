@@ -231,7 +231,9 @@ describe('sync', () => {
         'data/characters.json',
         'data/common.json',
         'data/database.json',
+        'data/looks.json',
         'data/settings.json',
+        'data/shaders.json',
         'data/tilesets.json',
         'graphics/props/ball.png',
         'graphics/sprites/characters/hero/run.png',
@@ -256,6 +258,25 @@ describe('sync', () => {
     assert.equal(settings.display.visibleTilesX, 40)
     assert.equal(settings.camera.followLag, 0.08)
     assert.equal(settings.display.junk, undefined)
+  })
+
+  test('looks: the default profiles without a project file; shaders are copied and listed, stale ones removed', () => {
+    const sb = sandbox()
+    sb.sync()
+    assert.deepEqual(sb.json('data/looks.json').profiles.map((p) => p.id), ['day', 'sunset', 'night'])
+    assert.deepEqual(sb.json('data/shaders.json'), { version: 1, shaders: [] })
+
+    writeJson(path.join(sb.projectDir, 'looks.json'), { version: 1, profiles: [{ id: 'noon', name: 'Noon' }], start: 'noon', presets: [{ id: 'p', name: 'P', look: { adjust: { exposure: 1 } } }] })
+    fs.mkdirSync(path.join(sb.projectDir, 'shaders', 'fx'), { recursive: true })
+    fs.writeFileSync(path.join(sb.projectDir, 'shaders', 'fx', 'wave.frag'), 'void main(){}')
+    sb.sync()
+    assert.deepEqual(sb.json('data/looks.json'), { version: 1, profiles: [{ id: 'noon', name: 'Noon' }], start: 'noon' })
+    assert.deepEqual(sb.json('data/shaders.json').shaders, [{ id: 'fx/wave', file: 'shaders/fx/wave.frag' }])
+    assert.equal(fs.readFileSync(path.join(sb.publicDir, 'shaders/fx/wave.frag'), 'utf8'), 'void main(){}')
+
+    fs.rmSync(path.join(sb.projectDir, 'shaders'), { recursive: true })
+    sb.sync()
+    assert.equal(fs.existsSync(path.join(sb.publicDir, 'shaders/fx/wave.frag')), false)
   })
 
   test('a game-settings.json that is not JSON is an error and nothing is written', () => {

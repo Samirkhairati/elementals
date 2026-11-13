@@ -42,6 +42,11 @@ import { TriggerSystem } from "@/events/TriggerSystem";
 import { BusEventUI } from "@/events/BusEventUI";
 import { CameraEffects } from "@/events/CameraEffects";
 import type { MapService, WarpRequest } from "@/events/types";
+import { LookRuntime } from "@/look/LookRuntime";
+import { lookState } from "@/look/lookState";
+import { mapLook, readLooksFile, startProfile, tileLayerLooks } from "@/look/readLooks";
+import { loadedShaders } from "@/look/shaderManifest";
+import { MANIFEST_KEYS } from "@/data/gameData";
 
 const FADE_MS = 250;
 
@@ -86,6 +91,8 @@ export class Game extends Scene {
   private currentMapKey = "";
   private characters!: CharacterLoader;
   private debugGraphics?: Phaser.GameObjects.Graphics;
+  /** Colour grading, masks and shaders of the map, its layers and pictures (null with `?look=off`). */
+  private looks: LookRuntime | null = null;
 
   constructor() {
     super("Game");
@@ -107,6 +114,14 @@ export class Game extends Scene {
     this.animationSystem = new AnimationSystem();
     this.renderBridgeSystem = new RenderBridgeSystem(this, this.imageLayers.ySort);
     this.characters = new CharacterLoader(spriteRegistry, phaserLoaderPort(this));
+
+    // Looks: the profile to start in (time of day, ...) and the pipelines that grade the map
+    const looksFile = readLooksFile(this.cache.json.get(MANIFEST_KEYS.looks));
+    const looksOff = bootParams.look === "off" && !looksFile.profiles.some((p) => p.id === "off");
+    if (!looksOff) {
+      lookState.reset(startProfile(looksFile, bootParams.look));
+      this.looks = new LookRuntime(this, loadedShaders(this.cache.json.get(MANIFEST_KEYS.shaders), (key) => this.cache.text.get(key)));
+    }
 
     // Event runtime: state/states/interpreters + the system that decides when they start
     const maps: MapService = {
@@ -207,6 +222,7 @@ export class Game extends Scene {
       this.triggerSystem?.detach();
       this.runtime?.destroy();
       this.world?.destroy();
+      this.looks?.destroy();
       const w = window as unknown as { __game?: GameDebugHandle };
       if (w.__game?.scene === this) delete w.__game;
   }
@@ -232,6 +248,7 @@ export class Game extends Scene {
     // among the characters, at the player's depth.
     const mapProps = this.mapSystem.props;
     this.imageLayers.show(rawMapData, { ySortDepth: mapProps?.playerZ });
+    this.showLooks(map, rawMapData);
 
     this.spatialSystem.setMap(map);
 
@@ -279,6 +296,19 @@ export class Game extends Scene {
       Math.floor((spawned.y - 1) / tileSize),
       (spawn?.facing as Direction | undefined) ?? Direction.DOWN
     );
+  }
+
+  /** The looks of the map just loaded: its own, its tile layers' and its pictures'. */
+  private showLooks(map: Phaser.Tilemaps.Tilemap, raw: unknown): void {
+    if (!this.looks) return;
+    const byName = tileLayerLooks(raw);
+    const tileLayers = map.layers.flatMap((l) => {
+      const look = byName.get(l.name);
+      return look && l.tilemapLayer ? [{ layer: l.tilemapLayer, look }] : [];
+    });
+    const pictures = this.imageLayers.items.flatMap(({ image, def }) => (def.look || def.layerLook ? [{ image: image as unknown as Phaser.GameObjects.Image, look: def.look, layerLook: def.layerLook }] : []));
+    const props = this.mapSystem.props;
+    this.looks.showMap({ look: mapLook(raw), size: { w: props?.pixelWidth ?? map.widthInPixels, h: props?.pixelHeight ?? map.heightInPixels }, tileLayers, pictures });
   }
 
   /** Game map key for an id as the editor stores it (file name) or as exported (see data/mapIds.ts). */
@@ -444,6 +474,7 @@ export class Game extends Scene {
     }
     this.world?.update(delta);
     this.updateCameraLag(delta);
+    this.looks?.update(delta);
     this.redrawDebugOverlay();
   }
 }

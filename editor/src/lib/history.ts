@@ -1,4 +1,5 @@
 import type { EntityData, Layer } from '@/types/editor'
+import type { LookSet } from '../../../shared/look/types'
 
 /**
  * Pure undo/redo history model. Everything here is side-effect free so it can
@@ -10,6 +11,8 @@ export interface HistorySnapshot {
   entities: EntityData[]
   /** Map size in tiles; only set from the editor, so that undoing a resize brings the old size back. */
   size?: { width: number; height: number }
+  /** The whole map's look; only set from the editor (null = none), so undo brings an older map look back. */
+  look?: LookSet | null
 }
 
 /** The size to record in a snapshot for `map` (nothing when no map is open). */
@@ -32,6 +35,7 @@ export function cloneSnapshot(snapshot: HistorySnapshot): HistorySnapshot {
     entities: JSON.parse(JSON.stringify(snapshot.entities ?? [])),
   }
   if (snapshot.size) clone.size = { ...snapshot.size }
+  if (snapshot.look !== undefined) clone.look = snapshot.look === null ? null : JSON.parse(JSON.stringify(snapshot.look))
   return clone
 }
 
@@ -42,7 +46,8 @@ export function snapshotsEqual(a: HistorySnapshot | null | undefined, b: History
     a.size?.width === b.size?.width &&
     a.size?.height === b.size?.height &&
     JSON.stringify(a.layers ?? []) === JSON.stringify(b.layers ?? []) &&
-    JSON.stringify(a.entities ?? []) === JSON.stringify(b.entities ?? [])
+    JSON.stringify(a.entities ?? []) === JSON.stringify(b.entities ?? []) &&
+    JSON.stringify(a.look ?? null) === JSON.stringify(b.look ?? null)
   )
 }
 

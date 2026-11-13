@@ -7,6 +7,7 @@ import * as characterStore from './characterStore.js';
 import { TilesetCache } from './tilesetCache.js';
 import { syncGameAssets, type AssetSyncSummary } from './gameAssets.js';
 import * as gameSettingsStore from './gameSettingsStore.js';
+import * as lookStore from './lookStore.js';
 import * as tilesetStore from './tilesetStore.js';
 import * as graphicStore from './graphicStore.js';
 
@@ -179,6 +180,14 @@ export function createProjectChannels(
     // ── game settings (project/game-settings.json; saving also writes game/public/data/settings.json) ──
     'get-game-settings': () => toResult(() => gameSettingsStore.getGameSettings(root)),
     'save-game-settings': async (settings: unknown) => withAssetSync(toResult(() => gameSettingsStore.saveGameSettings(root, settings))),
+
+    // ── looks (project/looks.json and project/shaders; saving also refreshes the game's copies) ──
+    'get-looks': () => toResult(() => lookStore.getLooks(root)),
+    'save-looks': async (looks: unknown) => withAssetSync(toResult(() => lookStore.saveLooks(root, looks))),
+    'list-shaders': () => toResult(() => lookStore.listShaders(root)),
+    'save-shader': async (id: string, source: string) => withAssetSync(toResult(() => lookStore.saveShader(root, id, source))),
+    'delete-shader': async (id: string) => withAssetSync(toResult(() => lookStore.deleteShader(root, id))),
+    'rename-shader': async (id: string, newId: string) => withAssetSync(toResult(() => lookStore.renameShader(root, id, newId))),
 
     // ── common events ──
     'get-common-events': () =>

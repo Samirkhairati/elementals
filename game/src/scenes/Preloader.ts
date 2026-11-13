@@ -8,6 +8,7 @@ import { charactersForMap } from "@/sprites/preloadSets";
 import { imagePictureIds, pictureTextureKey, pictureUrl } from "@/world/imageLayers";
 import { bootParams } from "@/core/bootParams";
 import { settingsStore } from "@/core/SettingsStore";
+import { readShaderManifest, shaderTextKey } from "@/look/shaderManifest";
 
 export class Preloader extends Scene {
   constructor() {
@@ -39,6 +40,9 @@ export class Preloader extends Scene {
 
     // Tilesets (Tiled tileset name = texture key)
     for (const tileset of tilesets) this.load.image(tileset.name, tileset.file);
+
+    // User shaders of looks (sources; the Game scene registers their pipelines)
+    for (const shader of readShaderManifest(this.cache.json.get(MANIFEST_KEYS.shaders))) this.load.text(shaderTextKey(shader.id), shader.file);
 
     // Fonts
     this.load.bitmapFont('PokemonFont', 'fonts/PokemonFont2.png', 'fonts/PokemonFont2.xml');

@@ -1,5 +1,6 @@
 import { registerCommandHandler } from "./registry";
 import { bool, facing, num, str } from "./params";
+import { lookState } from "@/look/lookState";
 
 /** warp: map id = map file base name; x,y are tile coordinates, or pixels (the player's feet) when `free`; `facing` '' keeps the current one. */
 registerCommandHandler("warp", async (cmd, rt) => {
@@ -29,4 +30,12 @@ registerCommandHandler("fadeScreen", async (cmd, rt) => {
 registerCommandHandler("shakeScreen", async (cmd, rt) => {
   const power = Math.min(10, Math.max(1, num(cmd.params, "power", 3)));
   await rt.guard(rt.ctx.ui.shakeScreen(power, Math.max(0, num(cmd.params, "ms", 500)), rt.signal));
+});
+
+/** setLookProfile: every look follows the profile (docs/looks.md); `wait` holds the event until the fade ends. */
+registerCommandHandler("setLookProfile", async (cmd, rt) => {
+  const profile = str(cmd.params, "profile");
+  if (!profile) return rt.ctx.warn("[Event] setLookProfile without a profile; skipped");
+  const done = lookState.setProfile(profile, Math.max(0, num(cmd.params, "ms", 1000)));
+  if (bool(cmd.params, "wait", false)) await rt.guard(done);
 });

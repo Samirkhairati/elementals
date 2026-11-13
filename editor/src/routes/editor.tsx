@@ -53,7 +53,7 @@ export function EditorPage() {
     layerManager.setActiveLayerId(initLayers?.[0]?.id || null)
     entityManager.setEntities(initEntities || [])
     entityManager.setSelectedEntityId(null)
-    historyState.resetHistory({ layers: initLayers, entities: initEntities || [], size })
+    historyState.resetHistory({ layers: initLayers, entities: initEntities || [], size, look: mapManager.getActiveMap()?.look ?? null })
   })
 
   /** Reset every piece of per-map editor state (used once the active map is gone). */
@@ -91,6 +91,7 @@ export function EditorPage() {
       layers: layerManager.getLayers(),
       entities: entityManager.getEntities(),
       size: mapSize(mapManager.getActiveMap()),
+      look: mapManager.getActiveMap()?.look ?? null,
     })
   })
 
@@ -162,7 +163,13 @@ export function EditorPage() {
 
     layerManager.setLayers(snapshot.layers)
     entityManager.setEntities(entities)
-    mapManager.setActiveMap(m => (m ? { ...m, layers: snapshot.layers, entities, ...snapshot.size } : m))
+    mapManager.setActiveMap(m => {
+      if (!m) return m
+      const next = { ...m, layers: snapshot.layers, entities, ...snapshot.size }
+      if (snapshot.look === undefined) return next
+      const { look: _old, ...rest } = next
+      return snapshot.look ? { ...rest, look: snapshot.look } : rest
+    })
     layerManager.setActiveLayerId(current =>
       current && snapshot.layers.some(l => l.id === current) ? current : snapshot.layers[0]?.id ?? null
     )

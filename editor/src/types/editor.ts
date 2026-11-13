@@ -1,5 +1,6 @@
 import type { ComponentSchema, ComponentType as EngineComponentType, FieldKind } from '../../../shared/engine/types'
 import type { CollisionShape } from '../../../shared/collisionShapes'
+import type { LookSet } from '../../../shared/look/types'
 export type { CollisionShape, ShapePoint } from '../../../shared/collisionShapes'
 
 export type LayerType = 'tile' | 'collision' | 'terrain' | 'objects' | 'encounters' | 'image' | 'folder' | 'polygons'
@@ -38,6 +39,8 @@ export interface ImageItem {
   groupId?: string
   /** Y-sorted among the characters (shared/ySort.ts); absent = follow the group / layer / folder. */
   ySort?: boolean
+  /** Colour grading, masks and shaders of this picture, per profile (docs/looks.md). */
+  look?: LookSet
 }
 
 /** A named set of the pictures of one image layer: they are picked, duplicated and moved together (editor view only, not exported). */
@@ -70,6 +73,8 @@ export interface Layer {
   ySort?: boolean
   /** `polygons` layers only: collision shapes in map pixels. */
   shapes?: CollisionShape[]
+  /** Tile and image layers: colour grading, masks and shaders, per profile (docs/looks.md). */
+  look?: LookSet
 }
 
 export interface CopiedTile {
@@ -159,6 +164,8 @@ export interface MapData {
   pixelHeight?: number
   /** Map settings (right-click a map › Settings…). */
   settings?: MapSettings
+  /** The whole map's look (colour grading, masks, shaders), per profile (docs/looks.md). */
+  look?: LookSet
   layers: Layer[]
   entities?: EntityData[]
   entityFolders?: EntityFolder[]

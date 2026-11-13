@@ -72,6 +72,12 @@ interface ElectronAPI {
   saveDatabase: (database: GameDatabase) => Promise<({ success: true; database: GameDatabase }) | IpcFailure>;
   getGameSettings: () => Promise<({ success: true; settings: unknown | null }) | IpcFailure>;
   saveGameSettings: (settings: unknown) => Promise<({ success: true; settings: unknown; assets?: { written: number; skipped?: string } }) | IpcFailure>;
+  getLooks: () => Promise<({ success: true; looks: unknown | null }) | IpcFailure>;
+  saveLooks: (looks: unknown) => Promise<({ success: true; looks: unknown; assets?: { written: number; skipped?: string } }) | IpcFailure>;
+  listShaders: () => Promise<({ success: true; shaders: { id: string; source: string }[] }) | IpcFailure>;
+  saveShader: (id: string, source: string) => Promise<({ success: true; shader: { id: string; source: string }; assets?: { written: number; skipped?: string } }) | IpcFailure>;
+  deleteShader: (id: string) => Promise<({ success: true; id: string }) | IpcFailure>;
+  renameShader: (id: string, newId: string) => Promise<({ success: true; id: string }) | IpcFailure>;
   getCommonEvents: () => Promise<({ success: true; events: CommonEvent[]; warnings: { file: string; error: string }[] }) | IpcFailure>;
   saveCommonEvent: (event: CommonEvent) => Promise<({ success: true; event: CommonEvent }) | IpcFailure>;
   deleteCommonEvent: (id: string) => Promise<({ success: true }) | IpcFailure>;
