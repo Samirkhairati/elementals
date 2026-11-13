@@ -3,6 +3,7 @@
 
 import type { EngineEntity } from './engine/types.ts'
 import type { CollisionShape, ShapePoint } from './collisionShapes.ts'
+import type { LookSet } from './look/types.ts'
 
 export type EditorLayerType = 'tile' | 'collision' | 'terrain' | 'objects' | 'encounters' | 'image' | 'folder' | 'polygons'
 
@@ -49,6 +50,8 @@ export interface EditorImageItem {
   groupId?: string
   /** Y-sorted among the characters (see shared/ySort.ts); absent = follow the group / layer / folder. */
   ySort?: boolean
+  /** Colour grading, masks and shaders of this picture, per profile (docs/looks.md). */
+  look?: LookSet
 }
 
 /** A named set of the pictures of one image layer: they are picked, duplicated and moved together (editor view only, not exported). */
@@ -81,6 +84,8 @@ export interface EditorLayer {
   ySort?: boolean
   /** `polygons` layers only: collision shapes in map pixels (see shared/collisionShapes.ts). */
   shapes?: CollisionShape[]
+  /** Tile and image layers: colour grading, masks and shaders, per profile (docs/looks.md). */
+  look?: LookSet
 }
 
 export interface EditorEntity {
@@ -103,6 +108,8 @@ export interface EditorMap {
   pixelHeight?: number
   /** Per-map settings for the game. */
   settings?: { playerZ?: number }
+  /** Colour grading, masks and shaders of the whole map (everything drawn, characters too), per profile. */
+  look?: LookSet
   layers: EditorLayer[]
   entities?: EditorEntity[]
   entityFolders?: unknown[]

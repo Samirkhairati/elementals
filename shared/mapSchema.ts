@@ -150,6 +150,7 @@ function validateImages(images: unknown, label: string, errors: string[], warnin
       }
     }
     if (item.ySort !== undefined && typeof item.ySort !== 'boolean') errors.push(`${ip}: ySort must be true or false`)
+    if (item.look !== undefined && !isRecord(item.look)) errors.push(`${ip}: look must be an object`)
     if (item.groupId !== undefined && typeof item.groupId !== 'string') errors.push(`${ip}: groupId must be a string`)
     else if (typeof item.groupId === 'string' && !groupIds.has(item.groupId)) warnings.push(`${ip}: groupId ${JSON.stringify(item.groupId)} is not one of the layer's groups; it is ignored`)
     if (item.z !== undefined && !isFiniteNumber(item.z)) errors.push(`${ip}: z must be a finite number`)
@@ -179,6 +180,9 @@ export function validateEditorMap(data: unknown, options: ValidateEditorMapOptio
   if (data.settings !== undefined) {
     if (!isRecord(data.settings)) errors.push('map.settings must be an object')
     else if (data.settings.playerZ !== undefined && (typeof data.settings.playerZ !== 'number' || !Number.isFinite(data.settings.playerZ))) errors.push('map.settings.playerZ must be a number')
+  }
+  if (data.look !== undefined && !isRecord(data.look)) {
+    errors.push('map.look must be an object')
   }
 
   const tilesets = options.tilesets
@@ -218,6 +222,10 @@ export function validateEditorMap(data: unknown, options: ValidateEditorMapOptio
       if (layer.locked !== undefined && typeof layer.locked !== 'boolean') errors.push(`${label}: locked must be a boolean`)
       if (layer.ySort !== undefined && typeof layer.ySort !== 'boolean') errors.push(`${label}: ySort must be a boolean`)
       if (layer.z !== undefined && !isFiniteNumber(layer.z)) errors.push(`${label}: z must be a finite number`)
+      if (layer.look !== undefined) {
+        if (!isRecord(layer.look)) errors.push(`${label}: look must be an object`)
+        else if (layer.type !== 'tile' && layer.type !== 'image') warnings.push(`${label}: only tile and image layers have a look; it is dropped on export`)
+      }
 
       if (typeof layer.name === 'string' && layer.type !== 'folder') {
         const exported = layer.type === 'collision' ? 'collision' : layer.name

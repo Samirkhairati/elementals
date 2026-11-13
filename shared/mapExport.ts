@@ -9,10 +9,18 @@ import { migrateMap } from './engine/migrate.ts'
 import { itemYSort } from './ySort.ts'
 import { mapPixelSize } from './mapSize.ts'
 import { isUsableShape } from './collisionShapes.ts'
+import { cleanLookSet } from './look/schema.ts'
+import type { LookSet } from './look/types.ts'
 
 export const TILE_SIZE = 32
 export const COLLISION_TILESET_ID = '__collision__'
 export const COLLISION_DUMMY_IMAGE = 'collision_dummy.png'
+
+/** A look as a Tiled property (`look`, a JSON string), cleaned; nothing when there is none. */
+export function lookProperty(look: LookSet | undefined): TiledProperty[] {
+  const clean = cleanLookSet(look)
+  return clean ? [{ name: 'look', type: 'string', value: JSON.stringify(clean) }] : []
+}
 
 /** Tileset file names referenced by non-collision layers, in first-use order. */
 export function collectUsedTilesetIds(map: Pick<EditorMap, 'layers'>): string[] {
@@ -69,6 +77,7 @@ function imageObjects(layer: EditorLayer, nextId: () => number, allLayers: reado
     if (item.opacity !== undefined && item.opacity !== 1) properties.push({ name: 'opacity', type: 'float', value: item.opacity })
     // Folders and groups are editor-only, so the y-sort they pass down is resolved here, one flag per picture.
     if (itemYSort(item, layer, allLayers)) properties.push({ name: 'ySort', type: 'bool', value: true })
+    properties.push(...lookProperty(item.look))
     return {
       id: nextId(),
       name: item.name || item.graphicId || item.assetId || '',
@@ -178,6 +187,7 @@ export function convertEditorMapToTiled(map: EditorMap, tilesets: TilesetInfo[])
         properties: [{ name: 'kind', type: 'string', value: 'image' }],
       }
       if (layer.z !== undefined) imageLayer.properties!.push({ name: 'z', type: 'int', value: Number(layer.z) })
+      imageLayer.properties!.push(...lookProperty(layer.look))
       return imageLayer
     }
 
@@ -214,6 +224,7 @@ export function convertEditorMapToTiled(map: EditorMap, tilesets: TilesetInfo[])
     if (layer.z !== undefined) {
       props.push({ name: 'z', type: 'int', value: Number(layer.z) })
     }
+    if (layer.type === 'tile') props.push(...lookProperty(layer.look))
     if (props.length > 0) {
       exportLayer.properties = props
     }
@@ -228,6 +239,7 @@ export function convertEditorMapToTiled(map: EditorMap, tilesets: TilesetInfo[])
   }
   const playerZ = map.settings?.playerZ
   if (typeof playerZ === 'number' && Number.isFinite(playerZ)) mapProps.push({ name: 'playerZ', type: 'int', value: Math.round(playerZ) })
+  mapProps.push(...lookProperty(map.look))
 
   return {
     ...(mapProps.length > 0 ? { properties: mapProps } : {}),
