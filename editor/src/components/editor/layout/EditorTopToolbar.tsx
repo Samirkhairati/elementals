@@ -24,6 +24,7 @@ import { ShortcutsDialog } from '../dialogs/ShortcutsDialog'
 import { GridSettingsPanel } from './GridSettingsPanel'
 import { toggleCanvasView, useCanvasView, type CanvasViewToggle } from '@/hooks/editor/canvas/canvasView'
 import { IconButton } from '../ui/controls'
+import { LookToolbarMenu } from '../look/LookToolbarMenu'
 
 export type EditorViewMode = 'map' | 'behaviour-graph' | 'lighting' | 'dialogue'
 
@@ -46,6 +47,7 @@ const selectToolbar = (c: EditorContextValue) => ({
   toggleShowGrid: c.toggleShowGrid,
   snapToGrid: c.snapToGrid,
   toggleSnapToGrid: c.toggleSnapToGrid,
+  openPanel: c.openPanel,
 })
 
 /** A bordered group of icon buttons (28px high, 24px buttons, 14px icons). */
@@ -216,6 +218,12 @@ function MapToolbar() {
           >
             {view.lockImages ? <Lock /> : <LockOpen />}
           </ToolButton>
+        </ToolGroup>
+
+        <Divider />
+
+        <ToolGroup label="Look">
+          <LookToolbarMenu disabled={!hasActiveMap} onOpenPanel={() => ctx.openPanel('look')} />
         </ToolGroup>
       </div>
 

@@ -98,3 +98,10 @@ export function resetLookView(patch: Partial<LookViewState> = {}): void {
   state = { ...DEFAULTS, ...patch }
   listeners.forEach((l) => l())
 }
+
+// The part of the map the canvas showed last (map pixels): where new masks of a layer or the map are placed.
+let viewRect: { x: number; y: number; w: number; h: number } | null = null
+export const setCanvasViewRect = (r: { x: number; y: number; w: number; h: number } | null): void => {
+  viewRect = r
+}
+export const getCanvasViewRect = () => viewRect

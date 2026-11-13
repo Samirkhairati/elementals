@@ -7,7 +7,8 @@ export type PanelId =
   | 'tilesets'
   | 'preview'
   | 'activeSelection'
-  | 'database';
+  | 'database'
+  | 'look';
 
 export interface PanelInfo {
   id: PanelId;
@@ -27,6 +28,7 @@ export const ALL_PANELS: PanelInfo[] = [
   { id: 'activeSelection', title: 'Active Selection', column: 'right' },
   // Opened on demand (menu / shortcut), not part of the default layout.
   { id: 'database', title: 'Database', column: 'right', shortcut: 'Alt+D' },
+  { id: 'look', title: 'Look (colour grading)', column: 'right', shortcut: 'Alt+G' },
 ];
 
 /** Panels that exist in the default layout; the others are opened on demand. */

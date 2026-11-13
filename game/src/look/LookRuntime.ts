@@ -56,6 +56,12 @@ export class LookRuntime {
   private unsubscribe: () => void;
   private warned = new Set<string>();
 
+  private warnOnce(w: string): void {
+    if (this.warned.has(w)) return;
+    this.warned.add(w);
+    console.warn(`[Looks] ${w}`);
+  }
+
   constructor(scene: Phaser.Scene, shaders: ShaderInfo[]) {
     this.scene = scene;
     this.shaders = new Map(shaders.map((s) => [s.id, s]));
@@ -130,7 +136,7 @@ export class LookRuntime {
         return look ? [{ look, space }] : [];
       });
       c = compileLooks(stack, { subjectSize: s.own, mapSize: this.mapSize, lutSize });
-      for (const w of c.warnings) if (!this.warned.has(w)) (this.warned.add(w), console.warn(`[Looks] ${w}`));
+      for (const w of c.warnings) this.warnOnce(w);
       s.compiled.set(key, c);
     }
     return c;
@@ -180,7 +186,7 @@ export class LookRuntime {
     const wanted = uses.filter((u) => {
       if (this.shaders.has(u.shader)) return true;
       const w = `shader "${u.shader}" is not loaded (run \`npm run assets:sync\`)`;
-      if (!this.warned.has(w)) (this.warned.add(w), console.warn(`[Looks] ${w}`));
+      this.warnOnce(w);
       return false;
     });
     const keys = wanted.map((u) => userShaderKey(u.shader));

@@ -95,6 +95,10 @@ export function setupMenu(win: BrowserWindow, projectDir?: string) {
                   label: 'Database (switches & variables)',
                   click: () => win.webContents.send('dockview-toggle-panel', 'database'),
                 },
+                {
+                  label: 'Look (colour grading)',
+                  click: () => win.webContents.send('dockview-toggle-panel', 'look'),
+                },
               ],
             },
             { type: 'separator' },

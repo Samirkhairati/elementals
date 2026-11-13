@@ -585,7 +585,7 @@ export const COMMAND_CATALOG: Record<string, CommandDef> = {
       { key: 'wait', label: 'Wait for it', kind: 'boolean', help: 'Pause this event until the transition ends.' },
     ],
     defaultParams: { profile: '', ms: 1000, wait: false },
-    yields: true,
+    yields: (p) => p.wait === true,
     status: 'implemented',
     summarize: (p) => `Look profile → ${str(p.profile, '?')}${num(p.ms) > 0 ? ` over ${num(p.ms)} ms` : ''}${p.wait === true ? ', wait' : ''}`,
   }),

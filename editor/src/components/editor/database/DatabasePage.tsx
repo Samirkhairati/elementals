@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
-import { Bug, Grid3x3, Image, Lock, Map as MapIcon, MessageSquareText, Package, PersonStanding, Search, ToggleLeft, X, Zap, type LucideIcon } from 'lucide-react'
+import { Bug, Grid3x3, Image, Lock, Map as MapIcon, MessageSquareText, Package, PersonStanding, Search, Sparkles, ToggleLeft, X, Zap, type LucideIcon } from 'lucide-react'
 import { DATABASE_TABLES, GROUP_LABELS, characterCounts, getTable, unusedGraphics, type DatabaseTable, type TableGroup } from '@/lib/databaseModel'
 import { clipboardHasFiles, pastedPngs } from '@/lib/droppedFiles'
 import { Badge, InfoTip } from '../ui/controls'
@@ -9,13 +9,14 @@ import { CharacterDetail, CharactersBrowser, CharactersToolbar } from './Charact
 import { ViewToggle, useViewMode } from './browse'
 import { FlagsTable } from './FlagsTable'
 import { GraphicDetail, GraphicsBrowser, GraphicsToolbar } from './GraphicsTable'
+import { ShadersPage } from './ShadersPage'
 import { MapDetail, MapsBrowser } from './MapsTable'
 import { TilesetDetail, TilesetsBrowser, TilesetsToolbar } from './TilesetsTable'
 import { ImportDialog } from './ImportDialog'
 import { acceptable, dropCandidates, graphicImporter, looseFiles, pickCandidates, pickFolderCandidates, tilesetImporter, type Candidate, type ImportResult, type Importer } from './importFlow'
 import type { LibraryControls, TableProps } from './shared'
 
-const ICONS: Record<string, LucideIcon> = { Image, Grid3x3, PersonStanding, ToggleLeft, Map: MapIcon, MessageSquareText, Bug, Package, Zap }
+const ICONS: Record<string, LucideIcon> = { Image, Grid3x3, PersonStanding, ToggleLeft, Map: MapIcon, MessageSquareText, Bug, Package, Sparkles, Zap }
 
 export interface DatabaseSearch {
   table?: string
@@ -42,6 +43,7 @@ const VIEWS: Record<string, TableView> = {
   tilesets: { Browser: TilesetsBrowser, Detail: TilesetDetail, Toolbar: TilesetsToolbar, tiles: true, importer: tilesetImporter },
   characters: { Browser: CharactersBrowser, Detail: CharacterDetail, Toolbar: CharactersToolbar, tiles: true },
   maps: { Browser: MapsBrowser, Detail: MapDetail },
+  shaders: { Browser: () => null, Detail: () => null, full: ShadersPage },
   flags: { Browser: () => null, Detail: () => null, full: FlagsTable },
 }
 

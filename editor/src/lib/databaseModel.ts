@@ -27,6 +27,7 @@ export const LIBRARY_INFO = 'Import, rename, move into folders and delete here. 
 export const DATABASE_TABLES: readonly DatabaseTable[] = [
   { id: 'graphics', label: 'Graphics', group: 'visual', icon: 'Image', access: 'editable', status: 'ready', info: LIBRARY_INFO },
   { id: 'tilesets', label: 'Tilesets', group: 'visual', icon: 'Grid3x3', access: 'editable', status: 'ready', info: LIBRARY_INFO },
+  { id: 'shaders', label: 'Shaders', group: 'visual', icon: 'Sparkles', access: 'editable', status: 'ready', info: 'Your own GLSL effects (project/shaders). Looks and layers can use them; the preview shows the draft over a test picture.' },
   { id: 'characters', label: 'Sprites', group: 'design', icon: 'PersonStanding', access: 'editable', status: 'ready', info: 'Anything drawn that can animate: a person, a flower, a chest, a door.' },
   { id: 'flags', label: 'Flags', group: 'design', icon: 'ToggleLeft', access: 'editable', status: 'ready', info: 'Switches, variables, stages and common events used by events.' },
   { id: 'maps', label: 'Maps', group: 'world', icon: 'Map', access: 'readonly', status: 'ready', info: 'A read-only overview. Open a map in the Map Editor to change it.' },

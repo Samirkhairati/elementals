@@ -13,6 +13,15 @@ import { WarpTilePicker } from './WarpTilePicker'
 import { ClipPicker, CommonEventPicker, FacingPicker, characterOfTarget, MapPicker, SpritePicker, StagePicker, StageValuePicker, SwitchPicker, TargetPicker, VariablePicker } from './pickers'
 import { CheckRow, DraftNumber, DraftText, DraftTextarea, FieldRow, IconButton, SmallButton, inputClass } from './primitives'
 import { useEventEnv } from './eventEnv'
+import { useLookLibrary } from '@/lib/look/lookLibrary'
+
+/** The look profiles of the library (value = id); a profile that no longer exists stays visible. */
+export function LookProfilePicker({ id, value, onChange }: { id?: string; value: string; onChange: (id: string) => void }) {
+  const { file } = useLookLibrary()
+  const options = file.profiles.map((p) => ({ value: p.id, label: p.name }))
+  if (!options.some((o) => o.value === value)) options.unshift({ value, label: value === '' ? '(none)' : `(missing) ${value}` })
+  return <Select id={id} value={value} options={options} onChange={onChange} />
+}
 
 export type ParamPatch = (patch: Record<string, unknown>, pruneBranches?: string[]) => void
 
@@ -141,6 +150,8 @@ function FieldControl({ field, command, params, onPatch, id }: FieldControlProps
         <Select id={id} value={value} options={[...(options.some((o) => o.value === value) ? [] : [{ value, label: value === '' ? '(none)' : `${value} (invalid)` }]), ...options.map((o) => ({ value: o.value, label: o.label }))]} onChange={set} />
       )
     }
+    case 'lookProfile':
+      return <LookProfilePicker id={id} value={asString(raw)} onChange={set} />
     case 'color': {
       const value = asString(raw)
       return (

@@ -12,6 +12,8 @@ import type { useSpriteAssets } from '@/hooks/useSpriteAssets'
 import type { useDatabase } from '@/hooks/useDatabase'
 import type { useCommonEvents } from '@/hooks/useCommonEvents'
 import type { LayerType, MapData } from '@/types/editor'
+import type { LookSet } from '../../../../../shared/look/types'
+import type { LookSubjectRef } from '@/lib/look/lookView'
 
 // ── Value type ──────────────────────────────────────────────────────────────
 // Derived from the hooks that supply each field, so the context can never drift from them.
@@ -174,6 +176,8 @@ export interface EditorBaseContextValue
   /** Opens the resize dialog for the map (opening the map first). */
   handleResizeMap: (map: MapData) => void
   handleMapSettings: (map: MapData) => void
+  /** Replaces the look of the map, a layer or a picture (`commit` false: no undo step yet, e.g. while dragging). */
+  setLook: (ref: LookSubjectRef, set: LookSet | undefined, commit?: boolean) => void
   /** Called by the dock when the last map tab closed: persists pending edits, then clears the editor state. */
   onClearActiveMap: () => void
 

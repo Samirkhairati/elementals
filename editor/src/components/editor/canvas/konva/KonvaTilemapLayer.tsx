@@ -9,7 +9,7 @@ import { renderOrder, sortedImages } from '@/lib/layerOrder'
 import { resolveImageItem } from '@/lib/imageItems'
 import { imagePickKey } from '@/lib/graphicAssets'
 import { mapPixelSize } from '../../../../../../shared/mapSize'
-import { useLookView, subjectKey, type LookViewState } from '@/lib/look/lookView'
+import { useLookView, subjectKey, setCanvasViewRect, type LookViewState } from '@/lib/look/lookView'
 import { useLookLibrary } from '@/lib/look/lookLibrary'
 import { pictureStack, worldStack } from '@/lib/look/lookSubjects'
 import { drawGradedArea, drawGradedPicture } from '@/lib/look/lookDraw'
@@ -160,6 +160,7 @@ export const KonvaTilemapLayer = React.memo(function KonvaTilemapLayer({
             // Calculate visible tile bounds to cull offscreen draw calls
             const stage = shape.getStage()
             const rect = stageViewRect(stage)
+            setCanvasViewRect(rect)
             let minTileX = 0
             let maxTileX = mapWidth - 1
             let minTileY = 0

@@ -28,6 +28,9 @@ import { applyResize, mapPixelSize, type ResizeEdges } from '@/lib/mapResize'
 import { ResizeMapDialog } from '@/components/editor/dialogs/ResizeMapDialog'
 import { MapSettingsDialog } from '@/components/editor/dialogs/MapSettingsDialog'
 import type { MapSettings } from '@/types/editor'
+import type { LookSet } from '../../../shared/look/types'
+import type { LookSubjectRef } from '@/lib/look/lookView'
+import { setLayerLook, setMapLook } from '@/lib/look/lookSubjects'
 
 // Layout
 import {
@@ -99,6 +102,24 @@ export function EditorPage() {
   const layerManager = useLayerManager({
     setActiveMap: mapManager.setActiveMap,
     onCommitHistory: commitSnapshot,
+  })
+
+  /**
+   * Replaces the look of the map, a layer or a picture. While a slider is dragged `commit` is false (the canvas
+   * follows, no undo step); the release commits one step.
+   */
+  const setLook = useStableCallback((ref: LookSubjectRef, set: LookSet | undefined, commit: boolean = true) => {
+    if (ref.kind === 'map') {
+      mapManager.setActiveMap(m => (m ? setMapLook(m, set) : m))
+    } else {
+      const prev = layerManager.getLayers()
+      const next = setLayerLook(prev, ref, set)
+      if (next !== prev) {
+        layerManager.setLayers(next)
+        mapManager.setActiveMap(m => (m ? { ...m, layers: next } : m))
+      }
+    }
+    if (commit) commitSnapshot()
   })
 
   // ── Entity Manager ───────────────────────────────────────────────────────
@@ -452,6 +473,7 @@ export function EditorPage() {
     handleExportMapToGame,
     handleResizeMap,
     handleMapSettings,
+    setLook,
     handleMapDrop: mapManager.handleMapDrop,
     onSelectMap: mapManager.onSelectMap,
     onClearActiveMap: handleDockClearActiveMap,

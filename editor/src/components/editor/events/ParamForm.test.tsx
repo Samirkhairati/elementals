@@ -19,7 +19,7 @@ describe('ParamForm: every FieldKind has a real control', () => {
   it('covers every kind used by the catalog', () => {
     const kinds = new Set<FieldKind>()
     for (const def of Object.values(COMMAND_CATALOG)) for (const f of def.params) kinds.add(f.kind)
-    const covered: FieldKind[] = ['number', 'text', 'textarea', 'boolean', 'select', 'color', 'sprite', 'character', 'clip', 'facing', 'map', 'commonEvent', 'switch', 'variable', 'stage', 'stageValue', 'target', 'position', 'sound', 'item', 'route', 'choices', 'conditions']
+    const covered: FieldKind[] = ['number', 'text', 'textarea', 'boolean', 'select', 'color', 'sprite', 'character', 'clip', 'facing', 'map', 'commonEvent', 'switch', 'variable', 'stage', 'stageValue', 'target', 'position', 'sound', 'item', 'route', 'choices', 'conditions', 'lookProfile']
     expect([...kinds].filter((k) => !covered.includes(k))).toEqual([])
     // and no command renders raw JSON or crashes with its defaults
     for (const def of Object.values(COMMAND_CATALOG)) {
@@ -474,6 +474,22 @@ describe('ParamForm: animation (clip) picker', () => {
     setup(cmd('p', 'playAnimation', { target: 'self', animation: '' }), withClips())
     chooseOption(within(field('Animation')).getByRole('combobox'), '__other__')
     expect(within(field('Animation')).getByRole('textbox')).toBeInTheDocument()
+  })
+})
+
+describe('ParamForm: lookProfile', () => {
+  it('lists the library profiles by name and keeps a missing one visible', async () => {
+    const { cleanLooksFile } = await import('../../../../../shared/look/schema')
+    const { resetLookLibrary } = await import('@/lib/look/lookLibrary')
+    const file = cleanLooksFile(null)
+    file.profiles = [{ id: 'night', name: 'Night' }, { id: 'day', name: 'Day' }] as never
+    resetLookLibrary({ loaded: true, file })
+    const { onPatch } = setup(cmd('l', 'setLookProfile', { profile: 'gone', ms: 0, wait: false }))
+    const trigger = within(field('Profile')).getByRole('combobox')
+    expect(trigger).toHaveTextContent('(missing) gone')
+    chooseOption(trigger, 'night')
+    expect(onPatch).toHaveBeenCalledWith({ profile: 'night' })
+    resetLookLibrary()
   })
 })
 

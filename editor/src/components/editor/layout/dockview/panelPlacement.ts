@@ -45,6 +45,8 @@ export const PANEL_PLACEMENT: Record<string, PanelPlacement> = {
   activeSelection: { title: 'ACTIVE SELECTION', anchors: [[['preview', 'tilesets'], 'below']], mapSide: 'right' },
   // On-demand panel: a tab next to the Tileset Browser (right column).
   database: { title: 'DATABASE', anchors: [[['tilesets', 'preview', 'activeSelection'], 'within']], mapSide: 'right' },
+  // On-demand panel: its own column right of the right sidebar (that column swaps panels with the selection).
+  look: { title: 'LOOK', anchors: [[['tilesets', 'inspector', 'images', 'preview', 'activeSelection'], 'right']], mapSide: 'right' },
 }
 
 /**

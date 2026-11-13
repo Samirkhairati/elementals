@@ -162,7 +162,7 @@ logs and skips it until the system exists)
   ● `setMoveSpeed` {target, speed}; ● `setMovementMode` {target, mode}; ● `faceTowards` {target, other}.
 
 **Map / screen**
-* ● `warp` {map, x, y, free?, facing?, fade}; ● `fadeScreen` {mode: in|out, ms}; ● `shakeScreen` {power, ms};
+* ● `warp` {map, x, y, free?, facing?, fade}; ● `fadeScreen` {mode: in|out, ms}; ● `shakeScreen` {power, ms}; ● `setLookProfile` {profile, ms, wait?} (looks, see docs/looks.md);
 * ○ `tintScreen`, ○ `setWeather`.
 
 **Audio**

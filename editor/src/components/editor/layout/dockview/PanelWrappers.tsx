@@ -14,6 +14,7 @@ import { TilesetsPanel } from '@/components/editor/panels/TilesetsPanel';
 import { TilesetPreview } from '@/components/editor/panels/TilesetPreview';
 import { ActiveSelectionPanel } from '@/components/editor/panels/ActiveSelectionPanel';
 import { DatabasePanel } from '@/components/editor/panels/DatabasePanel';
+import { LookPanel } from '@/components/editor/look/LookPanel';
 import { MapCanvas } from '@/components/editor/canvas/MapCanvas';
 
 // Stable no-op used as a placeholder for callbacks on inactive canvases.
@@ -267,6 +268,15 @@ export function ImagesWrapper(_props: IDockviewPanelProps) {
   return (
     <div className="h-full min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain bg-card/40 p-2 text-xs text-muted-foreground" data-testid="images-scroll">
       <ImagesPanel />
+    </div>
+  );
+}
+
+/** The Look panel (colour grading of the map, a layer or a picture; opened on demand). */
+export function LookWrapper(_props: IDockviewPanelProps) {
+  return (
+    <div className="h-full min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain bg-card/40 p-2 text-xs" data-testid="look-scroll">
+      <LookPanel />
     </div>
   );
 }
@@ -615,4 +625,5 @@ export const dockviewComponents = {
   preview: PreviewWrapper,
   activeSelection: ActiveSelectionWrapper,
   database: DatabaseWrapper,
+  look: LookWrapper,
 };
