@@ -105,3 +105,12 @@ export const setCanvasViewRect = (r: { x: number; y: number; w: number; h: numbe
   viewRect = r
 }
 export const getCanvasViewRect = () => viewRect
+
+/** The subject a key names (subjectKey's inverse). */
+export function parseSubjectKey(key: string): LookSubjectRef | null {
+  if (key === 'map') return { kind: 'map' }
+  const [kind, layerId, ...rest] = key.split(':')
+  if (kind === 'layer' && layerId) return { kind: 'layer', layerId }
+  if (kind === 'picture' && layerId && rest.length) return { kind: 'picture', layerId, imageId: rest.join(':') }
+  return null
+}

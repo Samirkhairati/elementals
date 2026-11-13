@@ -2,6 +2,8 @@ import { withPlacement } from '@/lib/placementKind'
 import type { SelectMode } from '@/lib/imageSelection'
 import type { ImageDrag } from './konva/imageDrag'
 import React, { useCallback, useMemo, useRef } from 'react'
+import type Konva from 'konva'
+import { useMapLookPass } from '@/lib/look/useMapLookPass'
 import type { ImagePick } from '@/lib/graphicAssets'
 import { Stage, Layer as KonvaLayer, Rect, Group } from 'react-konva'
 import {
@@ -27,6 +29,7 @@ import { KonvaGhostEntity } from './konva/KonvaGhostEntity'
 import { withoutFolders } from '@/lib/layerFolders'
 import { KonvaGhostImage, KonvaImageItems } from './konva/KonvaImageItems'
 import { KonvaShapes } from './konva/KonvaShapes'
+import { KonvaMaskEditor } from './konva/KonvaMaskEditor'
 import { CanvasContextMenu } from './CanvasContextMenu'
 import { CanvasNavigator, type ViewportHandle } from './CanvasNavigator'
 import { PendingEntityPlacement } from '@/hooks/editor/useEntityPlacement'
@@ -38,6 +41,7 @@ import { openEventEditor } from '@/lib/openEventEditor'
 
 const selectCanvasContext = (c: EditorContextValue) => ({
   spriteAssets: c.spriteAssets,
+  setLook: c.setLook,
 })
 
 interface MapCanvasProps {
@@ -155,7 +159,7 @@ export function MapCanvas({
 }: MapCanvasProps) {
   // Preload and cache tileset image textures
   const images = useTilesetImages(tilesets)
-  const { spriteAssets } = useEditorSelector(selectCanvasContext)
+  const { spriteAssets, setLook } = useEditorSelector(selectCanvasContext)
   const view = useCanvasView()
 
   // Viewport, zoom, pan, and stage coordinate translation
@@ -266,6 +270,10 @@ export function MapCanvas({
   const mapWidthPx = mapPx.width
   const mapHeightPx = mapPx.height
 
+  // The map's look: graded after the content layer draws; redrawn when the look or the view of looks changes.
+  const contentLayerRef = useRef<Konva.Layer>(null)
+  useMapLookPass(contentLayerRef, activeMap?.look, mapWidthPx, mapHeightPx)
+
   return (
     <>
       <div
@@ -290,7 +298,8 @@ export function MapCanvas({
             onMouseDown={handleStageMouseDown}
             onMouseMove={handleStageMouseMove}
           >
-            <KonvaLayer>
+            {/* The map content: graded with the map's look (when it has one) right after it draws, see lookMapPass */}
+            <KonvaLayer ref={contentLayerRef}>
               {/* Map background */}
               <Rect
                 x={0}
@@ -345,7 +354,10 @@ export function MapCanvas({
                 dragRef={imageDrag}
               />
               </Group>
+            </KonvaLayer>
 
+            {/* Grid, handles and overlays: above the map content and never graded by the map's look */}
+            <KonvaLayer>
               {/* Grid and tool previews */}
               <KonvaOverlays
                 activeMap={activeMap}
@@ -423,6 +435,9 @@ export function MapCanvas({
                 updateLayers={updateLayers}
                 updateComponentProps={updateComponentProps}
               />
+
+              {/* Handles of the look mask component being edited in the Look panel (brush components paint here) */}
+              <KonvaMaskEditor map={activeMap} layers={layers} spriteAssets={spriteAssets} viewStore={viewStore} setLook={setLook} />
 
               {/* The image waiting to be placed follows the mouse, snapped (or not) exactly like the placement */}
               <KonvaGhostImage

@@ -13,6 +13,7 @@ import { useLookView, subjectKey, setCanvasViewRect, type LookViewState } from '
 import { useLookLibrary } from '@/lib/look/lookLibrary'
 import { pictureStack, worldStack } from '@/lib/look/lookSubjects'
 import { drawGradedArea, drawGradedPicture } from '@/lib/look/lookDraw'
+import { pictureBox } from '@/lib/look/pictureBox'
 
 const NO_ASSETS: Record<string, SpriteAssetInfo> = {}
 
@@ -40,16 +41,8 @@ export function drawImageItem(ctx: CanvasRenderingContext2D, item: ImageItem, sp
   if (looks && looks.view.enabled) {
     const stack = pictureStack(item, looks.layer, looks.view.profile)
     if (stack.length > 0) {
-      const { dest, src } = resolved
-      const mirrorX = !!item.flipX !== resolved.flipX
-      const mirrorY = !!item.flipY
-      // the box the picture covers, as drawResolvedSprite mirrors it (around the anchor)
-      const box = {
-        x: item.flipX ? at.x - dest.x - dest.w : at.x + dest.x,
-        y: item.flipY ? at.y - dest.y - dest.h : at.y + dest.y,
-        w: dest.w,
-        h: dest.h,
-      }
+      const { src } = resolved
+      const { box, mirrorX, mirrorY } = pictureBox(item, resolved, at)
       const key = `${imagePickKey(item)}@${src.x},${src.y},${src.w},${src.h}`
       const subject = subjectKey({ kind: 'picture', layerId: looks.layer.id, imageId: item.id })
       if (drawGradedPicture(ctx, { img: resolved.img, src, box, mirrorX, mirrorY, opacity: item.opacity, key }, stack, subject, looks.mapSize)) return
