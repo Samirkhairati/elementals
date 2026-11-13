@@ -1,6 +1,6 @@
-export interface Prefab<TProps = any> {
+export interface Prefab<TProps = unknown> {
   name: string;
-  build: (props: TProps) => any[];
+  build: (props: TProps) => unknown[];
 }
 
 export function definePrefab<TProps>(definition: Prefab<TProps>): Prefab<TProps> {

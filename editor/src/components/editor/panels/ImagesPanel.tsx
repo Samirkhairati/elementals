@@ -29,6 +29,7 @@ import { pastedFolder } from '@/lib/pictureTree'
 import { CropImageDialog } from '../dialogs/CropImageDialog'
 import { useShortcuts } from '@/hooks/useShortcuts'
 import { useEditorSelector, type EditorContextValue } from '../layout/EditorContext'
+import { RenameInput } from '../ui/RenameInput'
 
 const selectImages = (c: EditorContextValue) => ({
   layers: c.layers,
@@ -243,27 +244,7 @@ export function ImagesPanel() {
                       <ImageItemView item={img} assets={assets} size={24} />
                     </div>
                     {renaming === img.id ? (
-                      <input
-                        className="ed-input min-w-0 flex-1"
-                        aria-label="Image name"
-                        defaultValue={nameOf(img)}
-                        autoFocus
-                        onClick={(e) => e.stopPropagation()}
-                        onFocus={(e) => e.currentTarget.select()}
-                        onBlur={(e) => {
-                          const name = e.currentTarget.value.trim()
-                          if (name && name !== nameOf(img)) ctx.updateImage(layer.id, img.id, { name })
-                          setRenaming(null)
-                        }}
-                        onKeyDown={(e) => {
-                          e.stopPropagation()
-                          if (e.key === 'Enter') {
-                            const name = e.currentTarget.value.trim()
-                            if (name && name !== nameOf(img)) ctx.updateImage(layer.id, img.id, { name })
-                            setRenaming(null)
-                          } else if (e.key === 'Escape') setRenaming(null)
-                        }}
-                      />
+                      <RenameInput initial={nameOf(img)} label="Image name" onRename={(name) => name !== nameOf(img) && ctx.updateImage(layer.id, img.id, { name })} onClose={() => setRenaming(null)} />
                     ) : (
                       <span className="ed-row-label" title={imagePickLabel(img)}>
                         {nameOf(img)}
@@ -685,20 +666,7 @@ function ImageGroupBlock({
             </button>
             {collapsed ? <FolderIcon className="text-yellow-400" /> : <FolderOpen className="text-yellow-400" />}
             {renaming ? (
-              <input
-                className="ed-input min-w-0 flex-1"
-                aria-label="Group name"
-                defaultValue={group.name}
-                autoFocus
-                onClick={(e) => e.stopPropagation()}
-                onFocus={(e) => e.currentTarget.select()}
-                onBlur={(e) => { ctx.renameImageGroup(layerId, group.id, e.currentTarget.value); setRenaming(false) }}
-                onKeyDown={(e) => {
-                  e.stopPropagation()
-                  if (e.key === 'Enter') { ctx.renameImageGroup(layerId, group.id, e.currentTarget.value); setRenaming(false) }
-                  else if (e.key === 'Escape') setRenaming(false)
-                }}
-              />
+              <RenameInput initial={group.name} label="Group name" onRename={(name) => ctx.renameImageGroup(layerId, group.id, name)} onClose={() => setRenaming(false)} />
             ) : (
               <span className="ed-row-label" title={group.name}>{group.name}</span>
             )}

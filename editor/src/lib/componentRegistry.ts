@@ -1,7 +1,7 @@
 // Thin adapter over the shared engine definitions (shared/engine/components.ts, prefabs.ts).
 // The editor UI consumes COMPONENT_REGISTRY / PRESET_PREFABS in this shape; the single source of truth
 // for fields, defaults and prefabs lives in /shared.
-import type { ComponentFieldDef, ComponentSchemaEntry, ComponentType } from '@/types/editor'
+import type { ComponentFieldDef, ComponentSchemaEntry, ComponentType, PropBag } from '@/types/editor'
 import { COMPONENT_SCHEMAS, COMPONENT_TYPES, createDefaultComponent } from '../../../shared/engine/components'
 import { facingOptions } from '../../../shared/engine/constants'
 import { PREFABS, instantiatePrefab } from '../../../shared/engine/prefabs'
@@ -49,7 +49,7 @@ function buildRegistry(): Record<ComponentType, ComponentSchemaEntry> {
       label: schema.label,
       singleton: schema.singleton,
       // Event gets a real first state; everything else its schema defaults.
-      defaultProps: createDefaultComponent(type) as unknown as Record<string, any>,
+      defaultProps: createDefaultComponent(type) as unknown as PropBag,
       fields: schema.fields.map(toEditorField),
       description: schema.description,
       icon: schema.icon,
@@ -64,7 +64,7 @@ function buildRegistry(): Record<ComponentType, ComponentSchemaEntry> {
 export const COMPONENT_REGISTRY: Record<ComponentType, ComponentSchemaEntry> = buildRegistry()
 
 /** Whether a field applies given the component's current props (`visibleWhen`). */
-export function isFieldVisible(field: Pick<ComponentFieldDef, 'visibleWhen'>, props: Record<string, any>): boolean {
+export function isFieldVisible(field: Pick<ComponentFieldDef, 'visibleWhen'>, props: PropBag): boolean {
   if (!field.visibleWhen) return true
   return field.visibleWhen.in.includes(props[field.visibleWhen.key])
 }
@@ -75,7 +75,7 @@ export interface PresetPrefab {
   description: string
   icon: string
   /** A fresh deep copy on every access (new event state/command ids), ready to attach to an entity. */
-  readonly components: Partial<Record<ComponentType, Record<string, any>>>
+  readonly components: Partial<Record<ComponentType, PropBag>>
 }
 
 export const PRESET_PREFABS: PresetPrefab[] = PREFABS.map((prefab) => ({
@@ -84,6 +84,6 @@ export const PRESET_PREFABS: PresetPrefab[] = PREFABS.map((prefab) => ({
   description: prefab.description,
   icon: prefab.icon,
   get components() {
-    return instantiatePrefab(prefab, { x: 0, y: 0 }).components as unknown as Partial<Record<ComponentType, Record<string, any>>>
+    return instantiatePrefab(prefab, { x: 0, y: 0 }).components as unknown as Partial<Record<ComponentType, PropBag>>
   },
 }))

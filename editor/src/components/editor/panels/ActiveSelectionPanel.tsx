@@ -1,5 +1,6 @@
 import { Pin, PinOff } from 'lucide-react'
 import { CopiedTile, TileSelection, TilesetData } from '@/types/editor'
+import { TILE_SIZE } from '../../../../../shared/engine/constants'
 import { IconButton } from '../ui/controls'
 import { usePanZoom } from '@/hooks/usePanZoom'
 
@@ -15,7 +16,7 @@ const PIN_TIP =
   'Pin the selection: right-drag samples every selected layer (Ctrl/Cmd+click layers to pick several; image layers are skipped) and painting puts each layer\'s tiles back on its own layer.'
 const UNPIN_TIP = 'Unpin: right-drag samples only the active layer again.'
 
-const CELL = 32
+const CELL = TILE_SIZE
 
 /** One cell: the tile from its tileset, or the red collision marker. Layers overlap by being drawn in order. */
 function SelectionCell({ tile, dx, dy, tilesets }: { tile: CopiedTile; dx: number; dy: number; tilesets: TilesetData[] }) {

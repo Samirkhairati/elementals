@@ -13,7 +13,7 @@ import {
 import { Plus, Sparkles, Copy, CopyPlus, Trash2, Pipette, Palette } from 'lucide-react'
 import { OVERLAY_COLORS } from '@/hooks/editor/canvas/canvasView'
 import { PRESET_PREFABS } from '@/lib/componentRegistry'
-import { EntityData, ComponentType } from '@/types/editor'
+import { EntityData, ComponentType, type PropBag } from '@/types/editor'
 
 export interface CanvasContextMenuTarget {
   type: 'tile' | 'entity'
@@ -41,7 +41,7 @@ interface CanvasContextMenuProps {
     name: string,
     x: number,
     y: number,
-    components?: Partial<Record<ComponentType, Record<string, any>>>,
+    components?: Partial<Record<ComponentType, PropBag>>,
     /** A free entity: any pixel position and size, instead of one on the tile grid. */
     free?: boolean
   ) => void

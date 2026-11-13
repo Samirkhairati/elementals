@@ -1,5 +1,21 @@
 import type { TilemapData, LayerData, TilesetData } from "@/world/tilemap/interfaces";
 
+/** The raw Tiled JSON as loaded: any field may be missing, so everything is checked or defaulted below. */
+type RawLayer = Partial<LayerData>;
+type RawTileset = Partial<TilesetData> & { tilewidth?: number; tileheight?: number };
+export interface RawTiledMap {
+  width?: number;
+  height?: number;
+  tilewidth?: number;
+  tileheight?: number;
+  layers?: RawLayer[];
+  tilesets?: RawTileset[];
+  version?: string;
+  tiledversion?: string;
+  orientation?: string;
+  renderorder?: string;
+}
+
 export class MapParser {
   /**
    * Validates and normalizes raw JSON data loaded from a Tiled file
@@ -8,7 +24,7 @@ export class MapParser {
    * @param rawData The raw JSON object from Tiled
    * @returns A normalized TilemapData object
    */
-  static parse(rawData: any): TilemapData {
+  static parse(rawData: RawTiledMap | null | undefined): TilemapData {
     if (!rawData) {
       throw new Error("Cannot parse map: rawData is undefined or null.");
     }
@@ -17,11 +33,11 @@ export class MapParser {
       throw new Error("Invalid map data: missing layers or tilesets.");
     }
 
-    const layers: LayerData[] = rawData.layers.map((layer: any) => {
+    const layers: LayerData[] = rawData.layers.map((layer): LayerData => {
       return {
-        id: layer.id,
-        name: layer.name,
-        type: layer.type,
+        id: layer.id as number,
+        name: layer.name as string,
+        type: layer.type as string,
         visible: layer.visible ?? true,
         opacity: layer.opacity ?? 1,
         x: layer.x ?? 0,
@@ -34,27 +50,27 @@ export class MapParser {
       };
     });
 
-    const tilesets: TilesetData[] = rawData.tilesets.map((ts: any) => {
+    const tilesets: TilesetData[] = rawData.tilesets.map((ts): TilesetData => {
       return {
-        firstgid: ts.firstgid,
-        name: ts.name,
-        image: ts.image,
-        imagewidth: ts.imagewidth,
-        imageheight: ts.imageheight,
-        tilewidth: ts.tilewidth ?? rawData.tilewidth,
-        tileheight: ts.tileheight ?? rawData.tileheight,
+        firstgid: ts.firstgid as number,
+        name: ts.name as string,
+        image: ts.image as string,
+        imagewidth: ts.imagewidth as number,
+        imageheight: ts.imageheight as number,
+        tilewidth: ts.tilewidth ?? (rawData.tilewidth as number),
+        tileheight: ts.tileheight ?? (rawData.tileheight as number),
         margin: ts.margin ?? 0,
         spacing: ts.spacing ?? 0,
-        columns: ts.columns,
-        tilecount: ts.tilecount,
+        columns: ts.columns as number,
+        tilecount: ts.tilecount as number,
       };
     });
 
     return {
-      width: rawData.width,
-      height: rawData.height,
-      tileWidth: rawData.tilewidth,
-      tileHeight: rawData.tileheight,
+      width: rawData.width as number,
+      height: rawData.height as number,
+      tileWidth: rawData.tilewidth as number,
+      tileHeight: rawData.tileheight as number,
       layers,
       tilesets,
       version: rawData.version,

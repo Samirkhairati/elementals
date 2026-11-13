@@ -99,19 +99,7 @@ export class WorldEntityOps implements EntityOps {
       if (!route) route = this.world.addComponent(entity, new MoveRouteComponent());
       const queue = route;
 
-      let onAbort: (() => void) | undefined;
-      const request: RouteRequest = {
-        steps,
-        index: 0,
-        phase: "idle",
-        timer: 0,
-        blocked: 0,
-        resolve: (result) => {
-          if (onAbort) signal?.removeEventListener("abort", onAbort);
-          resolve(result);
-        },
-      };
-      onAbort = () => {
+      const onAbort = () => {
         const i = queue.queue.indexOf(request);
         if (i >= 0) queue.queue.splice(i, 1);
         if (i === 0) {
@@ -122,6 +110,17 @@ export class WorldEntityOps implements EntityOps {
           }
         }
         request.resolve({ completed: false, blocked: request.blocked });
+      };
+      const request: RouteRequest = {
+        steps,
+        index: 0,
+        phase: "idle",
+        timer: 0,
+        blocked: 0,
+        resolve: (result) => {
+          signal?.removeEventListener("abort", onAbort);
+          resolve(result);
+        },
       };
       signal?.addEventListener("abort", onAbort, { once: true });
       queue.queue.push(request);

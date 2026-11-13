@@ -52,7 +52,7 @@ interface MapsPanelProps {
   setCreateMapFolderName: (v: string) => void
   setCreateMapFolderDialog: (v: { open: boolean; parentPath?: string | null }) => void
   setRenameInput: (v: string) => void
-  setRenameDialog: (v: any) => void
+  setRenameDialog: (v: { open: boolean; type: 'folder' | 'map-folder' | 'map' | 'layer'; oldPath?: string; oldName?: string; targetFolder?: string | null }) => void
   handleDeleteMapFolder: (folderPath: string) => void
   handleDeleteMap: (folderPath: string | null, fileName: string) => void
   handleExportMap: (m: MapData) => void

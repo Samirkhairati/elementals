@@ -3,6 +3,7 @@ import { usePanZoom } from '@/hooks/usePanZoom'
 import { trackWindowDrag } from '@/lib/windowDrag'
 import { getBoundingBox } from '../canvas/canvasUtils'
 import { TilesetData, TileSelection, CopiedTile, Pos } from '@/types/editor'
+import { TILE_SIZE } from '../../../../../shared/engine/constants'
 
 interface TilesetPreviewProps {
   activeTileset: TilesetData | null
@@ -44,8 +45,8 @@ export function TilesetPreview({
   const getClampedTileCoords = useCallback((clientX: number, clientY: number): Pos | null => {
     if (!imageContainerRef.current || !tilesetDimensions) return null
     const rect = imageContainerRef.current.getBoundingClientRect()
-    const maxTilesX = Math.floor(tilesetDimensions.width / 32)
-    const maxTilesY = Math.floor(tilesetDimensions.height / 32)
+    const maxTilesX = Math.floor(tilesetDimensions.width / TILE_SIZE)
+    const maxTilesY = Math.floor(tilesetDimensions.height / TILE_SIZE)
     if (maxTilesX <= 0 || maxTilesY <= 0) return null
 
     // Calculate position relative to container, scaled by zoom
@@ -53,8 +54,8 @@ export function TilesetPreview({
     const relX = (clientX - rect.left) / currentZoom
     const relY = (clientY - rect.top) / currentZoom
 
-    const tileX = Math.max(0, Math.min(maxTilesX - 1, Math.floor(relX / 32)))
-    const tileY = Math.max(0, Math.min(maxTilesY - 1, Math.floor(relY / 32)))
+    const tileX = Math.max(0, Math.min(maxTilesX - 1, Math.floor(relX / TILE_SIZE)))
+    const tileY = Math.max(0, Math.min(maxTilesY - 1, Math.floor(relY / TILE_SIZE)))
 
     return { x: tileX, y: tileY }
   }, [tilesetDimensions, zoom])
@@ -64,8 +65,8 @@ export function TilesetPreview({
     const current = endPos || tilesetSelectionCurrent || start
     const box = getBoundingBox(start, current)
     if (box && activeTileset && tilesetDimensions) {
-      const maxTilesX = Math.floor(tilesetDimensions.width / 32)
-      const maxTilesY = Math.floor(tilesetDimensions.height / 32)
+      const maxTilesX = Math.floor(tilesetDimensions.width / TILE_SIZE)
+      const maxTilesY = Math.floor(tilesetDimensions.height / TILE_SIZE)
 
       const minX = Math.max(0, Math.min(maxTilesX - 1, box.minX))
       const maxX = Math.max(0, Math.min(maxTilesX - 1, box.maxX))
@@ -190,7 +191,7 @@ export function TilesetPreview({
           />
 
           {tilesetDimensions && (
-            <div className="absolute inset-0 z-20 pointer-events-none" style={{ backgroundImage: 'linear-gradient(to right, rgba(255,255,255,0.2) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.2) 1px, transparent 1px)', backgroundSize: '32px 32px' }}></div>
+            <div className="absolute inset-0 z-20 pointer-events-none" style={{ backgroundImage: 'linear-gradient(to right, rgba(255,255,255,0.2) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.2) 1px, transparent 1px)', backgroundSize: `${TILE_SIZE}px ${TILE_SIZE}px` }}></div>
           )}
 
           {/* Interactive Selection & Hover Layer */}
@@ -211,7 +212,7 @@ export function TilesetPreview({
             {hoverTile && !tilesetSelectionStart && (
               <div
                 className="absolute border border-yellow-400 bg-yellow-400/20 pointer-events-none"
-                style={{ left: hoverTile.x * 32, top: hoverTile.y * 32, width: 32, height: 32 }}
+                style={{ left: hoverTile.x * TILE_SIZE, top: hoverTile.y * TILE_SIZE, width: TILE_SIZE, height: TILE_SIZE }}
               />
             )}
             {(() => {
@@ -219,7 +220,7 @@ export function TilesetPreview({
                 return (
                   <div
                     className="absolute border-2 border-primary bg-primary/30 pointer-events-none shadow-[0_0_10px_rgba(59,130,246,0.5)]"
-                    style={{ left: box.minX * 32, top: box.minY * 32, width: box.width * 32, height: box.height * 32 }}
+                    style={{ left: box.minX * TILE_SIZE, top: box.minY * TILE_SIZE, width: box.width * TILE_SIZE, height: box.height * TILE_SIZE }}
                   />
                 )
               }
@@ -230,7 +231,7 @@ export function TilesetPreview({
                     <div
                       key={i}
                       className="absolute border border-primary bg-primary/30 pointer-events-none"
-                      style={{ left: t.x * 32, top: t.y * 32, width: 32, height: 32 }}
+                      style={{ left: t.x * TILE_SIZE, top: t.y * TILE_SIZE, width: TILE_SIZE, height: TILE_SIZE }}
                     />
                   )
                 })

@@ -63,9 +63,9 @@ export class PhaserTilemapAdapter {
           phaserLayer.setVisible(layerData.name !== "collision" && (layerData.visible ?? true));
 
           // Handle custom z-depth property for layering
-          const zProp = layerData.properties?.find((p: any) => p.name === "z");
+          const zProp = layerData.properties?.find((p) => p.name === "z");
           if (zProp) {
-            phaserLayer.setDepth(zProp.value);
+            phaserLayer.setDepth(zProp.value as number);
           }
 
           const gameLayer = new GameLayer(layerData.name, phaserLayer);

@@ -3,19 +3,20 @@ import { SpriteComponentEditor } from './SpriteComponentEditor'
 import { ColliderComponentEditor } from './ColliderComponentEditor'
 import { MovementComponentEditor } from './MovementComponentEditor'
 import { TagComponentEditor } from './TagComponentEditor'
+import type { PropBag } from '@/types/editor'
 import { EventComponentEditor } from '../events/EventComponentEditor'
 
 /** Props every custom component editor receives from the inspector's ComponentCard. */
 export interface CustomEditorProps {
   entityId: string
   /** Current props of the component being edited. */
-  value: Record<string, any>
+  value: PropBag
   /** Props of all of the entity's components (e.g. Sprite editor needs Transform/Collider). */
-  components: Record<string, Record<string, any>>
+  components: Record<string, PropBag>
   /** Change one prop (history + autosave handled upstream). */
-  onChange: (key: string, value: any) => void
+  onChange: (key: string, value: unknown) => void
   /** Change several props as one history step. */
-  onChangeMany: (patch: Record<string, any>) => void
+  onChangeMany: (patch: PropBag) => void
 }
 
 /**

@@ -2,6 +2,7 @@ import type { CommonEvent } from '../../../shared/engine/common';
 import type { CharacterDef } from '../../../shared/engine/characters';
 import type { CharacterInfo, GraphicInfo } from '../../../shared/engine/graphics';
 import type { GameDatabase } from '../../../shared/engine/types';
+import type { MapData } from './editor';
 
 /** Result of every project-data call: `success: false` carries a readable `error`. */
 type IpcFailure = { success: false; error: string; canceled?: boolean };
@@ -26,9 +27,9 @@ interface ElectronAPI {
   renameTilesetFile: (folderPath: string | null, fileName: string, newStem: string) => Promise<{ success: boolean; fileName?: string; error?: string }>;
   deleteTileset: (folderPath: string | null, fileName: string) => Promise<{ success: boolean; error?: string }>;
   moveTilesetFolder: (folderPath: string, newParent: string | null) => Promise<{ success: boolean; newFolderPath?: string; error?: string }>;
-  getMaps: () => Promise<{ success: boolean; folders?: string[]; maps?: any[]; warnings?: { file: string; error: string }[]; error?: string }>;
-  createMap: (name: string, width: number, height: number, folderPath: string | null, pixelSize?: { width: number; height: number } | null) => Promise<{ success: boolean; map?: any; error?: string }>;
-  saveMap: (folderPath: string | null, fileName: string, mapData: any) => Promise<{ success: boolean; error?: string }>;
+  getMaps: () => Promise<{ success: boolean; folders?: string[]; maps?: MapData[]; warnings?: { file: string; error: string }[]; error?: string }>;
+  createMap: (name: string, width: number, height: number, folderPath: string | null, pixelSize?: { width: number; height: number } | null) => Promise<{ success: boolean; map?: MapData; error?: string }>;
+  saveMap: (folderPath: string | null, fileName: string, mapData: MapData) => Promise<{ success: boolean; error?: string }>;
   deleteMap: (folderPath: string | null, fileName: string) => Promise<{ success: boolean; error?: string }>;
   createMapFolder: (parentPath: string | null, folderName: string) => Promise<{ success: boolean; folderPath?: string; error?: string }>;
   deleteMapFolder: (folderPath: string) => Promise<{ success: boolean; error?: string }>;

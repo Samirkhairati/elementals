@@ -96,7 +96,7 @@ export interface TileSelection {
 }
 
 // Component model comes from the shared engine (shared/engine); the editor-facing shapes below are thin
-// views over it so UI code keeps working with loose `Record<string, any>` props.
+// views over it so UI code keeps working with loose `PropBag` props.
 export type ComponentType = EngineComponentType
 
 /** Form field as the (schema-driven) inspector renders it; derived from the shared `FieldDef`. */
@@ -120,7 +120,7 @@ export interface ComponentFieldDef {
 export interface ComponentSchemaEntry {
   label: string
   singleton?: boolean
-  defaultProps: Record<string, any>
+  defaultProps: PropBag
   fields: ComponentFieldDef[]
   description: string
   /** lucide icon name (kebab-case), e.g. 'footprints' */
@@ -137,7 +137,7 @@ export interface EntityData {
   y: number
   visible?: boolean
   folder?: string | null
-  components: Partial<Record<ComponentType, Record<string, any>>>
+  components: Partial<Record<ComponentType, PropBag>>
 }
 
 export interface EntityFolder {

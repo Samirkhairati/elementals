@@ -13,7 +13,6 @@ import {
   Stamp,
   Info,
   Map as MapIcon,
-  ScanLine,
   Image as ImageIcon,
   Type,
   Zap,

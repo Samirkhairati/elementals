@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo } from 'react'
 import { Maximize, PenLine, RotateCcw, Square } from 'lucide-react'
 import { COMPONENT_SCHEMAS } from '../../../../../shared/engine/components'
 import { FIT_TILE, colliderLocalRect, fitColliderToSprite, normalizeCollider, sameCollider, type ColliderPatch } from '@/lib/entityVisuals'

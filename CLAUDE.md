@@ -97,7 +97,8 @@ editor  --writes-->  project/maps/*.json (editor map format, tile index keyed)
 * **State shape**: one `EditorPage` (`src/routes/editor.tsx`) composes the managers in `src/hooks/editor/` (`useMapManager`, `useLayerManager`, `useEntityManager`,
   `useGridSettings`, `useTilesetManager`...) plus `usePaintTools`, `useHistory`, `useMapAutosave`. It puts everything into one memoised context
   (`components/editor/layout/EditorContext.tsx`); Dockview panels read slices through `useEditorSelector` in `layout/dockview/PanelWrappers.tsx`.
-  Adding editor state means: manager hook -> `EditorContext` type -> the `contextValue` object **and its deps array** in `editor.tsx` -> a wrapper selector.
+  Adding editor state means: manager hook -> `EditorContext` type -> a field of the `contextValue` object in `editor.tsx` (kept stable by `useShallowStable`, so there is no deps array) -> a wrapper selector.
+  `useLayerManager` holds the layers and composes `useImageItems` (the pictures of image layers: placing, picking, groups); an image-layer edit goes through `editImageLayer` (`lib/imageLayerEdit.ts`).
 * Pure logic lives in `src/lib/` (`paintOps`, `layerOrder`, `layerSelection`, `history`, ...) and is unit-tested; hooks are thin wrappers around it. Alias `@/` = `editor/src`.
 * **Dialogs**: Esc closes (Radix). Enter presses the button marked `data-dialog-confirm` (handled once in `components/ui/dialog.tsx`; fields inside a `<form>`, buttons and text areas keep their own Enter). Confirm dialogs use `ConfirmFooter`/`DangerHeader` (`dialogs/ConfirmParts.tsx`): the Delete button takes focus and shows its key. Inline "Delete anyway / Cancel" boxes are `<InlineConfirm>` (`ui/InlineConfirm.tsx`, which mounts `<ConfirmKeys>`). New dialogs: mark the confirm button.
 * **Help text goes in an info icon**: explanations, how-it-works notes and tips are an `InfoTip` (`ui/controls.tsx`, the little "i" that opens on click, or `info=` on `Field`/`Section`) next to the label or title they explain, never a standing paragraph (`ed-hint`) in the layout. Only state ("No images yet", errors, live readouts) stays as visible text.
@@ -107,7 +108,9 @@ editor  --writes-->  project/maps/*.json (editor map format, tile index keyed)
   `fitZoom`/`centredRect` (`lib/canvas2d.ts`); a map preview draws through `drawMapScenery` (`lib/mapScenery.ts`); a mouse drag that leaves the
   element uses `trackWindowDrag`/`trackWindowPan` (`lib/windowDrag.ts`); a hand-made popover closes with `useDismiss` (`hooks/useDismiss.ts`); a
   CSS-transform preview pans and zooms with `usePanZoom`. Game code reading raw map JSON uses `game/src/world/tiledRaw.ts`; `isRecord` comes
-  from `shared/engine/util.ts`; scripts write files with `scripts/lib/atomicWrite.mjs`.
+  from `shared/engine/util.ts`; scripts write files with `scripts/lib/atomicWrite.mjs`. A list row being renamed shows `<RenameInput>` (`ui/RenameInput.tsx`);
+  an object handed to a context or a dependency list is kept stable with `useShallowStable`; where a dock panel opens is the `PANEL_PLACEMENT` table
+  (`layout/dockview/panelPlacement.ts`). `npm run lint` fails on any warning, so fix them as they appear.
 
 ### Layers and the canvas
 

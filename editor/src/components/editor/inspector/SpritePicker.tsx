@@ -2,7 +2,6 @@ import React, { useMemo, useState } from 'react'
 import { Search, X } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import type { SpriteAssetInfo } from '../../../../../shared/engine/types'
-import { EdButton } from '../ui/controls'
 import { SpriteThumb } from '../sprites/SpriteThumb'
 
 interface SpritePickerProps {

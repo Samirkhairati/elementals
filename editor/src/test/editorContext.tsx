@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any -- tests build partial editor contexts and entity props */
 import React from 'react'
 import { render, type RenderResult } from '@testing-library/react'
 import { EditorProvider, type EditorBaseContextValue } from '@/components/editor/layout/EditorContext'

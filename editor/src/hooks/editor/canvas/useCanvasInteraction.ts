@@ -47,7 +47,6 @@ interface UseCanvasInteractionProps {
   commitPlacement?: (x: number, y: number) => void
   cancelPlacement?: () => void
   snapToGrid?: boolean
-  snapEntityPos?: (rawX: number, rawY: number) => { x: number; y: number }
   selectedEntityId?: string | null
   setSelectedEntityId?: (id: string | null) => void
   /** Pinned: a right-drag samples every selected layer instead of only the active one. */
@@ -112,7 +111,6 @@ export function useCanvasInteraction({
   commitPlacement,
   cancelPlacement,
   snapToGrid = true,
-  snapEntityPos,
   selectedEntityId = null,
   setSelectedEntityId,
   pinSelection = false,
@@ -284,13 +282,13 @@ export function useCanvasInteraction({
   )
 
   /** The pixel under the pointer in map space, rounded (nothing when the stage has no pointer yet). */
-  const worldPixel = (): { worldX?: number; worldY?: number } => {
+  const worldPixel = useCallback((): { worldX?: number; worldY?: number } => {
     const stage = stageRef?.current
     const p = stage?.getPointerPosition()
     if (!stage || !p) return {}
     const scale = stage.scaleX() || 1
     return { worldX: Math.round((p.x - stage.x()) / scale), worldY: Math.round((p.y - stage.y()) / scale) }
-  }
+  }, [stageRef])
 
   // ── Right-Click on Entity Handler ────────────────────────────────────────
   const handleRightClickEntity = useCallback(
@@ -478,7 +476,7 @@ export function useCanvasInteraction({
       commitImagePlacement,
       cancelImagePlacement,
       clearImageSelection,
-      snapEntityPos,
+      worldPixel,
     ]
   )
 
@@ -558,7 +556,7 @@ export function useCanvasInteraction({
         handlePaint(coords.x, coords.y)
       }
     },
-    [getTileCoordsFromPointer, isPanningRef, isZoomingRef, handlePaint, stageRef]
+    [getTileCoordsFromPointer, isPanningRef, isZoomingRef, handlePaint, stageRef, pendingImage]
   )
 
   // ── Global Window Drag Listeners (Outside Stage Bounds) ───────────────────

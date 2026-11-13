@@ -6,7 +6,7 @@ import type { Prefab } from "./prefabs/Prefab";
 export class World {
   private nextEntityId: Entity = 1;
   private aliveEntities: Set<Entity> = new Set();
-  private componentPools: Map<ComponentConstructor<any>, Map<Entity, any>> = new Map();
+  private componentPools: Map<ComponentConstructor, Map<Entity, unknown>> = new Map();
   private systems: System[] = [];
 
   // --- Entity Management ---
@@ -48,7 +48,7 @@ export class World {
       throw new Error(`Cannot add component to non-existent entity ${entity}`);
     }
 
-    const ctor = (component as any).constructor as ComponentConstructor<T>;
+    const ctor = (component as { constructor: ComponentConstructor<T> }).constructor;
     let pool = this.componentPools.get(ctor);
     if (!pool) {
       pool = new Map();
@@ -60,7 +60,7 @@ export class World {
   }
 
   public getComponent<T>(entity: Entity, componentClass: ComponentConstructor<T>): T | undefined {
-    return this.componentPools.get(componentClass)?.get(entity);
+    return this.componentPools.get(componentClass)?.get(entity) as T | undefined;
   }
 
   public hasComponent<T>(entity: Entity, componentClass: ComponentConstructor<T>): boolean {
@@ -71,8 +71,8 @@ export class World {
     this.componentPools.get(componentClass)?.delete(entity);
   }
 
-  public getComponents(entity: Entity): any[] {
-    const components: any[] = [];
+  public getComponents(entity: Entity): unknown[] {
+    const components: unknown[] = [];
     for (const pool of this.componentPools.values()) {
       const comp = pool.get(entity);
       if (comp !== undefined) {
@@ -88,7 +88,7 @@ export class World {
     if (componentClasses.length === 0) return [];
 
     // Find smallest pool to minimize checks
-    let smallestPool: Map<Entity, any> | undefined;
+    let smallestPool: Map<Entity, unknown> | undefined;
     for (const cls of componentClasses) {
       const pool = this.componentPools.get(cls);
       if (!pool || pool.size === 0) return [];
@@ -127,7 +127,7 @@ export class World {
     c2: ComponentConstructor<T2>,
     c3: ComponentConstructor<T3>
   ): [Entity, T1, T2, T3][];
-  public view(...classes: ComponentConstructor[]): any[] {
+  public view(...classes: ComponentConstructor[]): unknown[] {
     const entities = this.query(...classes);
     return entities.map((e) => [
       e,

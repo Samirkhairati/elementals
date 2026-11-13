@@ -7,7 +7,7 @@
 //    shape whose sceneFunc reads refs and the stage scale at draw time: no React state per mouse move.
 //  * The per-entity geometry is computed once per entities/assets change, not per frame.
 
-import React, { useCallback, useMemo, useRef } from 'react'
+import React, { useMemo, useRef } from 'react'
 import { Group, Rect, Shape } from 'react-konva'
 import { EntityData, EntityFolder, MapData } from '@/types/editor'
 import type { SpriteAssetInfo } from '../../../../../../shared/engine/types'
@@ -20,7 +20,6 @@ import {
   sortByDepth,
   summarizeEntity,
   translateRect,
-  type ColliderPatch,
   type Rect as GeoRect,
 } from '@/lib/entityVisuals'
 import { drawResolvedSprite, resolveSprite, useSpriteImagesVersion } from '@/lib/spriteImages'
@@ -326,8 +325,6 @@ export const KonvaEntities = React.memo(function KonvaEntities({
   const selected = useMemo(() => infos.find((i) => i.id === selectedEntityId) ?? null, [infos, selectedEntityId])
 
   if (showEntities === false) return null
-
-  const colliderEntity = selected ? { id: selected.id, x: selected.entity.x, y: selected.entity.y, collider: selected.entity.components.Collider } : null
 
   return (
     <Group>

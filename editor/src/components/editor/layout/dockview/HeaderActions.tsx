@@ -16,7 +16,7 @@ export function TilesetsActions() {
   );
 }
 
-export const DefaultHeaderActions = (props: any) => {
+export const DefaultHeaderActions = (props: { group?: { activePanel?: { id?: string } }; panel?: { id?: string } }) => {
   const panelId = props.group?.activePanel?.id || props.panel?.id;
   if (panelId === 'tilesets') return <TilesetsActions />;
   return null;

@@ -1,5 +1,5 @@
 import { withPlacement } from '@/lib/placementKind'
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { graphicAssets } from '@/lib/graphicAssets'
 import { EntityData, Layer, LayerType, MapData } from '@/types/editor'
 import { mapSize, type HistorySnapshot } from '@/lib/history'
@@ -12,6 +12,7 @@ import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { usePaintTools } from '@/hooks/usePaintTools'
 import { useMapAutosave } from '@/hooks/useMapAutosave'
 import { useStableCallback } from '@/hooks/useStableCallback'
+import { useShallowStable } from '@/hooks/useShallowStable'
 import { useTilesetManager } from '@/hooks/editor/useTilesetManager'
 import { useMapManager } from '@/hooks/editor/useMapManager'
 import { useLayerManager } from '@/hooks/editor/useLayerManager'
@@ -130,12 +131,12 @@ export function EditorPage() {
   })
 
   // ── Data Loading Coordinator ─────────────────────────────────────────────
-  const loadData = useCallback(async () => {
+  const loadData = useStableCallback(async () => {
     const [, loadedMaps] = await Promise.all([tilesetManager.loadTilesets(), mapManager.loadMaps()])
     if (loadedMaps && loadedMaps.length > 0 && !mapManager.getActiveMap()) {
       mapManager.onSelectMap(loadedMaps[0])
     }
-  }, [tilesetManager.loadTilesets, mapManager.loadMaps, mapManager.getActiveMap, mapManager.onSelectMap])
+  })
 
   useEffect(() => {
     loadData()
@@ -143,9 +144,7 @@ export function EditorPage() {
 
   // ── Dialogs Hook ─────────────────────────────────────────────────────────
   const dialogs = useEditorDialogs({
-    folders: tilesetManager.folders,
     mapFolders: mapManager.mapFolders,
-    setExpandedFolders: tilesetManager.setExpandedFolders,
     setExpandedMapFolders: mapManager.setExpandedMapFolders,
     loadData,
     onMapCreated: (map) => {
@@ -304,51 +303,36 @@ export function EditorPage() {
   })
 
   // ── Unified Layer & Entity Selection Handlers ─────────────────────────────
-  const handleSelectLayer = useCallback(
-    (layerId: string | null) => {
-      layerManager.setActiveLayerId(layerId)
-      entityManager.setSelectedEntityId(null)
-      setFocusedDomain('layers')
-    },
-    [layerManager.setActiveLayerId, entityManager.setSelectedEntityId, setFocusedDomain]
-  )
+  const handleSelectLayer = useStableCallback((layerId: string | null) => {
+    layerManager.setActiveLayerId(layerId)
+    entityManager.setSelectedEntityId(null)
+    setFocusedDomain('layers')
+  })
 
-  const handleSelectLayerExtended = useCallback(
-    (layerId: string, additive: boolean | 'range' = false) => {
-      layerManager.selectLayer(layerId, additive)
-      entityManager.setSelectedEntityId(null)
-      setFocusedDomain('layers')
-    },
-    [layerManager.selectLayer, entityManager.setSelectedEntityId, setFocusedDomain]
-  )
+  const handleSelectLayerExtended = useStableCallback((layerId: string, additive: boolean | 'range' = false) => {
+    layerManager.selectLayer(layerId, additive)
+    entityManager.setSelectedEntityId(null)
+    setFocusedDomain('layers')
+  })
 
-  const handleSelectEntity = useCallback(
-    (entityId: string | null) => {
-      entityManager.setSelectedEntityId(entityId)
-      if (entityId) {
-        setFocusedDomain('entities')
-      }
-    },
-    [entityManager.setSelectedEntityId, setFocusedDomain]
-  )
+  const handleSelectEntity = useStableCallback((entityId: string | null) => {
+    entityManager.setSelectedEntityId(entityId)
+    if (entityId) {
+      setFocusedDomain('entities')
+    }
+  })
 
-  const handleCreateLayerOfType = useCallback(
-    (type: LayerType, folderId?: string) => {
-      entityManager.setSelectedEntityId(null)
-      setFocusedDomain('layers')
-      layerManager.handleCreateLayerOfType(type, folderId)
-    },
-    [entityManager.setSelectedEntityId, setFocusedDomain, layerManager.handleCreateLayerOfType]
-  )
+  const handleCreateLayerOfType = useStableCallback((type: LayerType, folderId?: string) => {
+    entityManager.setSelectedEntityId(null)
+    setFocusedDomain('layers')
+    layerManager.handleCreateLayerOfType(type, folderId)
+  })
 
-  const handleDuplicateLayer = useCallback(
-    (id: string) => {
-      entityManager.setSelectedEntityId(null)
-      setFocusedDomain('layers')
-      layerManager.handleDuplicateLayer(id)
-    },
-    [entityManager.setSelectedEntityId, setFocusedDomain, layerManager.handleDuplicateLayer]
-  )
+  const handleDuplicateLayer = useStableCallback((id: string) => {
+    entityManager.setSelectedEntityId(null)
+    setFocusedDomain('layers')
+    layerManager.handleDuplicateLayer(id)
+  })
 
   const handleExportMap = useStableCallback((m: MapData) => {
     exportMap(m, tilesetManager.tilesets, mapManager.getActiveMap(), layerManager.getLayers())
@@ -435,12 +419,12 @@ export function EditorPage() {
   })
 
   // ── Context Value for all panels ─────────────────────────────────────────
-  // Memoized so context only re-propagates to all Dockview panels when
-  // something meaningful actually changes — not on every incidental re-render.
+  // Kept the same object while every field is unchanged (useShallowStable), so the context only re-propagates to the
+  // Dockview panels when something actually changed. There is no dependency list: a new field is just added below.
   // Sprites plus plain pictures ("graphic:<id>"), so image-layer items of either kind draw the same way.
   const canvasAssets = useMemo(() => ({ ...sprites.assets, ...graphicAssets(sprites.graphics, sprites.images) }), [sprites.assets, sprites.graphics, sprites.images])
 
-  const contextValue = useMemo<EditorBaseContextValue>(() => ({
+  const contextValue = useShallowStable<EditorBaseContextValue>({
     focusedDomain,
     setFocusedDomain,
     // Maps domain
@@ -656,73 +640,7 @@ export function EditorPage() {
     renameCommonEvent: common.renameEvent,
     setCommonEventGraph: common.setEventGraph,
     removeCommonEvent: common.removeEvent,
-  }), [
-    common.events, common.addEvent, common.renameEvent, common.setEventGraph, common.removeEvent,
-    canvasAssets, sprites.images, sprites.list, sprites.folders, sprites.warnings, sprites.getAsset, sprites.reload, sprites.pickFile,
-    sprites.characters, sprites.graphics, sprites.getCharacter, sprites.importGraphic, sprites.saveCharacter, sprites.rename, sprites.remove,
-    sprites.createFolder, sprites.renameFolder, sprites.moveFolder, sprites.deleteFolder,
-    db.database, db.switches, db.variables, db.getSwitch, db.getVariable, db.addSwitch, db.renameSwitch,
-    db.removeSwitch, db.addVariable, db.renameVariable, db.setVariableInitial, db.removeVariable, db.reload,
-    db.stages, db.getStage, db.addStage, db.renameStage, db.removeStage, db.addStageValue, db.renameStageValue,
-    db.removeStageValue, db.moveStageValue, db.setStageInitial, db.setFolder,
-    focusedDomain, setFocusedDomain,
-    gridSettings.showGrid, gridSettings.setShowGrid, gridSettings.toggleShowGrid,
-    gridSettings.snapToGrid, gridSettings.setSnapToGrid, gridSettings.toggleSnapToGrid,
-    gridSettings.snapEntityPos, gridSettings.snapCoord, gridSettings.snapDimension,
-    entityPlacement.pendingPlacement, entityPlacement.startPlacement, entityPlacement.cancelPlacement,
-    handleCommitPlacement,
-    // Maps
-    mapManager.maps, mapManager.mapFolders, mapManager.activeMap,
-    mapManager.expandedMapFolders, mapManager.toggleMapFolder,
-    mapManager.handleDeleteMapFolder, mapManager.handleDeleteMap,
-    handleExportMap, handleExportMapToGame, handleResizeMap, handleMapSettings, mapManager.handleMapDrop, mapManager.onSelectMap,
-    handleDockClearActiveMap,
-    dialogs.setCreateMapData, dialogs.setCreateMapDialog,
-    dialogs.setCreateMapFolderName, dialogs.setCreateMapFolderDialog,
-    dialogs.setRenameInput, dialogs.setRenameDialog, dialogs.setConfirmDialog,
-    // Layers
-    layerManager.layers, layerManager.activeLayerId, layerManager.activeLayerType,
-    handleSelectLayer, handleSelectLayerExtended, layerManager.toggleLayerVisibility,
-    layerManager.selectedLayerIds, layerManager.justCreatedLayer, layerManager.pinSelection, layerManager.setPinSelection,
-    layerManager.pendingImage, layerManager.startImagePlacement, layerManager.cancelImagePlacement,
-    layerManager.selectedImageId, layerManager.setSelectedImageId, layerManager.resizingImageId, layerManager.setResizingImageId,
-    layerManager.pickedImageIds, layerManager.selectImage, layerManager.openImageGroupId, layerManager.selectImageGroup, layerManager.groupPickedImages, layerManager.createImageGroup, layerManager.setImagesGroup, layerManager.deleteImageGroup, layerManager.ungroupImageGroup, layerManager.renameImageGroup, layerManager.setImageGroupLocked, layerManager.setImageGroupYSort, layerManager.setImagesYSort, layerManager.moveImageGroupTo, layerManager.moveImages, layerManager.deleteImages, layerManager.duplicateImages, layerManager.placeMultiple, layerManager.copyImages, layerManager.pasteImages,
-    layerManager.addImage, layerManager.updateImage, layerManager.deleteImage, layerManager.duplicateImage, layerManager.reorderImage, layerManager.moveImageTo,
-    layerManager.toggleLayerLock, layerManager.setLayerYSort, layerManager.handleDeleteLayer,
-    layerManager.handleReorderLayers, layerManager.toggleFolderCollapsed, layerManager.handleCreateLayer,
-    handleCreateLayerOfType, layerManager.handleRenameLayer,
-    handleDuplicateLayer, layerManager.copyLayers, layerManager.pasteLayers, layerManager.updateLayers, layerManager.setEntitiesIndex,
-    layerManager.activeTool, layerManager.paintMode, layerManager.setActiveTool,
-    layerManager.setPaintMode, layerManager.tileSelection, layerManager.setTileSelection,
-    layerManager.isPainting, layerManager.setIsPainting,
-    layerManager.paintStartPos, layerManager.setPaintStartPos, layerManager.debugInfo,
-    // Entities
-    entityManager.entities, entityManager.selectedEntityId, handleSelectEntity,
-    entityManager.showEntities, entityManager.setShowEntities, entityManager.toggleShowEntities,
-    entityManager.entityFolders, entityManager.createEntityFolder, entityManager.renameEntityFolder,
-    entityManager.deleteEntityFolder, entityManager.toggleEntityFolderVisibility,
-    entityManager.toggleEntityFolderExpanded, entityManager.toggleEntityVisibility,
-    entityManager.moveEntityToFolder,
-    entityManager.createEntity, entityManager.duplicateEntity, entityManager.deleteEntity,
-    entityManager.renameEntity, entityManager.moveEntity, entityManager.setEntityPlacement, entityManager.reorderEntities,
-    entityManager.addComponent, entityManager.removeComponent, entityManager.updateComponentProp,
-    entityManager.updateComponentProps,
-    // History
-    historyState.historyIndex, historyState.history.length,
-    boundHandleUndo, boundHandleRedo,
-    // Paint tools
-    paintTools.handlePaint, paintTools.handlePaintBucket, paintTools.handleRectangleFill,
-    handleCommit,
-    // Tilesets
-    tilesetManager.tilesets, tilesetManager.folders, tilesetManager.activeTileset,
-    tilesetManager.setActiveTileset, tilesetManager.expandedFolders,
-    tilesetManager.toggleFolder,
-    tilesetManager.tilesetDimensions,
-    tilesetManager.setTilesetDimensions, tilesetManager.tilesetSelectionStart,
-    tilesetManager.setTilesetSelectionStart, tilesetManager.tilesetSelectionCurrent,
-    tilesetManager.setTilesetSelectionCurrent, tilesetManager.hoverTile,
-    tilesetManager.setHoverTile,
-  ])
+  })
 
   return (
     <EditorProvider value={contextValue}>

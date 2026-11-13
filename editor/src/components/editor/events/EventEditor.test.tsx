@@ -1,7 +1,7 @@
 import { chooseOption } from '@/test/helpers'
 import React, { useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, screen, within } from '@testing-library/react'
 import type { EventState } from '../../../../../shared/engine/types'
 import { EventEditor } from './EventEditor'
 import { commandNodes, getNode } from '../../../../../shared/engine/graph'

@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
-import { EntityData, ComponentType, MapData, EntityFolder } from '@/types/editor'
+import { EntityData, ComponentType, MapData, EntityFolder, type PropBag } from '@/types/editor'
 import { COMPONENT_REGISTRY } from '@/lib/componentRegistry'
 import { cloneEntity, createDefaultComponent } from '../../../../shared/engine/components'
 import { setEntityFree } from '../../../../shared/engine/placement'
+import type { EngineEntity } from '../../../../shared/engine/types'
 import { useSyncedState } from '@/hooks/useSyncedState'
 import { withCharacterDepth } from '@/lib/entityDepth'
 
@@ -162,7 +163,7 @@ export function useEntityManager(options: UseEntityManagerOptions) {
       name: string,
       x: number = 0,
       y: number = 0,
-      initialComponents?: Partial<Record<ComponentType, Record<string, any>>>,
+      initialComponents?: Partial<Record<ComponentType, PropBag>>,
       folderId?: string | null
     ) => {
       let createdId: string | null = null
@@ -177,7 +178,7 @@ export function useEntityManager(options: UseEntityManagerOptions) {
             cleanName = `Entity ${counter}`
           }
 
-          const defaultComponents: Partial<Record<ComponentType, Record<string, any>>> = {
+          const defaultComponents: Partial<Record<ComponentType, PropBag>> = {
             Transform: {
               ...COMPONENT_REGISTRY.Transform.defaultProps,
               x,
@@ -226,7 +227,7 @@ export function useEntityManager(options: UseEntityManagerOptions) {
             visible: target.visible !== false,
             folder: target.folder || null,
             // fresh event state / command ids so the copy is independent of the original
-            components: cloneEntity(target as any, true).components as EntityData['components'],
+            components: cloneEntity(target as unknown as EngineEntity, true).components as EntityData['components'],
           }
 
           if (cloned.components.Transform) {
@@ -267,7 +268,7 @@ export function useEntityManager(options: UseEntityManagerOptions) {
               y: source.y + 16,
               visible: source.visible !== false,
               folder: source.folder || null,
-              components: cloneEntity(source as any, true).components as EntityData['components'],
+              components: cloneEntity(source as unknown as EngineEntity, true).components as EntityData['components'],
             }
             if (copy.components.Transform) {
               copy.components.Transform.x = copy.x
@@ -338,7 +339,7 @@ export function useEntityManager(options: UseEntityManagerOptions) {
       commitNewEntities(prev => {
         const index = prev.findIndex(e => e.id === id)
         if (index === -1) return prev
-        const next = setEntityFree(prev[index] as any, free) as unknown as EntityData
+        const next = setEntityFree(prev[index] as unknown as EngineEntity, free) as unknown as EntityData
         if (next === (prev[index] as unknown)) return prev
         return prev.map((e, i) => (i === index ? next : e))
       })
@@ -367,7 +368,7 @@ export function useEntityManager(options: UseEntityManagerOptions) {
             return e
           }
 
-          const defaultProps = createDefaultComponent(type) as unknown as Record<string, any>
+          const defaultProps = createDefaultComponent(type) as unknown as PropBag
           if (type === 'Transform') {
             defaultProps.x = e.x
             defaultProps.y = e.y
@@ -404,7 +405,7 @@ export function useEntityManager(options: UseEntityManagerOptions) {
   )
 
   const updateComponentProp = useCallback(
-    (entityId: string, type: ComponentType, key: string, value: any) => {
+    (entityId: string, type: ComponentType, key: string, value: unknown) => {
       commitNewEntities(prev =>
         prev.map(e => {
           if (e.id !== entityId) return e
@@ -437,7 +438,7 @@ export function useEntityManager(options: UseEntityManagerOptions) {
 
   /** Set several props of one component in a single commit (one history step, one save). */
   const updateComponentProps = useCallback(
-    (entityId: string, type: ComponentType, props: Record<string, any>) => {
+    (entityId: string, type: ComponentType, props: PropBag) => {
       commitNewEntities(prev =>
         prev.map(e => {
           if (e.id !== entityId) return e

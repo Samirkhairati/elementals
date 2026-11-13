@@ -145,19 +145,6 @@ describe('createCommand', () => {
   })
 })
 
-// A tree used by the helper tests:
-//  0 text
-//  1 cond(then: [2 wait, 3 loop(body:[4 break])], else: [5 comment])
-//  6 exit
-function tree(): Command[] {
-  const c = (id: string, type: string, extra: Partial<Command> = {}): Command => ({ id, type, params: {}, ...extra })
-  return [
-    c('text', 'showText'),
-    c('cond', 'conditional', { branches: { then: [c('wait', 'wait'), c('loop', 'loop', { branches: { body: [c('break', 'breakLoop')] } })], else: [c('note', 'comment')] } }),
-    c('exit', 'exitEvent'),
-  ]
-}
-
 describe('cloneCommands', () => {
   it('cloneCommands deep copies, optionally with fresh ids, keeping choice option ids', () => {
     const choices = mk('showChoices')

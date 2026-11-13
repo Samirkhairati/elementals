@@ -3,9 +3,7 @@ import { MapData } from '@/types/editor'
 import { mapSaveQueue } from '@/lib/saveQueue'
 
 interface UseEditorDialogsOptions {
-  folders: string[]
   mapFolders: string[]
-  setExpandedFolders: React.Dispatch<React.SetStateAction<Set<string>>>
   setExpandedMapFolders: React.Dispatch<React.SetStateAction<Set<string>>>
   loadData: () => Promise<void>
   onMapCreated?: (map: MapData) => void
@@ -14,9 +12,7 @@ interface UseEditorDialogsOptions {
 
 export function useEditorDialogs(options: UseEditorDialogsOptions) {
   const {
-    folders,
     mapFolders,
-    setExpandedFolders,
     setExpandedMapFolders,
     loadData,
     onMapCreated,
@@ -143,7 +139,7 @@ export function useEditorDialogs(options: UseEditorDialogsOptions) {
       setCreateMapDialog({ open: false })
       document.body.style.pointerEvents = ''
       loadData()
-      onMapCreated?.(res.map)
+      if (res.map) onMapCreated?.(res.map)
     } else {
       alert(res.error)
     }

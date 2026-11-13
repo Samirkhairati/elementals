@@ -307,7 +307,6 @@ const selectCanvas = (c: EditorContextValue) => ({
   handleUpdateComponentProps: c.handleUpdateComponentProps,
   showEntities: c.showEntities,
   entityFolders: c.entityFolders,
-  handleAddComponent: c.handleAddComponent,
   pinSelection: c.pinSelection,
   selectedLayerIds: c.selectedLayerIds,
   pendingImage: c.pendingImage,
@@ -413,7 +412,6 @@ export function CanvasWrapper(props: IDockviewPanelProps) {
         updateComponentProps={ctx.handleUpdateComponentProps}
         showEntities={ctx.showEntities}
         entityFolders={ctx.entityFolders}
-        addComponent={ctx.handleAddComponent}
         pinSelection={isActive ? ctx.pinSelection : false}
         selectedLayerIds={isActive ? ctx.selectedLayerIds : []}
         pendingImage={isActive ? ctx.pendingImage : null}

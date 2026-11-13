@@ -15,6 +15,7 @@ import {
   EntityData,
   ComponentType,
   EntityFolder,
+  type PropBag,
 } from '@/types/editor'
 import { useTilesetImages } from '@/hooks/editor/useTilesetImages'
 import { useCanvasViewport } from '@/hooks/editor/canvas/useCanvasViewport'
@@ -66,13 +67,12 @@ interface MapCanvasProps {
   pendingPlacement?: PendingEntityPlacement | null
   commitPlacement?: (x: number, y: number) => void
   cancelPlacement?: () => void
-  createEntity?: (name: string, x?: number, y?: number, initialComponents?: any) => void
+  createEntity?: (name: string, x?: number, y?: number, initialComponents?: Partial<Record<ComponentType, PropBag>>) => void
   duplicateEntity?: (id: string) => void
   deleteEntity?: (id: string) => void
-  updateComponentProp?: (entityId: string, type: ComponentType, key: string, value: any) => void
+  updateComponentProp?: (entityId: string, type: ComponentType, key: string, value: unknown) => void
   /** Batch variant: applies several props in one commit (one undo step / one save). */
-  updateComponentProps?: (entityId: string, type: ComponentType, props: Record<string, any>) => void
-  addComponent?: (entityId: string, type: ComponentType) => void
+  updateComponentProps?: (entityId: string, type: ComponentType, props: PropBag) => void
   showEntities?: boolean
   entityFolders?: EntityFolder[]
   /** Pinned: a right-drag samples every selected layer. */
@@ -133,7 +133,6 @@ export function MapCanvas({
   deleteEntity,
   updateComponentProp,
   updateComponentProps,
-  addComponent,
   showEntities = true,
   entityFolders = [],
   pinSelection = false,
@@ -224,7 +223,6 @@ export function MapCanvas({
     commitPlacement,
     cancelPlacement,
     snapToGrid,
-    snapEntityPos,
     selectedEntityId,
     setSelectedEntityId,
     pinSelection,
@@ -256,7 +254,7 @@ export function MapCanvas({
   )
 
   const handleUpdateTag = useCallback(
-    (entityId: string, patch: Record<string, any>) => {
+    (entityId: string, patch: PropBag) => {
       if (updateComponentProps) updateComponentProps(entityId, 'Tag', patch)
       else for (const [key, value] of Object.entries(patch)) updateComponentProp?.(entityId, 'Tag', key, value)
     },

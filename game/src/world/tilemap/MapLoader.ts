@@ -17,7 +17,7 @@ export class MapLoader {
   /**
    * Fetches and parses a JSON map from a URL manually (useful if bypassing Phaser's loader).
    */
-  static async fetchMapDetails(url: string): Promise<any> {
+  static async fetchMapDetails(url: string): Promise<unknown> {
     const response = await fetch(url);
     if (!response.ok) {
       throw new Error(`Failed to load tilemap data from ${url}`);

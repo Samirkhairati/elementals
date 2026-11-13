@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ClipboardPaste, FolderOpen } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { clipboardHasFiles, pastedPngs } from '@/lib/droppedFiles'
+import { useStableCallback } from '@/hooks/useStableCallback'
 import { EdButton, InfoTip } from '../ui/controls'
 import { ConfirmFooter } from '../dialogs/ConfirmParts'
 import { ImageThumb } from './browse'
@@ -45,13 +46,14 @@ function ReplaceBody({ id, current, onReplace, onClose }: Props) {
   const pickedRef = useRef(picked)
   pickedRef.current = picked
 
-  const take = async (files: File[], pasted = false) => {
+  // Stable, so the paste listener below (subscribed once) always reads the current picture kind.
+  const take = useStableCallback(async (files: File[], pasted: boolean = false) => {
     const r = await dropCandidates(looseFiles(files.slice(0, 1)), { pasted, accept: [kind] })
     if (!r.ok) return setError(r.error)
     setError('')
     setSize(null)
     setPicked(r.candidates[0])
-  }
+  })
 
   // Ctrl/Cmd+V anywhere in the dialog.
   useEffect(() => {
@@ -62,7 +64,7 @@ function ReplaceBody({ id, current, onReplace, onClose }: Props) {
     }
     window.addEventListener('paste', onPaste)
     return () => window.removeEventListener('paste', onPaste)
-  }, [])
+  }, [take])
 
   // The new picture's size, read from the picture itself.
   useEffect(() => {

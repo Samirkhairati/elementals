@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { previewFrame, validateSpriteMeta as sharedValidateSpriteMeta } from '../shared/engine/sprites';
+import { previewFrame } from '../shared/engine/sprites';
 import { clipFrameAt, clipFrames, effectiveFps, resolveClip } from '../shared/engine/characters';
 import { migrateCharacter } from '../shared/engine/characterMigrate';
 import { FACINGS } from '../shared/engine/constants';

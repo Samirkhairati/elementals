@@ -1,5 +1,5 @@
 import { withPlacement } from '@/lib/placementKind'
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState } from 'react'
 import {
   Edit2,
   Trash2,
@@ -16,7 +16,7 @@ import {
   FolderInput,
   Zap,
 } from 'lucide-react'
-import { EntityData, ComponentType, EntityFolder } from '@/types/editor'
+import { EntityData, ComponentType, EntityFolder, type PropBag } from '@/types/editor'
 import { PRESET_PREFABS } from '@/lib/componentRegistry'
 import { entityIconName, summarizeEntity } from '@/lib/entityVisuals'
 import { openEventEditor } from '@/lib/openEventEditor'
@@ -45,6 +45,7 @@ import {
   ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
+import { RenameInput } from '../ui/RenameInput'
 
 interface EntitiesPanelProps {
   /** Whether a map is open (the panel only needs presence, not the map itself). */
@@ -56,7 +57,7 @@ interface EntitiesPanelProps {
     name: string,
     x?: number,
     y?: number,
-    initialComponents?: Partial<Record<ComponentType, Record<string, any>>>,
+    initialComponents?: Partial<Record<ComponentType, PropBag>>,
     folderId?: string | null
   ) => void
   duplicateEntity: (id: string) => void
@@ -69,7 +70,7 @@ interface EntitiesPanelProps {
     description: string
     action: () => void
   }) => void
-  startPlacement?: (template: { name: string; components?: any; free?: boolean }) => void
+  startPlacement?: (template: { name: string; components?: Partial<Record<ComponentType, PropBag>>; free?: boolean }) => void
   showEntities?: boolean
   toggleShowEntities?: () => void
   entityFolders?: EntityFolder[]
@@ -145,59 +146,21 @@ export function EntitiesPanel({
 }: EntitiesPanelProps) {
   // Inline rename state for entities
   const [editingEntityId, setEditingEntityId] = useState<string | null>(null)
-  const [editingName, setEditingName] = useState('')
-  const inputRef = useRef<HTMLInputElement>(null)
 
   // Inline rename state for folders
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null)
-  const [editingFolderName, setEditingFolderName] = useState('')
-  const folderInputRef = useRef<HTMLInputElement>(null)
 
   // Drag & drop state
   const [draggedEntityId, setDraggedEntityId] = useState<string | null>(null)
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null)
   const [dragOverTarget, setDragOverTarget] = useState<{ id: string; position: 'top' | 'bottom' } | null>(null)
 
-  useEffect(() => {
-    if (editingEntityId && inputRef.current) {
-      inputRef.current.focus()
-      inputRef.current.select()
-    }
-  }, [editingEntityId])
-
-  useEffect(() => {
-    if (editingFolderId && folderInputRef.current) {
-      folderInputRef.current.focus()
-      folderInputRef.current.select()
-    }
-  }, [editingFolderId])
-
   const startEditingEntity = (entity: EntityData) => {
     setEditingEntityId(entity.id)
-    setEditingName(entity.name)
-  }
-
-  const commitEditingEntity = (id: string) => {
-    if (editingEntityId === id) {
-      if (editingName.trim()) {
-        renameEntity(id, editingName.trim())
-      }
-      setEditingEntityId(null)
-    }
   }
 
   const startEditingFolder = (folder: EntityFolder) => {
     setEditingFolderId(folder.id)
-    setEditingFolderName(folder.name)
-  }
-
-  const commitEditingFolder = (id: string) => {
-    if (editingFolderId === id) {
-      if (editingFolderName.trim()) {
-        renameEntityFolder?.(id, editingFolderName.trim())
-      }
-      setEditingFolderId(null)
-    }
   }
 
   const handleDragStart = (e: React.DragEvent, id: string) => {
@@ -371,19 +334,7 @@ export function EntitiesPanel({
             </div>
 
             {isEditing ? (
-              <input
-                ref={inputRef}
-                type="text"
-                value={editingName}
-                onChange={e => setEditingName(e.target.value)}
-                onBlur={() => commitEditingEntity(entity.id)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') commitEditingEntity(entity.id)
-                  if (e.key === 'Escape') setEditingEntityId(null)
-                }}
-                onClick={e => e.stopPropagation()}
-                className="ed-input h-row-sm min-w-0 flex-1 border-primary/60"
-              />
+              <RenameInput initial={entity.name} label="Entity name" onRename={(name) => renameEntity(entity.id, name)} onClose={() => setEditingEntityId(null)} className="h-row-sm border-primary/60" />
             ) : (
               <span className="ed-row-label" title={entity.name}>{entity.name}</span>
             )}
@@ -594,19 +545,7 @@ export function EntitiesPanel({
                         {isExpanded ? <FolderOpen className="text-amber-400" /> : <Folder className="text-amber-400" />}
 
                         {isEditing ? (
-                          <input
-                            ref={folderInputRef}
-                            type="text"
-                            value={editingFolderName}
-                            onChange={e => setEditingFolderName(e.target.value)}
-                            onBlur={() => commitEditingFolder(folder.id)}
-                            onKeyDown={e => {
-                              if (e.key === 'Enter') commitEditingFolder(folder.id)
-                              if (e.key === 'Escape') setEditingFolderId(null)
-                            }}
-                            onClick={e => e.stopPropagation()}
-                            className="ed-input h-row-sm min-w-0 flex-1 border-amber-400/60"
-                          />
+                          <RenameInput initial={folder.name} label="Folder name" onRename={(name) => renameEntityFolder?.(folder.id, name)} onClose={() => setEditingFolderId(null)} className="h-row-sm border-amber-400/60" />
                         ) : (
                           <span className="ed-row-label font-medium" title={folder.name}>
                             {folder.name}

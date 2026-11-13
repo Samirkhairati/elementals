@@ -1,9 +1,9 @@
 import { useState, useCallback, useEffect } from 'react'
-import { ComponentType } from '@/types/editor'
+import { ComponentType, type PropBag } from '@/types/editor'
 
 export interface PendingEntityPlacement {
   name: string
-  components?: Partial<Record<ComponentType, Record<string, any>>>
+  components?: Partial<Record<ComponentType, PropBag>>
   /** A free entity (any pixel, any size) instead of a tile-based one. */
   free?: boolean
 }

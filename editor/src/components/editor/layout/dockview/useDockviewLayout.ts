@@ -1,8 +1,9 @@
-import React, { useRef, useState, useCallback, useEffect } from 'react';
-import { DockviewApi, DockviewReadyEvent } from 'dockview-react';
+import { useRef, useState, useCallback, useEffect } from 'react';
+import { DockviewApi, DockviewReadyEvent, type IDockviewPanel } from 'dockview-react';
 import type { SerializedDockview } from 'dockview-core';
 import { ALL_PANELS, PanelId, getMapPanelId, isMapPanelId, parseMapPanelId } from './types';
 import { MapData } from '@/types/editor';
+import { PANEL_PLACEMENT, panelPosition } from './panelPlacement';
 
 // The layout survives leaving the Map view (the page unmounts) and a reload: it is kept in memory and in
 // localStorage, written whenever dockview reports a layout change, and read back when the dock is ready.
@@ -109,7 +110,7 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
 
   const buildDefaultLayout = useCallback((api: DockviewApi) => {
     const currentActiveMap = optionsRef.current.activeMap;
-    let centerPanel: any = null;
+    let centerPanel: IDockviewPanel | null = null;
 
     if (currentActiveMap) {
       const mapPanelId = getMapPanelId(currentActiveMap.folderPath, currentActiveMap.fileName);
@@ -522,226 +523,16 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
       return;
     }
 
-    const firstMapPanel = api.panels.find((p) => isMapPanelId(p.id));
-
-    switch (id) {
-      case 'maps': {
-        const ref = api.getPanel('layers') || api.getPanel('entities') || api.getPanel('properties');
-        if (ref) {
-          api.addPanel({
-            id: 'maps',
-            component: 'maps',
-            title: 'MAPS',
-            position: { referencePanel: ref, direction: 'above' }
-          });
-        } else if (firstMapPanel) {
-          api.addPanel({
-            id: 'maps',
-            component: 'maps',
-            title: 'MAPS',
-            position: { referencePanel: firstMapPanel, direction: 'left' }
-          });
-        } else {
-          api.addPanel({ id: 'maps', component: 'maps', title: 'MAPS' });
-        }
-        break;
-      }
-      case 'layers': {
-        const ref = api.getPanel('maps');
-        const refBelow = api.getPanel('properties');
-        const refEntities = api.getPanel('entities');
-        if (refEntities) {
-          api.addPanel({
-            id: 'layers',
-            component: 'layers',
-            title: 'LAYERS',
-            position: { referencePanel: refEntities, direction: 'within' }
-          });
-        } else if (ref) {
-          api.addPanel({
-            id: 'layers',
-            component: 'layers',
-            title: 'LAYERS',
-            position: { referencePanel: ref, direction: 'below' }
-          });
-        } else if (refBelow) {
-          api.addPanel({
-            id: 'layers',
-            component: 'layers',
-            title: 'LAYERS',
-            position: { referencePanel: refBelow, direction: 'above' }
-          });
-        } else if (firstMapPanel) {
-          api.addPanel({
-            id: 'layers',
-            component: 'layers',
-            title: 'LAYERS',
-            position: { referencePanel: firstMapPanel, direction: 'left' }
-          });
-        } else {
-          api.addPanel({ id: 'layers', component: 'layers', title: 'LAYERS' });
-        }
-        break;
-      }
-      case 'entities': {
-        const refLayers = api.getPanel('layers');
-        const refMaps = api.getPanel('maps');
-        const refProps = api.getPanel('properties');
-        if (refLayers) {
-          api.addPanel({
-            id: 'entities',
-            component: 'entities',
-            title: 'ENTITIES',
-            position: { referencePanel: refLayers, direction: 'within' }
-          });
-        } else if (refMaps) {
-          api.addPanel({
-            id: 'entities',
-            component: 'entities',
-            title: 'ENTITIES',
-            position: { referencePanel: refMaps, direction: 'below' }
-          });
-        } else if (refProps) {
-          api.addPanel({
-            id: 'entities',
-            component: 'entities',
-            title: 'ENTITIES',
-            position: { referencePanel: refProps, direction: 'above' }
-          });
-        } else if (firstMapPanel) {
-          api.addPanel({
-            id: 'entities',
-            component: 'entities',
-            title: 'ENTITIES',
-            position: { referencePanel: firstMapPanel, direction: 'left' }
-          });
-        } else {
-          api.addPanel({ id: 'entities', component: 'entities', title: 'ENTITIES' });
-        }
-        break;
-      }
-      case 'properties': {
-        const ref = api.getPanel('layers') || api.getPanel('entities') || api.getPanel('maps');
-        if (ref) {
-          api.addPanel({
-            id: 'properties',
-            component: 'properties',
-            title: 'PROPERTIES',
-            position: { referencePanel: ref, direction: 'below' }
-          });
-        } else if (firstMapPanel) {
-          api.addPanel({
-            id: 'properties',
-            component: 'properties',
-            title: 'PROPERTIES',
-            position: { referencePanel: firstMapPanel, direction: 'left' }
-          });
-        } else {
-          api.addPanel({ id: 'properties', component: 'properties', title: 'PROPERTIES' });
-        }
-        break;
-      }
-      case 'tilesets': {
-        const refBelow = api.getPanel('preview') || api.getPanel('activeSelection');
-        if (refBelow) {
-          api.addPanel({
-            id: 'tilesets',
-            component: 'tilesets',
-            title: 'TILESET BROWSER',
-            position: { referencePanel: refBelow, direction: 'above' }
-          });
-        } else if (firstMapPanel) {
-          api.addPanel({
-            id: 'tilesets',
-            component: 'tilesets',
-            title: 'TILESET BROWSER',
-            position: { referencePanel: firstMapPanel, direction: 'right' }
-          });
-        } else {
-          api.addPanel({ id: 'tilesets', component: 'tilesets', title: 'TILESET BROWSER' });
-        }
-        break;
-      }
-      case 'preview': {
-        const refAbove = api.getPanel('tilesets');
-        const refBelow = api.getPanel('activeSelection');
-        if (refAbove) {
-          api.addPanel({
-            id: 'preview',
-            component: 'preview',
-            title: 'TILESET',
-            position: { referencePanel: refAbove, direction: 'below' }
-          });
-        } else if (refBelow) {
-          api.addPanel({
-            id: 'preview',
-            component: 'preview',
-            title: 'TILESET',
-            position: { referencePanel: refBelow, direction: 'above' }
-          });
-        } else if (firstMapPanel) {
-          api.addPanel({
-            id: 'preview',
-            component: 'preview',
-            title: 'TILESET',
-            position: { referencePanel: firstMapPanel, direction: 'right' }
-          });
-        } else {
-          api.addPanel({ id: 'preview', component: 'preview', title: 'TILESET' });
-        }
-        break;
-      }
-      case 'activeSelection': {
-        const refAbove = api.getPanel('preview') || api.getPanel('tilesets');
-        if (refAbove) {
-          api.addPanel({
-            id: 'activeSelection',
-            component: 'activeSelection',
-            title: 'ACTIVE SELECTION',
-            position: { referencePanel: refAbove, direction: 'below' }
-          });
-        } else if (firstMapPanel) {
-          api.addPanel({
-            id: 'activeSelection',
-            component: 'activeSelection',
-            title: 'ACTIVE SELECTION',
-            position: { referencePanel: firstMapPanel, direction: 'right' }
-          });
-        } else {
-          api.addPanel({ id: 'activeSelection', component: 'activeSelection', title: 'ACTIVE SELECTION' });
-        }
-        break;
-      }
-      case 'database': {
-        // On-demand panel: opens as a tab next to the Tileset Browser (right column).
-        const refRight = api.getPanel('tilesets') || api.getPanel('preview') || api.getPanel('activeSelection');
-        if (refRight) {
-          api.addPanel({
-            id,
-            component: id,
-            title: 'DATABASE',
-            position: { referencePanel: refRight, direction: 'within' }
-          });
-        } else if (firstMapPanel) {
-          api.addPanel({
-            id,
-            component: id,
-            title: 'DATABASE',
-            position: { referencePanel: firstMapPanel, direction: 'right' }
-          });
-        } else {
-          api.addPanel({ id, component: id, title: 'DATABASE' });
-        }
-        break;
-      }
-      case 'canvas': {
-        if (optionsRef.current.activeMap) {
-          openMapTab(optionsRef.current.activeMap);
-        } else if (optionsRef.current.maps && optionsRef.current.maps.length > 0) {
-          openMapTab(optionsRef.current.maps[0]);
-        }
-        break;
-      }
+    const placement = PANEL_PLACEMENT[id];
+    if (placement) {
+      const firstMapPanel = api.panels.find((p) => isMapPanelId(p.id))?.id ?? null;
+      const position = panelPosition(placement, (other) => !!api.getPanel(other), firstMapPanel);
+      const reference = position && api.getPanel(position.referencePanel);
+      api.addPanel({ id, component: id, title: placement.title, ...(position && reference ? { position: { referencePanel: reference, direction: position.direction } } : {}) });
+    } else if (id === 'canvas') {
+      const { activeMap, maps } = optionsRef.current;
+      const map = activeMap ?? maps?.[0];
+      if (map) openMapTab(map);
     }
 
     api.layout(api.width, api.height);
@@ -791,8 +582,9 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
       resetLayout();
     });
 
-    const handleCustomToggle = (e: any) => {
-      if (e.detail) togglePanel(e.detail);
+    const handleCustomToggle = (e: Event) => {
+      const detail = (e as CustomEvent<string>).detail;
+      if (detail) togglePanel(detail);
     };
     const handleCustomReset = () => {
       resetLayout();

@@ -1,3 +1,9 @@
+export interface LayerProperty {
+  name: string;
+  type?: string;
+  value: unknown;
+}
+
 export interface LayerData {
   id: number;
   name: string;
@@ -9,8 +15,8 @@ export interface LayerData {
   width?: number; // Tilelayer only
   height?: number; // Tilelayer only
   data?: number[]; // Tilelayer only, 1D array of GIDs
-  objects?: any[]; // Objectgroup only
-  properties?: any[]; // Custom properties
+  objects?: unknown[]; // Objectgroup only
+  properties?: LayerProperty[]; // Custom properties
 }
 
 export interface TilesetData {

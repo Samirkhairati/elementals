@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { validateCharacter, type CharacterDef } from '../../../shared/engine/characters'
+import { validateCharacter } from '../../../shared/engine/characters'
 import {
   KIND_LABELS, KIND_ORDER, PRESET_FOLDERS, addClip, addSheet, autoAssignRows, characterKind, cutFromGrid, deleteClip, facingChangeImpact, framesFor, marqueeFrames, newCharacter, pickFrame, removeSheet,
   renameClip, rowFrames, setBinding, setDirectional, setFacingMode, setFrames, setMirror, setPivot, setTags, sheetSummary, sheetUsers, slugify, suggestGrid, uniqueKey, updateClip, updateSheet,

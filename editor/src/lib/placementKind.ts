@@ -2,9 +2,9 @@
 
 import { COMPONENT_SCHEMAS } from '../../../shared/engine/components'
 import { snapAnchorToTile } from '../../../shared/engine/placement'
-import type { ComponentType } from '@/types/editor'
+import type { ComponentType, PropBag } from '@/types/editor'
 
-type Components = Partial<Record<ComponentType, Record<string, any>>>
+type Components = Partial<Record<ComponentType, PropBag>>
 
 /** `components` (a prefab's, or none for an empty entity) with the Transform marked tile-based or free. */
 export function withPlacement(components: Components | undefined, free: boolean): Components {

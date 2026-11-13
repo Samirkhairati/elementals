@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   Layers as LayersIcon,
   XSquare,
@@ -42,6 +42,7 @@ import {
   ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
+import { RenameInput } from '../ui/RenameInput'
 
 function getLayerIcon(type: LayerType) {
   switch (type) {
@@ -240,19 +241,8 @@ export function LayersPanel({
   } | null>(null)
   const canPasteLayers = useEditorClipboard((s) => s.content?.kind === 'layers')
   const [editingLayerId, setEditingLayerId] = useState<string | null>(null)
-  const [editingName, setEditingName] = useState('')
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    if (editingLayerId && inputRef.current) {
-      inputRef.current.focus()
-      inputRef.current.select()
-    }
-  }, [editingLayerId])
-
   const startEditing = (layer: Layer) => {
     setEditingLayerId(layer.id)
-    setEditingName(layer.name)
   }
 
   // A layer or folder that was just created opens its name for typing, so Ctrl+N then a name is all it takes.
@@ -262,13 +252,6 @@ export function LayersPanel({
     if (made) startEditing(made)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [justCreatedLayer?.n])
-
-  const commitEditing = (id: string) => {
-    if (editingName.trim()) {
-      renameLayer(id, editingName.trim())
-    }
-    setEditingLayerId(null)
-  }
 
   const handleDragStart = (e: React.DragEvent, id: string) => {
     setDraggedLayerId(id)
@@ -451,19 +434,7 @@ export function LayersPanel({
                     {isFolderRow ? (layer.collapsed ? <FolderIcon className="text-yellow-400" /> : <FolderOpen className="text-yellow-400" />) : getLayerIcon(layer.type)}
 
                     {isEditing ? (
-                      <input
-                        ref={inputRef}
-                        type="text"
-                        value={editingName}
-                        onChange={(e) => setEditingName(e.target.value)}
-                        onBlur={() => commitEditing(layer.id)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') commitEditing(layer.id)
-                          if (e.key === 'Escape') setEditingLayerId(null)
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                        className="ed-input h-row-sm min-w-0 flex-1 border-primary/60"
-                      />
+                      <RenameInput initial={layer.name} label="Layer name" onRename={(name) => renameLayer(layer.id, name)} onClose={() => setEditingLayerId(null)} className="h-row-sm border-primary/60" />
                     ) : (
                       <span className="ed-row-label" title={layer.name}>{layer.name}</span>
                     )}
