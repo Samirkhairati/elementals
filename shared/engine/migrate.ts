@@ -23,6 +23,7 @@
 //   schemaVersion 5: the trigger names action / playerTouch / eventTouch / autorun / parallel become a start kind
 //   plus `blocks` (autorun and parallel also `repeat`); see triggers.ts.
 
+import { migrateCollisionLayers } from '../collisionLayers.ts';
 import type { Command, EngineEntity, EventState, LegacyComponentType } from './types.ts';
 import { SCHEMA_VERSION } from './types.ts';
 import { createCommand } from './commands.ts';
@@ -277,6 +278,15 @@ export function migrateMap<T extends object>(map: T): MigrateResult<T> {
     if (entitiesChanged) {
       out.entities = entities;
       changed = true;
+    }
+  }
+
+  // Old `polygons` layers become collision layers (shared/collisionLayers.ts).
+  if (Array.isArray(map.layers)) {
+    const layers = migrateCollisionLayers(map.layers)
+    if (layers.changed) {
+      out.layers = layers.value
+      changed = true
     }
   }
 

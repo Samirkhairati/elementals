@@ -4,7 +4,7 @@
 
 import { characterToAssetInfo, type GraphicInfo } from '../../../shared/engine/graphics'
 import type { SpriteAssetInfo } from '../../../shared/engine/types'
-import { newCharacter } from './characterEdit'
+import { newCharacter, newGifCharacter } from './characterEdit'
 
 /** What an image-layer item points at: a sprite or a picture. */
 export interface ImagePick {
@@ -33,10 +33,10 @@ export const imagePickName = (pick: ImagePick): string => {
   return id.slice(id.lastIndexOf('/') + 1).replace(/\.png$/i, '')
 }
 
-/** A picture as one still frame (the whole image) anchored bottom-centre. */
+/** A picture as one still frame (the whole image) anchored bottom-centre; a GIF as one frame of its sheet (its own frame size). */
 export function graphicAsset(graphic: GraphicInfo, url: string): SpriteAssetInfo {
-  const name = graphic.id.slice(graphic.id.lastIndexOf('/') + 1).replace(/\.png$/i, '')
-  const def = newCharacter('prop', name, graphic.id, graphic)
+  const name = graphic.id.slice(graphic.id.lastIndexOf('/') + 1).replace(/\.(png|gif)$/i, '')
+  const def = graphic.gif ? newGifCharacter(name, graphic) : newCharacter('prop', name, graphic.id, graphic)
   return characterToAssetInfo({ id: graphicAssetKey(graphic.id), def, images: { [graphic.id]: url } }) as SpriteAssetInfo
 }
 

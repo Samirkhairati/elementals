@@ -1,7 +1,6 @@
 export type PanelId =
   | 'maps'
   | 'layers'
-  | 'entities'
   | 'properties'
   | 'canvas'
   | 'tilesets'
@@ -20,7 +19,6 @@ export interface PanelInfo {
 export const ALL_PANELS: PanelInfo[] = [
   { id: 'maps', title: 'Maps', column: 'left', shortcut: 'Alt+M' },
   { id: 'layers', title: 'Layers', column: 'left', shortcut: 'Alt+L' },
-  { id: 'entities', title: 'Entities', column: 'left', shortcut: 'Alt+E' },
   { id: 'properties', title: 'Properties', column: 'left', shortcut: 'Alt+P' },
   { id: 'canvas', title: 'Canvas', column: 'center', shortcut: 'Alt+C' },
   { id: 'tilesets', title: 'Tileset Browser', column: 'right', shortcut: 'Alt+T' },
@@ -32,7 +30,7 @@ export const ALL_PANELS: PanelInfo[] = [
 ];
 
 /** Panels that exist in the default layout; the others are opened on demand. */
-export const DEFAULT_PANEL_IDS: PanelId[] = ['maps', 'layers', 'entities', 'properties', 'canvas', 'tilesets', 'preview', 'activeSelection'];
+export const DEFAULT_PANEL_IDS: PanelId[] = ['maps', 'layers', 'properties', 'canvas', 'tilesets', 'preview', 'activeSelection'];
 
 export function getMapPanelId(folderPath: string | null, fileName: string): string {
   const folder = folderPath ? encodeURIComponent(folderPath) : '__root__';

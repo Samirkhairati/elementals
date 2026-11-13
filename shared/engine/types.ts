@@ -37,9 +37,9 @@ export interface TransformProps {
   /** Draw order. Higher draws on top. Characters default to 20, objects to 10, flat triggers to 5. */
   depth: number;
   /**
-   * Free entity: it may sit at any pixel position and its Collider (and sprite) may have any size and offset.
-   * Off (the default, and what every entity written before this flag has): a tile-based entity, whose anchor is
-   * the bottom-centre of a tile (`x = col*32+16`, `y = (row+1)*32`) and whose collider covers whole tiles.
+   * Derived from the position, never chosen (`withDerivedFree`): true when the anchor is off the tile grid
+   * (`x = col*32+16`, `y = (row+1)*32`), so the game keeps the entity on its pixel position and steps from there.
+   * Off (the default, and what every entity written before this flag has) when the anchor is a tile anchor.
    */
   free: boolean;
 }

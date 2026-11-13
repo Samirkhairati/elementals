@@ -57,7 +57,7 @@ function mountLayout(options: { entityFocus?: boolean; imageFocus?: boolean } = 
   return { ...fake, hook }
 }
 
-const DEFAULT_OPEN = ['empty_canvas', 'maps', 'layers', 'entities', 'properties', 'tilesets', 'inspector', 'images', 'preview', 'activeSelection']
+const DEFAULT_OPEN = ['empty_canvas', 'maps', 'layers', 'properties', 'tilesets', 'inspector', 'images', 'collision', 'preview', 'activeSelection']
 
 describe('panel registry', () => {
   it('lists the Database in the right column with its shortcut', () => {
@@ -66,7 +66,7 @@ describe('panel registry', () => {
   })
 
   it('keeps the default layout unchanged: the new panels are on demand only', () => {
-    expect(DEFAULT_PANEL_IDS).toEqual(['maps', 'layers', 'entities', 'properties', 'canvas', 'tilesets', 'preview', 'activeSelection'])
+    expect(DEFAULT_PANEL_IDS).toEqual(['maps', 'layers', 'properties', 'canvas', 'tilesets', 'preview', 'activeSelection'])
     expect(DEFAULT_PANEL_IDS).not.toContain('database')
   })
 
@@ -272,10 +272,9 @@ describe('useDockviewLayout with the new panels', () => {
   describe('remembered layout', () => {
     afterEach(() => writeSavedLayout(null))
 
-    it('shows Layers first: Entities is added as a tab behind it', () => {
+    it('has no separate Entities panel any more (the entities are part of the Layers panel)', () => {
       const { addPanel } = mountLayout()
-      const entities = addPanel.mock.calls.map((c) => c[0] as { id: string; inactive?: boolean }).find((c) => c.id === 'entities')
-      expect(entities?.inactive).toBe(true)
+      expect(addPanel.mock.calls.map((c) => (c[0] as { id: string }).id)).not.toContain('entities')
     })
 
     it('restores the saved layout instead of building the default one, and saves every change', () => {

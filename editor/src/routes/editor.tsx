@@ -1,4 +1,3 @@
-import { withPlacement } from '@/lib/placementKind'
 import { useState, useEffect, useMemo } from 'react'
 import { graphicAssets } from '@/lib/graphicAssets'
 import { EntityData, Layer, LayerType, MapData } from '@/types/editor'
@@ -146,7 +145,7 @@ export function EditorPage() {
         entityPlacement.pendingPlacement.name,
         x,
         y,
-        withPlacement(entityPlacement.pendingPlacement.components, entityPlacement.pendingPlacement.free === true)
+        entityPlacement.pendingPlacement.components
       )
       entityPlacement.cancelPlacement()
     }
@@ -557,7 +556,6 @@ export function EditorPage() {
     handleDeleteEntity: entityManager.deleteEntity,
     handleRenameEntity: entityManager.renameEntity,
     handleMoveEntity: entityManager.moveEntity,
-    handleSetEntityPlacement: entityManager.setEntityPlacement,
     handleReorderEntities: entityManager.reorderEntities,
     handleAddComponent: entityManager.addComponent,
     handleRemoveComponent: entityManager.removeComponent,

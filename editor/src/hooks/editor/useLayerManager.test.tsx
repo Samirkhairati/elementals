@@ -67,13 +67,19 @@ describe('useLayerManager (StrictMode)', () => {
     expect(onCommitHistory.mock.calls[1][0].map((l: Layer) => l.name)).toEqual(['Objects', 'Ground'])
   })
 
-  it('keeps special layers above new tile layers and enforces singletons', () => {
+  it('keeps special layers above new tile layers; one terrain layer per map, collision layers can be many', () => {
     const { result, onCommitHistory } = setup()
-    act(() => result.current.manager.handleCreateLayerOfType('collision'))
-    act(() => result.current.manager.handleCreateLayerOfType('collision')) // duplicate -> ignored
+    act(() => result.current.manager.handleCreateLayerOfType('terrain'))
+    act(() => result.current.manager.handleCreateLayerOfType('terrain')) // duplicate -> ignored
     expect(onCommitHistory).toHaveBeenCalledTimes(1)
+    act(() => result.current.manager.handleCreateLayerOfType('collision'))
+    act(() => result.current.manager.handleCreateLayerOfType('collision'))
+    expect(onCommitHistory).toHaveBeenCalledTimes(3)
     act(() => result.current.manager.handleCreateLayerOfType('tile'))
-    expect(result.current.manager.layers.map(l => l.type)).toEqual(['collision', 'tile', 'tile'])
+    expect(result.current.manager.layers.map(l => l.type)).toEqual(['collision', 'collision', 'terrain', 'tile', 'tile'])
+    const cols = result.current.manager.layers.filter(l => l.type === 'collision')
+    expect(cols.map(l => l.name).sort()).toEqual(['Collision', 'Collision 2'])
+    expect(cols[0]).toMatchObject({ data: {}, shapes: [], tileGroups: [] })
   })
 
   it('duplicates a layer with an independent copy of its data and selects it', () => {

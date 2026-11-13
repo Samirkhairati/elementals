@@ -11,6 +11,7 @@ import { mapPixelSize } from './mapSize.ts'
 import { isUsableShape } from './collisionShapes.ts'
 import { cleanLookSet } from './look/schema.ts'
 import type { LookSet } from './look/types.ts'
+import { migrateCollisionLayers } from './collisionLayers.ts'
 
 export const TILE_SIZE = 32
 export const COLLISION_TILESET_ID = '__collision__'
@@ -26,7 +27,7 @@ export function lookProperty(look: LookSet | undefined): TiledProperty[] {
 export function collectUsedTilesetIds(map: Pick<EditorMap, 'layers'>): string[] {
   const used = new Set<string>()
   for (const layer of map.layers || []) {
-    if (layer.type === 'collision' || layer.type === 'image') continue
+    if (layer.type === 'collision' || layer.type === 'polygons' || layer.type === 'image') continue
     for (const tile of Object.values(layer.data || {})) {
       used.add(tile.tilesetId)
     }
@@ -35,10 +36,10 @@ export function collectUsedTilesetIds(map: Pick<EditorMap, 'layers'>): string[] 
 }
 
 function tiledLayerType(layer: EditorLayer): TiledLayer['type'] {
-  return layer.type === 'objects' || layer.type === 'image' || layer.type === 'polygons' ? 'objectgroup' : 'tilelayer'
+  return layer.type === 'objects' || layer.type === 'image' ? 'objectgroup' : 'tilelayer'
 }
 
-/** A polygon layer's usable shapes as Tiled objects: x / y = the first point, `polygon` (closed) or `polyline` (open) relative to it. */
+/** A collision layer's usable shapes as Tiled objects: x / y = the first point, `polygon` (closed) or `polyline` (open) relative to it. */
 function shapeObjects(layer: EditorLayer, nextId: () => number): TiledObject[] {
   return (layer.shapes || []).filter(isUsableShape).map((shape) => {
     const [first] = shape.points
@@ -103,9 +104,18 @@ export function convertEditorMapToTiled(map: EditorMap, tilesets: TilesetInfo[])
   // Legacy entities (SpriteView, Interactable, ...) are converted so the game only ever sees the
   // canonical components; the exported map is always stamped with the schema version.
   const migrated = migrateMap(map).value
-  // Folders only group layers in the editor's list; the game gets the layers themselves.
-  const layers = (map.layers || []).filter((l) => l.type !== 'folder')
-  const hasCollisionLayer = layers.some((l) => l.type === 'collision')
+  // Folders only group layers in the editor's list; the game gets the layers themselves. Old `polygons` layers are
+  // collision layers (shared/collisionLayers.ts).
+  const layers = migrateCollisionLayers(map.layers || []).value.filter((l) => l.type !== 'folder')
+  const collisionLayers = layers.filter((l) => l.type === 'collision')
+  // The game reads one tile layer named `collision`: the cells of every collision layer, written where the first
+  // collision layer with painted cells is (with none painted, where the first one holding no shapes either is, as an
+  // empty layer; a map with only shapes gets no collision tile layer).
+  const tileCollisionLayer =
+    collisionLayers.find((l) => Object.keys(l.data || {}).length > 0) ?? collisionLayers.find((l) => (l.shapes || []).length === 0)
+  const hasCollisionLayer = tileCollisionLayer !== undefined
+  const collisionCells = new Set<number>()
+  for (const l of collisionLayers) for (const key of Object.keys(l.data || {})) collisionCells.add(Number(key))
 
   const exportTilesets: TiledTileset[] = []
   let currentGid = 1
@@ -155,26 +165,48 @@ export function convertEditorMapToTiled(map: EditorMap, tilesets: TilesetInfo[])
   let objectId = 1
   const nextObjectId = () => objectId++
 
-  const exportLayers: TiledLayer[] = layers.map((layer, index) => {
-    if (layer.type === 'polygons') {
-      // Collision data: the game blocks movement with these whether the layer is shown in the editor or not.
-      return {
-        id: index + 1,
-        name: layer.name,
-        objects: shapeObjects(layer, nextObjectId),
-        opacity: 1,
-        type: 'objectgroup',
-        visible: layer.visible,
-        width: map.width,
-        height: map.height,
-        x: 0,
-        y: 0,
-        properties: [{ name: 'kind', type: 'string', value: 'collision' }],
+  let layerId = 0
+  const exportLayers: TiledLayer[] = layers.flatMap((layer): TiledLayer[] => {
+    if (layer.type === 'collision') {
+      const out: TiledLayer[] = []
+      if (layer === tileCollisionLayer) {
+        const data: number[] = new Array(map.width * map.height).fill(0)
+        for (const idx of collisionCells) if (idx >= 0 && idx < data.length) data[idx] = collisionGid
+        out.push({
+          data,
+          height: map.height,
+          id: ++layerId,
+          name: 'collision',
+          opacity: 1,
+          type: 'tilelayer',
+          visible: layer.visible,
+          width: map.width,
+          x: 0,
+          y: 0,
+          ...(layer.z !== undefined ? { properties: [{ name: 'z', type: 'int', value: Number(layer.z) }] } : {}),
+        })
       }
+      if ((layer.shapes || []).length > 0) {
+        // Collision data: the game blocks movement with these whether the layer is shown in the editor or not.
+        out.push({
+          id: ++layerId,
+          name: layer.name,
+          objects: shapeObjects(layer, nextObjectId),
+          opacity: 1,
+          type: 'objectgroup',
+          visible: layer.visible,
+          width: map.width,
+          height: map.height,
+          x: 0,
+          y: 0,
+          properties: [{ name: 'kind', type: 'string', value: 'collision' }],
+        })
+      }
+      return out
     }
     if (layer.type === 'image') {
       const imageLayer: TiledLayer = {
-        id: index + 1,
+        id: ++layerId,
         name: layer.name,
         objects: imageObjects(layer, nextObjectId, map.layers || []),
         opacity: 1,
@@ -188,30 +220,26 @@ export function convertEditorMapToTiled(map: EditorMap, tilesets: TilesetInfo[])
       }
       if (layer.z !== undefined) imageLayer.properties!.push({ name: 'z', type: 'int', value: Number(layer.z) })
       imageLayer.properties!.push(...lookProperty(layer.look))
-      return imageLayer
+      return [imageLayer]
     }
 
     const data: number[] = new Array(map.width * map.height).fill(0)
 
     for (const [indexStr, tile] of Object.entries(layer.data || {})) {
       const idx = parseInt(indexStr)
-      if (layer.type === 'collision') {
-        data[idx] = collisionGid
-      } else {
-        const tsExport = exportTilesets.find(
-          (t) => t.name === tilesets.find((ts) => ts.fileName === tile.tilesetId)?.name
-        )
-        if (tsExport) {
-          data[idx] = tsExport.firstgid + (tile.y * tsExport.columns + tile.x)
-        }
+      const tsExport = exportTilesets.find(
+        (t) => t.name === tilesets.find((ts) => ts.fileName === tile.tilesetId)?.name
+      )
+      if (tsExport) {
+        data[idx] = tsExport.firstgid + (tile.y * tsExport.columns + tile.x)
       }
     }
 
     const exportLayer: TiledLayer = {
       data,
       height: map.height,
-      id: index + 1,
-      name: layer.type === 'collision' ? 'collision' : layer.name,
+      id: ++layerId,
+      name: layer.name,
       opacity: 1,
       type: tiledLayerType(layer),
       visible: layer.visible,
@@ -228,7 +256,7 @@ export function convertEditorMapToTiled(map: EditorMap, tilesets: TilesetInfo[])
     if (props.length > 0) {
       exportLayer.properties = props
     }
-    return exportLayer
+    return [exportLayer]
   })
 
   // The real size of a map that is not a whole number of tiles, and the map settings the game reads.

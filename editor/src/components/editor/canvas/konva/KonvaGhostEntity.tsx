@@ -3,14 +3,16 @@ import { Shape } from 'react-konva'
 import type { SpriteAssetInfo } from '../../../../../../shared/engine/types'
 import type { PropBag } from '@/types/editor'
 import { PendingEntityPlacement } from '@/hooks/editor/useEntityPlacement'
-import { colliderLocalRect, entityBounds, entityIconName, normalizeCollider } from '@/lib/entityVisuals'
+import { colliderLocalRect, entityAreaLocal, entityBounds, entityIconName, normalizeCollider } from '@/lib/entityVisuals'
+import { snapEntityAnchor } from '@/lib/entitySnap'
 import { drawResolvedSprite, resolveSprite, useSpriteImagesVersion } from '@/lib/spriteImages'
 import { drawAnchorCross, drawFootprint, drawLabel, drawPlaceholder } from './entityDraw'
 
 interface KonvaGhostEntityProps {
   pendingPlacement: PendingEntityPlacement | null
   pointerPos: { x: number; y: number } | null
-  snapEntityPos: (x: number, y: number) => { x: number; y: number }
+  /** The magnet: on, the area lands on grid lines; off, on whole pixels (the same rule as the click that places it). */
+  snapToGrid?: boolean
   spriteAssets?: Record<string, SpriteAssetInfo>
 }
 
@@ -20,7 +22,7 @@ const EMPTY: Record<string, SpriteAssetInfo> = {}
 export const KonvaGhostEntity = React.memo(function KonvaGhostEntity({
   pendingPlacement,
   pointerPos,
-  snapEntityPos,
+  snapToGrid = true,
   spriteAssets = EMPTY,
 }: KonvaGhostEntityProps) {
   const imagesVersion = useSpriteImagesVersion()
@@ -31,11 +33,12 @@ export const KonvaGhostEntity = React.memo(function KonvaGhostEntity({
   const model = useMemo(() => {
     void imagesVersion
     if (!pendingPlacement) return null
-    const entity = { name: pendingPlacement.name, x: 0, y: 0, components: { ...(components ?? {}), Transform: { ...(components?.Transform ?? {}), free: pendingPlacement.free === true } } as Record<string, PropBag> }
+    const entity = { name: pendingPlacement.name, x: 0, y: 0, components: { ...(components ?? {}), Transform: { ...(components?.Transform ?? {}) } } as Record<string, PropBag> }
     const bounds = entityBounds(entity, asset?.meta)
     const collider = components?.Collider ? normalizeCollider(components.Collider) : null
     return {
       bounds,
+      area: entityAreaLocal(entity),
       foot: collider ? colliderLocalRect(collider) : null,
       solid: collider ? collider.isSolid : true,
       resolved: sprite && asset ? resolveSprite(asset, sprite, 0) : null,
@@ -46,9 +49,8 @@ export const KonvaGhostEntity = React.memo(function KonvaGhostEntity({
 
   if (!pendingPlacement || !pointerPos || !model) return null
 
-  // A tile-based entity always shows on the tile it would land on; a free one follows the pointer pixel by pixel.
-  const free = pendingPlacement.free === true
-  const target = free ? { x: Math.round(pointerPos.x), y: Math.round(pointerPos.y) } : snapEntityPos(pointerPos.x, pointerPos.y)
+  // It shows where it would land: the area snapped with the magnet, or the pixel under the pointer.
+  const target = snapEntityAnchor(model.area, pointerPos.x, pointerPos.y, snapToGrid)
 
   return (
     <Shape
@@ -59,10 +61,10 @@ export const KonvaGhostEntity = React.memo(function KonvaGhostEntity({
       sceneFunc={(context, shape) => {
         const ctx = context._context as CanvasRenderingContext2D
         const s = shape.getStage()?.scaleX() || 1
-        if (!free) {
+        if (!model.foot) {
           // the tile it will occupy
           ctx.beginPath()
-          ctx.rect(-16, -32, 32, 32)
+          ctx.rect(model.area.x, model.area.y, model.area.w, model.area.h)
           ctx.fillStyle = 'rgba(96,165,250,0.12)'
           ctx.fill()
           ctx.lineWidth = 1 / s

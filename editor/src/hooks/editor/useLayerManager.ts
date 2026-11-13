@@ -216,8 +216,8 @@ export function useLayerManager(options: UseLayerManagerOptions) {
       let countBefore = 0
       commitNewLayers(
         prev => {
-          // Special layer singleton check
-          if (['collision', 'terrain', 'encounters'].includes(type) && prev.some(l => l.type === type)) {
+          // One terrain and one encounters layer per map (collision layers can be many).
+          if (['terrain', 'encounters'].includes(type) && prev.some(l => l.type === type)) {
             return prev
           }
 
@@ -229,7 +229,11 @@ export function useLayerManager(options: UseLayerManagerOptions) {
             }
             name = `Layer ${counter}`
           } else if (type === 'collision') {
-            name = 'Collision'
+            let counter = 1
+            while (prev.some(l => l.name === (counter === 1 ? 'Collision' : `Collision ${counter}`))) {
+              counter++
+            }
+            name = counter === 1 ? 'Collision' : `Collision ${counter}`
           } else if (type === 'terrain') {
             name = 'Terrain'
           } else if (type === 'encounters') {
@@ -246,12 +250,6 @@ export function useLayerManager(options: UseLayerManagerOptions) {
               counter++
             }
             name = counter === 1 ? 'Folder' : `Folder ${counter}`
-          } else if (type === 'polygons') {
-            let counter = 1
-            while (prev.some(l => l.name === (counter === 1 ? 'Collision shapes' : `Collision shapes ${counter}`))) {
-              counter++
-            }
-            name = counter === 1 ? 'Collision shapes' : `Collision shapes ${counter}`
           } else if (type === 'objects') {
             let counter = 1
             while (prev.some(l => l.name === (counter === 1 ? 'Objects' : `Objects ${counter}`))) {
@@ -260,8 +258,8 @@ export function useLayerManager(options: UseLayerManagerOptions) {
             name = counter === 1 ? 'Objects' : `Objects ${counter}`
           }
 
-          // Created from a folder's menu: a tile or image layer goes in as the folder's top layer, and the folder opens.
-          const folderAt = folderId && (type === 'tile' || type === 'image') ? prev.findIndex(l => l.id === folderId && l.type === 'folder') : -1
+          // Created from a folder's menu: a tile, image or collision layer goes in as the folder's top layer, and the folder opens.
+          const folderAt = folderId && (type === 'tile' || type === 'image' || type === 'collision') ? prev.findIndex(l => l.id === folderId && l.type === 'folder') : -1
           const newLayer: Layer = {
             id: crypto.randomUUID(),
             name,
@@ -269,7 +267,7 @@ export function useLayerManager(options: UseLayerManagerOptions) {
             visible: true,
             locked: false,
             ...(type === 'image' ? { images: [] } : {}),
-            ...(type === 'polygons' ? { shapes: [] } : {}),
+            ...(type === 'collision' ? { data: {}, shapes: [], tileGroups: [] } : {}),
             ...(folderAt >= 0 ? { folderId } : {}),
           }
           createdId = newLayer.id

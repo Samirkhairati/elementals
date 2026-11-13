@@ -1,9 +1,12 @@
 import type { ComponentSchema, ComponentType as EngineComponentType, FieldKind } from '../../../shared/engine/types'
 import type { CollisionShape } from '../../../shared/collisionShapes'
 import type { LookSet } from '../../../shared/look/types'
+import type { CollisionTileGroup } from '../../../shared/collisionLayers'
 export type { CollisionShape, ShapePoint } from '../../../shared/collisionShapes'
+export type { CollisionTileGroup } from '../../../shared/collisionLayers'
 
-export type LayerType = 'tile' | 'collision' | 'terrain' | 'objects' | 'encounters' | 'image' | 'folder' | 'polygons'
+/** A collision layer holds painted tiles and shapes (old `polygons` layers are migrated to it on load). */
+export type LayerType = 'tile' | 'collision' | 'terrain' | 'objects' | 'encounters' | 'image' | 'folder'
 
 /** A rectangle of a picture in its own pixels. */
 export interface ImageCrop {
@@ -60,7 +63,8 @@ export interface Layer {
   visible: boolean
   locked: boolean
   z?: number
-  data?: Record<number, { tilesetId: string; x: number; y: number }>
+  /** Painted cells. On a collision layer each is the `__collision__` marker and `group` is its tiles item. */
+  data?: Record<number, { tilesetId: string; x: number; y: number; group?: string }>
   /** `image` layers only. */
   images?: ImageItem[]
   /** `image` layers only: the groups the pictures can belong to. */
@@ -71,10 +75,12 @@ export interface Layer {
   collapsed?: boolean
   /** Image layers and folders: y-sort the pictures; absent = follow the folder, else off. */
   ySort?: boolean
-  /** `polygons` layers only: collision shapes in map pixels. */
+  /** `collision` layers only: collision shapes in map pixels, one item each. */
   shapes?: CollisionShape[]
   /** Tile and image layers: colour grading, masks and shaders, per profile (docs/looks.md). */
   look?: LookSet
+  /** `collision` layers only: the tiles items, in list order (shared/collisionLayers.ts). */
+  tileGroups?: CollisionTileGroup[]
 }
 
 export interface CopiedTile {

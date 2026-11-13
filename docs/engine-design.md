@@ -41,18 +41,22 @@ answers one question about the entity:
   collision shape (`SpatialSystem.canMove` / `stepBlocked`); an entity's own movement still uses its 16 × 4 feet box.
 * Sprite is drawn with its pivot (asset `pivotX/pivotY`, default bottom-centre) on the anchor, then shifted
   by the Sprite `offsetX/offsetY`.
-* **Tile-based and free entities.** Both are the same six-component entity; `Transform.free` (boolean, default `false`) says
-  which kind it is. *Tile-based* (what every entity written before the flag is): the anchor is a tile anchor and the collider
-  covers whole tiles, so its edges lie on tile lines. A box `n` tiles wide is centred on the anchor, so an even `n` needs half
-  a tile of `offsetX` (`offsetX = 16 * (n - 1)` mod 32); `snapColliderToTiles` computes it. *Free*: any pixel position and any
-  collider width, height and offset (the schema bound is 1-4096 px); nothing snaps. Existing data is never migrated: a missing
-  flag reads as `false`, the exporter passes the field through, and `schemaVersion` stays 5. Helpers in `shared/engine/placement.ts`
-  (`isFreeEntity`, `snapAnchorToTile`, `snapColliderToTiles`, `setEntityFree`, `isTileAnchor`); validation warns (`off-grid`) about a
-  tile-based entity whose anchor is not on the grid, never about a free one. In the game `TransformComponent.free` keeps
-  `MovementSystem.snapTransformToGrid` from moving a free entity onto a tile, and `AIWanderSystem` wanders it around its own pixel.
-  Triggers are unchanged: `footprint()` already returns the tiles its pixel box touches, so a free entity's events fire for every
-  tile its box overlaps (a 10×10 box inside a tile still covers that whole tile for `playerEnter`), and solid colliders block by
-  their exact pixels (`SpatialSystem.isWalkable`).
+* **One kind of entity.** There is no tile entity and free entity: an entity's *area* is its Collider box (a rect, any size 1-4096 px,
+  bottom-centred on the anchor and shifted by `offsetX/offsetY`), or one tile when it has no Collider (`entityAreaLocal` in
+  `editor/src/lib/entityVisuals.ts`). The author resizes it on the map (eight handles on the selected entity, `KonvaEntityResize`,
+  maths in `lib/entityResize.ts`; an entity without a Collider gets a non-solid one, which is what it behaves like in the game) and
+  the top-toolbar magnet (`snapToGrid`) snaps it the way it snaps pictures: on, the edges of the area land on grid lines
+  (`snapImageAnchor` on the grid in force, `lib/entitySnap.ts`), so the default one-tile area lands on the tile anchor
+  (`x = col*32+16`, `y = (row+1)*32`); off, on whole pixels. Placing, dragging and resizing all use this rule; the inspector's numbers never snap.
+  `Transform.free` is **derived, never chosen**: the editor writes it whenever an entity is created, moved, pasted, duplicated or its
+  Transform edited (`withDerivedFree` in `shared/engine/placement.ts`), and it is `true` exactly when the anchor is off the tile grid
+  (`isOffGrid`). The game also derives it (`d.free === true || !isTileAnchor(x, y)` in `componentFactory` / `expand`), so an entity off the
+  grid keeps its pixel position and steps from it, whatever the flag says: `TransformComponent.free` keeps
+  `MovementSystem.snapTransformToGrid` from moving it onto a tile, and `AIWanderSystem` wanders it around its own pixel.
+  Existing data is never migrated (a missing flag reads as `false`; `schemaVersion` stays 5) and validation no longer warns about an off-grid
+  anchor. Triggers are unchanged: `footprint()` returns the tiles the pixel box touches, so an entity's events fire for every tile its box
+  overlaps (a 10×10 box inside a tile still covers that whole tile for `playerEnter`), and solid colliders block by their exact pixels
+  (`SpatialSystem.isWalkable`). A GIF picture on an image layer is one frame of its sheet (`graphicAsset` uses `newGifCharacter`), so its bounds snap like any other.
 * **Default collider = one tile** (32×32, offset 0,0, solid). The old 16×8 default was a player "feet"
   box and looked wrong for placed objects. The editor offers "Fit to tile" and "Fit to sprite".
 
@@ -208,12 +212,11 @@ entity simply has no graphic until one is picked. `instantiatePrefab(prefab, { x
 * Every placed thing is visible and legible on the canvas: real sprite preview, a clear footprint
   (collider) outline, a label on hover/selection, an icon badge for entities with an Event or Movement,
   distinct colours for solid colliders vs trigger zones, handles only on the selected entity.
-* A tile-based entity always sits on the 32px grid (dragging, placing, the Tile fields) and its collider handles and numbers
-  snap to whole tiles (Shift = by the pixel); a free entity never snaps (position to the pixel, collider handles to 4px,
-  Shift = single pixels). The inspector's **Placement** switch converts one into the other: *Free* only sets the flag, *Tile-based*
-  moves the anchor onto its tile and rounds the collider to whole tiles (one undo step). New entities are made as either kind: the Entities panel's
-  add menu (Empty entity / Empty free entity / prefab lists) and the canvas right-click menu (New Tile Entity, New Free Entity, and a
-  prefab list for each; a free one is created on the exact pixel that was clicked).
+* One kind of entity: its area is its Collider box (one tile without a Collider). On the map the magnet snaps placing, dragging and
+  resizing (the area's edges land on grid lines; off, whole pixels); the handles on the selected entity resize the area. The inspector's
+  numbers (position, collider) take any value and the collider diagram snaps to 4px (Shift = single pixels). New entities come from
+  right-click › Entity › New / Prefab (the Layers panel and the map), and are placed with the same snapping. Duplicate and paste put
+  the copy one whole tile down-right, so an entity on the grid stays on it.
 * Inspector = one card per component with a coloured header, consistent 8px spacing scale, schema-driven
   fields, and *custom editors* where a form is not enough: Sprite (asset picker + live preview + animation
   playback + pivot/offset gizmo), Collider (mini diagram + Fit buttons), Movement (controller-dependent

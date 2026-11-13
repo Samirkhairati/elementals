@@ -11,14 +11,12 @@ import {
 import { Layer, EntityData, ComponentType, type PropBag } from '@/types/editor'
 import { COMPONENT_REGISTRY } from '@/lib/componentRegistry'
 import { COMPONENT_TYPES } from '../../../../../shared/engine/components'
-import { isFreeEntity } from '../../../../../shared/engine/placement'
 import { entityIconName, pxToTile, summarizeEntity, tileToPxClamped } from '@/lib/entityVisuals'
 import { ComponentCard } from './entity/ComponentCard'
-import { Badge, EdButton, Field, NumberField, ReadoutField, Segmented, TextField } from '../ui/controls'
+import { Badge, EdButton, Field, NumberField, TextField } from '../ui/controls'
 import { accentVar, NamedIcon } from '../ui/icons'
 import { SpriteThumb } from '../sprites/SpriteThumb'
 import { useEditorSelector, type EditorContextValue } from '../layout/EditorContext'
-import { PolygonLayerCard } from './PolygonLayerCard'
 
 interface PropertiesPanelProps {
   layers: Layer[]
@@ -28,8 +26,6 @@ interface PropertiesPanelProps {
   selectedEntityId?: string | null
   renameEntity?: (id: string, name: string) => void
   moveEntity?: (id: string, x: number, y: number) => void
-  /** Switch an entity between tile-based (snapped to the grid) and free (any pixel, any size). */
-  setEntityPlacement?: (id: string, free: boolean) => void
   addComponent?: (entityId: string, type: ComponentType) => void
   removeComponent?: (entityId: string, type: ComponentType) => void
   updateComponentProp?: (entityId: string, type: ComponentType, key: string, value: unknown) => void
@@ -100,7 +96,6 @@ export function PropertiesPanel({
   selectedEntityId = null,
   renameEntity,
   moveEntity,
-  setEntityPlacement,
   addComponent,
   removeComponent,
   updateComponentProp,
@@ -115,7 +110,6 @@ export function PropertiesPanel({
     const attachedTypes = COMPONENT_TYPES.filter((t) => selectedEntity.components?.[t])
     const summary = summarizeEntity(selectedEntity)
     const tile = pxToTile(selectedEntity.x, selectedEntity.y)
-    const free = isFreeEntity(selectedEntity)
 
     return (
       <div className="flex w-full flex-col gap-3 text-left" data-testid="entity-inspector">
@@ -144,23 +138,13 @@ export function PropertiesPanel({
             </div>
           </div>
           <div className="flex flex-col gap-2 border-t border-border/40 bg-background/30 p-3">
-            <Field label="Placement" info="Tile-based: the entity sits on the 32px grid and its collider covers whole tiles. Free: any pixel position and any size, nothing snaps. Switching to tile-based moves the entity onto the tile it is on and rounds its collider to whole tiles.">
-              <Segmented
-                aria-label="Placement"
-                value={free ? 'free' : 'tile'}
-                options={[{ value: 'tile', label: 'Tile-based' }, { value: 'free', label: 'Free' }]}
-                onChange={(v) => setEntityPlacement?.(selectedEntity.id, v === 'free')}
-              />
-            </Field>
-            {free ? (
-              <Field label="Position" info="Where the entity stands, in pixels: the bottom-centre of its collider. Any value; nothing snaps.">
+            <Field label="Position" info="Where the entity stands, in pixels: the bottom-centre of its area. Any value; on the map the magnet snaps it, here nothing does. Off the 32px tile grid the game keeps the entity on this pixel position.">
                 <div className="flex w-full items-center gap-2">
-                  <NumberField value={selectedEntity.x} integer unit="x" aria-label="Position X" onCommit={(x) => moveEntity?.(selectedEntity.id, x, selectedEntity.y)} />
-                  <NumberField value={selectedEntity.y} integer unit="y" aria-label="Position Y" onCommit={(y) => moveEntity?.(selectedEntity.id, selectedEntity.x, y)} />
+                  <NumberField value={selectedEntity.x} unit="x" aria-label="Position X" onCommit={(x) => moveEntity?.(selectedEntity.id, x, selectedEntity.y)} />
+                  <NumberField value={selectedEntity.y} unit="y" aria-label="Position Y" onCommit={(y) => moveEntity?.(selectedEntity.id, selectedEntity.x, y)} />
                 </div>
               </Field>
-            ) : (
-              <Field label="Tile" info="Column and row of the tile the entity stands on.">
+              <Field label="Tile" info="Column and row of the tile the anchor is in. Typing one moves the entity onto that tile's anchor.">
                 <div className="flex w-full items-center gap-2">
                   <NumberField
                     value={tile.col}
@@ -186,12 +170,6 @@ export function PropertiesPanel({
                   />
                 </div>
               </Field>
-            )}
-            {!free && (
-              <ReadoutField label="Anchor" info="Where the entity stands, in pixels: the bottom-centre of its tile. It follows from Tile and is not edited directly." testId="pixel-readout">
-                {selectedEntity.x}, {selectedEntity.y} px
-              </ReadoutField>
-            )}
           </div>
         </section>
 
@@ -233,7 +211,7 @@ export function PropertiesPanel({
               <Field label="Name">
                 <TextField value={layer.name} onCommit={(name) => updateLayers(layers.map((l) => (l.id === activeLayerId ? { ...l, name } : l)))} aria-label="Layer name" />
               </Field>
-              {layer.type !== 'polygons' && (
+              {layer.type !== 'collision' && (
                 <Field label="Z-index" hint="Draw order of the layer: higher draws on top, equal keeps the list order">
                   <NumberField
                     value={layer.z ?? 0}
@@ -245,7 +223,6 @@ export function PropertiesPanel({
               )}
             </div>
           </section>
-          {layer.type === 'polygons' && <PolygonLayerCard layer={layer} layers={layers} updateLayers={updateLayers} />}
         </div>
       )
     }

@@ -6,9 +6,11 @@ export interface ShapePoint {
   y: number
 }
 
-/** One collision shape of a `polygons` layer, in map pixels. */
+/** One collision shape of a collision layer, in map pixels. */
 export interface CollisionShape {
   id: string
+  /** Shown name in the layer's item list (editor only; "Polygon n" / "Line n" when absent). */
+  name?: string
   points: ShapePoint[]
   /** Closed: the last point joins the first and the inside is solid. Open: a line that cannot be crossed. */
   closed: boolean

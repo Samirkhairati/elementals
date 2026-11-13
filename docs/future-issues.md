@@ -49,10 +49,8 @@ Things that work today but will need attention later. Add an entry whenever you 
 - **What:** a polygon collider blocks other movers, but the entity's own movement still uses the fixed 16 × 4 feet box, and so does the player.
 - **Idea:** sweep the mover's own collider (box or polygon) against shapes, if non-box movers ever matter.
 
-## Collision shape layers in folders
+## Warps: the debug handle and a walkable check
 
-- **What:** only tile and image layers can sit in a layer folder; `polygons` layers stay loose in the list.
-- **Idea:** allow them in `lib/layerFolders.ts` and the schema's folder check.
 - **Game debug handle drives a private method**: the browser checks for warps call `scene.warpPlayer(...)` (private) through `window.__game`. A small public `warp()` on `GameDebugHandle` would let a test or script do it without reaching into the scene.
 - **Previews of a map have no per-pixel hit test**: the warp picker's free position is any pixel, including ones inside a solid building. Nothing warns; a "walkable" overlay from the collision shapes would.
 

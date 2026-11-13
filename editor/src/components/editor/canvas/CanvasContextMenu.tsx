@@ -10,7 +10,8 @@ import {
   DropdownMenuTrigger,
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu'
-import { Plus, Sparkles, Copy, CopyPlus, Trash2, Pipette, Palette } from 'lucide-react'
+import { Plus, Sparkles, Copy, CopyPlus, Trash2, Pipette, Palette, Users } from 'lucide-react'
+import { NamedIcon } from '../ui/icons'
 import { OVERLAY_COLORS } from '@/hooks/editor/canvas/canvasView'
 import { PRESET_PREFABS } from '@/lib/componentRegistry'
 import { EntityData, ComponentType, type PropBag } from '@/types/editor'
@@ -19,7 +20,7 @@ export interface CanvasContextMenuTarget {
   type: 'tile' | 'entity'
   tileX?: number
   tileY?: number
-  /** The map pixel that was right-clicked (where a free entity is created). */
+  /** The map pixel that was right-clicked (where a new entity goes while the magnet is off). */
   worldX?: number
   worldY?: number
   entity?: EntityData
@@ -41,10 +42,10 @@ interface CanvasContextMenuProps {
     name: string,
     x: number,
     y: number,
-    components?: Partial<Record<ComponentType, PropBag>>,
-    /** A free entity: any pixel position and size, instead of one on the tile grid. */
-    free?: boolean
+    components?: Partial<Record<ComponentType, PropBag>>
   ) => void
+  /** The top toolbar's magnet: a new entity lands on the clicked tile instead of the exact pixel. */
+  snapToGrid?: boolean
   onDuplicateEntity?: (id: string) => void
   onDeleteEntity?: (id: string) => void
   /** Sets the tint of an entity's area outline ('' = white). */
@@ -66,6 +67,7 @@ export function CanvasContextMenu({
   onSampleTile,
   onPlaceMultiple,
   placeMultipleKeys,
+  snapToGrid = true,
 }: CanvasContextMenuProps) {
   const { isOpen, x, y, target } = menuState
   const tileX = target?.tileX ?? 0
@@ -173,42 +175,53 @@ export function CanvasContextMenu({
                 <DropdownMenuSeparator />
               </>
             )}
-            {([false, true] as const).map((free) => {
-              // Tile-based entities are centred on the tile; a free one is created on the exact pixel.
-              const at = free ? { x: target?.worldX ?? tileX * 32 + 16, y: target?.worldY ?? tileY * 32 + 32 } : { x: tileX * 32 + 16, y: tileY * 32 + 32 }
+            {(() => {
+              // Where the entity goes: with the magnet on, the anchor of the clicked tile (a one-tile entity fills the
+              // tile); off, the exact pixel that was right-clicked.
+              const at = snapToGrid
+                ? { x: tileX * 32 + 16, y: tileY * 32 + 32 }
+                : { x: Math.round(target?.worldX ?? tileX * 32 + 16), y: Math.round(target?.worldY ?? tileY * 32 + 32) }
               return (
-                <React.Fragment key={free ? 'free' : 'tile'}>
-                  <DropdownMenuItem
-                    onClick={() => {
-                      onCreateEntity('New Entity', at.x, at.y, undefined, free)
-                      onClose()
-                    }}
-                  >
-                    <Plus className="w-3.5 h-3.5 mr-2 text-primary" />
-                    {free ? 'New Free Entity' : 'New Tile Entity'}
-                  </DropdownMenuItem>
-                  <DropdownMenuSub>
-                    <DropdownMenuSubTrigger>
-                      <Sparkles className="w-3.5 h-3.5 mr-2 text-amber-400" />
-                      {free ? 'Free From Prefab' : 'Tile From Prefab'}
-                    </DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent className="w-48 text-xs z-50 bg-popover/95 backdrop-blur-sm">
-                      {PRESET_PREFABS.map((prefab) => (
-                        <DropdownMenuItem
-                          key={prefab.name}
-                          onClick={() => {
-                            onCreateEntity(prefab.name, at.x, at.y, prefab.components, free)
-                            onClose()
-                          }}
-                        >
-                          {prefab.name}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuSubContent>
-                  </DropdownMenuSub>
-                </React.Fragment>
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>
+                    <Users className="w-3.5 h-3.5 mr-2 text-sky-400" />
+                    Entity
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent className="w-44 text-xs z-50 bg-popover/95 backdrop-blur-sm">
+                    <DropdownMenuItem
+                      onClick={() => {
+                        onCreateEntity('New Entity', at.x, at.y, undefined)
+                        onClose()
+                      }}
+                    >
+                      <Plus className="w-3.5 h-3.5 mr-2 text-primary" />
+                      New
+                    </DropdownMenuItem>
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger>
+                        <Sparkles className="w-3.5 h-3.5 mr-2 text-amber-400" />
+                        Prefab
+                      </DropdownMenuSubTrigger>
+                      <DropdownMenuSubContent className="w-52 text-xs z-50 bg-popover/95 backdrop-blur-sm">
+                        {PRESET_PREFABS.map((prefab) => (
+                          <DropdownMenuItem
+                            key={prefab.name}
+                            title={prefab.description}
+                            onClick={() => {
+                              onCreateEntity(prefab.name, at.x, at.y, prefab.components)
+                              onClose()
+                            }}
+                          >
+                            <NamedIcon name={prefab.icon} className="w-3.5 h-3.5 mr-2 text-muted-foreground" />
+                            {prefab.name}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuSubContent>
+                    </DropdownMenuSub>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
               )
-            })}
+            })()}
 
             <DropdownMenuSeparator />
             <DropdownMenuItem

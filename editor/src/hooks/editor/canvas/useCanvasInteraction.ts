@@ -1,7 +1,10 @@
+import { polygonEditStore } from '@/lib/polygonEditStore'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import type { ImagePick } from '@/lib/graphicAssets'
 import { flippedItemBounds } from '@/lib/imageItems'
 import { snapPicture } from '@/lib/imageSnap'
+import { entityAreaLocal } from '@/lib/entityVisuals'
+import { snapEntityAnchor } from '@/lib/entitySnap'
 import { applyAxisLock, type Axis, type AxisLock } from '@/lib/axisLock'
 import type { SpriteAssetInfo } from '../../../../../shared/engine/types'
 import Konva from 'konva'
@@ -13,6 +16,7 @@ import {
   PaintMode,
   Pos,
   EntityData,
+  type PropBag,
 } from '@/types/editor'
 import { getBoundingBox } from '@/components/editor/canvas/canvasUtils'
 import { sampleSelection, sampledLayers } from '@/lib/layerSelection'
@@ -356,18 +360,13 @@ export function useCanvasInteraction({
       // If pending entity placement mode is active
       if (pendingPlacement) {
         if (button === 0) {
+          // Same maths as the ghost preview: the area snapped with the magnet, or the pixel under the pointer.
           const stage = stageRef?.current
-          let posX = coords.rawX * 32 + 16
-          let posY = coords.rawY * 32 + 32
-          // A tile-based entity always lands on its tile; a free one on the pixel under the pointer.
-          if (pendingPlacement.free && stage) {
-            const p = stage.getPointerPosition()
-            if (p) {
-              const scale = stage.scaleX() || 1
-              posX = Math.round((p.x - stage.x()) / scale)
-              posY = Math.round((p.y - stage.y()) / scale)
-            }
-          }
+          const p = stage?.getPointerPosition()
+          const scale = stage?.scaleX() || 1
+          const raw = p && stage ? { x: (p.x - stage.x()) / scale, y: (p.y - stage.y()) / scale } : { x: coords.rawX * 32 + 16, y: coords.rawY * 32 + 32 }
+          const area = entityAreaLocal({ components: (pendingPlacement.components ?? {}) as Record<string, PropBag> })
+          const { x: posX, y: posY } = snapEntityAnchor(area, raw.x, raw.y, snapToGrid)
           commitPlacement?.(posX, posY)
           return
         }
@@ -427,6 +426,9 @@ export function useCanvasInteraction({
         }
         return
       }
+
+      // A collision layer with the Shape brush: the shape editor (KonvaShapes) takes the clicks, nothing is painted.
+      if (activeLayer?.type === 'collision' && polygonEditStore.get().brush === 'shape') return
 
       // Left-click tools on tilemap
       if (button === 0) {

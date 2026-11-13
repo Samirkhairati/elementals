@@ -126,17 +126,18 @@ export function colliderWorldRect(ax: number, ay: number, c: Pick<ColliderProps,
 }
 
 /**
- * The collider props that produce `rect` (a rect relative to the anchor, or a world rect plus the anchor).
- * Sizes and offsets are whole pixels (the schema rounds them anyway), so an odd width in a free-form
- * rect can be off by half a pixel on the left edge.
+ * The collider props that produce `rect` (a rect relative to the anchor, or a world rect plus the anchor). Sizes and
+ * offset Y are whole pixels; offset X is a whole or half pixel, so a box of whole-pixel edges keeps them whatever its
+ * width (the box is centred on the anchor).
  */
 export function rectToColliderProps(rect: Rect, anchor: Point = { x: 0, y: 0 }): ColliderPatch {
-  const width = Math.max(1, Math.round(rect.w))
+  const left = Math.round(rect.x)
+  const width = Math.max(1, Math.round(rect.x + rect.w) - left)
   const height = Math.max(1, Math.round(rect.h))
   return {
     width,
     height,
-    offsetX: Math.round(rect.x + rect.w / 2 - anchor.x),
+    offsetX: Math.round((left + width / 2 - anchor.x) * 2) / 2,
     offsetY: Math.round(rect.y + rect.h - anchor.y),
   }
 }
@@ -409,25 +410,18 @@ export function sortByDepth<T extends EntityLike>(entities: readonly T[]): T[] {
     .map((o) => o.e)
 }
 
-/** A free entity (`Transform.free`): any pixel position, any size; it is not tied to the tile it stands on. */
-export const isFreeEntityLike = (entity: Pick<EntityLike, 'components'>): boolean => entity.components.Transform?.free === true
-
-/** What a free entity without a collider occupies: a small box on its anchor, so it can still be picked and shown. */
-export const FREE_ANCHOR_BOX: Rect = { x: -8, y: -16, w: 16, h: 16 }
-
-/** The area of an entity relative to its anchor: its collider box; without one, its tile (a free entity: a small box). */
+/** The area of an entity relative to its anchor: its collider box, or one tile when it has no collider. */
 export function entityAreaLocal(entity: Pick<EntityLike, 'components'>): Rect {
   const collider = entity.components.Collider
-  if (collider) return colliderLocalRect(normalizeCollider(collider))
-  return isFreeEntityLike(entity) ? FREE_ANCHOR_BOX : TILE_RECT_LOCAL
+  return collider ? colliderLocalRect(normalizeCollider(collider)) : TILE_RECT_LOCAL
 }
 
 /**
  * Bounds used for hover/selection frames: the sprite frame (when there is one) united with the area the entity
- * stands on (its tile, or for a free entity its collider), in map space.
+ * stands on (its collider box, or its tile without one), in map space.
  */
 export function entityBounds(entity: EntityLike, meta: SpriteAssetMeta | undefined): Rect {
-  const tile = translateRect(isFreeEntityLike(entity) ? entityAreaLocal(entity) : TILE_RECT_LOCAL, entity.x, entity.y)
+  const tile = translateRect(entityAreaLocal(entity), entity.x, entity.y)
   const sprite = entity.components.Sprite
   if (!sprite || !meta) return tile
   const local = spriteLocalRect(meta, sprite as Partial<SpriteLike>)

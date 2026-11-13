@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { CanvasContextMenu } from './CanvasContextMenu'
 import { makeEntity } from '@/test/helpers'
 
@@ -52,28 +52,34 @@ describe('CanvasContextMenu over a picture', () => {
 })
 
 describe('CanvasContextMenu creating entities', () => {
-  const open = (onCreateEntity: (...a: unknown[]) => void) =>
+  const open = (onCreateEntity: (...a: unknown[]) => void, snapToGrid: boolean, prefab = false) => {
     render(
       <CanvasContextMenu
         menuState={{ isOpen: true, x: 10, y: 10, target: { type: 'tile', tileX: 3, tileY: 2, worldX: 117, worldY: 83 } }}
         onClose={vi.fn()}
         onCreateEntity={onCreateEntity as never}
+        snapToGrid={snapToGrid}
       />,
     )
+    fireEvent.keyDown(screen.getByRole('menuitem', { name: 'Entity' }), { key: 'ArrowRight' })
+    if (prefab) fireEvent.keyDown(screen.getByRole('menuitem', { name: 'Prefab' }), { key: 'ArrowRight' })
+  }
 
-  it('a tile entity is centred on the tile, a free one is made on the exact pixel', () => {
+  it('Entity › New lands on the clicked tile with the magnet on, and on the exact pixel with it off', () => {
     const create = vi.fn()
-    open(create)
-    fireEvent.click(screen.getByText('New Tile Entity'))
-    expect(create).toHaveBeenLastCalledWith('New Entity', 112, 96, undefined, false)
-    fireEvent.click(screen.getByText('New Free Entity'))
-    expect(create).toHaveBeenLastCalledWith('New Entity', 117, 83, undefined, true)
+    open(create, true)
+    fireEvent.click(screen.getByRole('menuitem', { name: 'New' }))
+    expect(create).toHaveBeenLastCalledWith('New Entity', 112, 96, undefined)
+    cleanup()
+    open(create, false)
+    fireEvent.click(screen.getByRole('menuitem', { name: 'New' }))
+    expect(create).toHaveBeenLastCalledWith('New Entity', 117, 83, undefined)
   })
 
-  it('a free entity without a known pixel falls back to the tile anchor', () => {
+  it('Entity › Prefab creates the prefab with its components', () => {
     const create = vi.fn()
-    render(<CanvasContextMenu menuState={{ isOpen: true, x: 0, y: 0, target: { type: 'tile', tileX: 3, tileY: 2 } }} onClose={vi.fn()} onCreateEntity={create} />)
-    fireEvent.click(screen.getByText('New Free Entity'))
-    expect(create).toHaveBeenLastCalledWith('New Entity', 112, 96, undefined, true)
+    open(create, true, true)
+    fireEvent.click(screen.getByRole('menuitem', { name: 'NPC' }))
+    expect(create).toHaveBeenLastCalledWith('NPC', 112, 96, expect.objectContaining({ Sprite: expect.anything() }))
   })
 })

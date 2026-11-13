@@ -168,12 +168,6 @@ const SYNTHETIC: Record<string, any> = {
       layer('a', 'a', 'tile', { 0: { tilesetId: 'missing.png', x: 0, y: 0 }, 1: { tilesetId: 'broken.png', x: 0, y: 0 }, 2: { tilesetId: 'wide.png', x: 2, y: 1 }, 3: { tilesetId: '__collision__', x: 0, y: 0 } }),
     ],
   },
-  twoCollisionLayers: {
-    name: 'cc',
-    width: 2,
-    height: 1,
-    layers: [layer('1', 'x', 'collision', { 0: { tilesetId: '__collision__', x: 0, y: 0 } }), layer('2', 'y', 'collision', { 1: { tilesetId: '__collision__', x: 0, y: 0 } })],
-  },
   sameNameTilesets: {
     name: 'dup',
     width: 2,
