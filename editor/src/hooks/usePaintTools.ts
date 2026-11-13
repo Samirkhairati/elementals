@@ -2,6 +2,35 @@ import { useCallback } from 'react'
 import { Layer, TileSelection, ActiveTool, PaintMode, DebugInfo, MapData, Pos } from '@/types/editor'
 import { brushPaint, bucketFill, erase, fillCells, floodRegion, rectangleFill, type TileMap } from '@/lib/paintOps'
 import { fitSelectionToLayer, partSelection, targetLayerIndex } from '@/lib/layerSelection'
+import { assignNewCells, hasNewCells, nextTileGroupName } from '../../../shared/collisionLayers'
+import { polygonEditStore } from '@/lib/polygonEditStore'
+
+const COLLISION_MARKER: TileSelection = { width: 1, height: 1, tiles: [{ tilesetId: '__collision__', x: 0, y: 0 }] }
+
+/** What a layer paints with: a collision layer always takes the collision marker (fitted from the selection, or the marker itself). */
+function selectionFor(layer: Layer, selection: TileSelection | null): TileSelection | null {
+  if (layer.type === 'collision') return (selection && fitSelectionToLayer('collision', selection)) || COLLISION_MARKER
+  return selection && fitSelectionToLayer(layer.type, selection)
+}
+
+/**
+ * The layer with its newly painted data. On a collision layer the new cells join the picked tiles item of the Collision
+ * panel; with none picked (or a shape picked) a new tiles item is made and picked, so every painted tile is in an item.
+ */
+export function withPaintedData(layer: Layer, data: TileMap): Layer {
+  if (layer.type !== 'collision' || !hasNewCells(layer, data)) return { ...layer, data }
+  const groups = layer.tileGroups ?? []
+  const picked = polygonEditStore.get().selectedShapeId
+  let groupId = picked && groups.some((g) => g.id === picked) ? picked : null
+  let tileGroups = groups
+  if (!groupId) {
+    const group = { id: crypto.randomUUID(), name: nextTileGroupName(layer) }
+    tileGroups = [...groups, group]
+    groupId = group.id
+    polygonEditStore.set({ selectedShapeId: group.id, brush: 'tiles' })
+  }
+  return { ...layer, tileGroups, data: assignNewCells(layer, data, groupId) }
+}
 
 interface UsePaintToolsProps {
   activeMap: MapData | null
@@ -27,7 +56,6 @@ function locatePaintableLayer(layers: Layer[], layerId: string) {
   if (layerIndex === -1) return 'Layer not found'
   const layer = layers[layerIndex]
   if (layer.type === 'image') return 'Image layers hold images, not tiles'
-  if (layer.type === 'polygons') return 'Collision shape layers hold shapes, not tiles'
   if (layer.type === 'folder') return 'Folders hold layers, not tiles'
   if (layer.locked || !layer.visible) return 'Layer locked/hidden'
   return { layers, layerIndex, layer }
@@ -47,7 +75,7 @@ function multiTargets(layers: Layer[], selection: TileSelection): MultiTarget[] 
     const layerIndex = targetLayerIndex(layers, part)
     if (layerIndex === -1 || seen.has(layerIndex)) continue
     const layer = layers[layerIndex]
-    if (layer.type === 'image' || layer.type === 'polygons' || layer.type === 'folder' || layer.locked || !layer.visible) continue
+    if (layer.type === 'image' || layer.type === 'folder' || layer.locked || !layer.visible) continue
     seen.add(layerIndex)
     targets.push({ layerIndex, layer, selection: partSelection(selection, part) })
   }
@@ -85,7 +113,7 @@ export function usePaintTools({
   const publish = useCallback(
     (layers: Layer[], layerIndex: number, layer: Layer, data: TileMap, withHistory: boolean) => {
       const next = [...layers]
-      next[layerIndex] = { ...layer, data }
+      next[layerIndex] = withPaintedData(layer, data)
       setLayers(next)
       setActiveMap(m => (m ? { ...m, layers: next } : m))
       if (withHistory) commitHistory()
@@ -95,7 +123,7 @@ export function usePaintTools({
 
   const publishMany = useCallback(
     (layers: Layer[], updates: Map<number, TileMap>, withHistory: boolean) => {
-      const next = layers.map((layer, index) => (updates.has(index) ? { ...layer, data: updates.get(index) } : layer))
+      const next = layers.map((layer, index) => (updates.has(index) ? withPaintedData(layer, updates.get(index)!) : layer))
       setLayers(next)
       setActiveMap(m => (m ? { ...m, layers: next } : m))
       if (withHistory) commitHistory()
@@ -108,7 +136,8 @@ export function usePaintTools({
       const time = Date.now()
       if (!hasMap) { setDebugInfo({ action: 'paint', error: 'No active map', time }); return }
       if (!activeLayerId) { setDebugInfo({ action: 'paint', error: 'No active layer', time }); return }
-      if (activeTool === 'brush' && !tileSelection) { setDebugInfo({ action: 'paint', error: 'No tile selected', time }); return }
+      const activeIsCollision = getLayers().some(l => l.id === activeLayerId && l.type === 'collision')
+      if (activeTool === 'brush' && !tileSelection && !activeIsCollision) { setDebugInfo({ action: 'paint', error: 'No tile selected', time }); return }
       if (gridX < 0 || gridX >= mapWidth || gridY < 0 || gridY >= mapHeight) {
         setDebugInfo({ action: 'paint', error: 'Out of bounds', x: gridX, y: gridY, time })
         return
@@ -138,8 +167,8 @@ export function usePaintTools({
       const { layers, layerIndex, layer } = target
 
       let data: TileMap | null = null
-      if (activeTool === 'brush' && tileSelection) {
-        const fitted = fitSelectionToLayer(layer.type, tileSelection)
+      if (activeTool === 'brush') {
+        const fitted = selectionFor(layer, tileSelection)
         if (!fitted) { setDebugInfo({ action: 'paint', error: 'Pick a tile for this layer', time }); return }
         data = brushPaint(layer.data, size, gridX, gridY, fitted, paintMode, paintStartPos)
       } else if (activeTool === 'eraser') {
@@ -159,9 +188,9 @@ export function usePaintTools({
 
   const handlePaintBucket = useCallback(
     (gridX: number, gridY: number) => {
-      if (!hasMap || !activeLayerId || !tileSelection) return
+      if (!hasMap || !activeLayerId) return
 
-      if (isMulti) {
+      if (isMulti && tileSelection) {
         const layers = getLayers()
         const targets = multiTargets(layers, tileSelection)
         // The region is decided on the active layer (or the first one in the selection) and filled on all of them.
@@ -182,7 +211,7 @@ export function usePaintTools({
       const target = locatePaintableLayer(getLayers(), activeLayerId)
       if (typeof target === 'string') return
       const { layers, layerIndex, layer } = target
-      const fitted = fitSelectionToLayer(layer.type, tileSelection)
+      const fitted = selectionFor(layer, tileSelection)
       if (!fitted) return
       const data = bucketFill(layer.data, size, gridX, gridY, fitted, paintMode, paintStartPos)
       if (data) publish(layers, layerIndex, layer, data, true)
@@ -193,9 +222,9 @@ export function usePaintTools({
 
   const handleRectangleFill = useCallback(
     (startPos: Pos, endPos: Pos) => {
-      if (!hasMap || !activeLayerId || !tileSelection) return
+      if (!hasMap || !activeLayerId) return
 
-      if (isMulti) {
+      if (isMulti && tileSelection) {
         const layers = getLayers()
         const updates = new Map<number, TileMap>()
         for (const t of multiTargets(layers, tileSelection)) {
@@ -209,7 +238,7 @@ export function usePaintTools({
       const target = locatePaintableLayer(getLayers(), activeLayerId)
       if (typeof target === 'string') return
       const { layers, layerIndex, layer } = target
-      const fitted = fitSelectionToLayer(layer.type, tileSelection)
+      const fitted = selectionFor(layer, tileSelection)
       if (!fitted) return
       const data = rectangleFill(layer.data, size, startPos, endPos, fitted, paintMode)
       if (data) publish(layers, layerIndex, layer, data, true)

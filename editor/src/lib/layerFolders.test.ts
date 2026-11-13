@@ -25,12 +25,13 @@ describe('layerFolders', () => {
     expect(ids(left.layers)).toEqual(['F', 'b', 'c', 'a'])
   })
 
-  it('only tile and image layers can be held', () => {
-    const layers = [L('F', 'folder'), L('col', 'collision'), L('img', 'image')]
-    const no = moveInList(layers, 0, 'col', 'F', 'bottom')
-    expect(no.layers.find((l) => l.id === 'col')!.folderId).toBeUndefined()
+  it('only tile, image and collision layers can be held', () => {
+    const layers = [L('F', 'folder'), L('ter', 'terrain'), L('img', 'image'), L('col', 'collision')]
+    const no = moveInList(layers, 0, 'ter', 'F', 'bottom')
+    expect(no.layers.find((l) => l.id === 'ter')!.folderId).toBeUndefined()
     expect(moveInList(layers, 0, 'img', 'F', 'bottom').layers.find((l) => l.id === 'img')!.folderId).toBe('F')
-    expect(setLayerFolder(layers, 0, 'col', 'F').layers).toBe(layers)
+    expect(moveInList(layers, 0, 'col', 'F', 'bottom').layers.find((l) => l.id === 'col')!.folderId).toBe('F')
+    expect(setLayerFolder(layers, 0, 'ter', 'F').layers).toBe(layers)
     expect(normalizeFolders([L('F', 'folder'), L('o', 'objects', { folderId: 'F' })], 0).layers[1].folderId).toBeUndefined()
   })
 
@@ -76,9 +77,9 @@ describe('copying and pasting layers', () => {
     let n = 0
     return () => `new${++n}`
   }
-  const list = () => [L('a'), L('F', 'folder'), L('b', 'tile', { folderId: 'F' }), L('c', 'image', { folderId: 'F', images: [{ id: 'p', x: 0, y: 0, z: 0 }] }), L('d'), L('col', 'collision')]
+  const list = () => [L('a'), L('F', 'folder'), L('b', 'tile', { folderId: 'F' }), L('c', 'image', { folderId: 'F', images: [{ id: 'p', x: 0, y: 0, z: 0 }] }), L('d'), L('col', 'terrain')]
 
-  it('copying a folder takes the layers it holds; gameplay layers are left out', () => {
+  it('copying a folder takes the layers it holds; terrain and other one-per-map layers are left out', () => {
     expect(ids(layersToCopy(list(), ['F', 'col']))).toEqual(['F', 'b', 'c'])
     expect(ids(layersToCopy(list(), ['d', 'b']))).toEqual(['b', 'd'])
   })

@@ -13,26 +13,16 @@ export interface PanelPlacement {
 }
 
 export const PANEL_PLACEMENT: Record<string, PanelPlacement> = {
-  maps: { title: 'MAPS', anchors: [[['layers', 'entities', 'properties'], 'above']], mapSide: 'left' },
+  maps: { title: 'MAPS', anchors: [[['layers', 'properties'], 'above']], mapSide: 'left' },
   layers: {
     title: 'LAYERS',
     anchors: [
-      [['entities'], 'within'],
       [['maps'], 'below'],
       [['properties'], 'above'],
     ],
     mapSide: 'left',
   },
-  entities: {
-    title: 'ENTITIES',
-    anchors: [
-      [['layers'], 'within'],
-      [['maps'], 'below'],
-      [['properties'], 'above'],
-    ],
-    mapSide: 'left',
-  },
-  properties: { title: 'PROPERTIES', anchors: [[['layers', 'entities', 'maps'], 'below']], mapSide: 'left' },
+  properties: { title: 'PROPERTIES', anchors: [[['layers', 'maps'], 'below']], mapSide: 'left' },
   tilesets: { title: 'TILESET BROWSER', anchors: [[['preview', 'activeSelection'], 'above']], mapSide: 'right' },
   preview: {
     title: 'TILESET',

@@ -2,7 +2,7 @@
 import React from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, screen, within } from '@testing-library/react'
-import { EntitiesPanel } from './EntitiesPanel'
+import { EntityTree } from './EntityTree'
 import { PRESET_PREFABS } from '@/lib/componentRegistry'
 import { renderWithEditor, assetMap, characterMeta, makeAsset } from '@/test/editorContext'
 import { makeEntity } from '@/test/helpers'
@@ -11,7 +11,6 @@ const hero = makeAsset('characters/hero', characterMeta())
 
 function setup(entities = [makeEntity('a', { name: 'Guard' })], over: Record<string, any> = {}) {
   const props = {
-    hasActiveMap: true,
     entities,
     selectedEntityId: null,
     setSelectedEntityId: vi.fn(),
@@ -23,66 +22,43 @@ function setup(entities = [makeEntity('a', { name: 'Guard' })], over: Record<str
     setConfirmDialog: vi.fn(),
     startPlacement: vi.fn(),
     toggleEntityVisibility: vi.fn(),
-    createEntityFolder: vi.fn(),
     ...over,
   }
-  renderWithEditor(<EntitiesPanel {...(props as any)} />, { spriteAssets: assetMap(hero), spriteList: [hero] })
+  renderWithEditor(<EntityTree {...(props as any)} />, { spriteAssets: assetMap(hero), spriteList: [hero] })
   return props
 }
 
-describe('EntitiesPanel add menu', () => {
-  it('lists Empty entity and every prefab with its description', async () => {
-    setup()
-    fireEvent.pointerDown(screen.getByRole('button', { name: 'Add entity' }), { button: 0, ctrlKey: false })
-    const menu = await screen.findByTestId('add-entity-menu')
-    expect(within(menu).getByRole('menuitem', { name: 'Empty entity' })).toBeInTheDocument()
-    for (const p of PRESET_PREFABS) {
-      const item = within(menu).getByRole('menuitem', { name: p.name })
-      expect(item).toHaveTextContent(p.description)
-    }
-  })
+/** Opens the right-click menu of a row, then Entity (and Prefab when asked). */
+async function openEntityMenu(rowTestId: string, prefab = false) {
+  fireEvent.contextMenu(screen.getByTestId(rowTestId))
+  fireEvent.keyDown(await screen.findByRole('menuitem', { name: 'Entity' }), { key: 'ArrowRight' })
+  if (prefab) fireEvent.keyDown(await screen.findByRole('menuitem', { name: 'Prefab' }), { key: 'ArrowRight' })
+}
 
-  it('choosing a prefab starts placement with its components', async () => {
+describe('EntityTree: right-click › Entity', () => {
+  it('Prefab lists every prefab; choosing one starts placement with its components', async () => {
     const props = setup()
-    fireEvent.pointerDown(screen.getByRole('button', { name: 'Add entity' }), { button: 0, ctrlKey: false })
+    await openEntityMenu('entity-row-a', true)
+    for (const p of PRESET_PREFABS) expect(await screen.findByRole('menuitem', { name: p.name })).toBeInTheDocument()
     fireEvent.click(await screen.findByRole('menuitem', { name: 'NPC' }))
     expect(props.startPlacement).toHaveBeenCalledTimes(1)
     const arg = props.startPlacement.mock.calls[0][0]
     expect(arg.name).toBe('NPC')
     expect(arg.components.Sprite.asset).toBe('characters/player')
     expect(arg.components.Collider).toMatchObject({ width: 32, height: 32, isSolid: true })
+    expect(arg).not.toHaveProperty('free')
     expect(props.createEntity).not.toHaveBeenCalled()
   })
 
-  it('choosing Empty entity starts placement without components', async () => {
+  it('New starts placement of an empty entity', async () => {
     const props = setup()
-    fireEvent.pointerDown(screen.getByRole('button', { name: 'Add entity' }), { button: 0, ctrlKey: false })
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Empty entity' }))
-    expect(props.startPlacement).toHaveBeenCalledWith({ name: 'New Entity', free: false })
+    await openEntityMenu('entity-row-a')
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'New' }))
+    expect(props.startPlacement).toHaveBeenCalledWith({ name: 'New Entity' })
   })
 })
 
-describe('EntitiesPanel add menu: free entities', () => {
-  it('Empty free entity starts a free placement', async () => {
-    const props = setup()
-    fireEvent.pointerDown(screen.getByRole('button', { name: 'Add entity' }), { button: 0, ctrlKey: false })
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Empty free entity' }))
-    expect(props.startPlacement).toHaveBeenCalledWith({ name: 'New Entity', free: true })
-  })
-
-  it('a prefab can be placed free from its own submenu, and is tile-based from the list', async () => {
-    const props = setup()
-    fireEvent.pointerDown(screen.getByRole('button', { name: 'Add entity' }), { button: 0, ctrlKey: false })
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'NPC' }))
-    expect(props.startPlacement.mock.calls[0][0]).toMatchObject({ name: 'NPC', free: false })
-    fireEvent.pointerDown(screen.getByRole('button', { name: 'Add entity' }), { button: 0, ctrlKey: false })
-    fireEvent.keyDown(await screen.findByRole('menuitem', { name: 'Free entity from prefab' }), { key: 'ArrowRight' })
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Free NPC' }))
-    expect(props.startPlacement.mock.calls[1][0]).toMatchObject({ name: 'NPC', free: true })
-  })
-})
-
-describe('EntitiesPanel Edit event', () => {
+describe('EntityTree Edit event', () => {
   it('offers "Edit event" only for entities with an Event: selects the entity, then asks the inspector card to open it', () => {
     vi.useFakeTimers()
     const opened: string[] = []
@@ -103,7 +79,7 @@ describe('EntitiesPanel Edit event', () => {
   })
 })
 
-describe('EntitiesPanel rows', () => {
+describe('EntityTree rows', () => {
   const rows = () => [
     makeEntity('npc', { name: 'Elder', components: { Sprite: { asset: 'characters/hero' }, Event: { states: [] }, Movement: { controller: 'wander' }, Collider: { isSolid: true } } }),
     makeEntity('zone', { name: 'Warp zone', components: { Collider: { isSolid: false }, Event: { states: [] } } }),
@@ -145,6 +121,6 @@ describe('EntitiesPanel rows', () => {
 
   it('shows an empty state', () => {
     setup([])
-    expect(screen.getByText('No entities yet.')).toBeInTheDocument()
+    expect(screen.getByText(/No entities yet/)).toBeInTheDocument()
   })
 })

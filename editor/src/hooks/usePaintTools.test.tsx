@@ -4,6 +4,7 @@ import { act, renderHook } from '@testing-library/react'
 import type { DebugInfo, Layer, MapData, TileSelection } from '@/types/editor'
 import { useSyncedState } from '@/hooks/useSyncedState'
 import { makeLayer, makeMap } from '@/test/helpers'
+import { polygonEditStore } from '@/lib/polygonEditStore'
 import { usePaintTools } from './usePaintTools'
 
 const wrapper = ({ children }: { children: ReactNode }) => <StrictMode>{children}</StrictMode>
@@ -67,6 +68,26 @@ describe('usePaintTools (StrictMode)', () => {
     })
     act(() => result.current.tools.handlePaint(1, 1))
     expect(result.current.layers[0].data).toEqual({ 15: marker })
+  })
+
+  it('on a collision layer new cells join the picked tiles item (a new one when none is picked); old cells keep theirs', () => {
+    const marker = { tilesetId: '__collision__', x: 0, y: 0 }
+    polygonEditStore.set({ selectedShapeId: null, brush: 'tiles' })
+    const { result } = setup({
+      layer: { type: 'collision', data: { 0: marker }, tileGroups: [{ id: 'tiles', name: 'Tiles' }] },
+      selection: null,
+    })
+    // No tileset tile is needed: a collision layer always paints the marker.
+    act(() => result.current.tools.handlePaint(1, 0))
+    const [made] = result.current.layers[0].tileGroups!.slice(1)
+    expect(made.name).toBe('Tiles 2')
+    expect(polygonEditStore.get().selectedShapeId).toBe(made.id)
+    expect(result.current.layers[0].data).toEqual({ 0: marker, 1: { ...marker, group: made.id } })
+    // The picked item takes the next cells too.
+    act(() => result.current.tools.handlePaint(2, 0))
+    expect(result.current.layers[0].tileGroups).toHaveLength(2)
+    expect(result.current.layers[0].data![2]).toEqual({ ...marker, group: made.id })
+    polygonEditStore.set({ selectedShapeId: null })
   })
 
   it('several paint calls in one tick compose', () => {

@@ -196,20 +196,28 @@ describe('KonvaEntities', () => {
     expect(recorded.some((r) => r.kind === 'Rect')).toBe(true)
   })
 
-  it('moving an entity reports a snapped, clamped position once on drop', () => {
+  it('with the magnet on, a dropped one-tile entity lands on a tile anchor, once on drop', () => {
     const moveEntity = vi.fn()
-    renderEntities([entity('a', 16, 32)], { moveEntity, snapEntityPos: (x, y) => ({ x: Math.floor(x / 32) * 32 + 16, y: Math.ceil(y / 32) * 32 }) })
+    renderEntities([entity('a', 16, 32)], { moveEntity, snapToGrid: true })
     const node = nodes()[0]
-    const target = { x: () => 150, y: () => 70, getStage: () => null }
     const setters: number[] = []
-    node.props.onDragEnd({ cancelBubble: false, target: { ...target, x: (v?: number) => (v === undefined ? 150 : setters.push(v)), y: (v?: number) => (v === undefined ? 70 : setters.push(v)), getStage: () => null } })
+    node.props.onDragEnd({ cancelBubble: false, target: { x: (v?: number) => (v === undefined ? 150 : setters.push(v)), y: (v?: number) => (v === undefined ? 70 : setters.push(v)), getStage: () => null } })
     expect(moveEntity).toHaveBeenCalledTimes(1)
-    expect(moveEntity).toHaveBeenCalledWith('a', 144, 96)
+    expect(moveEntity).toHaveBeenCalledWith('a', 144, 64)
   })
 
-  it('a free entity is dropped on the pixel (outside the map too), never snapped to a tile', () => {
+  it('with the magnet on, a bigger area snaps by its own edges', () => {
     const moveEntity = vi.fn()
-    renderEntities([entity('f', 50, 61, { Transform: { x: 50, y: 61, depth: 10, free: true } })], { moveEntity, snapEntityPos: (x, y) => ({ x: Math.floor(x / 32) * 32 + 16, y: Math.ceil(y / 32) * 32 }) })
+    renderEntities([entity('big', 16, 32, { Collider: { width: 64, height: 64, offsetX: 0, offsetY: 0, isSolid: true } })], { moveEntity, snapToGrid: true })
+    nodes()[0].props.onDragEnd({ cancelBubble: false, target: { x: (v?: number) => (v === undefined ? 100 : undefined), y: (v?: number) => (v === undefined ? 100 : undefined), getStage: () => null } })
+    const [, x, y] = moveEntity.mock.calls[0]
+    expect((x - 32) % 32).toBe(0)
+    expect(y % 32).toBe(0)
+  })
+
+  it('with the magnet off, an entity is dropped on the pixel (outside the map too)', () => {
+    const moveEntity = vi.fn()
+    renderEntities([entity('f', 50, 61)], { moveEntity, snapToGrid: false })
     const drop = (x: number, y: number) => {
       const target = { x: (v?: number) => (v === undefined ? x : undefined), y: (v?: number) => (v === undefined ? y : undefined), getStage: () => null }
       nodes()[0].props.onDragEnd({ cancelBubble: false, target })
@@ -220,14 +228,14 @@ describe('KonvaEntities', () => {
     expect(moveEntity).toHaveBeenLastCalledWith('f', -30, 99999)
   })
 
-  it('a free entity without a collider has a small area on its anchor, not a whole tile', () => {
-    renderEntities([entity('f', 50, 61, { Transform: { x: 50, y: 61, depth: 10, free: true } })])
+  it('an entity without a collider has its tile as area, wherever it stands', () => {
+    renderEntities([entity('f', 50, 61)])
     runOverlay()
-    expect(drawn.footprint.mock.calls.map((c) => c.slice(1, 5))).toEqual([[42, 45, 16, 16]])
+    expect(drawn.footprint.mock.calls.map((c) => c.slice(1, 5))).toEqual([[34, 29, 32, 32]])
   })
 
-  it('a free entity with a collider shows exactly that box, whatever its size', () => {
-    renderEntities([entity('f', 50, 61, { Transform: { x: 50, y: 61, depth: 10, free: true }, Collider: { width: 45, height: 13, offsetX: 3, offsetY: -2, isSolid: true } })])
+  it('an entity with a collider shows exactly that box, whatever its size', () => {
+    renderEntities([entity('f', 50, 61, { Collider: { width: 45, height: 13, offsetX: 3, offsetY: -2, isSolid: true } })])
     runOverlay()
     expect(drawn.footprint.mock.calls.map((c) => c.slice(1, 5))).toEqual([[30.5, 46, 45, 13]])
   })

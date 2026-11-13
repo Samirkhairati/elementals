@@ -1,12 +1,12 @@
 import type { Layer } from '@/types/editor'
 import { ENTITIES_ID, moveInStack, stackIds } from './layerOrder'
 
-// Folders are layers of type `folder` that sit in the layer list; the tile and image layers they hold follow them directly
+// Folders are layers of type `folder` that sit in the layer list; the tile, image and collision layers they hold follow them directly
 // (`folderId` points at the folder). Everything stays one flat, ordered list, so history, autosave and reordering need
 // nothing new, and the canvas and the exporter simply skip the folder rows.
 
 /** Only these layer kinds can be put in a folder. */
-export const canHoldInFolder = (layer: Pick<Layer, 'type'>): boolean => layer.type === 'tile' || layer.type === 'image'
+export const canHoldInFolder = (layer: Pick<Layer, 'type'>): boolean => layer.type === 'tile' || layer.type === 'image' || layer.type === 'collision'
 
 export const isFolder = (layer: Pick<Layer, 'type'>): boolean => layer.type === 'folder'
 

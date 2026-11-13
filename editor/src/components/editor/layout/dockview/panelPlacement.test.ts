@@ -6,7 +6,6 @@ const openOnly = (...ids: string[]) => (id: string) => ids.includes(id)
 
 describe('panelPosition', () => {
   it('uses the first anchor that is open, in its direction', () => {
-    expect(panelPosition(PANEL_PLACEMENT.layers, openOnly('entities', 'maps'), 'map:a')).toEqual({ referencePanel: 'entities', direction: 'within' })
     expect(panelPosition(PANEL_PLACEMENT.layers, openOnly('maps', 'properties'), 'map:a')).toEqual({ referencePanel: 'maps', direction: 'below' })
     expect(panelPosition(PANEL_PLACEMENT.layers, openOnly('properties'), 'map:a')).toEqual({ referencePanel: 'properties', direction: 'above' })
   })

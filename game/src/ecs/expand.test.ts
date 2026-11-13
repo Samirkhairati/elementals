@@ -44,10 +44,13 @@ describe('expandEntity', () => {
     expect(find(EntityInfoComponent)).toMatchObject({ editorId: 'e1', name: 'E1' });
   });
 
-  it('Transform.free reaches the TransformComponent; entities without the flag are tile-based', () => {
+  it('Transform.free reaches the TransformComponent, and an anchor off the tile grid is free whatever the flag says', () => {
     const free = expand({ Transform: createDefaultComponent('Transform', { x: 50, y: 61, free: true }) }).find(TransformComponent)!;
     expect(free).toMatchObject({ x: 50, y: 61, free: true });
     expect(expand({ Transform: { x: 48, y: 64, depth: 10 } }).find(TransformComponent)!.free).toBe(false);
+    expect(expand({ Transform: { x: 50, y: 61, depth: 10, free: false } }).find(TransformComponent)!.free).toBe(true);
+    expect(expand({ Transform: { x: 50, y: 61, depth: 10 } }).find(TransformComponent)!.free).toBe(true);
+    expect(expand({ Transform: { depth: 10 } }).find(TransformComponent)!.free).toBe(false);
     expect(createComponentFromData('Transform', { x: 1, y: 2, free: true })).toMatchObject({ free: true });
   });
 

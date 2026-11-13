@@ -23,6 +23,7 @@ const selectDockInputs = (c: EditorContextValue) => ({
   onClearActiveMap: c.onClearActiveMap,
   entityFocus: !!c.selectedEntityId,
   imageFocus: c.activeLayerType === 'image',
+  collisionFocus: c.activeLayerType === 'collision',
 });
 
 export function EditorDockview() {
@@ -44,6 +45,7 @@ export function EditorDockview() {
     onClearActiveMap: parentCtx.onClearActiveMap,
     entityFocus: parentCtx.entityFocus,
     imageFocus: parentCtx.imageFocus,
+    collisionFocus: parentCtx.collisionFocus,
   });
 
   const layoutValue = useMemo(

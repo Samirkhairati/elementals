@@ -1,4 +1,4 @@
-import { withPlacement } from '@/lib/placementKind'
+import { usePolygonEdit } from '@/lib/polygonEditStore'
 import type { SelectMode } from '@/lib/imageSelection'
 import type { ImageDrag } from './konva/imageDrag'
 import React, { useCallback, useMemo, useRef } from 'react'
@@ -24,6 +24,9 @@ import { KonvaTilemapLayer } from './konva/KonvaTilemapLayer'
 import { KonvaOverlays } from './konva/KonvaOverlays'
 import { KonvaEntities, type Visuals } from './konva/KonvaEntities'
 import { KonvaGhostEntity } from './konva/KonvaGhostEntity'
+import { KonvaEntityResize } from './konva/KonvaEntityResize'
+import { COMPONENT_SCHEMAS } from '../../../../../shared/engine/components'
+import type { ColliderPatch } from '@/lib/entityVisuals'
 import { withoutFolders } from '@/lib/layerFolders'
 import { KonvaGhostImage, KonvaImageItems } from './konva/KonvaImageItems'
 import { KonvaShapes } from './konva/KonvaShapes'
@@ -63,6 +66,7 @@ interface MapCanvasProps {
   moveEntity?: (id: string, x: number, y: number) => void
   showGrid?: boolean
   snapToGrid?: boolean
+  /** Unused: entities snap with the magnet (`snapToGrid`) like pictures. */
   snapEntityPos?: (rawX: number, rawY: number) => { x: number; y: number }
   pendingPlacement?: PendingEntityPlacement | null
   commitPlacement?: (x: number, y: number) => void
@@ -124,7 +128,6 @@ export function MapCanvas({
   moveEntity,
   showGrid = true,
   snapToGrid = true,
-  snapEntityPos = (x, y) => ({ x: Math.floor(x / 32) * 32 + 16, y: Math.floor((y - 16) / 32 + 1) * 32 }),
   pendingPlacement = null,
   commitPlacement,
   cancelPlacement,
@@ -245,12 +248,31 @@ export function MapCanvas({
 
   const activeLayer = useMemo(() => layers.find((l) => l.id === activeLayerId) ?? null, [layers, activeLayerId])
   const isImageLayerActive = activeLayer?.type === 'image'
+  const { brush: collisionBrush } = usePolygonEdit()
   // Entity placement and image placement both need clicks to land on the map, not on pictures.
   const placingAnything = !!pendingImage || !!pendingPlacement
   // Toolbar lock off: while no layer or an image layer is active (never a tile layer: painting wins) any image can be picked.
   const otherImageLayers = useMemo(
     () => (!view.lockImages && !placingAnything && (activeLayer === null || isImageLayerActive) ? layers.filter((l) => l.type === 'image') : []),
     [view.lockImages, placingAnything, activeLayer, isImageLayerActive, layers]
+  )
+
+  // The selected entity's area gets resize handles (see KonvaEntityResize); an entity without a Collider gets one with the new box.
+  // Without a Collider the game neither blocks nor touches anything beyond the entity's own tile, so the added one is not solid.
+  const resizableEntity = useMemo(() => {
+    const entity = showEntities && !placingAnything ? entities.find((e) => e.id === selectedEntityId) : undefined
+    if (!entity || entity.visible === false) return null
+    if (entity.folder && entityFolders.some((f) => f.id === entity.folder && f.visible === false)) return null
+    return entity
+  }, [showEntities, placingAnything, entities, selectedEntityId, entityFolders])
+  const handleResizeEntity = useCallback(
+    (entityId: string, patch: ColliderPatch) => {
+      const hasCollider = !!entities.find((e) => e.id === entityId)?.components.Collider
+      const props: PropBag = hasCollider ? { ...patch } : { ...(COMPONENT_SCHEMAS.Collider.defaultProps as PropBag), isSolid: false, ...patch }
+      if (updateComponentProps) updateComponentProps(entityId, 'Collider', props)
+      else for (const [key, value] of Object.entries(props)) updateComponentProp?.(entityId, 'Collider', key, value)
+    },
+    [entities, updateComponentProps, updateComponentProp]
   )
 
   const handleUpdateTag = useCallback(
@@ -328,7 +350,7 @@ export function MapCanvas({
                 setSelectedEntityId={setSelectedEntityId || (() => {})}
                 moveEntity={moveEntity || (() => {})}
                 activeMap={activeMap}
-                snapEntityPos={snapEntityPos}
+                snapToGrid={snapToGrid}
                 onRightClickEntity={handleRightClickEntity}
                 showEntities={showEntities}
                 entityFolders={entityFolders}
@@ -357,7 +379,7 @@ export function MapCanvas({
                 rectStart={rectStart}
                 rectCurrent={rectCurrent}
                 showGrid={showGrid}
-                paintingEnabled={!isImageLayerActive && activeLayer?.type !== 'polygons'}
+                paintingEnabled={!isImageLayerActive && !(activeLayer?.type === 'collision' && collisionBrush === 'shape')}
               />
 
               {/* Pick / drag handles of the active image layer (above the art; the entities' own handles are above these) */}
@@ -388,7 +410,7 @@ export function MapCanvas({
                 setSelectedEntityId={setSelectedEntityId || (() => {})}
                 moveEntity={moveEntity || (() => {})}
                 activeMap={activeMap}
-                snapEntityPos={snapEntityPos}
+                snapToGrid={snapToGrid}
                 onRightClickEntity={handleRightClickEntity}
                 showEntities={showEntities}
                 entityFolders={entityFolders}
@@ -396,6 +418,9 @@ export function MapCanvas({
                 view={view}
                 onOpenEvent={openEventEditor}
               />
+
+              {/* The selected entity's area with its resize handles (above the entities' own handles, so a handle wins) */}
+              <KonvaEntityResize entity={resizableEntity} snapToGrid={snapToGrid} onResize={handleResizeEntity} />
 
               {/* Entity areas, selection, badges and labels stay on top of every layer so they remain readable */}
               <KonvaEntities
@@ -406,18 +431,20 @@ export function MapCanvas({
                 setSelectedEntityId={setSelectedEntityId || (() => {})}
                 moveEntity={moveEntity || (() => {})}
                 activeMap={activeMap}
-                snapEntityPos={snapEntityPos}
+                snapToGrid={snapToGrid}
                 showEntities={showEntities}
                 entityFolders={entityFolders}
                 spriteAssets={spriteAssets}
                 view={view}
               />
 
-              {/* Collision shapes of the polygon layers, and their editor while one is active (or an entity's polygon collider is drawn) */}
+              {/* Collision shapes of the collision layers, and their editor while one is active with the Shape brush (or an entity's polygon collider is drawn) */}
               <KonvaShapes
                 layers={layers}
                 activeLayerId={activeLayerId}
                 entities={entities}
+                selectedEntityId={selectedEntityId}
+                mapWidth={activeMap.width}
                 enabled={!!updateLayers}
                 placing={placingAnything}
                 updateLayers={updateLayers}
@@ -437,7 +464,7 @@ export function MapCanvas({
               <KonvaGhostEntity
                 pendingPlacement={pendingPlacement}
                 pointerPos={stagePointerPos}
-                snapEntityPos={snapEntityPos}
+                snapToGrid={snapToGrid}
                 spriteAssets={spriteAssets}
               />
             </KonvaLayer>
@@ -464,7 +491,7 @@ export function MapCanvas({
       <CanvasContextMenu
         menuState={contextMenuState}
         onClose={closeContextMenu}
-        onCreateEntity={(name, x, y, comps, free) => createEntity?.(name, x, y, withPlacement(comps, free === true))}
+        onCreateEntity={(name, x, y, comps) => createEntity?.(name, x, y, comps)}
         onDuplicateEntity={duplicateEntity}
         onDeleteEntity={deleteEntity}
         onSetAreaColor={(id, color) => {
@@ -474,6 +501,7 @@ export function MapCanvas({
         onSampleTile={sampleSingleTile}
         onPlaceMultiple={onPlaceMultiple}
         placeMultipleKeys={placeMultipleKeys}
+        snapToGrid={snapToGrid}
       />
     </>
   )

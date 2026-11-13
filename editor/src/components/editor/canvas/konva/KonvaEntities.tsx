@@ -15,7 +15,6 @@ import {
   entityBounds,
   entityAreaLocal,
   entityIconName,
-  isFreeEntityLike,
   normalizeCollider,
   sortByDepth,
   summarizeEntity,
@@ -37,6 +36,7 @@ import {
   drawSelectionFrame,
   drawWanderRing,
 } from './entityDraw'
+import { snapEntityAnchor } from '@/lib/entitySnap'
 import { setStageCursor } from '../canvasUtils'
 
 const EMPTY_ASSETS: Record<string, SpriteAssetInfo> = {}
@@ -47,7 +47,8 @@ interface KonvaEntitiesProps {
   setSelectedEntityId: (id: string | null) => void
   moveEntity: (id: string, x: number, y: number) => void
   activeMap: MapData
-  snapEntityPos?: (x: number, y: number) => { x: number; y: number }
+  /** The magnet: on, a dragged entity's area lands on grid lines; off, on whole pixels. */
+  snapToGrid?: boolean
   onRightClickEntity?: (entity: EntityData, clientX: number, clientY: number) => void
   showEntities?: boolean
   entityFolders?: EntityFolder[]
@@ -77,8 +78,6 @@ interface EntityInfo {
   bounds: GeoRect
   /** The entity's area: its collider box, or the tile it stands on when it has no collider. */
   foot: GeoRect
-  /** A free entity: dragged pixel by pixel; a tile-based one always lands on a tile. */
-  free: boolean
   solid: boolean
   /** A polygon collider (points relative to the anchor), drawn instead of the box. */
   poly: { points: { x: number; y: number }[]; closed: boolean } | null
@@ -103,7 +102,6 @@ function buildInfo(entity: EntityData, assets: Record<string, SpriteAssetInfo>):
     asset,
     bounds: translateRect(abs, -entity.x, -entity.y),
     foot: entityAreaLocal(entity),
-    free: isFreeEntityLike(entity),
     solid: collider ? collider.isSolid : true,
     poly: collider?.points ? { points: collider.points, closed: collider.closed !== false } : null,
     hasEvent: sum.hasEvent,
@@ -133,7 +131,7 @@ interface KonvaEntityNodeProps {
   showSprites: boolean
   listening: boolean
   draggable: boolean
-  snapEntityPos: (x: number, y: number) => { x: number; y: number }
+  snapToGrid: boolean
   visuals: React.MutableRefObject<Visuals>
   setSelectedEntityId: (id: string | null) => void
   moveEntity: (id: string, x: number, y: number) => void
@@ -148,7 +146,7 @@ const KonvaEntityNode = React.memo(function KonvaEntityNode({
   showSprites,
   listening,
   draggable,
-  snapEntityPos,
+  snapToGrid,
   visuals,
   setSelectedEntityId,
   moveEntity,
@@ -167,7 +165,7 @@ const KonvaEntityNode = React.memo(function KonvaEntityNode({
   const dim = info.spriteHidden
 
   // Entities can be dragged past the map's edge too (off-screen spawners, things walking in).
-  const clampSnap = (x: number, y: number) => (info.free ? { x: Math.round(x), y: Math.round(y) } : snapEntityPos(x, y))
+  const clampSnap = (x: number, y: number) => snapEntityAnchor(info.foot, x, y, snapToGrid)
 
   return (
     <Group
@@ -299,7 +297,7 @@ export const KonvaEntities = React.memo(function KonvaEntities({
   setSelectedEntityId,
   moveEntity,
   activeMap,
-  snapEntityPos = (x, y) => ({ x: Math.floor(x / 32) * 32 + 16, y: Math.floor((y - 16) / 32 + 1) * 32 }),
+  snapToGrid = true,
   onRightClickEntity,
   showEntities = true,
   entityFolders = [],
@@ -338,7 +336,7 @@ export const KonvaEntities = React.memo(function KonvaEntities({
             showSprites={view.sprites}
             listening
             draggable
-            snapEntityPos={snapEntityPos}
+            snapToGrid={snapToGrid}
             visuals={visuals}
             setSelectedEntityId={setSelectedEntityId}
             moveEntity={moveEntity}

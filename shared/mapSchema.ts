@@ -11,7 +11,9 @@ import { isRecord } from './engine/util.ts'
 import { minPoints } from './collisionShapes.ts'
 
 /** Mirrors `LayerType` in editor/src/types/editor.ts (checked at compile time by the editor tests). */
-export const LAYER_TYPES = ['tile', 'collision', 'terrain', 'objects', 'encounters', 'image', 'folder', 'polygons'] as const
+export const LAYER_TYPES = ['tile', 'collision', 'terrain', 'objects', 'encounters', 'image', 'folder'] as const
+/** Older layer types still accepted: `polygons` (shapes only) is loaded and exported as a collision layer (shared/collisionLayers.ts). */
+export const LEGACY_LAYER_TYPES = ['polygons'] as const
 
 /**
  * Canonical component names (mirrors `ComponentType` in editor/src/types/editor.ts, checked at compile
@@ -67,7 +69,28 @@ function validateShapes(shapes: unknown, label: string, errors: string[], warnin
     shape.points.forEach((p, j) => {
       if (!isRecord(p) || !isFiniteNumber(p.x) || !isFiniteNumber(p.y)) errors.push(`${at} point ${j}: x and y must be finite numbers`)
     })
+    if (shape.name !== undefined && typeof shape.name !== 'string') errors.push(`${at}: name must be a string`)
     if (shape.points.length < minPoints(shape.closed !== false)) warnings.push(`${at}: too few points to collide; it is dropped on export`)
+  })
+}
+
+/** The tiles items of a collision layer: `{ id, name }` with unique ids. */
+function validateTileGroups(groups: unknown, label: string, errors: string[]): void {
+  if (!Array.isArray(groups)) {
+    errors.push(`${label}: tileGroups must be an array`)
+    return
+  }
+  const ids = new Set<string>()
+  groups.forEach((g, i) => {
+    const at = `${label} tileGroups[${i}]`
+    if (!isRecord(g)) {
+      errors.push(`${at}: must be an object`)
+      return
+    }
+    if (typeof g.id !== 'string' || g.id === '') errors.push(`${at}: id must be a non-empty string`)
+    else if (ids.has(g.id)) errors.push(`${at}: duplicate id ${JSON.stringify(g.id)}`)
+    else ids.add(g.id)
+    if (typeof g.name !== 'string') errors.push(`${at}: name must be a string`)
   })
 }
 
@@ -211,7 +234,7 @@ export function validateEditorMap(data: unknown, options: ValidateEditorMapOptio
         seenIds.add(layer.id)
       }
       if (typeof layer.name !== 'string') errors.push(`${label}: name must be a string`)
-      if (!(LAYER_TYPES as readonly unknown[]).includes(layer.type)) {
+      if (!(LAYER_TYPES as readonly unknown[]).includes(layer.type) && !(LEGACY_LAYER_TYPES as readonly unknown[]).includes(layer.type)) {
         errors.push(`${label}: unknown layer type ${JSON.stringify(layer.type)} (expected one of ${LAYER_TYPES.join(', ')})`)
       }
       if (typeof layer.visible !== 'boolean') errors.push(`${label}: visible must be a boolean`)
@@ -219,14 +242,14 @@ export function validateEditorMap(data: unknown, options: ValidateEditorMapOptio
       if (layer.ySort !== undefined && typeof layer.ySort !== 'boolean') errors.push(`${label}: ySort must be a boolean`)
       if (layer.z !== undefined && !isFiniteNumber(layer.z)) errors.push(`${label}: z must be a finite number`)
 
-      if (typeof layer.name === 'string' && layer.type !== 'folder') {
-        const exported = layer.type === 'collision' ? 'collision' : layer.name
-        exportedNames.set(exported, (exportedNames.get(exported) ?? 0) + 1)
+      // Every collision layer's tiles go into the one exported `collision` layer (shapes keep the layer's name).
+      if (typeof layer.name === 'string' && layer.type !== 'folder' && layer.type !== 'collision' && layer.type !== 'polygons') {
+        exportedNames.set(layer.name, (exportedNames.get(layer.name) ?? 0) + 1)
       }
 
       if (layer.folderId !== undefined) {
         const holder = (data.layers as unknown[]).find((l) => isRecord(l) && l.id === layer.folderId)
-        if (layer.type !== 'tile' && layer.type !== 'image') warnings.push(`${label}: only tile and image layers can sit in a folder`)
+        if (layer.type !== 'tile' && layer.type !== 'image' && layer.type !== 'collision') warnings.push(`${label}: only tile, image and collision layers can sit in a folder`)
         else if (!isRecord(holder) || holder.type !== 'folder') warnings.push(`${label}: folderId ${JSON.stringify(layer.folderId)} is not a folder layer; it is ignored`)
       }
 
@@ -238,8 +261,12 @@ export function validateEditorMap(data: unknown, options: ValidateEditorMapOptio
       }
 
       if (layer.shapes !== undefined) {
-        if (layer.type !== 'polygons') warnings.push(`${label}: only polygon collision layers keep "shapes"; they are dropped on export`)
+        if (layer.type !== 'collision' && layer.type !== 'polygons') warnings.push(`${label}: only collision layers keep "shapes"; they are dropped on export`)
         validateShapes(layer.shapes, label, errors, warnings)
+      }
+      if (layer.tileGroups !== undefined) {
+        if (layer.type !== 'collision') warnings.push(`${label}: only collision layers keep "tileGroups"; they are ignored`)
+        validateTileGroups(layer.tileGroups, label, errors)
       }
 
       if (layer.data === undefined) return
@@ -310,6 +337,9 @@ export function validateEditorMap(data: unknown, options: ValidateEditorMapOptio
       }
     })
 
+    if (data.layers.some((l) => isRecord(l) && (l.type === 'collision' || l.type === 'polygons'))) {
+      exportedNames.set('collision', (exportedNames.get('collision') ?? 0) + 1)
+    }
     for (const [name, count] of exportedNames) {
       if (count > 1) warnings.push(`${count} layers will be exported with the same name "${name}"`)
     }

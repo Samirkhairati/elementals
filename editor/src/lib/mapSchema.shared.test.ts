@@ -91,10 +91,30 @@ describe('validateEditorMap', () => {
   it('warns (does not fail) on collision tiles in tile layers and duplicate exported names', () => {
     const m = validMap()
     m.layers[1].data[0] = { tilesetId: '__collision__', x: 0, y: 0 }
-    m.layers.push({ id: 'c2', name: 'x', type: 'collision', visible: true, locked: false })
+    m.layers.push({ id: 'g2', name: 'ground', type: 'tile', visible: true, locked: false })
     const res = validateEditorMap(m, { tilesets: TILESETS })
     expect(res.ok).toBe(true)
     expect(res.warnings.length).toBe(2)
+  })
+
+  it('several collision layers are fine (their tiles are exported as one layer); a tile layer named "collision" clashes', () => {
+    const m = validMap()
+    m.layers.push({ id: 'c2', name: 'more', type: 'collision', visible: true, locked: false, data: {}, tileGroups: [{ id: 't', name: 'Tiles' }] })
+    expect(validateEditorMap(m, { tilesets: TILESETS }).warnings).toEqual([])
+    m.layers.push({ id: 'g2', name: 'collision', type: 'tile', visible: true, locked: false })
+    expect(validateEditorMap(m, { tilesets: TILESETS }).warnings.join()).toMatch(/same name "collision"/)
+  })
+
+  it('checks the tiles items and shape names of collision layers, and still accepts old polygons layers', () => {
+    const m = validMap()
+    m.layers[0].tileGroups = [{ id: 'a', name: 'A' }, { id: 'a', name: 7 }]
+    m.layers[0].shapes = [{ id: 's', name: 3, closed: true, points: [{ x: 0, y: 0 }, { x: 9, y: 0 }, { x: 0, y: 9 }] }]
+    m.layers.push({ id: 'p', name: 'old', type: 'polygons', visible: true, shapes: [] })
+    const res = validateEditorMap(m, { tilesets: TILESETS })
+    expect(res.errors.join('|')).toMatch(/tileGroups\[1\]: duplicate id "a"/)
+    expect(res.errors.join('|')).toMatch(/tileGroups\[1\]: name must be a string/)
+    expect(res.errors.join('|')).toMatch(/shape 0: name must be a string/)
+    expect(res.errors.join('|')).not.toMatch(/unknown layer type/)
   })
 
   it('never throws on garbage', () => {

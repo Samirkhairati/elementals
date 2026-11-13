@@ -25,7 +25,6 @@ import {
   type Handle,
   type Rect,
 } from '@/lib/entityVisuals'
-import { snapColliderToTiles } from '../../../../../shared/engine/placement'
 import { drawResolvedSprite, resolveSprite, useSpriteImagesVersion } from '@/lib/spriteImages'
 import { prepareCanvas } from '@/lib/canvas2d'
 import { trackWindowPan } from '@/lib/windowDrag'
@@ -60,7 +59,7 @@ export interface EntityViewportProps {
   onColliderChange?: (patch: ColliderPatch) => void
   /** Drag the sprite to change its offset; commits once per gesture. */
   onSpriteOffsetChange?: (offsetX: number, offsetY: number) => void
-  /** Snap grid in px (a tile) while the magnet is on; Shift places freely. Without it: 4px for the collider, 1px (8px with Shift) for the sprite. */
+  /** Sprite offset snap grid in px while the magnet is on; Shift places freely. Without it: 1px (8px with Shift). The collider always snaps to 4px (Shift: single pixels). */
   snapStep?: number
   className?: string
   children?: React.ReactNode
@@ -273,15 +272,10 @@ export function EntityViewport({
       if (g.kind !== 'collider') return startRect
       const dx = p.x - g.startPointer.x
       const dy = p.y - g.startPointer.y
-      const tiles = snapStep !== undefined && !ev.shiftKey
-      const step = ev.shiftKey ? 0 : tiles ? 1 : COLLIDER_SNAP
-      const free = g.handle === 'body'
+      const step = ev.shiftKey ? 0 : COLLIDER_SNAP
+      return g.handle === 'body'
         ? moveRect(g.startRect, dx, dy, { step })
         : resizeRect(g.startRect, g.handle, dx, dy, { step, fromCenter: !!ev.altKey })
-      if (!tiles) return free
-      // Tile snapping on: the size and the offset the drag produces are whole tiles, placed so the edges lie on tile lines
-      // (the same values the number fields accept).
-      return colliderLocalRect(snapColliderToTiles(rectToColliderProps(free)))
     }
     startGesture(
       { kind: 'collider', handle, startPointer: start, startRect },

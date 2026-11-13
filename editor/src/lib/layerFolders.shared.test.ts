@@ -21,8 +21,8 @@ describe('layer folders in maps', () => {
   })
 
   it('warn about a folderId that points nowhere or at a layer kind that cannot sit in a folder', () => {
-    const w = validateEditorMap(map([layers[0], { ...layers[1], folderId: 'nope' }, { id: 'c', name: 'Col', type: 'collision', visible: true, folderId: 'F' }])).warnings
+    const w = validateEditorMap(map([layers[0], { ...layers[1], folderId: 'nope' }, { id: 'o', name: 'Obj', type: 'objects', visible: true, folderId: 'F' }])).warnings
     expect(w.some((x) => x.includes('is not a folder'))).toBe(true)
-    expect(w.some((x) => x.includes('only tile and image'))).toBe(true)
+    expect(w.some((x) => x.includes('only tile, image and collision'))).toBe(true)
   })
 })

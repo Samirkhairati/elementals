@@ -13,6 +13,7 @@ import { expandMovement } from "./expand";
 import { spriteRegistry } from "@/data/spriteRegistry";
 import { buildSpriteComponents } from "@/sprites/spriteState";
 import { normalizeProps } from "@shared/engine/index.ts";
+import { isOffGrid } from "@shared/engine/placement.ts";
 import { Direction, MovementType } from "@/utils/Direction";
 
 /**
@@ -96,8 +97,13 @@ function defined<T extends object>(obj: T): T {
 type Factory<T> = (data: ComponentData) => T;
 
 const FACTORIES: { [K in ComponentTypeName]: Factory<ComponentTypeMap[K]> } = {
-  Transform: (d) =>
-    new TransformComponent(defined({ x: num(d, "x"), y: num(d, "y"), depth: num(d, "depth"), free: d.free === true ? true : undefined })),
+  // `free` follows the position: an anchor off the tile grid keeps its pixel position (and steps from it), whatever the flag says.
+  Transform: (d) => {
+    const x = num(d, "x");
+    const y = num(d, "y");
+    const offGrid = x !== undefined && y !== undefined && isOffGrid(x, y);
+    return new TransformComponent(defined({ x, y, depth: num(d, "depth"), free: d.free === true || offGrid ? true : undefined }));
+  },
 
   Sprite: (d) => {
     const props = normalizeProps("Sprite", d);

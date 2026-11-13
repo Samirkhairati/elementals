@@ -40,16 +40,20 @@ interface UseDockviewLayoutOptions {
   entityFocus?: boolean;
   /** An image layer is active (and no entity selected): the images panel replaces the tileset panels instead. */
   imageFocus?: boolean;
+  /** A collision layer is active (and no entity selected): the collision panel (its items) replaces them. */
+  collisionFocus?: boolean;
 }
 
-type RightFocus = 'tiles' | 'inspector' | 'images';
+type RightFocus = 'tiles' | 'inspector' | 'images' | 'collision';
 const TILE_PANELS = ['tilesets', 'preview', 'activeSelection'];
-const FOCUS_PANELS = ['inspector', 'images'];
+const FOCUS_PANELS = ['inspector', 'images', 'collision'];
+/** Panels of older layouts that no longer exist (the entity list is part of the Layers panel now). */
+const RETIRED_PANELS = ['entities'];
 
 export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
-  const { maps = [], activeMap = null, onSelectMap, onClearActiveMap, entityFocus = false, imageFocus = false } = options;
+  const { maps = [], activeMap = null, onSelectMap, onClearActiveMap, entityFocus = false, imageFocus = false, collisionFocus = false } = options;
 
-  const rightFocus: RightFocus = entityFocus ? 'inspector' : imageFocus ? 'images' : 'tiles';
+  const rightFocus: RightFocus = entityFocus ? 'inspector' : imageFocus ? 'images' : collisionFocus ? 'collision' : 'tiles';
   const optionsRef = useRef({ maps, activeMap, onSelectMap, onClearActiveMap, rightFocus });
   useEffect(() => {
     optionsRef.current = { maps, activeMap, onSelectMap, onClearActiveMap, rightFocus };
@@ -61,7 +65,7 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
   const lastFocus = useRef<RightFocus | null>(null);
   const tileHeights = useRef<Record<string, number> | null>(null);
   const [openPanels, setOpenPanels] = useState<string[]>([
-    'maps', 'layers', 'entities', 'properties', 'tilesets', 'preview', 'activeSelection'
+    'maps', 'layers', 'properties', 'tilesets', 'preview', 'activeSelection'
   ]);
 
   const updateOpenPanels = useCallback(() => {
@@ -147,15 +151,6 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
       position: { referencePanel: mapsPanel, direction: 'below' },
     });
 
-    // A tab behind Layers: Layers is the one shown at first.
-    api.addPanel({
-      id: 'entities',
-      component: 'entities',
-      title: 'ENTITIES',
-      position: { referencePanel: layersPanel, direction: 'within' },
-      inactive: true,
-    });
-
     const propsPanel = api.addPanel({
       id: 'properties',
       component: 'properties',
@@ -187,6 +182,14 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
       position: { referencePanel: tilesetsPanel, direction: 'above' },
     });
 
+    // Collision panel: the same spot, shown while a collision layer is active.
+    const collisionPanel = api.addPanel({
+      id: 'collision',
+      component: 'collision',
+      title: 'COLLISION',
+      position: { referencePanel: tilesetsPanel, direction: 'above' },
+    });
+
     const previewPanel = api.addPanel({
       id: 'preview',
       component: 'preview',
@@ -211,6 +214,7 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
     propsPanel.api.setSize({ width: sideWidth });
     inspectorPanel.api.setSize({ width: sideWidth });
     imagesPanel.api.setSize({ width: sideWidth });
+    collisionPanel.api.setSize({ width: sideWidth });
     tilesetsPanel.api.setSize({ width: sideWidth });
     previewPanel.api.setSize({ width: sideWidth });
     selectionPanel.api.setSize({ width: sideWidth });
@@ -241,6 +245,7 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
     if (props) props.api.setSize({ width: sideWidth });
     if (inspector) inspector.api.setSize({ width: sideWidth });
     api.getPanel('images')?.api.setSize({ width: sideWidth });
+    api.getPanel('collision')?.api.setSize({ width: sideWidth });
 
     if (tilesets) tilesets.api.setSize({ width: sideWidth });
     if (preview) preview.api.setSize({ width: sideWidth });
@@ -297,7 +302,6 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
         api.getPanel('activeSelection');
       const leftRef =
         api.getPanel('properties') ||
-        api.getPanel('entities') ||
         api.getPanel('layers') ||
         api.getPanel('maps');
 
@@ -346,7 +350,6 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
       api.getPanel('activeSelection');
     const leftRef =
       api.getPanel('properties') ||
-      api.getPanel('entities') ||
       api.getPanel('layers') ||
       api.getPanel('maps');
 
@@ -385,6 +388,12 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
     }
     if (restored) {
       if (!api.panels.some((p) => isMapPanelId(p.id) || p.id === 'empty_canvas')) ensureEmptyCanvasRef.current?.(api);
+      for (const id of RETIRED_PANELS) api.getPanel(id)?.api.close();
+      // A layout saved before the collision panel existed gets it in the right column, like the images panel.
+      const besideRight = api.getPanel('images') ?? api.getPanel('inspector') ?? api.getPanel('tilesets');
+      if (!api.getPanel('collision') && besideRight) {
+        api.addPanel({ id: 'collision', component: 'collision', title: 'COLLISION', position: { referencePanel: besideRight, direction: 'below' } });
+      }
       lastFocus.current = null;
       applyRightFocus(api, optionsRef.current.rightFocus);
     } else {

@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react'
 import {
   Layers as LayersIcon,
   XSquare,
-  Pentagon,
   Droplet,
   Leaf,
   Box,
@@ -43,41 +42,50 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
 import { RenameInput } from '../ui/RenameInput'
+import { collisionItems } from '../../../../../shared/collisionLayers'
+import { EntitySubmenu, NewEntityFolderItem, type Prefab } from './EntityTree'
+
+/** Every kind of layer the New Layer menus offer, with its icon and colour (the same icon marks its rows). */
+const LAYER_KINDS: { type: Exclude<LayerType, 'folder'>; label: string; Icon: typeof LayersIcon; color: string; title: string }[] = [
+  { type: 'tile', label: 'Tile Layer', Icon: LayersIcon, color: 'text-slate-300', title: 'Paint tiles from a tileset' },
+  { type: 'image', label: 'Image Layer', Icon: ImageIcon, color: 'text-violet-400', title: 'Place pictures and sprites anywhere' },
+  { type: 'collision', label: 'Collision Layer', Icon: XSquare, color: 'text-red-400', title: 'Painted tiles and shapes that block movement' },
+  { type: 'terrain', label: 'Terrain Layer', Icon: Droplet, color: 'text-blue-400', title: 'Ground kinds (water, sand...)' },
+  { type: 'encounters', label: 'Encounters Layer', Icon: Leaf, color: 'text-green-400', title: 'Where wild encounters happen' },
+  { type: 'objects', label: 'Objects Layer', Icon: Box, color: 'text-amber-400', title: 'Object markers' },
+]
+/** Only one of these per map. */
+const SINGLETON_TYPES: readonly LayerType[] = ['terrain', 'encounters']
 
 function getLayerIcon(type: LayerType) {
-  switch (type) {
-    case 'tile':
-      return <LayersIcon className="text-gray-400" />
-    case 'collision':
-      return <XSquare className="text-red-400" />
-    case 'terrain':
-      return <Droplet className="text-blue-400" />
-    case 'objects':
-      return <Box className="text-amber-400" />
-    case 'encounters':
-      return <Leaf className="text-green-400" />
-    case 'image':
-      return <ImageIcon className="text-violet-400" />
-    case 'folder':
-      return <FolderIcon className="text-yellow-400" />
-    case 'polygons':
-      return <Pentagon className="text-red-400" />
-    default:
-      return <LayersIcon className="text-gray-400" />
-  }
+  if (type === 'folder') return <FolderIcon className="text-yellow-400" />
+  const kind = LAYER_KINDS.find((k) => k.type === type)
+  return kind ? <kind.Icon className={kind.color} /> : <LayersIcon className="text-slate-300" />
+}
+
+function LayerKindItems({ createLayerOfType, layers, only }: { createLayerOfType: (type: LayerType) => void; layers: Layer[]; only?: readonly LayerType[] }) {
+  return (
+    <>
+      {LAYER_KINDS.filter((k) => !only || only.includes(k.type)).map(({ type, label, Icon, color, title }) => {
+        const taken = SINGLETON_TYPES.includes(type) && layers.some((l) => l.type === type)
+        return (
+          <ContextMenuItem key={type} disabled={taken} title={taken ? 'A map has one of these' : title} onClick={() => createLayerOfType(type)}>
+            <Icon className={`mr-2 h-3.5 w-3.5 ${color}`} />
+            {label}
+          </ContextMenuItem>
+        )
+      })}
+    </>
+  )
 }
 
 function NewLayerSubmenu({
   createLayerOfType,
-  hasCollision,
-  hasTerrain,
-  hasEncounters,
+  layers,
   keys,
 }: {
   createLayerOfType: (type: LayerType) => void
-  hasCollision: boolean
-  hasTerrain: boolean
-  hasEncounters: boolean
+  layers: Layer[]
   /** The shortcut of New layer (a plain tile layer). */
   keys?: string
 }) {
@@ -88,24 +96,28 @@ function NewLayerSubmenu({
         New Layer
         {keys && <span className="ml-auto pl-3 text-muted-foreground">{keys}</span>}
       </ContextMenuSubTrigger>
-      <ContextMenuSubContent className="w-44">
-        <ContextMenuItem onClick={() => createLayerOfType('tile')}>Tile Layer</ContextMenuItem>
-        <ContextMenuItem onClick={() => createLayerOfType('image')}>Image Layer</ContextMenuItem>
-        <ContextMenuItem onClick={() => createLayerOfType('folder')}>Folder</ContextMenuItem>
-        <ContextMenuItem disabled={hasCollision} onClick={() => createLayerOfType('collision')}>
-          Collision Layer
+      <ContextMenuSubContent className="w-48">
+        <LayerKindItems createLayerOfType={createLayerOfType} layers={layers} />
+        <ContextMenuSeparator />
+        <ContextMenuItem onClick={() => createLayerOfType('folder')}>
+          <FolderIcon className="mr-2 h-3.5 w-3.5 text-yellow-400" />
+          Folder
         </ContextMenuItem>
-        <ContextMenuItem onClick={() => createLayerOfType('polygons')}>Collision Shapes</ContextMenuItem>
-        <ContextMenuItem disabled={hasTerrain} onClick={() => createLayerOfType('terrain')}>
-          Terrain Layer
-        </ContextMenuItem>
-        <ContextMenuItem disabled={hasEncounters} onClick={() => createLayerOfType('encounters')}>
-          Encounters Layer
-        </ContextMenuItem>
-        <ContextMenuItem onClick={() => createLayerOfType('objects')}>Objects Layer</ContextMenuItem>
       </ContextMenuSubContent>
     </ContextMenuSub>
   )
+}
+
+/** What the Entities row needs to show the map's entities under it and to create new ones from its menus. */
+export interface EntitiesSlot {
+  count: number
+  /** The entity tree (EntityTree), shown while the row is open. */
+  tree: React.ReactNode
+  onNew: () => void
+  onPrefab: (prefab: Prefab) => void
+  onNewFolder: () => void
+  /** Something in the tree is selected: the row stays highlighted while closed. */
+  hasSelection?: boolean
 }
 
 interface EntitiesRowProps {
@@ -120,38 +132,72 @@ interface EntitiesRowProps {
   }
   /** Where a dragged item would land relative to this row. */
   dropPosition?: 'top' | 'bottom' | null
+  slot?: EntitiesSlot
+  open: boolean
+  setOpen: (open: boolean) => void
 }
 
-function EntitiesRow({ visible, onToggle, drag, dropPosition }: EntitiesRowProps) {
+/** The Entities row of the stack: where entity sprites draw among the layers, and (opened) the map's entities. */
+function EntitiesRow({ visible, onToggle, drag, dropPosition, slot, open, setOpen }: EntitiesRowProps) {
   return (
-    <div
-      className="ed-row"
-      data-dim={visible ? undefined : 'true'}
-      data-testid="entities-row"
-      title="All entities of the map. Drag to change where they draw among the layers."
-      draggable={!!drag}
-      {...drag}
-    >
-      {dropPosition && (
-        <div
-          className={`absolute left-0 right-0 h-[2px] bg-primary z-30 pointer-events-none rounded-full ${
-            dropPosition === 'top' ? '-top-[2px]' : '-bottom-[2px]'
-          }`}
-        />
-      )}
-      <Users className="text-sky-400" />
-      <span className="ed-row-label">Entities</span>
-      <div className="ed-row-actions mr-1">
-        <button
-          type="button"
-          onClick={onToggle}
-          className="ed-iconbtn"
-          title={visible ? 'Hide all entities on the canvas' : 'Show entities on the canvas'}
-          aria-label={visible ? 'Hide entities' : 'Show entities'}
-        >
-          {visible ? <Eye /> : <EyeOff />}
-        </button>
-      </div>
+    <div className="flex flex-col gap-0.5">
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <div
+            className="ed-row"
+            data-dim={visible ? undefined : 'true'}
+            data-current={!open && slot?.hasSelection ? 'true' : undefined}
+            data-testid="entities-row"
+            title="The entities of the map. Drag to change where they draw among the layers."
+            draggable={!!drag}
+            onClick={() => slot && setOpen(!open)}
+            {...drag}
+          >
+            {dropPosition && (
+              <div
+                className={`absolute left-0 right-0 h-[2px] bg-primary z-30 pointer-events-none rounded-full ${
+                  dropPosition === 'top' ? '-top-[2px]' : '-bottom-[2px]'
+                }`}
+              />
+            )}
+            {slot && (open ? <ChevronDown className="text-gray-400" /> : <ChevronRight className="text-gray-400" />)}
+            <Users className="text-sky-400" />
+            <span className="ed-row-label">Entities</span>
+            {slot && (
+              <span className="ed-badge" data-tone="count" title="Entities on this map" data-testid="entity-count">
+                <Users />
+                {slot.count}
+              </span>
+            )}
+            <div className="ed-row-actions mr-1">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onToggle?.()
+                }}
+                className="ed-iconbtn"
+                title={visible ? 'Hide all entities on the canvas' : 'Show entities on the canvas'}
+                aria-label={visible ? 'Hide entities' : 'Show entities'}
+              >
+                {visible ? <Eye /> : <EyeOff />}
+              </button>
+            </div>
+          </div>
+        </ContextMenuTrigger>
+        {slot && (
+          <ContextMenuContent className="w-48">
+            <EntitySubmenu onNew={slot.onNew} onPrefab={slot.onPrefab} />
+            <NewEntityFolderItem onCreate={slot.onNewFolder} />
+            <ContextMenuSeparator />
+            <ContextMenuItem onClick={onToggle}>
+              {visible ? <EyeOff className="w-3.5 h-3.5 mr-2" /> : <Eye className="w-3.5 h-3.5 mr-2" />}
+              {visible ? 'Hide Entities' : 'Show Entities'}
+            </ContextMenuItem>
+          </ContextMenuContent>
+        )}
+      </ContextMenu>
+      {slot && open && slot.tree}
     </div>
   )
 }
@@ -174,6 +220,8 @@ interface LayersPanelProps {
   entitiesIndex?: number
   setEntitiesIndex?: (index: number) => void
   setSelectedEntityId?: (id: string | null) => void
+  /** The map's entities, shown under the Entities row (without it the row only toggles and moves them). */
+  entitiesSlot?: EntitiesSlot
   toggleLayerVisibility: (id: string) => void
   toggleLayerLock: (id: string) => void
   /** Y-sort on / off for an image layer or a folder; undefined = follow the folder. */
@@ -217,6 +265,7 @@ export function LayersPanel({
   entitiesIndex = 0,
   setEntitiesIndex,
   setSelectedEntityId,
+  entitiesSlot,
   toggleLayerVisibility,
   toggleLayerLock,
   setLayerYSort,
@@ -241,6 +290,7 @@ export function LayersPanel({
   } | null>(null)
   const canPasteLayers = useEditorClipboard((s) => s.content?.kind === 'layers')
   const [editingLayerId, setEditingLayerId] = useState<string | null>(null)
+  const [entitiesOpen, setEntitiesOpen] = useState(true)
   const startEditing = (layer: Layer) => {
     setEditingLayerId(layer.id)
   }
@@ -321,9 +371,23 @@ export function LayersPanel({
   const stack = visibleStack(layers, entitiesIndex)
   const folders = layers.filter((l) => l.type === 'folder')
 
-  const hasCollision = layers.some((l) => l.type === 'collision')
-  const hasTerrain = layers.some((l) => l.type === 'terrain')
-  const hasEncounters = layers.some((l) => l.type === 'encounters')
+  // The menu of the panel's empty space and of the layer rows: new layers, folders and entities.
+  const createMenu = (createType: (type: LayerType) => void) => (
+    <>
+      <NewLayerSubmenu createLayerOfType={createType} layers={layers} keys={newLayerKeys} />
+      <ContextMenuItem onClick={() => createLayerOfType('folder')}>
+        <FolderPlus className="w-3.5 h-3.5 mr-2 text-yellow-400" />
+        New Folder
+        {newFolderKeys && <ContextMenuShortcut>{newFolderKeys}</ContextMenuShortcut>}
+      </ContextMenuItem>
+      {entitiesSlot && (
+        <>
+          <ContextMenuSeparator />
+          <EntitySubmenu onNew={entitiesSlot.onNew} onPrefab={entitiesSlot.onPrefab} />
+        </>
+      )}
+    </>
+  )
 
   if (!hasActiveMap) {
     return (
@@ -335,27 +399,14 @@ export function LayersPanel({
     return (
       <ContextMenu>
         <ContextMenuTrigger className="block h-full w-full">
-          <EntitiesRow visible={showEntities} onToggle={toggleShowEntities} />
+          <EntitiesRow visible={showEntities} onToggle={toggleShowEntities} slot={entitiesSlot} open={entitiesOpen} setOpen={setEntitiesOpen} />
           <div className="ed-empty">
             <p>No layers yet.</p>
             <p className="ed-hint">Right-click here to create a layer.</p>
           </div>
         </ContextMenuTrigger>
 
-        <ContextMenuContent className="w-48">
-          <NewLayerSubmenu
-            createLayerOfType={createLayerOfType}
-            hasCollision={hasCollision}
-            hasTerrain={hasTerrain}
-            hasEncounters={hasEncounters}
-            keys={newLayerKeys}
-          />
-          <ContextMenuItem onClick={() => createLayerOfType('folder')}>
-            <FolderPlus className="w-3.5 h-3.5 mr-2" />
-            New Folder
-            {newFolderKeys && <ContextMenuShortcut>{newFolderKeys}</ContextMenuShortcut>}
-          </ContextMenuItem>
-        </ContextMenuContent>
+        <ContextMenuContent className="w-48">{createMenu(createLayerOfType)}</ContextMenuContent>
       </ContextMenu>
     )
   }
@@ -378,6 +429,9 @@ export function LayersPanel({
                     onDrop: (e) => handleDrop(e, ENTITIES_ID),
                   }}
                   dropPosition={dragOverTarget?.id === ENTITIES_ID && draggedLayerId !== ENTITIES_ID ? dragOverTarget.position : null}
+                  slot={entitiesSlot}
+                  open={entitiesOpen}
+                  setOpen={setEntitiesOpen}
                 />
               )
             }
@@ -453,9 +507,17 @@ export function LayersPanel({
                             {layer.images?.length ?? 0}
                           </span>
                         )}
-                        <span className="ed-badge" data-tone="z" title="z-index, the layer's draw order in the game: higher draws on top" data-testid="layer-z">
-                          z {layer.z ?? 0}
-                        </span>
+                        {layer.type === 'collision' && (
+                          <span className="ed-badge" data-tone="count" title="Items in this layer (sets of tiles and shapes)" data-testid="item-count">
+                            <XSquare />
+                            {collisionItems(layer).length}
+                          </span>
+                        )}
+                        {layer.type !== 'collision' && (
+                          <span className="ed-badge" data-tone="z" title="z-index, the layer's draw order in the game: higher draws on top" data-testid="layer-z">
+                            z {layer.z ?? 0}
+                          </span>
+                        )}
                       </>
                     )}
 
@@ -498,26 +560,23 @@ export function LayersPanel({
                         <Plus className="w-3.5 h-3.5 mr-2" />
                         New Layer inside
                       </ContextMenuSubTrigger>
-                      <ContextMenuSubContent className="w-44">
-                        <ContextMenuItem onClick={() => createLayerOfType('tile', layer.id)}>Tile Layer</ContextMenuItem>
-                        <ContextMenuItem onClick={() => createLayerOfType('image', layer.id)}>Image Layer</ContextMenuItem>
+                      <ContextMenuSubContent className="w-48">
+                        <LayerKindItems createLayerOfType={(type) => createLayerOfType(type, layer.id)} layers={layers} only={['tile', 'image', 'collision']} />
                       </ContextMenuSubContent>
                     </ContextMenuSub>
                   )}
-                  {!isFolderRow && (
-                    <NewLayerSubmenu
-                      createLayerOfType={(type) => createLayerOfType(type, layer.folderId)}
-                      hasCollision={hasCollision}
-                      hasTerrain={hasTerrain}
-                      hasEncounters={hasEncounters}
-                      keys={newLayerKeys}
-                    />
+                  {isFolderRow ? (
+                    <>
+                      <ContextMenuItem onClick={() => createLayerOfType('folder')}>
+                        <FolderPlus className="w-3.5 h-3.5 mr-2 text-yellow-400" />
+                        New Folder
+                        {newFolderKeys && <ContextMenuShortcut>{newFolderKeys}</ContextMenuShortcut>}
+                      </ContextMenuItem>
+                      {entitiesSlot && <EntitySubmenu onNew={entitiesSlot.onNew} onPrefab={entitiesSlot.onPrefab} />}
+                    </>
+                  ) : (
+                    createMenu((type) => createLayerOfType(type, layer.folderId))
                   )}
-                  <ContextMenuItem onClick={() => createLayerOfType('folder')}>
-                    <FolderPlus className="w-3.5 h-3.5 mr-2" />
-                    New Folder
-                    {newFolderKeys && <ContextMenuShortcut>{newFolderKeys}</ContextMenuShortcut>}
-                  </ContextMenuItem>
                   {(isFolder(layer) || canHoldInFolder(layer)) && (
                     <>
                       <ContextMenuSeparator />
@@ -617,20 +676,7 @@ export function LayersPanel({
         </div>
       </ContextMenuTrigger>
 
-      <ContextMenuContent className="w-48">
-        <NewLayerSubmenu
-          createLayerOfType={createLayerOfType}
-          hasCollision={hasCollision}
-          hasTerrain={hasTerrain}
-          hasEncounters={hasEncounters}
-          keys={newLayerKeys}
-        />
-        <ContextMenuItem onClick={() => createLayerOfType('folder')}>
-          <FolderPlus className="w-3.5 h-3.5 mr-2" />
-          New Folder
-          {newFolderKeys && <ContextMenuShortcut>{newFolderKeys}</ContextMenuShortcut>}
-        </ContextMenuItem>
-      </ContextMenuContent>
+      <ContextMenuContent className="w-48">{createMenu(createLayerOfType)}</ContextMenuContent>
     </ContextMenu>
   )
 }

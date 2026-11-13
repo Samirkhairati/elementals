@@ -33,7 +33,7 @@ const fakeCtx = () => {
 
 describe('LAYER_SCENERY', () => {
   it('says what every layer type contributes: tiles and pictures are drawn, gameplay data and structure are not', () => {
-    const all: LayerType[] = ['tile', 'collision', 'terrain', 'objects', 'encounters', 'image', 'folder', 'polygons']
+    const all: LayerType[] = ['tile', 'collision', 'terrain', 'objects', 'encounters', 'image', 'folder']
     expect(Object.keys(LAYER_SCENERY).sort()).toEqual([...all].sort())
     expect(all.filter((t) => LAYER_SCENERY[t] !== 'none').sort()).toEqual(['image', 'tile'])
   })

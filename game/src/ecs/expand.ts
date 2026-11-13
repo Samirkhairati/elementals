@@ -18,6 +18,7 @@ import { AIWanderComponent } from "./components/AIWanderComponent";
 import { TagComponent } from "./components/TagComponent";
 import { EntityInfoComponent } from "./components/EntityInfoComponent";
 import { EventComponent } from "./components/EventComponent";
+import { isOffGrid } from "@shared/engine/placement.ts";
 
 export interface ExpandContext {
   sprites: SpriteRegistry;
@@ -72,7 +73,10 @@ export function expandEntity(entity: EngineEntity, ctx: ExpandContext = defaultE
   }
 
   const transform = normalizeProps("Transform", components.Transform);
-  out.push(new TransformComponent(transform));
+  // An anchor off the tile grid keeps its pixel position (see Transform.free), whatever the flag says.
+  const rawTransform = components.Transform;
+  const positioned = isRecord(rawTransform) && typeof rawTransform.x === "number" && typeof rawTransform.y === "number";
+  out.push(new TransformComponent({ ...transform, free: transform.free || (positioned && isOffGrid(transform.x, transform.y)) }));
   out.push(new EntityInfoComponent(typeof entity.id === "string" ? entity.id : "", typeof entity.name === "string" ? entity.name : ""));
 
   let spriteProps: SpriteProps | null = null;

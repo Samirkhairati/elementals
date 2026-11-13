@@ -4,8 +4,6 @@ import { ComponentType, type PropBag } from '@/types/editor'
 export interface PendingEntityPlacement {
   name: string
   components?: Partial<Record<ComponentType, PropBag>>
-  /** A free entity (any pixel, any size) instead of a tile-based one. */
-  free?: boolean
 }
 
 export interface EntityPlacementManager {

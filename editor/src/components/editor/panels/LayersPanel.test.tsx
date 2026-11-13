@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { useEditorClipboard } from '@/store/editorClipboard'
 import { makeLayer } from '@/test/helpers'
-import { LayersPanel } from './LayersPanel'
+import { LayersPanel, type EntitiesSlot } from './LayersPanel'
 
 function renderPanel(overrides: Partial<React.ComponentProps<typeof LayersPanel>> = {}) {
   const props: React.ComponentProps<typeof LayersPanel> = {
@@ -35,6 +35,51 @@ function renderPanel(overrides: Partial<React.ComponentProps<typeof LayersPanel>
 }
 
 const rowOf = (name: string) => screen.getByText(name).closest('.ed-row') as HTMLElement
+
+const slot = (over: Partial<EntitiesSlot> = {}): EntitiesSlot => ({
+  count: 2,
+  tree: <div data-testid="the-tree">tree</div>,
+  onNew: vi.fn(),
+  onPrefab: vi.fn(),
+  onNewFolder: vi.fn(),
+  ...over,
+})
+
+describe('LayersPanel: the entities are part of the stack', () => {
+  it('the Entities row shows the count and the entity tree under it; clicking the row closes and opens it', () => {
+    renderPanel({ entitiesSlot: slot() })
+    expect(screen.getByTestId('entity-count').textContent).toContain('2')
+    expect(screen.getByTestId('the-tree')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('entities-row'))
+    expect(screen.queryByTestId('the-tree')).toBeNull()
+    fireEvent.click(screen.getByTestId('entities-row'))
+    expect(screen.getByTestId('the-tree')).toBeInTheDocument()
+  })
+
+  it('right-click › Entity › New / Prefab, from a layer, the Entities row or a folder', () => {
+    const s = slot()
+    renderPanel({ entitiesSlot: s, layers: [makeLayer('f', { type: 'folder', name: 'Scenery' }), makeLayer('g', { name: 'Ground' })] })
+    for (const target of [screen.getByText('Ground'), screen.getByTestId('entities-row'), screen.getByText('Scenery')]) {
+      fireEvent.contextMenu(target)
+      fireEvent.keyDown(screen.getByRole('menuitem', { name: 'Entity' }), { key: 'ArrowRight' })
+      fireEvent.click(screen.getByRole('menuitem', { name: 'New' }))
+    }
+    expect(s.onNew).toHaveBeenCalledTimes(3)
+    fireEvent.contextMenu(screen.getByText('Ground'))
+    fireEvent.keyDown(screen.getByRole('menuitem', { name: 'Entity' }), { key: 'ArrowRight' })
+    fireEvent.keyDown(screen.getByRole('menuitem', { name: 'Prefab' }), { key: 'ArrowRight' })
+    fireEvent.click(screen.getByRole('menuitem', { name: 'NPC' }))
+    expect(s.onPrefab).toHaveBeenCalledWith(expect.objectContaining({ name: 'NPC' }))
+  })
+
+  it('the Entities row menu makes an entity folder', () => {
+    const s = slot()
+    renderPanel({ entitiesSlot: s })
+    fireEvent.contextMenu(screen.getByTestId('entities-row'))
+    fireEvent.click(screen.getByRole('menuitem', { name: /New Entity Folder/ }))
+    expect(s.onNewFolder).toHaveBeenCalled()
+  })
+})
 
 describe('LayersPanel', () => {
   it('lists the entities as a row on top, before every layer', () => {
@@ -115,7 +160,9 @@ describe('LayersPanel', () => {
     expect(within(rowOf('Trees')).getByTestId('layer-z').textContent).toMatch(/z\s*5/)
     expect(within(rowOf('Deco')).getByTestId('layer-z').textContent).toMatch(/z\s*-1/)
     expect(within(rowOf('Ground')).getByTestId('layer-z').textContent).toMatch(/z\s*0/)
-    expect(within(rowOf('Collision')).getByTestId('layer-z').textContent).toMatch(/z\s*0/)
+    // A collision layer is never drawn: it shows how many items it holds instead of a z-index.
+    expect(within(rowOf('Collision')).queryByTestId('layer-z')).toBeNull()
+    expect(within(rowOf('Collision')).getByTestId('item-count')).toBeInTheDocument()
   })
 
   it('tells the z-index apart from the item count: outlined "z N" versus a filled count with an icon, each with its own tooltip', () => {
@@ -268,6 +315,20 @@ describe('LayersPanel', () => {
       fireEvent.click(screen.getByRole('menuitem', { name: /New Layer/ }))
       fireEvent.click(screen.getByRole('menuitem', { name: 'Tile Layer' }))
       expect(props.createLayerOfType).toHaveBeenCalledWith('tile', 'f')
+    })
+
+    it('the New Layer submenu lists every kind with its coloured icon; collision layers can be many, terrain only one', () => {
+      const { props } = renderPanel({ layers: [makeLayer('col', { type: 'collision', name: 'Collision' }), makeLayer('t', { type: 'terrain', name: 'Terrain' })] })
+      fireEvent.contextMenu(screen.getByText('Collision'))
+      fireEvent.click(screen.getByRole('menuitem', { name: /New Layer/ }))
+      for (const name of ['Tile Layer', 'Image Layer', 'Collision Layer', 'Terrain Layer', 'Encounters Layer', 'Objects Layer', 'Folder']) {
+        const item = screen.getByRole('menuitem', { name })
+        expect(item.querySelector('svg')?.getAttribute('class')).toMatch(/text-/)
+      }
+      expect(screen.getByRole('menuitem', { name: 'Terrain Layer' })).toHaveAttribute('data-disabled')
+      expect(screen.getByRole('menuitem', { name: 'Collision Layer' })).not.toHaveAttribute('data-disabled')
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Collision Layer' }))
+      expect(props.createLayerOfType).toHaveBeenCalledWith('collision', undefined)
     })
 
     it('a layer or folder that was just created opens its name for typing, once per creation', () => {

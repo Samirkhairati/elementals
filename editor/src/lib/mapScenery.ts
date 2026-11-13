@@ -20,7 +20,6 @@ export const LAYER_SCENERY: Record<LayerType, 'tiles' | 'images' | 'none'> = {
   terrain: 'none',
   encounters: 'none',
   objects: 'none',
-  polygons: 'none',
   folder: 'none',
 }
 

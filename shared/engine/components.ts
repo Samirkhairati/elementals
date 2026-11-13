@@ -64,7 +64,7 @@ export const COMPONENT_SCHEMAS: Record<ComponentType, ComponentSchema> = {
       { key: 'x', label: 'Position X', kind: 'number', unit: 'px', step: 16, help: 'Anchor: the bottom-centre of the entity\'s tile.' },
       { key: 'y', label: 'Position Y', kind: 'number', unit: 'px', step: 16, help: 'Anchor: the bottom edge of the entity\'s tile.' },
       { key: 'depth', label: 'Depth', kind: 'number', min: 0, max: 999, step: 1, help: 'Draw layer; higher draws on top, and inside a layer whoever stands lower on the map draws on top. New entities start at 20 (characters); objects 10, flat triggers 5.' },
-      { key: 'free', label: 'Free placement', kind: 'boolean', help: 'Off: a tile-based entity that sits on the 32px grid with a collider of whole tiles. On: a free entity at any pixel position and of any size.' },
+      { key: 'free', label: 'Off the tile grid', kind: 'boolean', help: 'Set by the editor from the position, not chosen: on when the anchor is off the 32px tile grid. The game then keeps the entity on its pixel position instead of snapping it to a tile.' },
     ],
   },
   Sprite: {
@@ -116,7 +116,8 @@ export const COMPONENT_SCHEMAS: Record<ComponentType, ComponentSchema> = {
     fields: [
       { key: 'width', label: 'Width', kind: 'number', unit: 'px', min: 1, max: 4096, step: 1 },
       { key: 'height', label: 'Height', kind: 'number', unit: 'px', min: 1, max: 4096, step: 1 },
-      { key: 'offsetX', label: 'Offset X', kind: 'number', unit: 'px', step: 1, help: 'The box is bottom-centred on the anchor, then shifted.' },
+      // Half pixels: the box is centred on the anchor, so an odd width needs a half-pixel offset to put its edges on whole pixels.
+      { key: 'offsetX', label: 'Offset X', kind: 'number', unit: 'px', step: 0.5, help: 'The box is bottom-centred on the anchor, then shifted.' },
       { key: 'offsetY', label: 'Offset Y', kind: 'number', unit: 'px', step: 1 },
       { key: 'isSolid', label: 'Solid', kind: 'boolean', help: 'Solid colliders block movement; non-solid ones only trigger events.' },
     ],

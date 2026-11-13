@@ -2,10 +2,13 @@ import { useState, useEffect, useCallback } from 'react'
 import { EntityData, ComponentType, MapData, EntityFolder, type PropBag } from '@/types/editor'
 import { COMPONENT_REGISTRY } from '@/lib/componentRegistry'
 import { cloneEntity, createDefaultComponent } from '../../../../shared/engine/components'
-import { setEntityFree } from '../../../../shared/engine/placement'
+import { withDerivedFree } from '../../../../shared/engine/placement'
 import type { EngineEntity } from '../../../../shared/engine/types'
 import { useSyncedState } from '@/hooks/useSyncedState'
 import { withCharacterDepth } from '@/lib/entityDepth'
+
+/** How far a duplicate or a pasted copy lands from its original: one whole tile, so an entity on the tile grid stays on it. */
+const COPY_OFFSET = 32
 
 interface UseEntityManagerOptions {
   /** Read-only: used to (re)synchronise local state when the active map changes. */
@@ -199,7 +202,7 @@ export function useEntityManager(options: UseEntityManagerOptions) {
             components: JSON.parse(JSON.stringify(defaultComponents)),
           }
           createdId = newEntity.id
-          return [...prev, newEntity]
+          return [...prev, withDerivedFree(newEntity)]
         },
         () => {
           if (createdId) setSelectedEntityId(createdId)
@@ -222,8 +225,8 @@ export function useEntityManager(options: UseEntityManagerOptions) {
             ...target,
             id: crypto.randomUUID(),
             name: `${target.name} Copy`,
-            x: target.x + 16,
-            y: target.y + 16,
+            x: target.x + COPY_OFFSET,
+            y: target.y + COPY_OFFSET,
             visible: target.visible !== false,
             folder: target.folder || null,
             // fresh event state / command ids so the copy is independent of the original
@@ -237,7 +240,7 @@ export function useEntityManager(options: UseEntityManagerOptions) {
 
           createdId = cloned.id
           const next = [...prev]
-          next.splice(targetIndex + 1, 0, cloned)
+          next.splice(targetIndex + 1, 0, withDerivedFree(cloned))
           return next
         },
         () => {
@@ -248,7 +251,7 @@ export function useEntityManager(options: UseEntityManagerOptions) {
     [commitNewEntities]
   )
 
-  /** Put copies of `entities` on the map (one undo step), a little down-right of where they were, and pick the last. */
+  /** Put copies of `entities` on the map (one undo step), one tile down-right of where they were, and pick the last. */
   const pasteEntities = useCallback(
     (entities: readonly EntityData[]) => {
       let last: string | null = null
@@ -264,8 +267,8 @@ export function useEntityManager(options: UseEntityManagerOptions) {
               ...source,
               id: crypto.randomUUID(),
               name,
-              x: source.x + 16,
-              y: source.y + 16,
+              x: source.x + COPY_OFFSET,
+              y: source.y + COPY_OFFSET,
               visible: source.visible !== false,
               folder: source.folder || null,
               components: cloneEntity(source as unknown as EngineEntity, true).components as EntityData['components'],
@@ -274,7 +277,7 @@ export function useEntityManager(options: UseEntityManagerOptions) {
               copy.components.Transform.x = copy.x
               copy.components.Transform.y = copy.y
             }
-            return copy
+            return withDerivedFree(copy)
           })
           last = copies[copies.length - 1].id
           return [...prev, ...copies]
@@ -321,28 +324,14 @@ export function useEntityManager(options: UseEntityManagerOptions) {
               y,
             }
           }
-          return {
+          return withDerivedFree({
             ...e,
             x,
             y,
             components: updatedComponents,
-          }
+          })
         })
       )
-    },
-    [commitNewEntities]
-  )
-
-  /** Make an entity free (any pixel, any size) or tile-based (anchor and collider snapped to the grid): one undo step. */
-  const setEntityPlacement = useCallback(
-    (id: string, free: boolean) => {
-      commitNewEntities(prev => {
-        const index = prev.findIndex(e => e.id === id)
-        if (index === -1) return prev
-        const next = setEntityFree(prev[index] as unknown as EngineEntity, free) as unknown as EntityData
-        if (next === (prev[index] as unknown)) return prev
-        return prev.map((e, i) => (i === index ? next : e))
-      })
     },
     [commitNewEntities]
   )
@@ -424,12 +413,12 @@ export function useEntityManager(options: UseEntityManagerOptions) {
           }
 
           const components = { ...e.components, [type]: updatedCompProps }
-          return {
+          return withDerivedFree({
             ...e,
             x: nextX,
             y: nextY,
             components: type === 'Sprite' && key === 'asset' ? withCharacterDepth(components, value) : components,
-          }
+          })
         })
       )
     },
@@ -448,7 +437,7 @@ export function useEntityManager(options: UseEntityManagerOptions) {
             if ('x' in props) nextX = Number(props.x) || 0
             if ('y' in props) nextY = Number(props.y) || 0
           }
-          return {
+          return withDerivedFree({
             ...e,
             x: nextX,
             y: nextY,
@@ -456,7 +445,7 @@ export function useEntityManager(options: UseEntityManagerOptions) {
               const components = { ...e.components, [type]: { ...(e.components[type] || {}), ...props } }
               return type === 'Sprite' && 'asset' in props ? withCharacterDepth(components, props.asset) : components
             })(),
-          }
+          })
         })
       )
     },
@@ -488,7 +477,6 @@ export function useEntityManager(options: UseEntityManagerOptions) {
     deleteEntity,
     renameEntity,
     moveEntity,
-    setEntityPlacement,
     reorderEntities,
     addComponent,
     removeComponent,

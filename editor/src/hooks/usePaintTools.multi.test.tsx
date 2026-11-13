@@ -55,7 +55,9 @@ describe('usePaintTools: pinned multi-layer selection', () => {
   it('a brush stroke writes each part to the layer it came from', () => {
     const r = setup()
     act(() => r.result.current.tools.handlePaint(1, 2))
-    expect(layer(r, 'col').data).toEqual({ 9: COL })
+    // A collision cell joins a tiles item (a new one, as none was picked).
+    expect(layer(r, 'col').data).toEqual({ 9: { ...COL, group: layer(r, 'col').tileGroups?.[0]?.id } })
+    expect(layer(r, 'col').tileGroups).toHaveLength(1)
     expect(layer(r, 'ground').data).toEqual({ 9: t(1), 10: t(2) })
     expect(layer(r, 'img').data).toBeUndefined()
   })

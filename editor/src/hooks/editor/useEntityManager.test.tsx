@@ -117,8 +117,8 @@ describe('useEntityManager (StrictMode)', () => {
     act(() => result.current.manager.duplicateEntity('a'))
     const list = result.current.manager.entities
     expect(list.map(e => e.name)).toEqual(['a', 'a Copy', 'b'])
-    expect(list[1]).toMatchObject({ x: 26, y: 36 })
-    expect(list[1].components.Transform).toMatchObject({ x: 26, y: 36 })
+    expect(list[1]).toMatchObject({ x: 42, y: 52 })
+    expect(list[1].components.Transform).toMatchObject({ x: 42, y: 52 })
     expect(list[1].components.Transform).not.toBe(list[0].components.Transform)
     expect(result.current.manager.selectedEntityId).toBe(list[1].id)
     expect(onCommitHistory).toHaveBeenCalledTimes(1)
@@ -274,48 +274,37 @@ describe('useEntityManager (StrictMode)', () => {
   })
 })
 
-describe('useEntityManager free and tile-based entities', () => {
-  const FREE_COLLIDER = { width: 10, height: 20, offsetX: 1, offsetY: 2, isSolid: true }
-
-  it('createEntity keeps the kind of the components it is given, and tile-based is the default', () => {
+describe('useEntityManager derives Transform.free from the position', () => {
+  it('createEntity: on a tile anchor it is false, off the grid true (whatever the template said)', () => {
     const { result } = setup(makeMap({ entities: [] }))
     act(() => result.current.manager.createEntity('Tile', 48, 64))
-    act(() => result.current.manager.createEntity('Free', 50, 61, { Transform: { depth: 20, free: true } }))
-    const [tile, free] = result.current.manager.entities
+    act(() => result.current.manager.createEntity('Off', 50, 61, { Transform: { depth: 20, free: false } }))
+    const [tile, off] = result.current.manager.entities
     expect(tile.components.Transform).toMatchObject({ x: 48, y: 64, free: false })
-    expect(free).toMatchObject({ x: 50, y: 61 })
-    expect(free.components.Transform).toMatchObject({ x: 50, y: 61, free: true })
+    expect(off).toMatchObject({ x: 50, y: 61 })
+    expect(off.components.Transform).toMatchObject({ x: 50, y: 61, free: true })
   })
 
-  it('setEntityPlacement: free keeps position and size, tile-based snaps both; one undo step each', () => {
-    const entity = makeEntity('a', { x: 50, y: 61, components: { Transform: { x: 50, y: 61, depth: 10 }, Collider: FREE_COLLIDER } })
+  it('moveEntity and Transform edits keep the flag in step with the position, one undo step each', () => {
+    const entity = makeEntity('a', { x: 48, y: 64, components: { Transform: { x: 48, y: 64, depth: 10 } } })
     const { result, onCommitHistory } = setup(makeMap({ entities: [entity] }))
-
-    act(() => result.current.manager.setEntityPlacement('a', true))
-    expect(onCommitHistory).toHaveBeenCalledTimes(1)
-    let a = result.current.manager.entities[0]
-    expect(a).toMatchObject({ x: 50, y: 61 })
-    expect(a.components.Transform).toMatchObject({ free: true, x: 50, y: 61 })
-    expect(a.components.Collider).toMatchObject(FREE_COLLIDER)
-
-    act(() => result.current.manager.setEntityPlacement('a', false))
-    expect(onCommitHistory).toHaveBeenCalledTimes(2)
-    a = result.current.manager.entities[0]
-    expect(a).toMatchObject({ x: 48, y: 64 })
-    expect(a.components.Transform).toMatchObject({ free: false, x: 48, y: 64 })
-    expect(a.components.Collider).toMatchObject({ width: 32, height: 32, offsetX: 0, offsetY: 0 })
-
-    // nothing to change: no history step
-    act(() => result.current.manager.setEntityPlacement('a', false))
-    expect(onCommitHistory).toHaveBeenCalledTimes(2)
-    act(() => result.current.manager.setEntityPlacement('missing', true))
-    expect(onCommitHistory).toHaveBeenCalledTimes(2)
+    act(() => result.current.manager.moveEntity('a', 50, 61))
+    expect(result.current.manager.entities[0].components.Transform).toMatchObject({ x: 50, y: 61, free: true })
+    act(() => result.current.manager.updateComponentProp('a', 'Transform', 'x', 48))
+    act(() => result.current.manager.updateComponentProps('a', 'Transform', { y: 64 }))
+    expect(result.current.manager.entities[0].components.Transform).toMatchObject({ x: 48, y: 64, free: false })
+    expect(onCommitHistory).toHaveBeenCalledTimes(3)
   })
 
-  it('a duplicate of a free entity is free too', () => {
-    const entity = makeEntity('a', { x: 50, y: 61, components: { Transform: { x: 50, y: 61, depth: 10, free: true } } })
-    const { result } = setup(makeMap({ entities: [entity] }))
+  it('a duplicate moves one whole tile, so one on the grid stays on it and one off the grid stays off it', () => {
+    const onGrid = makeEntity('a', { x: 48, y: 64, components: { Transform: { x: 48, y: 64, depth: 10 } } })
+    const offGrid = makeEntity('b', { x: 50, y: 70, components: { Transform: { x: 50, y: 70, depth: 10 } } })
+    const { result } = setup(makeMap({ entities: [onGrid, offGrid] }))
     act(() => result.current.manager.duplicateEntity('a'))
-    expect(result.current.manager.entities[1].components.Transform).toMatchObject({ free: true })
+    act(() => result.current.manager.duplicateEntity('b'))
+    const [, aCopy, , bCopy] = result.current.manager.entities
+    expect(aCopy.components.Transform).toMatchObject({ x: 80, y: 96 })
+    expect(aCopy.components.Transform?.free).not.toBe(true)
+    expect(bCopy.components.Transform).toMatchObject({ x: 82, y: 102, free: true })
   })
 })

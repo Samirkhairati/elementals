@@ -7,7 +7,8 @@ import type { MapData } from '@/types/editor';
 
 import { MapsPanel } from '@/components/editor/panels/MapsPanel';
 import { LayersPanel } from '@/components/editor/panels/LayersPanel';
-import { EntitiesPanel } from '@/components/editor/panels/EntitiesPanel';
+import { EntityTree, entityCreators } from '@/components/editor/panels/EntityTree';
+import { CollisionPanel } from '@/components/editor/panels/CollisionPanel';
 import { PropertiesPanel } from '@/components/editor/panels/PropertiesPanel';
 import { ImagesPanel } from '@/components/editor/panels/ImagesPanel';
 import { TilesetsPanel } from '@/components/editor/panels/TilesetsPanel';
@@ -94,6 +95,23 @@ const selectLayers = (c: EditorContextValue) => ({
   entitiesIndex: c.activeMap?.entitiesIndex ?? 0,
   setEntitiesIndex: c.setEntitiesIndex,
   setSelectedEntityId: c.setSelectedEntityId,
+  // the entity tree under the Entities row
+  entities: c.entities,
+  selectedEntityId: c.selectedEntityId,
+  handleCreateEntity: c.handleCreateEntity,
+  handleDeleteEntity: c.handleDeleteEntity,
+  handleDuplicateEntity: c.handleDuplicateEntity,
+  handleRenameEntity: c.handleRenameEntity,
+  handleReorderEntities: c.handleReorderEntities,
+  startPlacement: c.startPlacement,
+  entityFolders: c.entityFolders,
+  createEntityFolder: c.createEntityFolder,
+  renameEntityFolder: c.renameEntityFolder,
+  deleteEntityFolder: c.deleteEntityFolder,
+  toggleEntityFolderVisibility: c.toggleEntityFolderVisibility,
+  toggleEntityFolderExpanded: c.toggleEntityFolderExpanded,
+  toggleEntityVisibility: c.toggleEntityVisibility,
+  moveEntityToFolder: c.moveEntityToFolder,
   toggleLayerVisibility: c.toggleLayerVisibility,
   toggleLayerLock: c.toggleLayerLock,
   setLayerYSort: c.setLayerYSort,
@@ -111,6 +129,43 @@ const selectLayers = (c: EditorContextValue) => ({
 export function LayersWrapper(_props: IDockviewPanelProps) {
   const ctx = useEditorSelector(selectLayers);
   const bindings = useBindings();
+  const { placeNew, placePrefab } = entityCreators({ startPlacement: ctx.startPlacement, createEntity: ctx.handleCreateEntity });
+  const entitiesSlot = {
+    count: ctx.entities.length,
+    hasSelection: !!ctx.selectedEntityId,
+    onNew: () => placeNew(),
+    onPrefab: placePrefab,
+    onNewFolder: () => ctx.createEntityFolder?.(),
+    tree: (
+      // Clicks in the tree make the entities the target of Delete / Copy / Paste, not the layers.
+      <div
+        onClick={(e) => {
+          e.stopPropagation();
+          ctx.setFocusedDomain('entities');
+        }}
+      >
+        <EntityTree
+          entities={ctx.entities}
+          selectedEntityId={ctx.selectedEntityId}
+          setSelectedEntityId={ctx.setSelectedEntityId}
+          createEntity={ctx.handleCreateEntity}
+          deleteEntity={ctx.handleDeleteEntity}
+          duplicateEntity={ctx.handleDuplicateEntity}
+          renameEntity={ctx.handleRenameEntity}
+          reorderEntities={ctx.handleReorderEntities}
+          setConfirmDialog={ctx.setConfirmDialog}
+          startPlacement={ctx.startPlacement}
+          entityFolders={ctx.entityFolders}
+          renameEntityFolder={ctx.renameEntityFolder}
+          deleteEntityFolder={ctx.deleteEntityFolder}
+          toggleEntityFolderVisibility={ctx.toggleEntityFolderVisibility}
+          toggleEntityFolderExpanded={ctx.toggleEntityFolderExpanded}
+          toggleEntityVisibility={ctx.toggleEntityVisibility}
+          moveEntityToFolder={ctx.moveEntityToFolder}
+        />
+      </div>
+    ),
+  };
   return (
     <div
       onClick={() => ctx.setFocusedDomain('layers')}
@@ -131,6 +186,7 @@ export function LayersWrapper(_props: IDockviewPanelProps) {
         entitiesIndex={ctx.entitiesIndex}
         setEntitiesIndex={ctx.setEntitiesIndex}
         setSelectedEntityId={ctx.setSelectedEntityId}
+        entitiesSlot={entitiesSlot}
         toggleLayerVisibility={ctx.toggleLayerVisibility}
         toggleLayerLock={ctx.toggleLayerLock}
         setLayerYSort={ctx.setLayerYSort}
@@ -149,63 +205,9 @@ export function LayersWrapper(_props: IDockviewPanelProps) {
   );
 }
 
-const selectEntities = (c: EditorContextValue) => ({
-  setFocusedDomain: c.setFocusedDomain,
-  hasActiveMap: !!c.activeMap,
-  entities: c.entities,
-  selectedEntityId: c.selectedEntityId,
-  setSelectedEntityId: c.setSelectedEntityId,
-  handleCreateEntity: c.handleCreateEntity,
-  handleDeleteEntity: c.handleDeleteEntity,
-  handleDuplicateEntity: c.handleDuplicateEntity,
-  handleRenameEntity: c.handleRenameEntity,
-  handleReorderEntities: c.handleReorderEntities,
-  setConfirmDialog: c.setConfirmDialog,
-  startPlacement: c.startPlacement,
-  showEntities: c.showEntities,
-  toggleShowEntities: c.toggleShowEntities,
-  entityFolders: c.entityFolders,
-  createEntityFolder: c.createEntityFolder,
-  renameEntityFolder: c.renameEntityFolder,
-  deleteEntityFolder: c.deleteEntityFolder,
-  toggleEntityFolderVisibility: c.toggleEntityFolderVisibility,
-  toggleEntityFolderExpanded: c.toggleEntityFolderExpanded,
-  toggleEntityVisibility: c.toggleEntityVisibility,
-  moveEntityToFolder: c.moveEntityToFolder,
-});
-
-export function EntitiesWrapper(_props: IDockviewPanelProps) {
-  const ctx = useEditorSelector(selectEntities);
-  return (
-    <div
-      onClick={() => ctx.setFocusedDomain('entities')}
-      className="flex-1 overflow-y-auto p-2 text-xs min-h-0 bg-sidebar-background h-full"
-    >
-      <EntitiesPanel
-        hasActiveMap={ctx.hasActiveMap}
-        entities={ctx.entities}
-        selectedEntityId={ctx.selectedEntityId}
-        setSelectedEntityId={ctx.setSelectedEntityId}
-        createEntity={ctx.handleCreateEntity}
-        deleteEntity={ctx.handleDeleteEntity}
-        duplicateEntity={ctx.handleDuplicateEntity}
-        renameEntity={ctx.handleRenameEntity}
-        reorderEntities={ctx.handleReorderEntities}
-        setConfirmDialog={ctx.setConfirmDialog}
-        startPlacement={ctx.startPlacement}
-        showEntities={ctx.showEntities}
-        toggleShowEntities={ctx.toggleShowEntities}
-        entityFolders={ctx.entityFolders}
-        createEntityFolder={ctx.createEntityFolder}
-        renameEntityFolder={ctx.renameEntityFolder}
-        deleteEntityFolder={ctx.deleteEntityFolder}
-        toggleEntityFolderVisibility={ctx.toggleEntityFolderVisibility}
-        toggleEntityFolderExpanded={ctx.toggleEntityFolderExpanded}
-        toggleEntityVisibility={ctx.toggleEntityVisibility}
-        moveEntityToFolder={ctx.moveEntityToFolder}
-      />
-    </div>
-  );
+/** A panel that no longer exists (the entity list is part of the Layers panel): old saved layouts still name it, and it is closed once restored. */
+function RetiredPanel(_props: IDockviewPanelProps) {
+  return null;
 }
 
 const selectProperties = (c: EditorContextValue) => ({
@@ -216,7 +218,6 @@ const selectProperties = (c: EditorContextValue) => ({
   selectedEntityId: c.selectedEntityId,
   handleRenameEntity: c.handleRenameEntity,
   handleMoveEntity: c.handleMoveEntity,
-  handleSetEntityPlacement: c.handleSetEntityPlacement,
   handleAddComponent: c.handleAddComponent,
   handleRemoveComponent: c.handleRemoveComponent,
   handleUpdateComponentProp: c.handleUpdateComponentProp,
@@ -242,7 +243,6 @@ function PropertiesBody({ entityMode }: { entityMode: boolean }) {
         selectedEntityId={entityMode ? ctx.selectedEntityId : null}
         renameEntity={ctx.handleRenameEntity}
         moveEntity={ctx.handleMoveEntity}
-        setEntityPlacement={ctx.handleSetEntityPlacement}
         addComponent={ctx.handleAddComponent}
         removeComponent={ctx.handleRemoveComponent}
         updateComponentProp={ctx.handleUpdateComponentProp}
@@ -260,6 +260,15 @@ export function PropertiesWrapper(_props: IDockviewPanelProps) {
 
 export function InspectorWrapper(_props: IDockviewPanelProps) {
   return <PropertiesBody entityMode />;
+}
+
+/** The right sidebar while a collision layer is active (see useDockviewLayout). */
+export function CollisionWrapper(_props: IDockviewPanelProps) {
+  return (
+    <div className="h-full min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain bg-card/40 p-2 text-xs text-muted-foreground" data-testid="collision-scroll">
+      <CollisionPanel />
+    </div>
+  );
 }
 
 /** The right sidebar while an image layer is active (see useDockviewLayout). */
@@ -605,10 +614,11 @@ export function DatabaseWrapper(_props: IDockviewPanelProps) {
 export const dockviewComponents = {
   maps: MapsWrapper,
   layers: LayersWrapper,
-  entities: EntitiesWrapper,
+  entities: RetiredPanel,
   properties: PropertiesWrapper,
   inspector: InspectorWrapper,
   images: ImagesWrapper,
+  collision: CollisionWrapper,
   canvas: CanvasWrapper,
   emptyCanvas: EmptyCanvasWrapper,
   tilesets: TilesetsWrapper,

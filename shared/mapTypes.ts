@@ -3,13 +3,17 @@
 
 import type { EngineEntity } from './engine/types.ts'
 import type { CollisionShape, ShapePoint } from './collisionShapes.ts'
+import type { CollisionTileGroup } from './collisionLayers.ts'
 
+/** `polygons` is the old shapes-only collision layer: loading or exporting a map turns it into a `collision` layer. */
 export type EditorLayerType = 'tile' | 'collision' | 'terrain' | 'objects' | 'encounters' | 'image' | 'folder' | 'polygons'
 
 export interface EditorTile {
   tilesetId: string
   x: number
   y: number
+  /** Collision layers only: the tiles item (`tileGroups`) the cell belongs to; absent = the first one. */
+  group?: string
 }
 
 /** A rectangle of a picture in its own pixels (whole numbers, inside the picture). */
@@ -79,8 +83,10 @@ export interface EditorLayer {
   collapsed?: boolean
   /** Image layers and folders: y-sort the pictures (see shared/ySort.ts); absent = follow the folder, else off. */
   ySort?: boolean
-  /** `polygons` layers only: collision shapes in map pixels (see shared/collisionShapes.ts). */
+  /** `collision` layers only: collision shapes in map pixels (see shared/collisionShapes.ts), one item each. */
   shapes?: CollisionShape[]
+  /** `collision` layers only: the tiles items, in list order (see shared/collisionLayers.ts). */
+  tileGroups?: CollisionTileGroup[]
 }
 
 export interface EditorEntity {
