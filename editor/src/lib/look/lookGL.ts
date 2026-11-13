@@ -224,8 +224,9 @@ export class LookGL {
 
   private setGrade(p: Program, g: GradePass): void {
     const gl = this.gl
-    const tex = this.lookTex(g.compiled)
+    // (creating the textures binds them to the active unit: never unit 0, which holds the input)
     gl.activeTexture(gl.TEXTURE1)
+    const tex = this.lookTex(g.compiled)
     gl.bindTexture(gl.TEXTURE_2D, tex.lut)
     gl.activeTexture(gl.TEXTURE2)
     gl.bindTexture(gl.TEXTURE_2D, tex.brush ?? tex.lut)

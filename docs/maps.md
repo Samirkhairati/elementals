@@ -26,6 +26,11 @@ The editor imports it from `src/hooks/useExportMap.ts` (relative path, no extens
 paths (type stripping). Keep the files free of enums, namespaces, parameter properties and DOM/Node imports.
 **Export to Game** (Maps panel context menu) validates the editor map and the converted map, then writes `game/public/data/maps/<id>.json` atomically with no dialog (`export-map-to-game` channel, `mapStore.exportMapToGame`; the id is the editor file name slugified, see below). It refuses to write (notice with the first errors) when either is invalid. **Export as File…** is the old save dialog. Run against a project copy (`ELEMENTALS_PROJECT_DIR`), the game folder is the one *beside that copy*, so the real game is never touched. Export to Game also runs the asset sync (what `npm run assets:sync` does: pictures, tilesets, sprites and manifests are copied into `game/public`, `electron/ipc/gameAssets.ts`), so the pictures and tilesets a map uses reach the game with it, and the notice says how many files were copied. It needs the repo's `scripts/lib/assets.mjs` next to the project; for a project copy (the harness) or a packaged editor it is skipped, the notice says so, and you run `npm run assets:sync` yourself. A failed sync never fails the export. `npm run dev` also syncs at start.
 
+## Looks
+
+The map, tile and image layers and pictures can carry a `look` (colour grading per profile), exported as a Tiled string
+property `look` (JSON); see docs/looks.md.
+
 ## Layer folders
 
 A layer of type `folder` groups tile and image layers in the editor's layer list: the layers it holds follow it in `layers[]` and carry `folderId`; the folder has `collapsed` for its open/closed state. Folders are editor-only: `convertEditorMapToTiled` leaves them out (the held layers export as normal layers, in list order) and `validateEditorMap` only warns about a `folderId` that points at no folder or sits on a layer kind that cannot be held. Logic and drag rules: `editor/src/lib/layerFolders.ts`.

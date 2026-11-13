@@ -68,3 +68,16 @@ Left for later:
   per-component props from `shared/engine/components.ts`.
 - **Still-large modules:** `routes/editor.tsx` (~680 lines, mostly the context object), `panels/ImagesPanel.tsx` (~740: the
   rows' drag-and-drop could move to a hook), `panels/DatabasePanel.tsx` (~720: one section per database kind).
+
+## Looks (colour grading)
+
+- **Deleted profiles leave their looks behind**: deleting a profile only removes it from `project/looks.json`; maps keep
+  `look.profiles[id]` (ignored, never shown). A cleanup across all maps (like `assetOps` does for renames) would drop them.
+- **Renaming / deleting a shader does not update the looks that use it**: a look then shows "Missing: <id>" and the game
+  skips it with a warning.
+- **Editor map look grades the whole content canvas on every draw** (one GPU pass + copy back at device pixel ratio). Fine on
+  laptops; on 4K screens while panning it may cost a few ms per frame. A cheaper path would grade only while idle.
+- **Every slider tick re-bakes the LUT** (32³ colour evaluations per look strip, a few ms). Debouncing the bake during a
+  drag (or a 16³ draft LUT) would make slow machines smoother.
+- **Picture looks are cached per placement**: dragging a picture with its own look re-grades it every frame of the drag.
+- **Look panel width**: the mask component rows and shader headers crowd below ~280px.

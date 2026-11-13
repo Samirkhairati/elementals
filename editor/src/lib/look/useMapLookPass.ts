@@ -15,13 +15,17 @@ export function useMapLookPass(layerRef: RefObject<Konva.Layer | null>, look: Lo
   useEffect(() => {
     const layer = layerRef.current
     if (!layer) return
-    const grade = () => {
-      gradeMapLayer(layer, look, { w: mapW, h: mapH })
+    // Graded only when the layer draws onto its own canvas (not into an export / cache canvas).
+    const own = Object.getPrototypeOf(layer).drawScene as Konva.Layer['drawScene']
+    layer.drawScene = function (this: Konva.Layer, ...args: Parameters<Konva.Layer['drawScene']>) {
+      const r = own.apply(this, args)
+      const can = args[0]
+      if (!can || can === this.getCanvas()) gradeMapLayer(this, look, { w: mapW, h: mapH })
+      return r
     }
-    layer.on('draw.lookPass', grade)
     layer.batchDraw()
     return () => {
-      layer.off('draw.lookPass', grade)
+      layer.drawScene = own
     }
   }, [layerRef, look, mapW, mapH, view, lib.shaders])
 

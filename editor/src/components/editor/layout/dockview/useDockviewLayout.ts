@@ -524,7 +524,10 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
     }
 
     const placement = PANEL_PLACEMENT[id];
-    if (placement) {
+    if (placement?.edge) {
+      const panel = api.addPanel({ id, component: id, title: placement.title, position: { direction: placement.edge } });
+      panel.api.setSize({ width: Math.max(280, Math.round(api.width * 0.18)) });
+    } else if (placement) {
       const firstMapPanel = api.panels.find((p) => isMapPanelId(p.id))?.id ?? null;
       const position = panelPosition(placement, (other) => !!api.getPanel(other), firstMapPanel);
       const reference = position && api.getPanel(position.referencePanel);

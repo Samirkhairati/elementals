@@ -10,6 +10,8 @@ export interface PanelPlacement {
   anchors: [panels: readonly string[], direction: PanelDirection][]
   /** With none of the anchors open: this side of the first map tab. */
   mapSide: 'left' | 'right'
+  /** A full-height column at this edge of the whole layout instead (anchors are not used). */
+  edge?: 'left' | 'right'
 }
 
 export const PANEL_PLACEMENT: Record<string, PanelPlacement> = {
@@ -45,8 +47,8 @@ export const PANEL_PLACEMENT: Record<string, PanelPlacement> = {
   activeSelection: { title: 'ACTIVE SELECTION', anchors: [[['preview', 'tilesets'], 'below']], mapSide: 'right' },
   // On-demand panel: a tab next to the Tileset Browser (right column).
   database: { title: 'DATABASE', anchors: [[['tilesets', 'preview', 'activeSelection'], 'within']], mapSide: 'right' },
-  // On-demand panel: its own column right of the right sidebar (that column swaps panels with the selection).
-  look: { title: 'LOOK', anchors: [[['tilesets', 'inspector', 'images', 'preview', 'activeSelection'], 'right']], mapSide: 'right' },
+  // On-demand panel: its own full-height column at the right edge (the right sidebar swaps panels with the selection).
+  look: { title: 'LOOK', anchors: [], mapSide: 'right', edge: 'right' },
 }
 
 /**
