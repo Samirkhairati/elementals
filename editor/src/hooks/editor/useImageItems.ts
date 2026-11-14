@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { imagePickName, type ImagePick } from '@/lib/graphicAssets'
 import { ARROW_DELTAS, nudgeStep } from '@/lib/imageNudge'
 import { movePictureStep, patchNode, setYSort } from '@/lib/sceneOps'
-import { layerOf, pictureLocked, shown } from '@/lib/sceneIndex'
+import { layerOf, lockedNode, pictureLocked, sceneIndex, shown } from '@/lib/sceneIndex'
 import { insertNode, findNode, type PictureNode, type SceneNode } from '../../../../shared/sceneTree'
 import type { ImageItem } from '@/types/editor'
 import type { SceneTreeApi } from './useSceneTree'
@@ -44,7 +44,7 @@ export function useImageItems(tree: SceneTreeApi) {
       commit(
         (prev) => {
           const layer = findNode(prev, layerId)
-          if (!layer || layer.type !== 'image') return prev
+          if (!layer || layer.type !== 'image' || lockedNode(sceneIndex(prev), layerId)) return prev
           const open = getSelection().openGroupId
           const parent = open && findNode([layer], open)?.type === 'group' ? open : layerId
           const picture: PictureNode = { ...item, id: crypto.randomUUID(), type: 'picture', name: item.name ?? imagePickName(item) }

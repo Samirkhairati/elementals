@@ -1,336 +1,341 @@
-import { StrictMode, useState, type ReactNode } from 'react'
+import { StrictMode, type ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
-import type { ImageItem, Layer, MapData } from '@/types/editor'
-import { makeLayer, makeMap } from '@/test/helpers'
+import type { GroupNode, ImageLayerNode, PictureNode, SceneNode } from '../../../../shared/sceneTree'
+import { drawOrderPictures, picturesOf } from '../../../../shared/sceneTree'
+import { makeGroup, makeImageLayer, makeLayer, makeMap, makePicture } from '@/test/helpers'
+import { useSceneHarness } from '@/test/sceneHarness'
 import { useEditorClipboard } from '@/store/editorClipboard'
-import { useLayerManager } from './useLayerManager'
 
 const wrapper = ({ children }: { children: ReactNode }) => <StrictMode>{children}</StrictMode>
 
-function setup(initialLayers: Layer[]) {
+function setup(initial: SceneNode[]) {
   const onCommitHistory = vi.fn()
-  const hook = renderHook(
-    () => {
-      const [, setActiveMap] = useState<MapData | null>(makeMap({ layers: initialLayers }))
-      return useLayerManager({ setActiveMap, onCommitHistory })
-    },
-    { wrapper }
-  )
-  act(() => {
-    hook.result.current.setLayers(initialLayers)
-    hook.result.current.setActiveLayerId(initialLayers[0]?.id ?? null)
-  })
+  const hook = renderHook(() => useSceneHarness(makeMap({ nodes: initial }), onCommitHistory), { wrapper })
+  act(() => hook.result.current.layers.setActiveLayerId(initial[0]?.id ?? null))
   return { ...hook, onCommitHistory }
 }
+type R = ReturnType<typeof setup>['result']
 
-const img = (id: string, x: number, name?: string): ImageItem => ({ id, graphicId: 'images/city/dam-wall.png', x, y: 64, name })
-const imageLayer = (images: ImageItem[], id = 'I1') => makeLayer(id, { type: 'image', name: 'Images', images })
+const img = (id: string, x: number, name?: string): PictureNode => makePicture(id, { assetId: undefined, graphicId: 'images/city/dam-wall.png', x, y: 64, name: name ?? id })
+const imageLayer = (pictures: SceneNode[], id = 'I1', extra: Record<string, unknown> = {}) => makeImageLayer(id, pictures as never, { name: 'Images', ...extra })
+const layer = (r: R, id = 'I1') => r.current.tree.index.byId.get(id)!.node as ImageLayerNode
+const parentOf = (r: R, id: string) => r.current.tree.index.byId.get(id)?.ancestors.slice(-1)[0]?.id ?? null
 
 afterEach(() => useEditorClipboard.getState().set(null))
 
 describe('picking several pictures', () => {
   it('Ctrl/Cmd toggles pictures into the picked set and Shift picks a range (front first)', () => {
     const { result } = setup([imageLayer([img('a', 0), img('b', 10), img('c', 20), img('d', 30)])])
-    act(() => result.current.selectImage('I1', 'a', 'replace'))
-    expect(result.current.pickedImageIds).toEqual(['a'])
-    act(() => result.current.selectImage('I1', 'c', 'toggle'))
-    expect(result.current.pickedImageIds.sort()).toEqual(['a', 'c'])
-    expect(result.current.selectedImageId).toBe('c')
-    act(() => result.current.selectImage('I1', 'a', 'toggle'))
-    expect(result.current.pickedImageIds).toEqual(['c'])
-    act(() => result.current.selectImage('I1', 'a', 'range'))
+    act(() => result.current.layers.selectImage('I1', 'a', 'replace'))
+    expect(result.current.layers.pickedImageIds).toEqual(['a'])
+    act(() => result.current.layers.selectImage('I1', 'c', 'toggle'))
+    expect([...result.current.layers.pickedImageIds].sort()).toEqual(['a', 'c'])
+    expect(result.current.layers.selectedImageId).toBe('c')
+    act(() => result.current.layers.selectImage('I1', 'a', 'toggle'))
+    expect(result.current.layers.pickedImageIds).toEqual(['c'])
+    act(() => result.current.layers.selectImage('I1', 'a', 'range'))
     // front first: d c b a, so from c to a is c b a
-    expect(result.current.pickedImageIds.sort()).toEqual(['a', 'b', 'c'])
+    expect([...result.current.layers.pickedImageIds].sort()).toEqual(['a', 'b', 'c'])
   })
 
-  it('setSelectedImageId drops the rest of the picked set', () => {
+  it('selecting the layer again lets go of the picked set', () => {
     const { result } = setup([imageLayer([img('a', 0), img('b', 10)])])
-    act(() => result.current.selectImage('I1', 'a', 'replace'))
-    act(() => result.current.selectImage('I1', 'b', 'toggle'))
-    act(() => result.current.setSelectedImageId(null))
-    expect(result.current.pickedImageIds).toEqual([])
+    act(() => result.current.layers.selectImage('I1', 'a', 'replace'))
+    act(() => result.current.layers.selectImage('I1', 'b', 'toggle'))
+    act(() => result.current.layers.setActiveLayerId('I1'))
+    expect(result.current.layers.pickedImageIds).toEqual([])
+    expect(result.current.layers.activeLayerId).toBe('I1')
   })
 })
 
 describe('several pictures at once', () => {
-  it('deleteImages removes them all in one history step', () => {
+  it('deleteNodes removes them all in one history step', () => {
     const { result, onCommitHistory } = setup([imageLayer([img('a', 0), img('b', 10), img('c', 20)])])
     onCommitHistory.mockClear()
-    act(() => result.current.deleteImages('I1', ['a', 'c']))
-    expect(result.current.layers[0].images!.map(i => i.id)).toEqual(['b'])
+    act(() => result.current.layers.deleteNodes(['a', 'c']))
+    expect(picturesOf(layer(result)).map((i) => i.id)).toEqual(['b'])
     expect(onCommitHistory).toHaveBeenCalledTimes(1)
-    expect(result.current.pickedImageIds).toEqual([])
+    expect(result.current.layers.pickedImageIds).toEqual([])
   })
 
-  it('duplicateImages copies them with new ids and unique names in one step, and picks the copies', () => {
+  it('duplicateNodes copies them with new ids and unique names in one step, and picks the copies', () => {
     const { result, onCommitHistory } = setup([imageLayer([img('a', 0), img('b', 10, 'Wall')])])
     onCommitHistory.mockClear()
-    act(() => result.current.duplicateImages('I1', ['a', 'b']))
-    const images = result.current.layers[0].images!
-    expect(images).toHaveLength(4)
-    expect(images.slice(2).map(i => i.name).sort()).toEqual(['Wall 2', 'dam-wall 2'])
-    expect(new Set(images.map(i => i.id)).size).toBe(4)
+    act(() => result.current.layers.duplicateNodes(['a', 'b']))
+    const pictures = picturesOf(layer(result))
+    expect(pictures).toHaveLength(4)
+    expect(new Set(pictures.map((i) => i.id)).size).toBe(4)
+    expect(pictures.map((i) => i.name)).toEqual(['a', 'Wall', 'a 2', 'Wall 2'])
     expect(onCommitHistory).toHaveBeenCalledTimes(1)
-    expect(result.current.pickedImageIds).toHaveLength(2)
+    expect(result.current.layers.pickedImageIds).toHaveLength(2)
+    expect(pictures[2].x).toBe(32)
   })
 
-  it('copy then paste puts copies in the layer, also in another image layer', () => {
+  it('copy then paste puts copies in the layer, also in another image layer, where the cursor is', () => {
     const { result } = setup([imageLayer([img('a', 100)], 'I1'), imageLayer([], 'I2')])
-    act(() => result.current.copyImages('I1', ['a']))
-    expect(useEditorClipboard.getState().content?.kind).toBe('images')
-    act(() => result.current.pasteImages('I2', { x: 5, y: 6 }))
-    const pasted = result.current.layers.find(l => l.id === 'I2')!.images!
+    act(() => {
+      expect(result.current.layers.copyNodes(['a'])).toBe(1)
+    })
+    expect(useEditorClipboard.getState().content?.kind).toBe('nodes')
+    act(() => result.current.layers.pasteNodes('I2', { x: 5, y: 6 }))
+    const pasted = picturesOf(layer(result, 'I2'))
     expect(pasted).toHaveLength(1)
-    expect(pasted[0]).toMatchObject({ graphicId: 'images/city/dam-wall.png', x: 5, y: 6, name: 'dam-wall' })
+    expect(pasted[0]).toMatchObject({ graphicId: 'images/city/dam-wall.png', x: 5, y: 6, name: 'a' })
     expect(pasted[0].id).not.toBe('a')
   })
 
-  it('does not paste into a locked layer or paste other kinds of content', () => {
-    const locked = makeLayer('I2', { type: 'image', name: 'Images', images: [], locked: true })
-    const { result } = setup([imageLayer([img('a', 0)], 'I1'), locked])
-    act(() => result.current.copyImages('I1', ['a']))
-    act(() => result.current.pasteImages('I2', null))
-    expect(result.current.layers.find(l => l.id === 'I2')!.images).toEqual([])
-    act(() => useEditorClipboard.getState().set({ kind: 'entities', entities: [] }))
-    act(() => result.current.pasteImages('I1', null))
-    expect(result.current.layers.find(l => l.id === 'I1')!.images).toHaveLength(1)
+  it('does not paste into a locked layer; pictures do not fit anywhere but an image layer', () => {
+    const { result } = setup([imageLayer([img('a', 0)], 'I1'), imageLayer([], 'I2', { locked: true }), makeLayer('T')])
+    act(() => result.current.layers.copyNodes(['a']))
+    act(() => result.current.layers.pasteNodes('I2'))
+    expect(picturesOf(layer(result, 'I2'))).toEqual([])
+    act(() => result.current.layers.pasteNodes('T'))
+    expect(picturesOf(layer(result, 'I1'))).toHaveLength(1)
+    expect(result.current.tree.nodes.map((n) => n.id)).toEqual(['I1', 'I2', 'T'])
   })
 })
 
 describe('several layers at once', () => {
-  const layers = () => [makeLayer('A', { name: 'A' }), makeLayer('B', { name: 'B' }), makeLayer('C', { name: 'C' }), makeLayer('F', { type: 'folder', name: 'F' })]
+  const layers = () => [makeLayer('A', { name: 'A' }), makeLayer('B', { name: 'B' }), makeLayer('C', { name: 'C' }), makeGroup('F', [], { name: 'F' })]
+  /** Names top first, groups followed by what they hold. */
+  const listed = (r: R) => r.current.tree.rows.map((id) => r.current.tree.index.byId.get(id)!.node.name)
 
-  it('Shift+click picks every layer from the active one to the clicked one, skipping folders', () => {
+  it('Shift+click picks every row from the active one to the clicked one', () => {
     const { result } = setup(layers())
-    act(() => result.current.selectLayer('C', 'range'))
-    expect(result.current.selectedLayerIds.sort()).toEqual(['A', 'B', 'C'])
-    expect(result.current.activeLayerId).toBe('C')
+    // the list reads F, C, B, A; A is active
+    act(() => result.current.layers.select('C', 'range'))
+    expect(new Set([result.current.layers.activeLayerId, ...result.current.layers.selectedLayerIds])).toEqual(new Set(['A', 'B', 'C']))
+    expect(result.current.layers.activeLayerId).toBe('C')
   })
 
-  it('deleteLayers removes several in one history step and drops them from the selection', () => {
+  it('deleteNodes removes several in one history step and drops them from the selection', () => {
     const { result, onCommitHistory } = setup(layers())
-    act(() => result.current.selectLayer('C', 'range'))
+    act(() => result.current.layers.select('C', 'range'))
     onCommitHistory.mockClear()
-    act(() => result.current.handleDeleteLayers(['A', 'C']))
-    expect(result.current.layers.map(l => l.id)).toEqual(['B', 'F'])
+    act(() => result.current.layers.deleteNodes(['A', 'C']))
+    expect(result.current.tree.nodes.map((n) => n.id)).toEqual(['B', 'F'])
     expect(onCommitHistory).toHaveBeenCalledTimes(1)
-    expect(result.current.selectedLayerIds).toEqual(['B'])
+    expect([result.current.layers.activeLayerId, ...result.current.layers.selectedLayerIds]).toEqual(['B'])
   })
 
-  it('duplicateLayers puts the copies right below the lowest one, with new ids and unique names', () => {
+  it('duplicateNodes puts the copies right below the lowest one, with new ids and unique names', () => {
     const { result } = setup(layers())
-    act(() => result.current.duplicateLayers(['A', 'B']))
-    expect(result.current.layers.map(l => l.name)).toEqual(['A', 'B', 'A Copy', 'B Copy', 'C', 'F'])
-    expect(new Set(result.current.layers.map(l => l.id)).size).toBe(6)
+    act(() => result.current.layers.duplicateNodes(['A', 'B']))
+    // the list reads F, C, B, A with the copies under A... A Copy, B Copy go below the lowest (A)
+    expect(listed(result)).toEqual(['F', 'C', 'B', 'A', 'B Copy', 'A Copy'])
+    expect(new Set(result.current.tree.index.entries.map((e) => e.node.id)).size).toBe(6)
   })
 
-  it('copyLayers + pasteLayers paste below the given layer, again with free names; folders are copied too', () => {
+  it('copyNodes + pasteNodes paste below the given layer, again with free names; groups are copied too', () => {
     const { result } = setup(layers())
-    act(() => result.current.copyLayers(['B', 'F']))
-    act(() => result.current.pasteLayers('C'))
-    expect(result.current.layers.map(l => l.name)).toEqual(['A', 'B', 'C', 'B Copy', 'F Copy', 'F'])
-    act(() => result.current.pasteLayers('C'))
-    expect(result.current.layers.map(l => l.name)).toContain('B Copy 2')
+    act(() => result.current.layers.copyNodes(['B', 'F']))
+    act(() => result.current.layers.pasteNodes('C'))
+    expect(listed(result)).toEqual(['F', 'C', 'F Copy', 'B Copy', 'B', 'A'])
+    act(() => result.current.layers.pasteNodes('C'))
+    expect(listed(result)).toContain('B Copy 2')
   })
 
-  it('a layer copied out of a folder is pasted back into that folder, and a copied folder brings its layers', () => {
-    const inFolder = [makeLayer('F', { type: 'folder', name: 'F' }), makeLayer('a', { name: 'a', folderId: 'F' }), makeLayer('b', { name: 'b', folderId: 'F' }), makeLayer('x', { name: 'x' })]
-    const { result } = setup(inFolder)
-    act(() => result.current.copyLayers(['a']))
-    act(() => result.current.pasteLayers('a'))
-    expect(result.current.layers.map(l => [l.name, l.folderId ?? null])).toEqual([['F', null], ['a', 'F'], ['a Copy', 'F'], ['b', 'F'], ['x', null]])
-    act(() => result.current.duplicateLayers(['F']))
-    const copy = result.current.layers.find(l => l.name === 'F Copy')!
-    expect(result.current.layers.filter(l => l.folderId === copy.id).map(l => l.name)).toEqual(['a Copy 2', 'a Copy Copy', 'b Copy'])
+  it('a layer copied out of a group is pasted back into that group, and a copied group brings its layers', () => {
+    const inGroup = [makeGroup('F', [makeLayer('a', { name: 'a' }), makeLayer('b', { name: 'b' })], { name: 'F' }), makeLayer('x', { name: 'x' })]
+    const { result } = setup(inGroup)
+    act(() => result.current.layers.copyNodes(['a']))
+    act(() => result.current.layers.pasteNodes('a'))
+    const at = (id: string) => result.current.tree.index.byId.get(id)
+    expect((at('F')!.node as GroupNode).children.map((n) => n.name)).toEqual(['a Copy', 'a', 'b'])
+    act(() => result.current.layers.duplicateNodes(['F']))
+    const copy = result.current.tree.nodes.find((n) => n.name === 'F Copy') as GroupNode
+    // what is inside keeps its names: only the copied group itself is a copy
+    expect(copy.children.map((n) => n.name)).toEqual(['a Copy', 'a', 'b'])
+    expect(copy.children.map((n) => n.id)).not.toContain('a')
+  })
+
+  it('pasting on a group row puts the copy inside it', () => {
+    const { result } = setup([makeGroup('F', [makeLayer('a')], { name: 'F' }), makeLayer('x', { name: 'x' })])
+    act(() => result.current.layers.copyNodes(['x']))
+    act(() => result.current.layers.pasteNodes('F'))
+    expect((result.current.tree.nodes[0] as GroupNode).children.map((n) => n.name)).toEqual(['a', 'x Copy'])
   })
 })
 
 describe('place multiple', () => {
   it('turns a picture into the placement preview with its crop, scale, flips and opacity, and drops what is unset', () => {
-    const item: ImageItem = { id: 'a', graphicId: 'images/city/dam-wall.png', x: 5, y: 6, name: 'Wall', crop: { x: 1, y: 2, w: 3, h: 4 }, scale: 2, flipX: true, opacity: 0.5 }
+    const item = makePicture('a', { assetId: undefined, graphicId: 'images/city/dam-wall.png', x: 5, y: 6, name: 'Wall', crop: { x: 1, y: 2, w: 3, h: 4 }, scale: 2, flipX: true, opacity: 0.5 })
     const { result } = setup([imageLayer([item, img('b', 0)])])
-    act(() => result.current.placeMultiple('I1', 'a'))
-    expect(result.current.pendingImage).toEqual({ graphicId: 'images/city/dam-wall.png', crop: { x: 1, y: 2, w: 3, h: 4 }, scale: 2, flipX: true, opacity: 0.5 })
-    expect(result.current.pendingImage?.crop).not.toBe(item.crop)
-    act(() => result.current.placeMultiple('I1', 'b'))
-    expect(result.current.pendingImage).toEqual({ graphicId: 'images/city/dam-wall.png' })
+    act(() => result.current.layers.placeMultiple('I1', 'a'))
+    expect(result.current.layers.pendingImage).toEqual({ graphicId: 'images/city/dam-wall.png', crop: { x: 1, y: 2, w: 3, h: 4 }, scale: 2, flipX: true, opacity: 0.5 })
+    expect(result.current.layers.pendingImage?.crop).not.toBe(item.crop)
+    act(() => result.current.layers.placeMultiple('I1', 'b'))
+    expect(result.current.layers.pendingImage).toEqual({ graphicId: 'images/city/dam-wall.png' })
   })
 
   it('does nothing for a picture that is not there', () => {
     const { result } = setup([imageLayer([img('a', 0)])])
-    act(() => result.current.placeMultiple('I1', 'zzz'))
-    expect(result.current.pendingImage).toBeNull()
+    act(() => result.current.layers.placeMultiple('I1', 'zzz'))
+    expect(result.current.layers.pendingImage).toBeNull()
   })
 })
 
 describe('groups of pictures', () => {
   const four = () => imageLayer([img('a', 0), img('b', 10), img('c', 20), img('d', 30)])
-  const layerOf = (r: { current: ReturnType<typeof useLayerManager> }, id = 'I1') => r.current.layers.find(l => l.id === id)!
+  const groupId = (r: R) => (layer(r).children.find((n) => n.type === 'group') as GroupNode).id
   const groupedFirstTwo = () => {
     const hook = setup([four()])
-    act(() => hook.result.current.selectImage('I1', 'a', 'replace'))
-    act(() => hook.result.current.selectImage('I1', 'b', 'toggle'))
-    act(() => hook.result.current.groupPickedImages('I1'))
+    act(() => hook.result.current.layers.selectImage('I1', 'a', 'replace'))
+    act(() => hook.result.current.layers.selectImage('I1', 'b', 'toggle'))
+    act(() => hook.result.current.layers.groupNodes(hook.result.current.layers.pickedImageIds))
     return hook
   }
 
   it('groups the picked pictures in one history step and selects the group row', () => {
     const { result, onCommitHistory } = setup([four()])
-    act(() => result.current.groupPickedImages('I1'))
-    expect(layerOf(result).groups).toBeUndefined()
+    act(() => result.current.layers.groupNodes([]))
+    expect(layer(result).children.some((n) => n.type === 'group')).toBe(false)
     expect(onCommitHistory).not.toHaveBeenCalled()
-    act(() => result.current.selectImage('I1', 'a', 'replace'))
+    act(() => result.current.layers.selectImage('I1', 'a', 'replace'))
     onCommitHistory.mockClear()
-    act(() => result.current.selectImage('I1', 'b', 'toggle'))
-    act(() => result.current.groupPickedImages('I1'))
-    const layer = layerOf(result)
-    expect(layer.groups).toHaveLength(1)
-    expect(layer.images!.filter(i => i.groupId === layer.groups![0].id).map(i => i.id).sort()).toEqual(['a', 'b'])
+    act(() => result.current.layers.selectImage('I1', 'b', 'toggle'))
+    act(() => result.current.layers.groupNodes(result.current.layers.pickedImageIds))
+    const gid = groupId(result)
+    expect(picturesOf(result.current.tree.index.byId.get(gid)!.node).map((i) => i.id).sort()).toEqual(['a', 'b'])
     expect(onCommitHistory).toHaveBeenCalledTimes(1)
-    expect(result.current.openImageGroupId).toBe(layer.groups![0].id)
+    expect(result.current.tree.view.primaryId).toBe(gid)
   })
 
   it('a locked group is picked as a whole by a click on any member; unlocked ones are not', () => {
     const { result } = groupedFirstTwo()
-    const gid = layerOf(result).groups![0].id
-    act(() => result.current.setSelectedImageId(null))
-    act(() => result.current.selectImage('I1', 'a', 'replace'))
-    expect(result.current.pickedImageIds).toEqual(['a'])
-    act(() => result.current.setImageGroupLocked('I1', gid, true))
-    expect(layerOf(result).groups![0].locked).toBe(true)
-    act(() => result.current.setSelectedImageId(null))
-    act(() => result.current.selectImage('I1', 'a', 'replace'))
-    expect([...result.current.pickedImageIds].sort()).toEqual(['a', 'b'])
-    expect(result.current.selectedImageId).toBe('a')
+    const gid = groupId(result)
+    act(() => result.current.layers.setActiveLayerId('I1'))
+    act(() => result.current.layers.selectImage('I1', 'a', 'replace'))
+    expect(result.current.layers.pickedImageIds).toEqual(['a'])
+    act(() => result.current.layers.toggleNodeLock(gid))
+    expect(result.current.tree.index.byId.get(gid)!.node.locked).toBe(true)
+    act(() => result.current.layers.setActiveLayerId('I1'))
+    act(() => result.current.layers.selectImage('I1', 'a', 'replace'))
+    expect([...result.current.layers.pickedImageIds].sort()).toEqual(['a', 'b'])
+    expect(result.current.layers.selectedImageId).toBe('a')
   })
 
   it('selecting the group row opens it: then one member can be picked on its own, until another picture is clicked', () => {
     const { result } = groupedFirstTwo()
-    const gid = layerOf(result).groups![0].id
-    act(() => result.current.setImageGroupLocked('I1', gid, true))
-    act(() => result.current.setSelectedImageId(null))
-    act(() => result.current.selectImageGroup('I1', gid))
-    expect([...result.current.pickedImageIds].sort()).toEqual(['a', 'b'])
-    expect(result.current.openImageGroupId).toBe(gid)
-    act(() => result.current.selectImage('I1', 'b', 'replace'))
-    expect(result.current.pickedImageIds).toEqual(['b'])
-    expect(result.current.openImageGroupId).toBe(gid)
-    act(() => result.current.selectImage('I1', 'c', 'replace'))
-    expect(result.current.openImageGroupId).toBeNull()
-    act(() => result.current.selectImage('I1', 'a', 'replace'))
-    expect([...result.current.pickedImageIds].sort()).toEqual(['a', 'b'])
+    const gid = groupId(result)
+    act(() => result.current.layers.toggleNodeLock(gid))
+    act(() => result.current.layers.select(gid))
+    expect([...result.current.layers.pickedImageIds].sort()).toEqual(['a', 'b'])
+    expect(result.current.layers.openImageGroupId).toBe(gid)
+    act(() => result.current.layers.selectImage('I1', 'b', 'replace'))
+    expect(result.current.layers.pickedImageIds).toEqual(['b'])
+    expect(result.current.layers.openImageGroupId).toBe(gid)
+    act(() => result.current.layers.selectImage('I1', 'c', 'replace'))
+    expect(result.current.layers.openImageGroupId).toBeNull()
+    act(() => result.current.layers.selectImage('I1', 'a', 'replace'))
+    expect([...result.current.layers.pickedImageIds].sort()).toEqual(['a', 'b'])
   })
 
   it('Ctrl/Cmd+click on a locked group toggles all of it in or out', () => {
     const { result } = groupedFirstTwo()
-    const gid = layerOf(result).groups![0].id
-    act(() => result.current.setImageGroupLocked('I1', gid, true))
-    act(() => result.current.setSelectedImageId(null))
-    act(() => result.current.selectImage('I1', 'c', 'replace'))
-    act(() => result.current.selectImage('I1', 'a', 'toggle'))
-    expect([...result.current.pickedImageIds].sort()).toEqual(['a', 'b', 'c'])
-    act(() => result.current.selectImage('I1', 'b', 'toggle'))
-    expect(result.current.pickedImageIds).toEqual(['c'])
+    act(() => result.current.layers.toggleNodeLock(groupId(result)))
+    act(() => result.current.layers.selectImage('I1', 'c', 'replace'))
+    act(() => result.current.layers.selectImage('I1', 'a', 'toggle'))
+    expect([...result.current.layers.pickedImageIds].sort()).toEqual(['a', 'b', 'c'])
+    act(() => result.current.layers.selectImage('I1', 'b', 'toggle'))
+    expect(result.current.layers.pickedImageIds).toEqual(['c'])
   })
 
   it('ungroup keeps the pictures and drops the group', () => {
     const { result } = groupedFirstTwo()
-    const gid = layerOf(result).groups![0].id
-    act(() => result.current.ungroupImageGroup('I1', gid))
-    const layer = layerOf(result)
-    expect(layer.groups).toBeUndefined()
-    expect(layer.images).toHaveLength(4)
-    expect(layer.images!.every(i => i.groupId === undefined)).toBe(true)
-    expect(result.current.openImageGroupId).toBeNull()
+    act(() => result.current.layers.ungroupNode(groupId(result)))
+    expect(layer(result).children.every((n) => n.type === 'picture')).toBe(true)
+    expect(picturesOf(layer(result))).toHaveLength(4)
+    expect(result.current.layers.openImageGroupId).toBeNull()
   })
 
   it('renames a group, ignoring an empty name', () => {
     const { result } = groupedFirstTwo()
-    const gid = layerOf(result).groups![0].id
-    act(() => result.current.renameImageGroup('I1', gid, '  Dam wall '))
-    expect(layerOf(result).groups![0].name).toBe('Dam wall')
-    act(() => result.current.renameImageGroup('I1', gid, '   '))
-    expect(layerOf(result).groups![0].name).toBe('Dam wall')
+    const gid = groupId(result)
+    act(() => result.current.layers.renameNode(gid, '  Dam wall '))
+    expect(result.current.tree.index.byId.get(gid)!.node.name).toBe('Dam wall')
+    act(() => result.current.layers.renameNode(gid, '   '))
+    expect(result.current.tree.index.byId.get(gid)!.node.name).toBe('Dam wall')
   })
 
   it('moveImages moves several pictures by one amount in one history step', () => {
     const { result, onCommitHistory } = groupedFirstTwo()
     onCommitHistory.mockClear()
-    act(() => result.current.moveImages('I1', ['a', 'b'], 5, -3))
-    const xs = Object.fromEntries(layerOf(result).images!.map(i => [i.id, [i.x, i.y]]))
+    act(() => result.current.layers.moveImages('I1', ['a', 'b'], 5, -3))
+    const xs = Object.fromEntries(picturesOf(layer(result)).map((i) => [i.id, [i.x, i.y]]))
     expect(xs.a).toEqual([5, 61])
     expect(xs.b).toEqual([15, 61])
     expect(xs.c).toEqual([20, 64])
     expect(onCommitHistory).toHaveBeenCalledTimes(1)
   })
 
-  it('duplicating a whole group makes a new group of copies ("copy" name, same lock); the original is untouched', () => {
+  it('duplicating a whole group makes a new group of copies ("Copy" name, same lock); the original is untouched', () => {
     const { result } = groupedFirstTwo()
-    const gid = layerOf(result).groups![0].id
-    act(() => result.current.setImageGroupLocked('I1', gid, true))
-    act(() => result.current.duplicateImages('I1', ['a', 'b']))
-    const layer = layerOf(result)
-    expect(layer.groups).toHaveLength(2)
-    expect(layer.groups![1]).toMatchObject({ name: 'Group copy', locked: true })
-    expect(layer.groups![1].id).not.toBe(gid)
-    expect(layer.images!.filter(i => i.groupId === gid)).toHaveLength(2)
-    expect(layer.images!.filter(i => i.groupId === layer.groups![1].id)).toHaveLength(2)
+    const gid = groupId(result)
+    act(() => result.current.layers.toggleNodeLock(gid))
+    act(() => result.current.layers.duplicateNodes([gid]))
+    const groups = layer(result).children.filter((n): n is GroupNode => n.type === 'group')
+    expect(groups).toHaveLength(2)
+    expect(groups[1]).toMatchObject({ name: 'Group Copy', locked: true })
+    expect(groups[1].id).not.toBe(gid)
+    expect(groups[0].children).toHaveLength(2)
+    expect(groups[1].children).toHaveLength(2)
   })
 
   it('deleting its pictures keeps the group (empty); deleting the group takes its pictures', () => {
     const { result } = groupedFirstTwo()
-    act(() => result.current.deleteImages('I1', ['a', 'b']))
-    expect(layerOf(result).groups).toHaveLength(1)
+    act(() => result.current.layers.deleteNodes(['a', 'b']))
+    expect(layer(result).children.filter((n) => n.type === 'group')).toHaveLength(1)
     const again = groupedFirstTwo()
-    const gid = layerOf(again.result).groups![0].id
-    act(() => again.result.current.deleteImageGroup('I1', gid))
-    expect(layerOf(again.result).groups).toBeUndefined()
-    expect(layerOf(again.result).images!.map(i => i.id)).toEqual(['c', 'd'])
-    expect(again.result.current.pickedImageIds).toEqual([])
+    act(() => again.result.current.layers.deleteNodes([groupId(again.result)]))
+    expect(layer(again.result).children.some((n) => n.type === 'group')).toBe(false)
+    expect(picturesOf(layer(again.result)).map((i) => i.id)).toEqual(['c', 'd'])
+    expect(again.result.current.layers.pickedImageIds).toEqual([])
   })
 
   it('an empty group can be made, filled, and pictures taken back out of it', () => {
     const { result } = setup([four()])
-    let gid: string | null = null
-    act(() => { gid = result.current.createImageGroup('I1') })
-    expect(layerOf(result).groups).toEqual([{ id: gid, name: 'Group' }])
-    act(() => result.current.setImagesGroup('I1', ['c', 'd'], gid))
-    expect(layerOf(result).images!.filter(i => i.groupId === gid).map(i => i.id)).toEqual(['c', 'd'])
-    act(() => result.current.setImagesGroup('I1', ['d'], null))
-    expect(layerOf(result).images!.find(i => i.id === 'd')!.groupId).toBeUndefined()
+    act(() => result.current.layers.createNode('group', 'I1'))
+    const gid = groupId(result)
+    expect(result.current.tree.index.byId.get(gid)!.node).toMatchObject({ name: 'Group', children: [] })
+    act(() => result.current.layers.moveNodes(['c', 'd'], gid, 'inside'))
+    expect(picturesOf(result.current.tree.index.byId.get(gid)!.node).map((i) => i.id)).toEqual(['c', 'd'])
+    act(() => result.current.layers.moveNodes(['d'], gid, 'above'))
+    expect(parentOf(result, 'd')).toBe('I1')
   })
 
   it('dragging a picture in the list onto a loose one takes it out of its group; onto a member puts it in', () => {
     const { result, onCommitHistory } = groupedFirstTwo()
-    const gid = layerOf(result).groups![0].id
+    const gid = groupId(result)
     onCommitHistory.mockClear()
-    act(() => result.current.moveImageTo('I1', 'a', 'd', 'top'))
-    expect(layerOf(result).images!.find(i => i.id === 'a')!.groupId).toBeUndefined()
+    act(() => result.current.layers.moveNodes(['a'], 'd', 'above'))
+    expect(parentOf(result, 'a')).toBe('I1')
     expect(onCommitHistory).toHaveBeenCalledTimes(1)
-    act(() => result.current.moveImageTo('I1', 'c', 'b', 'bottom'))
-    expect(layerOf(result).images!.find(i => i.id === 'c')!.groupId).toBe(gid)
+    act(() => result.current.layers.moveNodes(['c'], 'b', 'below'))
+    expect(parentOf(result, 'c')).toBe(gid)
   })
 
   it('copy and paste into another image layer brings the group along as a new one', () => {
     const hook = setup([four(), imageLayer([], 'I2')])
-    act(() => hook.result.current.selectImage('I1', 'a', 'replace'))
-    act(() => hook.result.current.selectImage('I1', 'b', 'toggle'))
-    act(() => hook.result.current.groupPickedImages('I1'))
-    act(() => hook.result.current.copyImages('I1', ['a', 'b']))
-    act(() => hook.result.current.pasteImages('I2', null))
-    const target = layerOf(hook.result, 'I2')
-    expect(target.groups).toHaveLength(1)
-    expect(target.groups![0].name).toBe('Group copy')
-    expect(target.images!.every(i => i.groupId === target.groups![0].id)).toBe(true)
+    act(() => hook.result.current.layers.selectImage('I1', 'a', 'replace'))
+    act(() => hook.result.current.layers.selectImage('I1', 'b', 'toggle'))
+    act(() => hook.result.current.layers.groupNodes(hook.result.current.layers.pickedImageIds))
+    act(() => hook.result.current.layers.copyNodes([groupId(hook.result)]))
+    act(() => hook.result.current.layers.pasteNodes('I2'))
+    const target = layer(hook.result, 'I2')
+    const groups = target.children.filter((n): n is GroupNode => n.type === 'group')
+    expect(groups).toHaveLength(1)
+    expect(groups[0].name).toBe('Group Copy')
+    expect(groups[0].children).toHaveLength(2)
+    expect(drawOrderPictures(target)).toHaveLength(2)
   })
 
   it('a locked layer refuses group changes', () => {
-    const locked = makeLayer('I1', { type: 'image', name: 'Images', images: [img('a', 0), img('b', 1)], locked: true })
-    const { result } = setup([locked])
-    act(() => result.current.selectImage('I1', 'a', 'replace'))
-    act(() => result.current.selectImage('I1', 'b', 'toggle'))
-    act(() => result.current.groupPickedImages('I1'))
-    expect(layerOf(result).groups).toBeUndefined()
+    const { result } = setup([imageLayer([img('a', 0), img('b', 1)], 'I1', { locked: true })])
+    act(() => result.current.layers.selectImage('I1', 'a', 'replace'))
+    act(() => result.current.layers.selectImage('I1', 'b', 'toggle'))
+    act(() => result.current.layers.groupNodes(result.current.layers.pickedImageIds))
+    expect(layer(result).children.some((n) => n.type === 'group')).toBe(false)
   })
 })

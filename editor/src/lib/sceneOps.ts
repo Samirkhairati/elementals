@@ -208,6 +208,17 @@ export function patchNode(nodes: SceneNode[], id: string, patch: Record<string, 
   })
 }
 
+// ── locks ──────────────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Whether a place (the path from the root to a container) is locked: it, or something above it, has its lock on. A locked
+ * group inside an image layer is not counted: that lock only makes a click on its pictures pick the group as a whole.
+ */
+export function isLockedPlace(path: readonly SceneNode[]): boolean {
+  const imageAt = path.findIndex((n) => n.type === 'image')
+  return path.some((n, i) => n.locked === true && !(n.type === 'group' && imageAt !== -1 && i > imageAt))
+}
+
 // ── groups, deleting ───────────────────────────────────────────────────────────────────────────────
 
 /** Ids of `ids` that are not inside another id of the list (copying or deleting a group already takes what is inside it). */
@@ -229,6 +240,7 @@ export function groupNodes(nodes: SceneNode[], ids: readonly string[], groupId: 
   const parentId = places[0].parent?.id ?? null
   if (places.some((at) => (at.parent?.id ?? null) !== parentId)) return { nodes, group: null }
   const parentPath = places[0].ancestors
+  if (isLockedPlace(parentPath)) return { nodes, group: null }
   const group: SceneNode = { id: groupId, type: 'group', name, children: places.sort((a, b) => a.index - b.index).map((at) => at.node) }
   if (!canPlace(parentPath, group)) return { nodes, group: null }
   const at = Math.max(...places.map((p) => p.index))
@@ -244,6 +256,7 @@ export function ungroupNode(nodes: SceneNode[], groupId: string): SceneNode[] {
   const at = locate(nodes, groupId)
   if (!at || at.node.type !== 'group') return nodes
   const group = at.node
+  if (isLockedPlace(at.ancestors)) return nodes
   if (!group.children.every((c) => canPlace(at.ancestors, c, nodes, groupId))) return nodes
   const parentId = at.parent?.id ?? null
   const without = removeNodes(nodes, [groupId])
@@ -304,16 +317,17 @@ function destinationFor(
   const at = targetId ? locate(nodes, targetId) : undefined
   if (at) {
     const path = [...at.ancestors, at.node]
-    if (mode === 'inside' && isContainer(at.node) && canPlace(path, node, nodes)) return { parentId: at.node.id }
+    if (mode === 'inside' && isContainer(at.node) && !isLockedPlace(path) && canPlace(path, node, nodes)) return { parentId: at.node.id }
     // Beside: climb until a container can take it, putting it right next to the node we came from.
     let child: SceneNode = at.node
     for (let i = path.length - 2; i >= -1; i--) {
       const parentPath = path.slice(0, i + 1)
-      if (canPlace(parentPath, node, nodes)) {
+      if (!isLockedPlace(parentPath) && canPlace(parentPath, node, nodes)) {
         const parent = parentPath[parentPath.length - 1] as ContainerNode | undefined
         const siblings = parent ? parent.children : nodes
         const idx = siblings.indexOf(child)
-        const below = node.type !== 'entity' && node.type !== 'picture' && node.type !== 'collisionShape'
+        // Layers and groups go below, pictures (and groups of pictures), entities and shapes above.
+        const below = node.type !== 'entity' && node.type !== 'picture' && node.type !== 'collisionShape' && !(node.type === 'group' && parentPath.some((n) => n.type === 'image'))
         return { parentId: parent?.id ?? null, index: below ? idx : idx + 1 }
       }
       child = parentPath[parentPath.length - 1]
@@ -381,9 +395,9 @@ export function pasteCopies(nodes: SceneNode[], copies: readonly SceneNode[], ta
 export function duplicateNodes(nodes: SceneNode[], ids: readonly string[], newId: () => string): { nodes: SceneNode[]; ids: string[] } {
   const copies = copiesOf(nodes, ids)
   if (copies.length === 0) return { nodes, ids: [] }
-  const layerLike = copies.every((c) => c.type !== 'entity' && c.type !== 'picture' && c.type !== 'collisionShape')
   const order = walk(nodes)
   const originals = copies.map((c) => order.find((e) => e.node.id === c.id)).filter((e): e is NonNullable<typeof e> => !!e)
+  const layerLike = originals.every(({ node, ancestors }) => node.type !== 'entity' && node.type !== 'picture' && node.type !== 'collisionShape' && !(node.type === 'group' && ancestors.some((a) => a.type === 'image')))
   const anchor = layerLike ? originals[0] : originals[originals.length - 1]
   return pasteCopies(nodes, copies, anchor.node.id, newId, { mode: 'beside' })
 }
@@ -415,7 +429,7 @@ export function canDrop(nodes: readonly SceneNode[], ids: readonly string[], tar
     if (place.parentPath.some((n) => n.id === id)) return false
     // A tiles item is only reordered inside its own layer.
     if (at.node.type === 'collisionTiles' && (at.parent?.id ?? null) !== (place.parentPath[place.parentPath.length - 1]?.id ?? null)) return false
-    return canPlace(place.parentPath, at.node, nodes as SceneNode[], id)
+    return !isLockedPlace(place.parentPath) && canPlace(place.parentPath, at.node, nodes as SceneNode[], id)
   })
 }
 
