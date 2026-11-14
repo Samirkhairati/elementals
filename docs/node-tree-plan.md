@@ -1,6 +1,6 @@
 # One node tree for maps: migration plan
 
-Status: **plan, nothing implemented yet**. Goal: replace the map's mix of layers, folders, picture groups, the
+Status: **being implemented on `feat/node-tree`** (see "Implementation decisions" at the end; they win where they differ from the text above). Goal: replace the map's mix of layers, folders, picture groups, the
 Entities row, entity folders and collision items with **one tree of nodes**, the way Godot's scene tree works. Every
 node type gets the same treatment: one row, one menu, one inspector, one selection, and the same inherited properties.
 
@@ -168,3 +168,67 @@ Each phase can ship on its own and ends with `npm run verify` and a look in the 
    (gameplay grouping only)? Recommendation: any group. This is the point of the change.
 3. **Terrain and encounters.** Keep them as one-per-map nodes, or turn them into properties of the map root?
    Recommendation: nodes, so they get the eye, lock and order like everything else.
+
+## Implementation decisions (feat/node-tree)
+
+The three questions above are settled with the recommendations: the panel keeps today's order (top row drawn on top),
+entities may sit in any group, terrain and encounters are one-per-map nodes. Where this section differs from the text
+above, this section wins.
+
+### Node shape
+
+* Fields live **on the node** (a discriminated union on `type`), not in a `props` bag, so a tile node is shaped like
+  today's tile layer (`data`, `z`, `look`) and paint code keeps working on it.
+* Common to every node: `id`, `type`, `name`, `visible?` (absent = shown), `locked?`. Containers also have
+  `children: SceneNode[]` and `collapsed?` (list view state, not an undo step, as folders today).
+* Children are stored **in draw order: the first child draws first** (at the back). The panel lists a container's
+  children last-first, so the top row is the one drawn on top, exactly as the layer list is today.
+* Types (`SceneNodeType`):
+
+| type | holds | own fields |
+|---|---|---|
+| `group` | anything its place allows (see rules) | `ySort?`, later `opacity?`, `look?` |
+| `tile` | — | `data`, `z?`, `look?` |
+| `image` (image layer) | `picture`, `group` | `z?`, `ySort?`, `look?` |
+| `picture` | — | today's image item fields: `assetId?` / `graphicId?`, `crop?`, `x`, `y`, `z?`, `scale?`, `flipX?`, `flipY?`, `opacity?`, `ySort?`, `look?` |
+| `collision` | `collisionTiles`, `collisionShape` | `data` (cells, `group` = a `collisionTiles` id, as today), `z?` |
+| `collisionTiles` | — | (its cells are the parent's `data` cells whose `group` is its id) |
+| `collisionShape` | — | today's `CollisionShape` fields (`points`, `closed`, ...) |
+| `terrain`, `encounters` | — | `data`, `z?` (one of each per map) |
+| `objects` | — | `data`, `z?` (kept for old maps) |
+| `entity` | — | `x`, `y`, `components` (the node id is the entity id; `visible` is the node's) |
+
+* **Image layers stay a node type.** Pictures only live inside an image layer (directly or in groups below it); a group
+  inside an image layer holds only pictures and groups. This keeps the export (one `kind=image` object group per image
+  layer) and the game unchanged.
+* **Placement rules** (`canHold(parentPath, childType)`): root and groups that are not inside an image or collision
+  layer hold every type but `picture`, `collisionTiles` and `collisionShape`; an image layer (and groups below it) hold
+  `picture` and `group`; a collision layer holds `collisionTiles` and `collisionShape`; leaves hold nothing; at most one
+  `terrain` and one `encounters` per map.
+* The map root is the map itself: `map.nodes` are its children; the map keeps `name`, size, `settings`, `look`.
+
+### Storage
+
+* `SCHEMA_VERSION` becomes 6. A v6 map has `nodes` and no `layers`, `entities`, `entityFolders`, `entitiesIndex`.
+* `migrateToNodeTree` (pure, idempotent, deterministic ids for anything it creates) converts v5 and older:
+  layers (top first) become root nodes in draw order (reversed); a folder becomes a group holding its `folderId`
+  layers; an image layer's `images` become `picture` children and its `groups` become groups holding their members
+  (a group sits where its first member was in draw order; empty groups go to the front); collision `tileGroups` and
+  `shapes` become children; all entities go into one group named "Entities" placed so that `entitiesIndex` layers are
+  above it (missing = on top); entity folders become groups inside it (`expanded: false` = collapsed), in the old
+  entity order. The editor-only entity field `folder` is dropped.
+* The exporter walks the tree and writes the same Tiled JSON as before: inherited visibility and y-sort folded into
+  each exported layer / picture. A golden test exports every map in `project/maps` and `shared/fixtures` through the
+  v5 exporter (fixtures captured before the change) and through migration + the new exporter: the outputs must be
+  equal except the stamped `schemaVersion` (5 → 6) and the dropped editor-only `folder` key of entities.
+
+### Editor
+
+* `MapData.nodes` is the source of truth; managers, history snapshots, autosave and the canvas work on it.
+  Flat read-only views (all entities, the layer nodes in list order, all pictures of an image layer) are derived and
+  memoised by the tree's identity, never stored.
+* The canvas walks the tree: tile, image and collision layers draw as today, entity sprites draw where the entity sits
+  in the tree (a run of neighbouring entities is sorted among itself as the Entities row sorts today).
+* One Scene panel (`SceneTree.tsx`) replaces the Layers list, the Entities rows and the picture/collision item lists;
+  the Images and Collision panels keep their tools as the inspectors of the selected picture / collision node.
+* Old saved dock layouts: `images` / `collision` list panels that no longer exist close on load, like `entities` today.
