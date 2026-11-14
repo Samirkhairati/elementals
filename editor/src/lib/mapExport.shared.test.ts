@@ -7,7 +7,7 @@ import { collectUsedTilesetIds, convertEditorMapToTiled, serializeTiledMap } fro
 import { readPngSize } from '../../../shared/png'
 import { validateTiledMap } from '../../../shared/mapSchema'
 import type { EditorMap, TilesetInfo } from '../../../shared/mapTypes'
-import { migrateMap } from '../../../shared/engine/migrate'
+import { migrateMapToLegacy } from '../../../shared/engine/migrate'
 
 // ── Reference implementation ────────────────────────────────────────────────
 // Verbatim copy of the conversion that lived in hooks/useExportMap.ts before it moved to
@@ -119,8 +119,9 @@ function legacyConvert(mapToExport: any, tilesets: TilesetInfo[]) {
     type: 'map',
     version: '1.10',
     width: mapToExport.width,
-    schemaVersion: 5,
-    entities: migrateMap(mapToExport).value.entities || [],
+    // The only differences from the hook: maps are schema 6 now (nodes), and the editor-only entity `folder` is not kept.
+    schemaVersion: 6,
+    entities: (migrateMapToLegacy(mapToExport).value.entities || []).map(({ folder: _folder, ...entity }: any) => entity),
   }
   return JSON.stringify(tiledMap, null, 2)
 }
@@ -229,7 +230,7 @@ describe('convertEditorMapToTiled: golden equivalence with the legacy export hoo
       // The legacy hook predates image layers (their export is covered in imageLayer.shared.test.ts), and so do folders (editor-only rows), so compare the rest.
       // It also predates the pixel size and map settings (map properties, covered in the shared export tests).
       const { pixelWidth: _w, pixelHeight: _h, settings: _s, ...rest } = full
-      const map = { ...rest, layers: full.layers.filter((l) => l.type !== 'image' && l.type !== 'folder' && l.type !== 'polygons') }
+      const map = { ...rest, layers: full.layers!.filter((l) => l.type !== 'image' && l.type !== 'folder' && l.type !== 'polygons') }
       expect(serializeTiledMap(convertEditorMapToTiled(map, tilesets))).toBe(legacyConvert(map, tilesets))
     }
   })
@@ -283,7 +284,7 @@ describe('convertEditorMapToTiled: structure', () => {
   it('carries canonical entities over unchanged and stamps the schema version', () => {
     // Already canonical (Transform + Tag only): nothing to migrate.
     expect(tiled.entities).toEqual(SYNTHETIC.multiTilesetAndCollision.entities)
-    expect(tiled.schemaVersion).toBe(5)
+    expect(tiled.schemaVersion).toBe(6)
   })
 
   it('migrates legacy entities on export (the game only ever sees canonical components)', () => {
@@ -303,7 +304,7 @@ describe('convertEditorMapToTiled: structure', () => {
       ],
     }
     const out = convertEditorMapToTiled(legacy, [])
-    expect(out.schemaVersion).toBe(5)
+    expect(out.schemaVersion).toBe(6)
     expect(Object.keys(out.entities[0].components)).toEqual(['Transform', 'Event'])
     expect(JSON.stringify(out.entities)).not.toContain('Interactable')
     // idempotent: exporting the already exported entities changes nothing

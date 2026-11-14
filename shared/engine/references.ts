@@ -5,6 +5,8 @@
 
 import type { CharacterDef } from './characters.ts';
 import { isRecord } from './util.ts';
+import type { SceneNode } from '../sceneTree.ts';
+import { allEntities, layerNodesInListOrder, mapTree, picturesOf } from '../sceneTree.ts';
 
 export type RefTarget =
   | { table: 'character'; id: string; clip?: string }
@@ -26,12 +28,35 @@ export interface Reference {
   label: string;
 }
 
-/** The slice of a map the index reads (an editor `MapData` fits). */
+type RefLayer = { name: string; type?: string; data?: Record<number, { tilesetId: string }>; images?: { id: string; assetId?: string; graphicId?: string }[] };
+type RefEntity = { id: string; name: string; components?: Record<string, unknown> };
+
+/**
+ * The slice of a map the index reads (an editor `MapData` fits). A schema 6 map has `nodes` (the tree, shared/sceneTree.ts)
+ * and is read through them; an older one has `layers` and `entities`.
+ */
 export interface RefMap {
   fileName: string;
   name: string;
-  layers?: { name: string; type?: string; data?: Record<number, { tilesetId: string }>; images?: { id: string; assetId?: string; graphicId?: string }[] }[];
-  entities?: { id: string; name: string; components?: Record<string, unknown> }[];
+  layers?: RefLayer[];
+  entities?: RefEntity[];
+  nodes?: SceneNode[];
+}
+
+/** The layers of a map as the layer list shows them (top first), whichever schema it is. */
+function refLayers(map: RefMap): RefLayer[] {
+  if (!map.nodes) return map.layers ?? [];
+  return layerNodesInListOrder(map.nodes).map((n) => ({
+    name: n.name,
+    type: n.type,
+    ...('data' in n && n.data ? { data: n.data as RefLayer['data'] } : {}),
+    ...(n.type === 'image' ? { images: picturesOf(n) } : {}),
+  }));
+}
+
+/** Every entity of a map, whichever schema it is. */
+function refEntities(map: RefMap): RefEntity[] {
+  return map.nodes ? allEntities(map.nodes) : (map.entities ?? []);
 }
 
 export interface RefPrefab {
@@ -89,14 +114,16 @@ export function buildReferenceIndex(input: ReferenceInput): ReferenceIndex {
 
   for (const map of input.maps) {
     const mapName = map.name || map.fileName;
-    const byId = new Map((map.entities ?? []).map((e) => [e.id, e]));
-    for (const layer of map.layers ?? []) {
+    const entities = refEntities(map);
+    const layers = refLayers(map);
+    const byId = new Map(entities.map((e) => [e.id, e]));
+    for (const layer of layers) {
       const used = new Set(Object.values(layer.data ?? {}).map((t) => t.tilesetId));
       for (const id of used) {
         all.push({ target: { table: 'tileset', id }, source: { table: 'map', mapFile: map.fileName, mapName, entityId: '', entityName: '', layer: layer.name }, where: 'tileset-layer', label: `${mapName} › layer ${layer.name}` });
       }
     }
-    for (const layer of map.layers ?? []) {
+    for (const layer of layers) {
       for (const item of layer.images ?? []) {
         const source = { table: 'map' as const, mapFile: map.fileName, mapName, entityId: item.id, entityName: `image in ${layer.name}`, layer: layer.name };
         const label = `${mapName} › layer ${layer.name} › image`;
@@ -104,7 +131,7 @@ export function buildReferenceIndex(input: ReferenceInput): ReferenceIndex {
         else if (item.assetId) addCharacter(item.assetId, '', source, 'image-layer', label);
       }
     }
-    for (const entity of map.entities ?? []) {
+    for (const entity of entities) {
       const entityName = entity.name || entity.id;
       const base = { table: 'map' as const, mapFile: map.fileName, mapName, entityId: entity.id, entityName };
       const sprite = spriteOf(entity);
@@ -178,7 +205,12 @@ export function buildReferenceIndex(input: ReferenceInput): ReferenceIndex {
 // ── rewrites (safe rename) ──────────────────────────────────────────────────────────────────────
 
 /** Deep-maps the entities of a map through `fn`; returns the same map object when nothing changed. */
-function rewriteEntities<M extends RefMap>(map: M, fn: (entity: NonNullable<M['entities']>[number], self: Map<string, NonNullable<M['entities']>[number]>) => NonNullable<M['entities']>[number]): { map: M; changed: boolean } {
+function rewriteEntities<M extends RefMap>(map: M, fn: (entity: RefEntity, self: Map<string, RefEntity>) => RefEntity): { map: M; changed: boolean } {
+  if (map.nodes) {
+    const byId = new Map(allEntities(map.nodes).map((e) => [e.id, e as RefEntity]));
+    const nodes = mapTree(map.nodes, (node) => (node.type === 'entity' ? (fn(node as RefEntity, byId) as unknown as SceneNode) : node));
+    return nodes === map.nodes ? { map, changed: false } : { map: { ...map, nodes }, changed: true };
+  }
   if (!map.entities) return { map, changed: false };
   const byId = new Map(map.entities.map((e) => [e.id, e]));
   let changed = false;
@@ -217,6 +249,10 @@ function mapNodes(state: Record<string, unknown>, fn: (node: Record<string, unkn
 
 /** Maps the items of every image layer through `fn` (same item back = unchanged); the map object is kept when nothing changed. */
 function rewriteImageItems<M extends RefMap>(map: M, fn: (item: { id: string; assetId?: string; graphicId?: string }) => { id: string; assetId?: string; graphicId?: string }): { map: M; changed: boolean } {
+  if (map.nodes) {
+    const nodes = mapTree(map.nodes, (node) => (node.type === 'picture' ? (fn(node) as unknown as SceneNode) : node));
+    return nodes === map.nodes ? { map, changed: false } : { map: { ...map, nodes }, changed: true };
+  }
   if (!map.layers) return { map, changed: false };
   let changed = false;
   const layers = map.layers.map((layer) => {
@@ -241,12 +277,20 @@ export function rewriteMapGraphicId<M extends RefMap>(map: M, from: string, to: 
 
 /** Points every tile painted from the tileset `from` (its file name) at `to`. */
 export function rewriteTilesetId<M extends RefMap>(map: M, from: string, to: string): { map: M; changed: boolean } {
+  const retile = <L extends { data?: Record<number, { tilesetId: string }> }>(layer: L): L => {
+    if (!layer.data || !Object.values(layer.data).some((t) => t.tilesetId === from)) return layer;
+    return { ...layer, data: Object.fromEntries(Object.entries(layer.data).map(([k, t]) => [k, t.tilesetId === from ? { ...t, tilesetId: to } : t])) };
+  };
+  if (map.nodes) {
+    const nodes = mapTree(map.nodes, (node) => (node.type === 'tile' || node.type === 'terrain' || node.type === 'encounters' || node.type === 'objects' || node.type === 'collision' ? retile(node as never) : node));
+    return nodes === map.nodes ? { map, changed: false } : { map: { ...map, nodes }, changed: true };
+  }
   if (!map.layers) return { map, changed: false };
   let changed = false;
   const layers = map.layers.map((layer) => {
-    if (!layer.data || !Object.values(layer.data).some((t) => t.tilesetId === from)) return layer;
-    changed = true;
-    return { ...layer, data: Object.fromEntries(Object.entries(layer.data).map(([k, t]) => [k, t.tilesetId === from ? { ...t, tilesetId: to } : t])) };
+    const next = retile(layer);
+    if (next !== layer) changed = true;
+    return next;
   });
   return changed ? { map: { ...map, layers }, changed } : { map, changed };
 }

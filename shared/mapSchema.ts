@@ -9,6 +9,8 @@ import type { EntityLike } from './engine/migrate.ts'
 import { validateEntity } from './engine/validate.ts'
 import { isRecord } from './engine/util.ts'
 import { minPoints } from './collisionShapes.ts'
+import { NODE_TYPES, canHold } from './sceneTree.ts'
+import type { SceneNode, SceneNodeType } from './sceneTree.ts'
 
 /** Mirrors `LayerType` in editor/src/types/editor.ts (checked at compile time by the editor tests). */
 export const LAYER_TYPES = ['tile', 'collision', 'terrain', 'objects', 'encounters', 'image', 'folder'] as const
@@ -144,6 +146,32 @@ function validateGroups(groups: unknown, label: string, errors: string[]): Set<s
   return ids
 }
 
+/** What one picture (an `images` item or a picture node) must look like: its sprite or graphic, position, crop, flags and look. */
+function validatePicture(item: Rec, ip: string, errors: string[], warnings: string[], groupIds?: ReadonlySet<string>): void {
+  const hasAsset = item.assetId !== undefined && item.assetId !== ''
+  const hasGraphic = item.graphicId !== undefined && item.graphicId !== ''
+  if (hasAsset === hasGraphic) errors.push(`${ip}: needs exactly one of assetId (a sprite) and graphicId (a picture)`)
+  else if ((hasAsset && typeof item.assetId !== 'string') || (hasGraphic && typeof item.graphicId !== 'string')) errors.push(`${ip}: assetId / graphicId must be a string`)
+  if (!isFiniteNumber(item.x) || !isFiniteNumber(item.y)) errors.push(`${ip}: x/y must be finite numbers`)
+  if (item.name !== undefined && typeof item.name !== 'string') errors.push(`${ip}: name must be a string`)
+  if (item.crop !== undefined) {
+    const c = item.crop
+    if (!hasGraphic) errors.push(`${ip}: only a picture (graphicId) can be cropped`)
+    else if (!isRecord(c) || !Number.isInteger(c.x) || !Number.isInteger(c.y) || !Number.isInteger(c.w) || !Number.isInteger(c.h) || (c.x as number) < 0 || (c.y as number) < 0 || (c.w as number) < 1 || (c.h as number) < 1) {
+      errors.push(`${ip}: crop must be whole numbers x, y >= 0 and w, h >= 1`)
+    }
+  }
+  if (item.ySort !== undefined && typeof item.ySort !== 'boolean') errors.push(`${ip}: ySort must be true or false`)
+  if (item.look !== undefined && !isRecord(item.look)) errors.push(`${ip}: look must be an object`)
+  if (item.groupId !== undefined && typeof item.groupId !== 'string') errors.push(`${ip}: groupId must be a string`)
+  else if (typeof item.groupId === 'string' && groupIds && !groupIds.has(item.groupId)) warnings.push(`${ip}: groupId ${JSON.stringify(item.groupId)} is not one of the layer's groups; it is ignored`)
+  if (item.z !== undefined && !isFiniteNumber(item.z)) errors.push(`${ip}: z must be a finite number`)
+  if (item.scale !== undefined && (!isFiniteNumber(item.scale) || item.scale <= 0)) errors.push(`${ip}: scale must be a positive number`)
+  if (item.opacity !== undefined && (!isFiniteNumber(item.opacity) || item.opacity < 0 || item.opacity > 1)) {
+    warnings.push(`${ip}: opacity should be between 0 and 1`)
+  }
+}
+
 function validateImages(images: unknown, label: string, errors: string[], warnings: string[], groupIds: ReadonlySet<string> = new Set()) {
   if (!Array.isArray(images)) {
     errors.push(`${label}: images must be an array`)
@@ -159,29 +187,230 @@ function validateImages(images: unknown, label: string, errors: string[], warnin
     if (typeof item.id !== 'string' || item.id.length === 0) errors.push(`${ip}: id must be a non-empty string`)
     else if (seen.has(item.id)) errors.push(`${ip}: duplicate image id "${item.id}"`)
     else seen.add(item.id)
-    const hasAsset = item.assetId !== undefined && item.assetId !== ''
-    const hasGraphic = item.graphicId !== undefined && item.graphicId !== ''
-    if (hasAsset === hasGraphic) errors.push(`${ip}: needs exactly one of assetId (a sprite) and graphicId (a picture)`)
-    else if ((hasAsset && typeof item.assetId !== 'string') || (hasGraphic && typeof item.graphicId !== 'string')) errors.push(`${ip}: assetId / graphicId must be a string`)
-    if (!isFiniteNumber(item.x) || !isFiniteNumber(item.y)) errors.push(`${ip}: x/y must be finite numbers`)
-    if (item.name !== undefined && typeof item.name !== 'string') errors.push(`${ip}: name must be a string`)
-    if (item.crop !== undefined) {
-      const c = item.crop
-      if (!hasGraphic) errors.push(`${ip}: only a picture (graphicId) can be cropped`)
-      else if (!isRecord(c) || !Number.isInteger(c.x) || !Number.isInteger(c.y) || !Number.isInteger(c.w) || !Number.isInteger(c.h) || (c.x as number) < 0 || (c.y as number) < 0 || (c.w as number) < 1 || (c.h as number) < 1) {
-        errors.push(`${ip}: crop must be whole numbers x, y >= 0 and w, h >= 1`)
+    validatePicture(item, ip, errors, warnings, groupIds)
+  })
+}
+
+/** One entity of `entities` (or an entity node): id, name, position, components and, on the migrated entity, the engine's own checks. */
+function validateEntityRecord(entity: Rec, label: string, seen: Set<string>, options: ValidateEditorMapOptions, errors: string[], warnings: string[]): void {
+  if (typeof entity.id !== 'string' || entity.id.length === 0) {
+    errors.push(`${label}: id must be a non-empty string`)
+  } else if (seen.has(entity.id)) {
+    errors.push(`${label}: duplicate entity id "${entity.id}"`)
+  } else {
+    seen.add(entity.id)
+  }
+  if (typeof entity.name !== 'string') errors.push(`${label}: name must be a string`)
+  if (!isFiniteNumber(entity.x) || !isFiniteNumber(entity.y)) {
+    errors.push(`${label}: x/y must be finite numbers`)
+  }
+  if (!isRecord(entity.components)) {
+    errors.push(`${label}: components must be an object`)
+    return
+  }
+  for (const [type, props] of Object.entries(entity.components)) {
+    if (!(COMPONENT_TYPES as readonly string[]).includes(type) && !(LEGACY_COMPONENT_TYPES as readonly string[]).includes(type)) {
+      errors.push(`${label}: unknown component type "${type}"`)
+      continue
+    }
+    if (!isRecord(props)) {
+      errors.push(`${label}: component ${type} must be an object`)
+      continue
+    }
+    checkFinite(props, `${label}: ${type}`, errors)
+  }
+  if (entity.x !== undefined || entity.y !== undefined) {
+    const transform = entity.components.Transform
+    if (!isRecord(transform)) {
+      errors.push(`${label}: has x/y but no Transform component`)
+    }
+  }
+
+  // Canonical-component checks run on the migrated entity, so legacy maps are judged by what
+  // the exporter will actually write.
+  const legacy = listLegacyComponents(entity)
+  if (legacy.length > 0) {
+    warnings.push(`${label}: uses legacy components (${legacy.join(', ')}); they are converted to Sprite/Movement/Event on load and export`)
+  }
+  try {
+    const migrated = migrateEntity(entity as EntityLike).value
+    const nonFinite = errors.some((e) => e.startsWith(`${label}: `) && e.endsWith('is not a finite number'))
+    for (const issue of validateEntity(migrated, options.context)) {
+      if (RAW_COVERED_CODES.has(issue.code)) continue
+      if (nonFinite && issue.code === 'bad-prop' && issue.message.endsWith('must be a number')) continue
+      const text = `${label}: ${issue.message} (${issue.path})`
+      if (issue.severity === 'error') errors.push(text)
+      else warnings.push(text)
+    }
+  } catch (e) {
+    errors.push(`${label}: could not be checked (${e instanceof Error ? e.message : String(e)})`)
+  }
+}
+
+interface CellContext {
+  cellCount: number | null
+  tilesets: ValidateEditorMapOptions['tilesets']
+  tilesetByFile: Map<string, { name?: string; width?: number; height?: number }>
+  /** tileset display name -> the first file name using it (two files sharing a name collapse into one on export). */
+  usedTilesetNames: Map<string, string>
+}
+
+/** The painted cells (`data`) of a layer: keys, tiles and, with a tileset list, that every tile exists in its tileset. */
+function validateCells(data: unknown, isCollision: boolean, label: string, ctx: CellContext, errors: string[], warnings: string[]): void {
+  if (data === undefined) return
+  if (!isRecord(data)) {
+    errors.push(`${label}: data must be an object keyed by tile index`)
+    return
+  }
+  for (const [key, tile] of Object.entries(data)) {
+    const tp = `${label}: tile "${key}"`
+    if (!/^(0|[1-9][0-9]*)$/.test(key)) {
+      errors.push(`${tp}: key is not a non-negative integer`)
+      continue
+    }
+    const idx = Number(key)
+    if (ctx.cellCount !== null && idx >= ctx.cellCount) {
+      errors.push(`${tp}: index out of range (map has ${ctx.cellCount} cells)`)
+    }
+    if (!isRecord(tile)) {
+      errors.push(`${tp}: tile is not an object`)
+      continue
+    }
+    if (typeof tile.tilesetId !== 'string' || tile.tilesetId.length === 0) {
+      errors.push(`${tp}: tilesetId must be a non-empty string`)
+      continue
+    }
+    if (!isNonNegInt(tile.x) || !isNonNegInt(tile.y)) {
+      errors.push(`${tp}: x/y must be non-negative integers`)
+      continue
+    }
+    if (isCollision) continue
+    if (tile.tilesetId === COLLISION_TILESET_ID) {
+      warnings.push(`${tp}: "${COLLISION_TILESET_ID}" tile on a non-collision layer is dropped on export`)
+      continue
+    }
+    if (ctx.tilesets) {
+      const ts = ctx.tilesetByFile.get(tile.tilesetId)
+      if (!ts) {
+        errors.push(`${tp}: unknown tileset "${tile.tilesetId}"`)
+        continue
+      }
+      if (ts.width === 0 || ts.height === 0) {
+        errors.push(`${tp}: tileset "${tile.tilesetId}" has no readable image`)
+        continue
+      }
+      if (ts.width && ts.height) {
+        const cols = Math.floor(ts.width / 32)
+        const rows = Math.floor(ts.height / 32)
+        if (tile.x >= cols || tile.y >= rows) {
+          errors.push(`${tp}: (${tile.x},${tile.y}) is outside tileset "${tile.tilesetId}" (${cols}x${rows} tiles)`)
+        }
       }
     }
-    if (item.ySort !== undefined && typeof item.ySort !== 'boolean') errors.push(`${ip}: ySort must be true or false`)
-    if (item.look !== undefined && !isRecord(item.look)) errors.push(`${ip}: look must be an object`)
-    if (item.groupId !== undefined && typeof item.groupId !== 'string') errors.push(`${ip}: groupId must be a string`)
-    else if (typeof item.groupId === 'string' && !groupIds.has(item.groupId)) warnings.push(`${ip}: groupId ${JSON.stringify(item.groupId)} is not one of the layer's groups; it is ignored`)
-    if (item.z !== undefined && !isFiniteNumber(item.z)) errors.push(`${ip}: z must be a finite number`)
-    if (item.scale !== undefined && (!isFiniteNumber(item.scale) || item.scale <= 0)) errors.push(`${ip}: scale must be a positive number`)
-    if (item.opacity !== undefined && (!isFiniteNumber(item.opacity) || item.opacity < 0 || item.opacity > 1)) {
-      warnings.push(`${ip}: opacity should be between 0 and 1`)
+  }
+  if (ctx.tilesets) {
+    // Two used tilesets sharing a display name collapse into one on export.
+    const seenHere = new Set<string>()
+    for (const tile of Object.values(data)) {
+      if (!isRecord(tile) || typeof tile.tilesetId !== 'string' || seenHere.has(tile.tilesetId)) continue
+      seenHere.add(tile.tilesetId)
+      const ts = ctx.tilesetByFile.get(tile.tilesetId)
+      if (isCollision || !ts || typeof ts.name !== 'string') continue
+      const prev = ctx.usedTilesetNames.get(ts.name)
+      if (prev === undefined) ctx.usedTilesetNames.set(ts.name, tile.tilesetId)
+      else if (prev !== tile.tilesetId) {
+        errors.push(`tilesets "${prev}" and "${tile.tilesetId}" share the name "${ts.name}"; their tiles would be mixed up on export`)
+      }
     }
+  }
+}
+
+/** A shape node: `closed` and finite `points` (too few to collide is a warning, the shape is dropped on export). */
+function validateShapeNode(node: Rec, label: string, errors: string[], warnings: string[]): void {
+  if (typeof node.closed !== 'boolean') errors.push(`${label}: closed must be a boolean`)
+  if (!Array.isArray(node.points)) {
+    errors.push(`${label}: points must be an array`)
+    return
+  }
+  node.points.forEach((p, j) => {
+    if (!isRecord(p) || !isFiniteNumber(p.x) || !isFiniteNumber(p.y)) errors.push(`${label} point ${j}: x and y must be finite numbers`)
   })
+  if (node.points.length < minPoints(node.closed !== false)) warnings.push(`${label}: too few points to collide; it is dropped on export`)
+}
+
+/**
+ * The `nodes` of a schema 6 map: every node has a unique id, a name and a known type, sits where the placement rules allow
+ * (`canHold` in shared/sceneTree.ts) and has the fields of its type in the right shape.
+ */
+function validateNodes(nodes: unknown[], cellCtx: CellContext, options: ValidateEditorMapOptions, errors: string[], warnings: string[]): void {
+  const seenIds = new Set<string>()
+  const exportedNames = new Map<string, number>()
+  const counts: Record<string, number> = {}
+  let anyCollision = false
+
+  const visit = (list: unknown[], path: SceneNode[], at: string) => {
+    list.forEach((node: unknown, i: number) => {
+      const np = `${at}[${i}]`
+      if (!isRecord(node)) {
+        errors.push(`${np} is not an object`)
+        return
+      }
+      const label = typeof node.name === 'string' ? `${np} ("${node.name}")` : np
+      if (typeof node.id !== 'string' || node.id.length === 0) errors.push(`${label}: id must be a non-empty string`)
+      else if (seenIds.has(node.id)) errors.push(`${label}: duplicate node id "${node.id}"`)
+      else seenIds.add(node.id)
+      if (typeof node.name !== 'string') errors.push(`${label}: name must be a string`)
+      if (typeof node.type !== 'string' || !Object.hasOwn(NODE_TYPES, node.type)) {
+        errors.push(`${label}: unknown node type ${JSON.stringify(node.type)} (expected one of ${Object.keys(NODE_TYPES).join(', ')})`)
+        return
+      }
+      const type = node.type as SceneNodeType
+      counts[type] = (counts[type] ?? 0) + 1
+      if (node.visible !== undefined && typeof node.visible !== 'boolean') errors.push(`${label}: visible must be a boolean`)
+      if (node.locked !== undefined && typeof node.locked !== 'boolean') errors.push(`${label}: locked must be a boolean`)
+      if (node.collapsed !== undefined && typeof node.collapsed !== 'boolean') errors.push(`${label}: collapsed must be a boolean`)
+      if (node.ySort !== undefined && typeof node.ySort !== 'boolean') errors.push(`${label}: ySort must be a boolean`)
+      if (node.z !== undefined && !isFiniteNumber(node.z)) errors.push(`${label}: z must be a finite number`)
+      if (!canHold(path, type)) {
+        const parent = path[path.length - 1]
+        errors.push(`${label}: a ${type} node cannot sit ${parent ? `in a ${parent.type} node` : 'at the top of the map'}`)
+      }
+
+      if (node.look !== undefined) {
+        if (!isRecord(node.look)) errors.push(`${label}: look must be an object`)
+        else if (type !== 'tile' && type !== 'image' && type !== 'picture') warnings.push(`${label}: only tile and image layers and pictures have a look; it is dropped on export`)
+      }
+      if (type === 'tile' || type === 'terrain' || type === 'encounters' || type === 'objects' || type === 'image') {
+        const name = typeof node.name === 'string' ? node.name : ''
+        exportedNames.set(name, (exportedNames.get(name) ?? 0) + 1)
+      }
+      if (type === 'tile' || type === 'terrain' || type === 'encounters' || type === 'objects') validateCells(node.data, false, label, cellCtx, errors, warnings)
+      if (type === 'collision') {
+        anyCollision = true
+        validateCells(node.data, true, label, cellCtx, errors, warnings)
+      }
+      if (type === 'picture') validatePicture(node, label, errors, warnings)
+      if (type === 'collisionShape') validateShapeNode(node, label, errors, warnings)
+      if (type === 'entity') validateEntityRecord(node, label, new Set(), options, errors, warnings)
+
+      if (NODE_TYPES[type].container) {
+        if (!Array.isArray(node.children)) errors.push(`${label}: children must be an array`)
+        else visit(node.children, [...path, node as unknown as SceneNode], `${np}.children`)
+      } else if (Array.isArray(node.children) && node.children.length > 0) {
+        warnings.push(`${label}: a ${type} node holds no children; they are ignored`)
+      }
+    })
+  }
+  visit(nodes, [], 'nodes')
+
+  for (const type of ['terrain', 'encounters']) {
+    if ((counts[type] ?? 0) > 1) warnings.push(`${counts[type]} ${type} layers; a map has one`)
+  }
+  // Every collision layer's tiles go into the one exported `collision` layer (shapes keep the layer's name).
+  if (anyCollision) exportedNames.set('collision', (exportedNames.get('collision') ?? 0) + 1)
+  for (const [name, count] of exportedNames) {
+    if (count > 1) warnings.push(`${count} layers will be exported with the same name "${name}"`)
+  }
 }
 
 export function validateEditorMap(data: unknown, options: ValidateEditorMapOptions = {}): ValidationResult {
@@ -214,14 +443,17 @@ export function validateEditorMap(data: unknown, options: ValidateEditorMapOptio
     for (const ts of tilesets) tilesetByFile.set(ts.fileName, ts)
   }
 
+  const usedTilesetNames = new Map<string, string>() // tileset name -> first fileName using it
+  const cellCtx: CellContext = { cellCount, tilesets, tilesetByFile, usedTilesetNames }
+
   // ── layers ──
-  if (!Array.isArray(data.layers)) {
+  if (Array.isArray(data.nodes)) {
+    validateNodes(data.nodes, cellCtx, options, errors, warnings)
+  } else if (!Array.isArray(data.layers)) {
     errors.push('map.layers must be an array')
   } else {
     const seenIds = new Set<string>()
     const exportedNames = new Map<string, number>()
-    const usedTilesetNames = new Map<string, string>() // tileset name -> first fileName using it
-
     data.layers.forEach((layer: unknown, li: number) => {
       const lp = `layers[${li}]`
       if (!isRecord(layer)) {
@@ -277,72 +509,7 @@ export function validateEditorMap(data: unknown, options: ValidateEditorMapOptio
         validateTileGroups(layer.tileGroups, label, errors)
       }
 
-      if (layer.data === undefined) return
-      if (!isRecord(layer.data)) {
-        errors.push(`${label}: data must be an object keyed by tile index`)
-        return
-      }
-      for (const [key, tile] of Object.entries(layer.data)) {
-        const tp = `${label}: tile "${key}"`
-        if (!/^(0|[1-9][0-9]*)$/.test(key)) {
-          errors.push(`${tp}: key is not a non-negative integer`)
-          continue
-        }
-        const idx = Number(key)
-        if (cellCount !== null && idx >= cellCount) {
-          errors.push(`${tp}: index out of range (map has ${cellCount} cells)`)
-        }
-        if (!isRecord(tile)) {
-          errors.push(`${tp}: tile is not an object`)
-          continue
-        }
-        if (typeof tile.tilesetId !== 'string' || tile.tilesetId.length === 0) {
-          errors.push(`${tp}: tilesetId must be a non-empty string`)
-          continue
-        }
-        if (!isNonNegInt(tile.x) || !isNonNegInt(tile.y)) {
-          errors.push(`${tp}: x/y must be non-negative integers`)
-          continue
-        }
-        if (layer.type === 'collision') continue
-        if (tile.tilesetId === COLLISION_TILESET_ID) {
-          warnings.push(`${tp}: "${COLLISION_TILESET_ID}" tile on a non-collision layer is dropped on export`)
-          continue
-        }
-        if (tilesets) {
-          const ts = tilesetByFile.get(tile.tilesetId)
-          if (!ts) {
-            errors.push(`${tp}: unknown tileset "${tile.tilesetId}"`)
-            continue
-          }
-          if (ts.width === 0 || ts.height === 0) {
-            errors.push(`${tp}: tileset "${tile.tilesetId}" has no readable image`)
-            continue
-          }
-          if (ts.width && ts.height) {
-            const cols = Math.floor(ts.width / 32)
-            const rows = Math.floor(ts.height / 32)
-            if (tile.x >= cols || tile.y >= rows) {
-              errors.push(`${tp}: (${tile.x},${tile.y}) is outside tileset "${tile.tilesetId}" (${cols}x${rows} tiles)`)
-            }
-          }
-        }
-      }
-      if (tilesets) {
-        // Two used tilesets sharing a display name collapse into one on export.
-        const seenHere = new Set<string>()
-        for (const tile of Object.values(layer.data)) {
-          if (!isRecord(tile) || typeof tile.tilesetId !== 'string' || seenHere.has(tile.tilesetId)) continue
-          seenHere.add(tile.tilesetId)
-          const ts = tilesetByFile.get(tile.tilesetId)
-          if (layer.type === 'collision' || !ts || typeof ts.name !== 'string') continue
-          const prev = usedTilesetNames.get(ts.name)
-          if (prev === undefined) usedTilesetNames.set(ts.name, tile.tilesetId)
-          else if (prev !== tile.tilesetId) {
-            errors.push(`tilesets "${prev}" and "${tile.tilesetId}" share the name "${ts.name}"; their tiles would be mixed up on export`)
-          }
-        }
-      }
+      validateCells(layer.data, layer.type === 'collision', label, cellCtx, errors, warnings)
     })
 
     if (data.layers.some((l) => isRecord(l) && (l.type === 'collision' || l.type === 'polygons'))) {
@@ -366,58 +533,7 @@ export function validateEditorMap(data: unknown, options: ValidateEditorMapOptio
           return
         }
         const label = typeof entity.name === 'string' ? `${ep} ("${entity.name}")` : ep
-        if (typeof entity.id !== 'string' || entity.id.length === 0) {
-          errors.push(`${label}: id must be a non-empty string`)
-        } else if (seen.has(entity.id)) {
-          errors.push(`${label}: duplicate entity id "${entity.id}"`)
-        } else {
-          seen.add(entity.id)
-        }
-        if (typeof entity.name !== 'string') errors.push(`${label}: name must be a string`)
-        if (!isFiniteNumber(entity.x) || !isFiniteNumber(entity.y)) {
-          errors.push(`${label}: x/y must be finite numbers`)
-        }
-        if (!isRecord(entity.components)) {
-          errors.push(`${label}: components must be an object`)
-          return
-        }
-        for (const [type, props] of Object.entries(entity.components)) {
-          if (!(COMPONENT_TYPES as readonly string[]).includes(type) && !(LEGACY_COMPONENT_TYPES as readonly string[]).includes(type)) {
-            errors.push(`${label}: unknown component type "${type}"`)
-            continue
-          }
-          if (!isRecord(props)) {
-            errors.push(`${label}: component ${type} must be an object`)
-            continue
-          }
-          checkFinite(props, `${label}: ${type}`, errors)
-        }
-        if (entity.x !== undefined || entity.y !== undefined) {
-          const transform = entity.components.Transform
-          if (!isRecord(transform)) {
-            errors.push(`${label}: has x/y but no Transform component`)
-          }
-        }
-
-        // Canonical-component checks run on the migrated entity, so legacy maps are judged by what
-        // the exporter will actually write.
-        const legacy = listLegacyComponents(entity)
-        if (legacy.length > 0) {
-          warnings.push(`${label}: uses legacy components (${legacy.join(', ')}); they are converted to Sprite/Movement/Event on load and export`)
-        }
-        try {
-          const migrated = migrateEntity(entity as EntityLike).value
-          const nonFinite = errors.some((e) => e.startsWith(`${label}: `) && e.endsWith('is not a finite number'))
-          for (const issue of validateEntity(migrated, options.context)) {
-            if (RAW_COVERED_CODES.has(issue.code)) continue
-            if (nonFinite && issue.code === 'bad-prop' && issue.message.endsWith('must be a number')) continue
-            const text = `${label}: ${issue.message} (${issue.path})`
-            if (issue.severity === 'error') errors.push(text)
-            else warnings.push(text)
-          }
-        } catch (e) {
-          errors.push(`${label}: could not be checked (${e instanceof Error ? e.message : String(e)})`)
-        }
+        validateEntityRecord(entity, label, seen, options, errors, warnings)
       })
     }
   }

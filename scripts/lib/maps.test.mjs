@@ -148,6 +148,37 @@ describe('checkMaps statuses', () => {
     assert.match(results[0].notes[0], /not valid JSON/)
   })
 
+  test('a schema 6 map (nodes) exports the same game file as the schema 5 map it came from', () => {
+    const v5 = sampleEditorMap()
+    const v6 = {
+      name: 'sample',
+      width: 3,
+      height: 2,
+      schemaVersion: 6,
+      nodes: [
+        { id: 'g', type: 'tile', name: 'ground', z: 1, data: v5.layers[1].data },
+        { id: 'c', type: 'collision', name: 'collisions', data: v5.layers[0].data, children: [{ id: 't', type: 'collisionTiles', name: 'Tiles' }] },
+        { id: 'eg', type: 'group', name: 'Entities', children: [{ id: 'e1', type: 'entity', name: 'Sign', x: 32, y: 32, components: { Transform: { x: 32, y: 32 } } }] },
+      ],
+    }
+    const sb = sandbox({ 'old.json': v5, 'new.json': v6 })
+    const { results } = checkMaps(sb)
+    assert.deepEqual(results.map((r) => r.status), [STATUS.MISSING_IN_GAME, STATUS.MISSING_IN_GAME])
+    const [fromNew, fromOld] = [results.find((r) => r.name === 'new').tiled, results.find((r) => r.name === 'old').tiled]
+    assert.equal(fromNew.schemaVersion, 6)
+    assert.deepEqual(fromNew, fromOld)
+    // a schema 6 map is checked against its game copy like any other
+    writeMaps(results, { gameDir: sb.gameDir, only: ['new'] })
+    assert.equal(statusOf(checkMaps(sb).results, 'new'), STATUS.IN_SYNC)
+  })
+
+  test('a schema 6 map that breaks the placement rules is INVALID', () => {
+    const sb = sandbox({ 'bad.json': { name: 'bad', width: 1, height: 1, schemaVersion: 6, nodes: [{ id: 'p', type: 'picture', name: '', graphicId: 'a.png', x: 0, y: 0 }] } })
+    const { results } = checkMaps(sb)
+    assert.equal(results[0].status, STATUS.INVALID)
+    assert.match(results[0].errors.join(), /a picture node cannot sit at the top of the map/)
+  })
+
   test('multi tileset maps get firstgid offsets in order of first use', () => {
     const map = sampleEditorMap({
       layers: [

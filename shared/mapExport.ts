@@ -2,16 +2,17 @@
 // Used by the editor's Export button (renderer) and by scripts/export-maps.mjs (Node).
 // Pure TypeScript: no DOM, electron or node imports. Keep syntax type-strippable (no enums etc).
 
-import type { EditorLayer, EditorMap, TilesetInfo, TiledLayer, TiledMap, TiledObject, TiledProperty, TiledTileset } from './mapTypes.ts'
+import type { EditorMap, TilesetInfo, TiledLayer, TiledMap, TiledObject, TiledProperty, TiledTileset } from './mapTypes.ts'
 import type { EngineEntity } from './engine/types.ts'
 import { SCHEMA_VERSION } from './engine/types.ts'
 import { migrateMap } from './engine/migrate.ts'
-import { itemYSort } from './ySort.ts'
 import { mapPixelSize } from './mapSize.ts'
 import { isUsableShape } from './collisionShapes.ts'
 import { cleanLookSet } from './look/schema.ts'
 import type { LookSet } from './look/types.ts'
-import { migrateCollisionLayers } from './collisionLayers.ts'
+import type { CollisionLayerNode, EntityNode, ImageLayerNode, LayerNode, PictureNode, SceneNode } from './sceneTree.ts'
+import { allEntities, collisionShapeNodes, effectiveOpacity, effectiveYSort, isCellLayer, isLayerNode, isVisible, walk, walkPanel } from './sceneTree.ts'
+import { nodesOfMap } from './sceneTreeMigrate.ts'
 
 export const TILE_SIZE = 32
 export const COLLISION_TILESET_ID = '__collision__'
@@ -23,25 +24,28 @@ export function lookProperty(look: LookSet | undefined): TiledProperty[] {
   return clean ? [{ name: 'look', type: 'string', value: JSON.stringify(clean) }] : []
 }
 
-/** Tileset file names referenced by non-collision layers, in first-use order. */
-export function collectUsedTilesetIds(map: Pick<EditorMap, 'layers'>): string[] {
+/**
+ * Tileset file names referenced by the layers that hold painted tiles (not collision or image layers), in first-use
+ * order (the layer list, top first). Takes a map of any schema.
+ */
+export function collectUsedTilesetIds(map: Pick<EditorMap, 'layers' | 'nodes'>): string[] {
   const used = new Set<string>()
-  for (const layer of map.layers || []) {
-    if (layer.type === 'collision' || layer.type === 'polygons' || layer.type === 'image') continue
-    for (const tile of Object.values(layer.data || {})) {
+  for (const { node } of walkPanel(nodesOfMap(map))) {
+    if (!isCellLayer(node)) continue
+    for (const tile of Object.values(node.data || {})) {
       used.add(tile.tilesetId)
     }
   }
   return [...used]
 }
 
-function tiledLayerType(layer: EditorLayer): TiledLayer['type'] {
+function tiledLayerType(layer: LayerNode): TiledLayer['type'] {
   return layer.type === 'objects' || layer.type === 'image' ? 'objectgroup' : 'tilelayer'
 }
 
 /** A collision layer's usable shapes as Tiled objects: x / y = the first point, `polygon` (closed) or `polyline` (open) relative to it. */
-function shapeObjects(layer: EditorLayer, nextId: () => number): TiledObject[] {
-  return (layer.shapes || []).filter(isUsableShape).map((shape) => {
+function shapeObjects(layer: CollisionLayerNode, nextId: () => number): TiledObject[] {
+  return collisionShapeNodes(layer).filter(isUsableShape).map((shape) => {
     const [first] = shape.points
     const rel = shape.points.map((p) => ({ x: p.x - first.x, y: p.y - first.y }))
     return {
@@ -59,12 +63,18 @@ function shapeObjects(layer: EditorLayer, nextId: () => number): TiledObject[] {
   })
 }
 
-/** The images of an image layer as Tiled objects (x/y = the sprite anchor); `nextId` hands out map-unique object ids. */
-function imageObjects(layer: EditorLayer, nextId: () => number, allLayers: readonly EditorLayer[]): TiledObject[] {
-  const items = (layer.images || []).map((item, index) => ({ item, index }))
-  // Draw order inside the layer: z first, array order for ties.
+/**
+ * The pictures of an image layer as Tiled objects (x/y = the sprite anchor); `nextId` hands out map-unique object ids.
+ * Groups are editor-only, so what they pass down (y-sort) is resolved here, one flag per picture.
+ */
+function imageObjects(layer: ImageLayerNode, above: readonly SceneNode[], nextId: () => number): TiledObject[] {
+  const path = [...above, layer]
+  const items = walk(layer.children, path)
+    .filter((e): e is typeof e & { node: PictureNode } => e.node.type === 'picture')
+    .map((e, index) => ({ item: e.node, ancestors: e.ancestors, index }))
+  // Draw order inside the layer: z first, tree order for ties.
   items.sort((a, b) => (a.item.z ?? 0) - (b.item.z ?? 0) || a.index - b.index)
-  return items.map(({ item }) => {
+  return items.map(({ item, ancestors }) => {
     const properties: TiledProperty[] = [item.graphicId ? { name: 'graphic', type: 'string', value: item.graphicId } : { name: 'sprite', type: 'string', value: item.assetId ?? '' }]
     if (item.graphicId && item.crop) {
       // One region of the picture's file; the game draws that sub-rectangle of the one texture.
@@ -75,9 +85,9 @@ function imageObjects(layer: EditorLayer, nextId: () => number, allLayers: reado
     if (item.scale !== undefined && item.scale !== 1) properties.push({ name: 'scale', type: 'float', value: item.scale })
     if (item.flipX) properties.push({ name: 'flipX', type: 'bool', value: true })
     if (item.flipY) properties.push({ name: 'flipY', type: 'bool', value: true })
-    if (item.opacity !== undefined && item.opacity !== 1) properties.push({ name: 'opacity', type: 'float', value: item.opacity })
-    // Folders and groups are editor-only, so the y-sort they pass down is resolved here, one flag per picture.
-    if (itemYSort(item, layer, allLayers)) properties.push({ name: 'ySort', type: 'bool', value: true })
+    const opacity = effectiveOpacity(item, ancestors)
+    if (opacity !== 1) properties.push({ name: 'opacity', type: 'float', value: opacity })
+    if (effectiveYSort(item, ancestors)) properties.push({ name: 'ySort', type: 'bool', value: true })
     properties.push(...lookProperty(item.look))
     return {
       id: nextId(),
@@ -95,7 +105,9 @@ function imageObjects(layer: EditorLayer, nextId: () => number, allLayers: reado
 }
 
 /**
- * Converts an editor map to a Tiled-format map object.
+ * Converts an editor map (schema 6, or any older one: it is migrated first) to a Tiled-format map object.
+ * The tree is walked in the order of the layer list (top first), each layer with what its ancestors pass down: a hidden
+ * group hides the layers below it and y-sort is resolved per picture. The Tiled output is the same as before the tree.
  * `tilesets` must contain size info for every tileset the map uses; tilesets that are unknown or
  * have a zero size are skipped (their tiles become empty), exactly like the historic export hook.
  * Run validateEditorMap first to turn those cases into explicit errors.
@@ -104,22 +116,22 @@ export function convertEditorMapToTiled(map: EditorMap, tilesets: TilesetInfo[])
   // Legacy entities (SpriteView, Interactable, ...) are converted so the game only ever sees the
   // canonical components; the exported map is always stamped with the schema version.
   const migrated = migrateMap(map).value
-  // Folders only group layers in the editor's list; the game gets the layers themselves. Old `polygons` layers are
-  // collision layers (shared/collisionLayers.ts).
-  const layers = migrateCollisionLayers(map.layers || []).value.filter((l) => l.type !== 'folder')
-  const collisionLayers = layers.filter((l) => l.type === 'collision')
+  const nodes = migrated.nodes ?? []
+  // Groups only organise the editor's list; the game gets the layers themselves.
+  const layers = walkPanel(nodes).filter((e): e is typeof e & { node: LayerNode } => isLayerNode(e.node))
+  const collisionLayers = layers.filter((e): e is typeof e & { node: CollisionLayerNode } => e.node.type === 'collision')
   // The game reads one tile layer named `collision`: the cells of every collision layer, written where the first
   // collision layer with painted cells is (with none painted, where the first one holding no shapes either is, as an
   // empty layer; a map with only shapes gets no collision tile layer).
   const tileCollisionLayer =
-    collisionLayers.find((l) => Object.keys(l.data || {}).length > 0) ?? collisionLayers.find((l) => (l.shapes || []).length === 0)
+    collisionLayers.find((e) => Object.keys(e.node.data || {}).length > 0)?.node ?? collisionLayers.find((e) => collisionShapeNodes(e.node).length === 0)?.node
   const hasCollisionLayer = tileCollisionLayer !== undefined
   const collisionCells = new Set<number>()
-  for (const l of collisionLayers) for (const key of Object.keys(l.data || {})) collisionCells.add(Number(key))
+  for (const e of collisionLayers) for (const key of Object.keys(e.node.data || {})) collisionCells.add(Number(key))
 
   const exportTilesets: TiledTileset[] = []
   let currentGid = 1
-  for (const tsId of collectUsedTilesetIds(map)) {
+  for (const tsId of collectUsedTilesetIds(migrated)) {
     const ts = tilesets.find((t) => t.fileName === tsId)
     if (!ts) continue
     if (!ts.width || !ts.height) continue
@@ -166,7 +178,8 @@ export function convertEditorMapToTiled(map: EditorMap, tilesets: TilesetInfo[])
   const nextObjectId = () => objectId++
 
   let layerId = 0
-  const exportLayers: TiledLayer[] = layers.flatMap((layer): TiledLayer[] => {
+  const exportLayers: TiledLayer[] = layers.flatMap(({ node: layer, ancestors }): TiledLayer[] => {
+    const visible = isVisible(layer, ancestors)
     if (layer.type === 'collision') {
       const out: TiledLayer[] = []
       if (layer === tileCollisionLayer) {
@@ -179,14 +192,14 @@ export function convertEditorMapToTiled(map: EditorMap, tilesets: TilesetInfo[])
           name: 'collision',
           opacity: 1,
           type: 'tilelayer',
-          visible: layer.visible,
+          visible,
           width: map.width,
           x: 0,
           y: 0,
           ...(layer.z !== undefined ? { properties: [{ name: 'z', type: 'int', value: Number(layer.z) }] } : {}),
         })
       }
-      if ((layer.shapes || []).length > 0) {
+      if (collisionShapeNodes(layer).length > 0) {
         // Collision data: the game blocks movement with these whether the layer is shown in the editor or not.
         out.push({
           id: ++layerId,
@@ -194,7 +207,7 @@ export function convertEditorMapToTiled(map: EditorMap, tilesets: TilesetInfo[])
           objects: shapeObjects(layer, nextObjectId),
           opacity: 1,
           type: 'objectgroup',
-          visible: layer.visible,
+          visible,
           width: map.width,
           height: map.height,
           x: 0,
@@ -208,10 +221,10 @@ export function convertEditorMapToTiled(map: EditorMap, tilesets: TilesetInfo[])
       const imageLayer: TiledLayer = {
         id: ++layerId,
         name: layer.name,
-        objects: imageObjects(layer, nextObjectId, map.layers || []),
+        objects: imageObjects(layer, ancestors, nextObjectId),
         opacity: 1,
         type: 'objectgroup',
-        visible: layer.visible,
+        visible,
         width: map.width,
         height: map.height,
         x: 0,
@@ -242,7 +255,7 @@ export function convertEditorMapToTiled(map: EditorMap, tilesets: TilesetInfo[])
       name: layer.name,
       opacity: 1,
       type: tiledLayerType(layer),
-      visible: layer.visible,
+      visible,
       width: map.width,
       x: 0,
       y: 0,
@@ -287,8 +300,14 @@ export function convertEditorMapToTiled(map: EditorMap, tilesets: TilesetInfo[])
     version: '1.10',
     width: map.width,
     schemaVersion: typeof migrated.schemaVersion === 'number' ? migrated.schemaVersion : SCHEMA_VERSION,
-    entities: (migrated.entities || []) as unknown as EngineEntity[],
+    entities: allEntities(nodes).map(exportEntity),
   }
+}
+
+/** An entity node as the game's entity: the node-only fields (`type`, `locked`) are left out. */
+function exportEntity(node: EntityNode): EngineEntity {
+  const { type: _type, locked: _locked, ...entity } = node
+  return entity as unknown as EngineEntity
 }
 
 /** The one true serialization (2-space JSON, no trailing newline) used by the editor and the CLI. */
