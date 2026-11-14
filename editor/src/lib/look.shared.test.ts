@@ -195,9 +195,9 @@ describe('looks in maps', () => {
     const tiled = convertEditorMapToTiled(map, [])
     const prop = (props: { name: string; value: unknown }[] | undefined) => JSON.parse(String(props?.find((p) => p.name === 'look')?.value))
     expect(prop(tiled.properties)).toEqual(map.look)
-    expect(prop(tiled.layers[0].properties)).toEqual(map.layers[0].look)
-    expect(prop(tiled.layers[1].properties)).toEqual(map.layers[1].look)
-    expect(prop(tiled.layers[1].objects![0].properties)).toEqual(map.layers[1].images![0].look)
+    expect(prop(tiled.layers[0].properties)).toEqual(map.layers![0].look)
+    expect(prop(tiled.layers[1].properties)).toEqual(map.layers![1].look)
+    expect(prop(tiled.layers[1].objects![0].properties)).toEqual(map.layers![1].images![0].look)
   })
 
   it('a map without looks exports exactly as before', () => {

@@ -81,7 +81,7 @@ describe('collision shape geometry', () => {
 })
 
 const map = (layers: EditorMap['layers']): EditorMap => ({ name: 'm', width: 4, height: 4, layers })
-const polygons: EditorMap['layers'][number] = {
+const polygons: NonNullable<EditorMap['layers']>[number] = {
   id: 'p1',
   name: 'Walls',
   type: 'polygons',

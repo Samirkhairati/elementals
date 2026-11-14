@@ -5,6 +5,7 @@ import type { EngineEntity } from './engine/types.ts'
 import type { CollisionShape, ShapePoint } from './collisionShapes.ts'
 import type { LookSet } from './look/types.ts'
 import type { CollisionTileGroup } from './collisionLayers.ts'
+import type { SceneNode } from './sceneTree.ts'
 
 /** `polygons` is the old shapes-only collision layer: loading or exporting a map turns it into a `collision` layer. */
 export type EditorLayerType = 'tile' | 'collision' | 'terrain' | 'objects' | 'encounters' | 'image' | 'folder' | 'polygons'
@@ -116,12 +117,20 @@ export interface EditorMap {
   settings?: { playerZ?: number }
   /** Colour grading, masks and shaders of the whole map (everything drawn, characters too), per profile. */
   look?: LookSet
-  layers: EditorLayer[]
+  /**
+   * Schema 6: the map's tree of nodes (the children of the map root, in draw order), see shared/sceneTree.ts. It replaces
+   * `layers`, `entities`, `entityFolders` and `entitiesIndex`; `migrateMap` turns older maps into it.
+   */
+  nodes?: SceneNode[]
+  /** Schema 5 and older (legacy input of `migrateToNodeTree`): the layers, top first, folders and picture groups among them. */
+  layers?: EditorLayer[]
+  /** Schema 5 and older (legacy input): all entities. */
   entities?: EditorEntity[]
+  /** Schema 5 and older (legacy input): the entity folders. */
   entityFolders?: unknown[]
-  /** Editor view only: how many layers are above the Entities row in the layer list (0 or missing = on top). Not exported. */
+  /** Schema 5 and older (legacy input): how many layers are above the Entities row in the layer list (0 or missing = on top). */
   entitiesIndex?: number
-  /** 2 = canonical engine components (see shared/engine). Missing = legacy (1); migrateMap upgrades it. */
+  /** 6 = one tree of nodes (`nodes`); 2-5 = layers and entities; missing = legacy (1). `migrateMap` upgrades it. */
   schemaVersion?: number
   fileName?: string
   folderPath?: string | null

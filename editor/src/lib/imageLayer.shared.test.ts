@@ -5,7 +5,7 @@ import type { EditorMap } from '../../../shared/mapTypes'
 
 const map = (layers: EditorMap['layers']): EditorMap => ({ name: 'm', width: 4, height: 4, layers })
 
-const imageLayer: EditorMap['layers'][number] = {
+const imageLayer: NonNullable<EditorMap['layers']>[number] = {
   id: 'i1',
   name: 'Trees',
   type: 'image',
@@ -34,7 +34,7 @@ describe('image layers: validation', () => {
   })
 
   it('accepts a picture item and rejects an item with both or neither', () => {
-    const items = (images: NonNullable<EditorMap['layers'][number]['images']>) => validateEditorMap(map([{ ...imageLayer, images }])).errors
+    const items = (images: NonNullable<NonNullable<EditorMap['layers']>[number]['images']>) => validateEditorMap(map([{ ...imageLayer, images }])).errors
     expect(items([{ id: 'p', graphicId: 'scenery/clouds.png', x: 0, y: 0 }])).toEqual([])
     expect(items([{ id: 'p', assetId: 'tree', graphicId: 'a.png', x: 0, y: 0 }]).some((e) => e.includes('exactly one'))).toBe(true)
     expect(items([{ id: 'p', x: 0, y: 0 }]).some((e) => e.includes('exactly one'))).toBe(true)
@@ -117,7 +117,7 @@ describe('image layers: export', () => {
 })
 
 describe('image layers: groups (editor view only)', () => {
-  const grouped = (groups: unknown, images: EditorMap['layers'][number]['images']) =>
+  const grouped = (groups: unknown, images: NonNullable<EditorMap['layers']>[number]['images']) =>
     validateEditorMap(map([{ ...imageLayer, groups: groups as never, images }]))
 
   it('accepts groups and pictures that belong to them, and the export ignores both', () => {
