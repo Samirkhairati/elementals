@@ -1,5 +1,5 @@
 import { usePolygonEdit } from '@/lib/polygonEditStore'
-import type { SelectMode } from '@/lib/imageSelection'
+import type { SelectMode } from '@/lib/sceneSelection'
 import type { ImageDrag } from './konva/imageDrag'
 import React, { useCallback, useMemo, useRef } from 'react'
 import type Konva from 'konva'
@@ -7,7 +7,6 @@ import { useMapLookPass } from '@/lib/look/useMapLookPass'
 import type { ImagePick } from '@/lib/graphicAssets'
 import { Stage, Layer as KonvaLayer, Rect, Group } from 'react-konva'
 import {
-  Layer,
   TilesetData,
   MapData,
   TileSelection,
@@ -16,7 +15,7 @@ import {
   Pos,
   EntityData,
   ComponentType,
-  EntityFolder,
+  CollisionShape,
   type PropBag,
 } from '@/types/editor'
 import { useTilesetImages } from '@/hooks/editor/useTilesetImages'
@@ -29,7 +28,7 @@ import { KonvaGhostEntity } from './konva/KonvaGhostEntity'
 import { KonvaEntityResize } from './konva/KonvaEntityResize'
 import { COMPONENT_SCHEMAS } from '../../../../../shared/engine/components'
 import type { ColliderPatch } from '@/lib/entityVisuals'
-import { withoutFolders } from '@/lib/layerFolders'
+import { useDrawPlan } from '@/hooks/editor/canvas/useDrawPlan'
 import { KonvaGhostImage, KonvaImageItems } from './konva/KonvaImageItems'
 import { KonvaShapes } from './konva/KonvaShapes'
 import { KonvaMaskEditor } from './konva/KonvaMaskEditor'
@@ -37,7 +36,7 @@ import { CanvasContextMenu } from './CanvasContextMenu'
 import { CanvasNavigator, type ViewportHandle } from './CanvasNavigator'
 import { PendingEntityPlacement } from '@/hooks/editor/useEntityPlacement'
 import { useCanvasView } from '@/hooks/editor/canvas/canvasView'
-import { clampEntitiesIndex } from '@/lib/layerOrder'
+import type { ImageLayerNode } from '../../../../../shared/sceneTree'
 import { mapPixelSize } from '../../../../../shared/mapSize'
 import { useEditorSelector, type EditorContextValue } from '@/components/editor/layout/EditorContext'
 import { useDropShadow } from '@/components/editor/look/DropShadowMenuItem'
@@ -50,8 +49,8 @@ const selectCanvasContext = (c: EditorContextValue) => ({
 })
 
 interface MapCanvasProps {
+  /** The map to draw (its scene tree is `nodes`). */
   activeMap: MapData | null
-  layers: Layer[]
   tilesets: TilesetData[]
   tileSelection: TileSelection | null
   setTileSelection: (s: TileSelection | null) => void
@@ -66,7 +65,6 @@ interface MapCanvasProps {
   handlePaintBucket: (x: number, y: number) => void
   handleRectangleFill: (start: Pos, end: Pos) => void
   handleCommit: () => void
-  entities?: EntityData[]
   selectedEntityId?: string | null
   setSelectedEntityId?: (id: string | null) => void
   moveEntity?: (id: string, x: number, y: number) => void
@@ -83,8 +81,6 @@ interface MapCanvasProps {
   updateComponentProp?: (entityId: string, type: ComponentType, key: string, value: unknown) => void
   /** Batch variant: applies several props in one commit (one undo step / one save). */
   updateComponentProps?: (entityId: string, type: ComponentType, props: PropBag) => void
-  showEntities?: boolean
-  entityFolders?: EntityFolder[]
   /** Pinned: a right-drag samples every selected layer. */
   pinSelection?: boolean
   selectedLayerIds?: readonly string[]
@@ -96,7 +92,8 @@ interface MapCanvasProps {
   resizeImage?: (layerId: string, imageId: string, change: { scale: number; x: number; y: number }) => void
   cancelImagePlacement?: () => void
   selectedImageId?: string | null
-  setSelectedImageId?: (id: string | null) => void
+  /** A click on empty canvas while an image layer is active: lets go of the picked pictures. */
+  clearImageSelection?: () => void
   pickedImageIds?: readonly string[]
   selectImage?: (layerId: string, imageId: string, mode: SelectMode) => void
   /** A dragged picked set (a group) moves as a whole. */
@@ -107,13 +104,14 @@ interface MapCanvasProps {
   /** Picking an image of another layer (toolbar lock off) makes that layer the active one. */
   activateLayer?: (layerId: string) => void
   moveImage?: (layerId: string, imageId: string, x: number, y: number) => void
-  /** Replaces the layer list (the collision-shape editor); absent on a map tab that is not the active map. */
-  updateLayers?: (layers: Layer[]) => void
+  /** Replaces the shapes of a collision layer (the collision-shape editor); absent on a map tab that is not the active map. */
+  setCollisionShapes?: (layerId: string, shapes: readonly CollisionShape[]) => void
+  /** Removes an item (tiles item or shape) of the active collision layer. */
+  deleteCollisionItem?: (itemId: string) => void
 }
 
 export function MapCanvas({
   activeMap,
-  layers,
   tilesets,
   tileSelection,
   setTileSelection,
@@ -128,7 +126,6 @@ export function MapCanvas({
   handlePaintBucket,
   handleRectangleFill,
   handleCommit,
-  entities = [],
   selectedEntityId = null,
   setSelectedEntityId,
   moveEntity,
@@ -142,8 +139,6 @@ export function MapCanvas({
   deleteEntity,
   updateComponentProp,
   updateComponentProps,
-  showEntities = true,
-  entityFolders = [],
   pinSelection = false,
   selectedLayerIds = [],
   pendingImage = null,
@@ -152,7 +147,7 @@ export function MapCanvas({
   resizeImage,
   cancelImagePlacement,
   selectedImageId = null,
-  setSelectedImageId,
+  clearImageSelection,
   pickedImageIds,
   selectImage,
   moveImages,
@@ -160,13 +155,16 @@ export function MapCanvas({
   placeMultipleKeys,
   activateLayer,
   moveImage,
-  updateLayers,
+  setCollisionShapes,
+  deleteCollisionItem,
 }: MapCanvasProps) {
   // Preload and cache tileset image textures
   const images = useTilesetImages(tilesets)
   const { spriteAssets, setLook } = useEditorSelector(selectCanvasContext)
   const dropShadow = useDropShadow()
   const view = useCanvasView()
+  // The scene tree: the index, and what draws in which order (computed once per tree, see useDrawPlan).
+  const { index, segments, entities } = useDrawPlan(activeMap?.nodes)
 
   // Viewport, zoom, pan, and stage coordinate translation
   const {
@@ -210,7 +208,7 @@ export function MapCanvas({
     handleStageMouseMove,
   } = useCanvasInteraction({
     activeMap,
-    layers,
+    index,
     activeTool,
     paintMode,
     activeLayerId,
@@ -241,45 +239,40 @@ export function MapCanvas({
     spriteAssets,
     commitImagePlacement,
     cancelImagePlacement,
-    clearImageSelection: () => setSelectedImageId?.(null),
+    clearImageSelection,
   })
 
-  // Where the Entities row sits among the layers: the layers above it draw over the entities, the ones below under them.
-  const entitiesAt = clampEntitiesIndex(activeMap?.entitiesIndex, layers.length)
-  // Folder rows only group layers in the list; they draw nothing.
-  const layersAboveEntities = useMemo(() => withoutFolders(layers.slice(0, entitiesAt)), [layers, entitiesAt])
-  const layersBelowEntities = useMemo(() => withoutFolders(layers.slice(entitiesAt)), [layers, entitiesAt])
   const entityVisuals = useRef<Visuals>({ hoverId: null, dragId: null, dragX: 0, dragY: 0 })
   // The image being dragged, drawn at the mouse by the image layer itself (see KonvaImageItems).
   const imageDrag = useRef<ImageDrag | null>(null)
 
-  const activeLayer = useMemo(() => layers.find((l) => l.id === activeLayerId) ?? null, [layers, activeLayerId])
-  const isImageLayerActive = activeLayer?.type === 'image'
+  const activeLayer = useMemo(() => index.byId.get(activeLayerId ?? '')?.node ?? null, [index, activeLayerId])
+  const activeImageLayer = activeLayer?.type === 'image' ? activeLayer : null
+  const isImageLayerActive = activeImageLayer !== null
   const { brush: collisionBrush } = usePolygonEdit()
   // Entity placement and image placement both need clicks to land on the map, not on pictures.
   const placingAnything = !!pendingImage || !!pendingPlacement
   // Toolbar lock off: while no layer or an image layer is active (never a tile layer: painting wins) any image can be picked.
   const otherImageLayers = useMemo(
-    () => (!view.lockImages && !placingAnything && (activeLayer === null || isImageLayerActive) ? layers.filter((l) => l.type === 'image') : []),
-    [view.lockImages, placingAnything, activeLayer, isImageLayerActive, layers]
+    () => (!view.lockImages && !placingAnything && (activeLayer === null || isImageLayerActive) ? index.layers.filter((l): l is ImageLayerNode => l.type === 'image') : []),
+    [view.lockImages, placingAnything, activeLayer, isImageLayerActive, index]
   )
 
   // The selected entity's area gets resize handles (see KonvaEntityResize); an entity without a Collider gets one with the new box.
   // Without a Collider the game neither blocks nor touches anything beyond the entity's own tile, so the added one is not solid.
   const resizableEntity = useMemo(() => {
-    const entity = showEntities && !placingAnything ? entities.find((e) => e.id === selectedEntityId) : undefined
-    if (!entity || entity.visible === false) return null
-    if (entity.folder && entityFolders.some((f) => f.id === entity.folder && f.visible === false)) return null
-    return entity
-  }, [showEntities, placingAnything, entities, selectedEntityId, entityFolders])
+    const entity = !placingAnything ? entities.find((e) => e.id === selectedEntityId) : undefined
+    // Entities listed here are the shown ones (the node and every group above it are visible).
+    return entity ?? null
+  }, [placingAnything, entities, selectedEntityId])
   const handleResizeEntity = useCallback(
     (entityId: string, patch: ColliderPatch) => {
-      const hasCollider = !!entities.find((e) => e.id === entityId)?.components.Collider
+      const hasCollider = !!(index.byId.get(entityId)?.node as EntityData | undefined)?.components.Collider
       const props: PropBag = hasCollider ? { ...patch } : { ...(COMPONENT_SCHEMAS.Collider.defaultProps as PropBag), isSolid: false, ...patch }
       if (updateComponentProps) updateComponentProps(entityId, 'Collider', props)
       else for (const [key, value] of Object.entries(props)) updateComponentProp?.(entityId, 'Collider', key, value)
     },
-    [entities, updateComponentProps, updateComponentProp]
+    [index, updateComponentProps, updateComponentProp]
   )
 
   const handleUpdateTag = useCallback(
@@ -338,7 +331,7 @@ export function MapCanvas({
                 listening={false}
               />
 
-              {/* Layers below the Entities row, the entities, then the layers above them: the layer list's order.
+              {/* The tree in draw order: runs of layers and runs of entities, each where it sits in the tree.
                   "Clip to map" (top toolbar) only hides what is drawn past the map's edge; handles and overlays stay. */}
               <Group
                 clipX={view.clip ? 0 : undefined}
@@ -346,38 +339,34 @@ export function MapCanvas({
                 clipWidth={view.clip ? mapWidthPx : undefined}
                 clipHeight={view.clip ? mapHeightPx : undefined}
               >
-              <KonvaTilemapLayer
-                layers={layersBelowEntities}
-                images={images}
-                activeMap={activeMap}
-                spriteAssets={spriteAssets}
-                dragRef={imageDrag}
-              />
-
-              <KonvaEntities
-                part="sprites"
-                visuals={entityVisuals}
-                entities={entities}
-                selectedEntityId={selectedEntityId}
-                setSelectedEntityId={setSelectedEntityId || (() => {})}
-                moveEntity={moveEntity || (() => {})}
-                activeMap={activeMap}
-                snapToGrid={snapToGrid}
-                onRightClickEntity={handleRightClickEntity}
-                showEntities={showEntities}
-                entityFolders={entityFolders}
-                spriteAssets={spriteAssets}
-                view={view}
-                onOpenEvent={openEventEditor}
-              />
-
-              <KonvaTilemapLayer
-                layers={layersAboveEntities}
-                images={images}
-                activeMap={activeMap}
-                spriteAssets={spriteAssets}
-                dragRef={imageDrag}
-              />
+                {segments.map((seg) =>
+                  seg.kind === 'layers' ? (
+                    <KonvaTilemapLayer
+                      key={seg.key}
+                      layers={seg.layers}
+                      images={images}
+                      activeMap={activeMap}
+                      spriteAssets={spriteAssets}
+                      dragRef={imageDrag}
+                    />
+                  ) : (
+                    <KonvaEntities
+                      key={seg.key}
+                      part="sprites"
+                      visuals={entityVisuals}
+                      entities={seg.entities as unknown as EntityData[]}
+                      selectedEntityId={selectedEntityId}
+                      setSelectedEntityId={setSelectedEntityId || (() => {})}
+                      moveEntity={moveEntity || (() => {})}
+                      activeMap={activeMap}
+                      snapToGrid={snapToGrid}
+                      onRightClickEntity={handleRightClickEntity}
+                      spriteAssets={spriteAssets}
+                      view={view}
+                      onOpenEvent={openEventEditor}
+                    />
+                  )
+                )}
               </Group>
             </KonvaLayer>
 
@@ -399,11 +388,11 @@ export function MapCanvas({
 
               {/* Pick / drag handles of the active image layer (above the art; the entities' own handles are above these) */}
               <KonvaImageItems
-                layer={activeLayer}
+                index={index}
+                layer={activeImageLayer}
                 otherLayers={otherImageLayers}
                 activateLayer={activateLayer}
                 selectedImageId={selectedImageId}
-                setSelectedImageId={setSelectedImageId || (() => {})}
                 pickedImageIds={pickedImageIds}
                 selectImage={selectImage}
                 moveImages={moveImages}
@@ -427,8 +416,6 @@ export function MapCanvas({
                 activeMap={activeMap}
                 snapToGrid={snapToGrid}
                 onRightClickEntity={handleRightClickEntity}
-                showEntities={showEntities}
-                entityFolders={entityFolders}
                 spriteAssets={spriteAssets}
                 view={view}
                 onOpenEvent={openEventEditor}
@@ -447,27 +434,26 @@ export function MapCanvas({
                 moveEntity={moveEntity || (() => {})}
                 activeMap={activeMap}
                 snapToGrid={snapToGrid}
-                showEntities={showEntities}
-                entityFolders={entityFolders}
                 spriteAssets={spriteAssets}
                 view={view}
               />
 
               {/* Collision shapes of the collision layers, and their editor while one is active with the Shape brush (or an entity's polygon collider is drawn) */}
               <KonvaShapes
-                layers={layers}
+                index={index}
                 activeLayerId={activeLayerId}
                 entities={entities}
                 selectedEntityId={selectedEntityId}
                 mapWidth={activeMap.width}
-                enabled={!!updateLayers}
+                enabled={!!setCollisionShapes}
                 placing={placingAnything}
-                updateLayers={updateLayers}
+                setShapes={setCollisionShapes}
+                deleteItem={deleteCollisionItem}
                 updateComponentProps={updateComponentProps}
               />
 
               {/* Handles of the look mask component being edited in the Look panel (brush components paint here) */}
-              <KonvaMaskEditor map={activeMap} layers={layers} spriteAssets={spriteAssets} viewStore={viewStore} setLook={setLook} />
+              <KonvaMaskEditor map={activeMap} nodes={activeMap.nodes} spriteAssets={spriteAssets} viewStore={viewStore} setLook={setLook} />
 
               {/* The image waiting to be placed follows the mouse, snapped (or not) exactly like the placement */}
               <KonvaGhostImage
@@ -499,8 +485,7 @@ export function MapCanvas({
             dimensions={dimensions}
             mapWidth={activeMap.width}
             mapHeight={activeMap.height}
-            layers={layers}
-            entities={entities}
+            nodes={activeMap.nodes}
             images={images}
           />
         )}
@@ -519,9 +504,10 @@ export function MapCanvas({
         onSampleTile={sampleSingleTile}
         onPlaceMultiple={onPlaceMultiple}
         pictureShadow={(imageId) => {
-          const layer = layers.find((l) => l.images?.some((i) => i.id === imageId))
-          if (!layer) return null
-          return { has: hasShadow(layer.images!.find((i) => i.id === imageId)!.look), add: () => dropShadow({ kind: 'picture', layerId: layer.id, imageId }) }
+          const entry = index.byId.get(imageId)
+          const layer = entry?.ancestors.find((a) => a.type === 'image')
+          if (!entry || entry.node.type !== 'picture' || !layer) return null
+          return { has: hasShadow(entry.node.look), add: () => dropShadow({ kind: 'picture', layerId: layer.id, imageId }) }
         }}
         placeMultipleKeys={placeMultipleKeys}
         snapToGrid={snapToGrid}

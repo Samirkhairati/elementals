@@ -7,7 +7,9 @@ import { Circle, Ellipse, Group, Line, Rect } from 'react-konva'
 import type Konva from 'konva'
 import { subjectToWorld, worldToSubject, WORLD_SUBJECT, type LookPlacement } from '../../../../../../shared/look/shader'
 import type { BrushStroke, LookSet, MaskComponent } from '../../../../../../shared/look/types'
-import type { Layer as MapLayer, MapData } from '@/types/editor'
+import type { MapData } from '@/types/editor'
+import type { SceneNode } from '../../../../../../shared/sceneTree'
+import { findPicture } from '@/lib/look/lookEdit'
 import type { SpriteAssetInfo } from '../../../../../../shared/engine/types'
 import { editLookSet, lookInView, updateComponent, updateMask } from '@/lib/look/lookEdit'
 import { getLookSet } from '@/lib/look/lookSubjects'
@@ -24,16 +26,16 @@ const ACCENT = '#3b82f6'
 
 interface Props {
   map: MapData
-  layers: MapLayer[]
+  nodes: readonly SceneNode[]
   spriteAssets: Record<string, SpriteAssetInfo>
   viewStore: { subscribe: (l: () => void) => () => void; getSnapshot: () => { scale: number; x: number; y: number } }
   setLook: (ref: LookSubjectRef, set: LookSet | undefined, commit?: boolean) => void
 }
 
 /** The subject mapping of a look subject: world for the map / a layer, the picture's own pixels for a picture. */
-function subjectMapping(ref: LookSubjectRef, layers: MapLayer[], assets: Record<string, SpriteAssetInfo>): Subject | null {
+function subjectMapping(ref: LookSubjectRef, nodes: readonly SceneNode[], assets: Record<string, SpriteAssetInfo>): Subject | null {
   if (ref.kind !== 'picture') return WORLD_SUBJECT
-  const item = layers.find((l) => l.id === ref.layerId)?.images?.find((i) => i.id === ref.imageId)
+  const item = findPicture(nodes, ref)
   const resolved = item ? resolveImageItem(item, assets) : null
   return item && resolved ? pictureBox(item, resolved, item).subject : null
 }
@@ -62,7 +64,7 @@ function Handle({ at, k, onMove, onEnd, fill = COLOR, label }: { at: Pt; k: numb
   )
 }
 
-export function KonvaMaskEditor({ map, layers, spriteAssets, viewStore, setLook }: Props) {
+export function KonvaMaskEditor({ map, nodes, spriteAssets, viewStore, setLook }: Props) {
   const view = useLookView()
   const lib = useLookLibrary()
   const cam = useSyncExternalStore(viewStore.subscribe, viewStore.getSnapshot)
@@ -71,9 +73,9 @@ export function KonvaMaskEditor({ map, layers, spriteAssets, viewStore, setLook 
   if (!editing || !editing.componentId || !view.enabled) return null
   const ref = parseSubjectKey(editing.subject)
   if (!ref) return null
-  const s = subjectMapping(ref, layers, spriteAssets)
+  const s = subjectMapping(ref, nodes, spriteAssets)
   if (!s) return null
-  const set = getLookSet(map, layers, ref)
+  const set = getLookSet(map, nodes, ref)
   const profile = view.profile !== null && lib.file.profiles.some((p) => p.id === view.profile) ? view.profile : null
   const look = lookInView(set, profile).look
   const mask = look?.masks?.find((m) => m.id === editing.maskId)

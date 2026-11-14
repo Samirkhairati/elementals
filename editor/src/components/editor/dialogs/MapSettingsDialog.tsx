@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { sceneIndex } from '@/lib/sceneIndex'
 import { Scaling } from 'lucide-react'
 import type { MapData, MapSettings } from '@/types/editor'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -26,7 +27,7 @@ export function MapSettingsDialog({ map, onClose, onSave, onResize }: Props) {
   if (!map) return <Dialog open={false} />
   const px = mapPixelSize(map)
   // Layers drawn over the player (a higher z) and under it, so the number means something.
-  const imageAndTile = map.layers.filter((l) => l.type === 'tile' || l.type === 'image')
+  const imageAndTile = sceneIndex(map.nodes).layers.filter((l) => l.type === 'tile' || l.type === 'image')
   const above = imageAndTile.filter((l) => (l.z ?? 0) > playerZ).length
   const save = () => {
     const { playerZ: _old, ...rest } = map.settings ?? {}

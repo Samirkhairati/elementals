@@ -2,10 +2,11 @@ import type { ImageDrag } from './imageDrag'
 import React from 'react'
 import { Shape, Group } from 'react-konva'
 import type Konva from 'konva'
-import { Layer as MapLayer, MapData, type ImageItem } from '@/types/editor'
+import type { MapData, ImageItem } from '@/types/editor'
+import { isDataLayer, type DataLayerNode, type ImageLayerNode, type LayerNode } from '../../../../../../shared/sceneTree'
 import type { SpriteAssetInfo } from '../../../../../../shared/engine/types'
 import { drawResolvedSprite, useSpriteImagesVersion } from '@/lib/spriteImages'
-import { renderOrder, sortedImages } from '@/lib/layerOrder'
+import { visiblePictures } from '@/lib/sceneIndex'
 import { resolveImageItem } from '@/lib/imageItems'
 import { imagePickKey } from '@/lib/graphicAssets'
 import { mapPixelSize } from '../../../../../../shared/mapSize'
@@ -20,7 +21,8 @@ import { shadowFor } from '../../../../../../shared/look/shadow'
 const NO_ASSETS: Record<string, SpriteAssetInfo> = {}
 
 interface KonvaTilemapLayerProps {
-  layers: MapLayer[]
+  /** The layers to draw, bottom first (a run of the tree's draw order, hidden layers already left out). */
+  layers: readonly LayerNode[]
   images: Record<string, HTMLImageElement>
   activeMap: MapData
   spriteAssets?: Record<string, SpriteAssetInfo>
@@ -30,7 +32,7 @@ interface KonvaTilemapLayerProps {
 
 /** Looks to draw a picture with: its layer, the map size and the profile in view (absent = drawn plainly). */
 export interface PictureLookContext {
-  layer: MapLayer
+  layer: Pick<ImageLayerNode, 'id' | 'look'>
   mapSize: { w: number; h: number }
   view: LookViewState
 }
@@ -62,7 +64,7 @@ export function drawImageItem(ctx: CanvasRenderingContext2D, item: ImageItem, sp
 }
 
 /** The tiles of a tile layer between two tile columns / rows (inclusive). */
-function drawTiles(ctx: CanvasRenderingContext2D, data: NonNullable<MapLayer['data']>, images: Record<string, HTMLImageElement>, mapWidth: number, x0: number, y0: number, x1: number, y1: number) {
+function drawTiles(ctx: CanvasRenderingContext2D, data: NonNullable<DataLayerNode['data']>, images: Record<string, HTMLImageElement>, mapWidth: number, x0: number, y0: number, x1: number, y1: number) {
   for (let ty = y0; ty <= y1; ty++) {
     const rowOffset = ty * mapWidth
     const y = ty * 32
@@ -103,6 +105,10 @@ export function stageViewRect(stage: Konva.Stage | null): { x: number; y: number
   return { x: -stage.x() / scale, y: -stage.y() / scale, w: stage.width() / scale, h: stage.height() / scale }
 }
 
+/** Same layer nodes in the same order: the tree handed out a new array but nothing in this run changed. */
+const sameLayers = (a: KonvaTilemapLayerProps, b: KonvaTilemapLayerProps) =>
+  a.images === b.images && a.activeMap === b.activeMap && a.spriteAssets === b.spriteAssets && a.dragRef === b.dragRef && a.layers.length === b.layers.length && a.layers.every((l, i) => l === b.layers[i])
+
 export const KonvaTilemapLayer = React.memo(function KonvaTilemapLayer({
   layers,
   images,
@@ -119,12 +125,9 @@ export const KonvaTilemapLayer = React.memo(function KonvaTilemapLayer({
   const px = mapPixelSize(activeMap)
   const mapSize = { w: px.width, h: px.height }
 
-  // Bottom layer of the list first: what the layer list shows is what draws.
-  const visibleLayers = renderOrder(layers).filter(l => l.visible)
-
   return (
     <Group listening={false}>
-      {visibleLayers.map(layer => layer.type === 'image' ? (
+      {layers.map(layer => layer.type === 'image' ? (
         <Shape
           key={`${layer.id}:${imagesVersion}`}
           listening={false}
@@ -133,7 +136,7 @@ export const KonvaTilemapLayer = React.memo(function KonvaTilemapLayer({
           sceneFunc={(context) => {
             const ctx = context._context as CanvasRenderingContext2D
             const looks = { layer, mapSize, view }
-            for (const item of sortedImages(layer.images)) {
+            for (const item of visiblePictures(layer)) {
               drawImageItem(ctx, item, spriteAssets, dragRef?.current ?? null, looks)
             }
           }}
@@ -148,6 +151,7 @@ export const KonvaTilemapLayer = React.memo(function KonvaTilemapLayer({
             const ctx = context._context as CanvasRenderingContext2D
             ctx.imageSmoothingEnabled = false
 
+            if (!isDataLayer(layer)) return
             const data = layer.data
             if (!data) return
 
@@ -190,4 +194,4 @@ export const KonvaTilemapLayer = React.memo(function KonvaTilemapLayer({
       ))}
     </Group>
   )
-})
+}, sameLayers)

@@ -6,9 +6,7 @@ import { useEditorSelector, type EditorContextValue } from '../EditorContext';
 import type { MapData } from '@/types/editor';
 
 import { MapsPanel } from '@/components/editor/panels/MapsPanel';
-import { LayersPanel } from '@/components/editor/panels/LayersPanel';
-import { useDropShadow } from '@/components/editor/look/DropShadowMenuItem';
-import { EntityTree, entityCreators } from '@/components/editor/panels/EntityTree';
+import { SceneTree } from '@/components/editor/panels/SceneTree';
 import { CollisionPanel } from '@/components/editor/panels/CollisionPanel';
 import { PropertiesPanel } from '@/components/editor/panels/PropertiesPanel';
 import { ImagesPanel } from '@/components/editor/panels/ImagesPanel';
@@ -18,6 +16,8 @@ import { ActiveSelectionPanel } from '@/components/editor/panels/ActiveSelection
 import { DatabasePanel } from '@/components/editor/panels/DatabasePanel';
 import { LookPanel } from '@/components/editor/look/LookPanel';
 import { MapCanvas } from '@/components/editor/canvas/MapCanvas';
+
+const NO_NODES: never[] = [];
 
 // Stable no-op used as a placeholder for callbacks on inactive canvases.
 // Defined at module scope so it's the same reference every render — avoids
@@ -83,128 +83,14 @@ export function MapsWrapper(_props: IDockviewPanelProps) {
   );
 }
 
-const selectLayers = (c: EditorContextValue) => ({
-  setFocusedDomain: c.setFocusedDomain,
-  hasActiveMap: !!c.activeMap,
-  layers: c.layers,
-  activeLayerId: c.activeLayerId,
-  setActiveLayerId: c.setActiveLayerId,
-  selectLayer: c.selectLayer,
-  selectedLayerIds: c.selectedLayerIds,
-  justCreatedLayer: c.justCreatedLayer,
-  showEntities: c.showEntities,
-  toggleShowEntities: c.toggleShowEntities,
-  entitiesIndex: c.activeMap?.entitiesIndex ?? 0,
-  setEntitiesIndex: c.setEntitiesIndex,
-  setSelectedEntityId: c.setSelectedEntityId,
-  // the entity tree under the Entities row
-  entities: c.entities,
-  selectedEntityId: c.selectedEntityId,
-  handleCreateEntity: c.handleCreateEntity,
-  handleDeleteEntity: c.handleDeleteEntity,
-  handleDuplicateEntity: c.handleDuplicateEntity,
-  handleRenameEntity: c.handleRenameEntity,
-  handleReorderEntities: c.handleReorderEntities,
-  startPlacement: c.startPlacement,
-  entityFolders: c.entityFolders,
-  createEntityFolder: c.createEntityFolder,
-  renameEntityFolder: c.renameEntityFolder,
-  deleteEntityFolder: c.deleteEntityFolder,
-  toggleEntityFolderVisibility: c.toggleEntityFolderVisibility,
-  toggleEntityFolderExpanded: c.toggleEntityFolderExpanded,
-  toggleEntityVisibility: c.toggleEntityVisibility,
-  moveEntityToFolder: c.moveEntityToFolder,
-  toggleLayerVisibility: c.toggleLayerVisibility,
-  toggleLayerLock: c.toggleLayerLock,
-  setLayerYSort: c.setLayerYSort,
-  handleDeleteLayer: c.handleDeleteLayer,
-  handleReorderLayers: c.handleReorderLayers,
-  handleCreateLayerOfType: c.handleCreateLayerOfType,
-  handleRenameLayer: c.handleRenameLayer,
-  handleDuplicateLayer: c.handleDuplicateLayer,
-  copyLayers: c.copyLayers,
-  pasteLayers: c.pasteLayers,
-  toggleFolderCollapsed: c.toggleFolderCollapsed,
-  setConfirmDialog: c.setConfirmDialog,
-});
-
+/** The Scene panel (dock panel `layers`, so saved layouts keep working): the map's scene tree. */
 export function LayersWrapper(_props: IDockviewPanelProps) {
-  const ctx = useEditorSelector(selectLayers);
-  const bindings = useBindings();
-  const dropShadow = useDropShadow();
-  const { placeNew, placePrefab } = entityCreators({ startPlacement: ctx.startPlacement, createEntity: ctx.handleCreateEntity });
-  const entitiesSlot = {
-    count: ctx.entities.length,
-    hasSelection: !!ctx.selectedEntityId,
-    onNew: () => placeNew(),
-    onPrefab: placePrefab,
-    onNewFolder: () => ctx.createEntityFolder?.(),
-    tree: (
-      // Clicks in the tree make the entities the target of Delete / Copy / Paste, not the layers.
-      <div
-        onClick={(e) => {
-          e.stopPropagation();
-          ctx.setFocusedDomain('entities');
-        }}
-      >
-        <EntityTree
-          entities={ctx.entities}
-          selectedEntityId={ctx.selectedEntityId}
-          setSelectedEntityId={ctx.setSelectedEntityId}
-          createEntity={ctx.handleCreateEntity}
-          deleteEntity={ctx.handleDeleteEntity}
-          duplicateEntity={ctx.handleDuplicateEntity}
-          renameEntity={ctx.handleRenameEntity}
-          reorderEntities={ctx.handleReorderEntities}
-          setConfirmDialog={ctx.setConfirmDialog}
-          startPlacement={ctx.startPlacement}
-          entityFolders={ctx.entityFolders}
-          renameEntityFolder={ctx.renameEntityFolder}
-          deleteEntityFolder={ctx.deleteEntityFolder}
-          toggleEntityFolderVisibility={ctx.toggleEntityFolderVisibility}
-          toggleEntityFolderExpanded={ctx.toggleEntityFolderExpanded}
-          toggleEntityVisibility={ctx.toggleEntityVisibility}
-          moveEntityToFolder={ctx.moveEntityToFolder}
-        />
-      </div>
-    ),
-  };
   return (
     <div
-      onClick={() => ctx.setFocusedDomain('layers')}
       className="flex-1 overflow-y-auto p-2 text-xs min-h-0 bg-sidebar-background h-full"
+      data-testid="scene-panel"
     >
-      <LayersPanel
-        hasActiveMap={ctx.hasActiveMap}
-        layers={ctx.layers}
-        activeLayerId={ctx.activeLayerId}
-        setActiveLayerId={ctx.setActiveLayerId}
-        selectLayer={ctx.selectLayer}
-        selectedLayerIds={ctx.selectedLayerIds}
-        justCreatedLayer={ctx.justCreatedLayer}
-        newLayerKeys={describeBindings('layer.new', bindings)}
-        newFolderKeys={describeBindings('layer.newFolder', bindings)}
-        showEntities={ctx.showEntities}
-        toggleShowEntities={ctx.toggleShowEntities}
-        entitiesIndex={ctx.entitiesIndex}
-        setEntitiesIndex={ctx.setEntitiesIndex}
-        setSelectedEntityId={ctx.setSelectedEntityId}
-        entitiesSlot={entitiesSlot}
-        toggleLayerVisibility={ctx.toggleLayerVisibility}
-        toggleLayerLock={ctx.toggleLayerLock}
-        setLayerYSort={ctx.setLayerYSort}
-        addDropShadow={(layerId) => dropShadow({ kind: 'layer', layerId })}
-        deleteLayer={ctx.handleDeleteLayer}
-        reorderLayers={ctx.handleReorderLayers}
-        createLayerOfType={ctx.handleCreateLayerOfType}
-        renameLayer={ctx.handleRenameLayer}
-        duplicateLayer={ctx.handleDuplicateLayer}
-        copyLayers={ctx.copyLayers}
-        pasteLayers={ctx.pasteLayers}
-        editKeys={{ copy: describeBindings('edit.copy', bindings), paste: describeBindings('edit.paste', bindings), duplicate: describeBindings('edit.duplicate', bindings) }}
-        toggleFolderCollapsed={ctx.toggleFolderCollapsed}
-        setConfirmDialog={ctx.setConfirmDialog}
-      />
+      <SceneTree />
     </div>
   );
 }
@@ -215,9 +101,9 @@ function RetiredPanel(_props: IDockviewPanelProps) {
 }
 
 const selectProperties = (c: EditorContextValue) => ({
-  layers: c.layers,
+  nodes: c.activeMap?.nodes,
   activeLayerId: c.activeLayerId,
-  updateLayers: c.updateLayers,
+  editNode: c.editNode,
   entities: c.entities,
   selectedEntityId: c.selectedEntityId,
   handleRenameEntity: c.handleRenameEntity,
@@ -240,9 +126,9 @@ function PropertiesBody({ entityMode }: { entityMode: boolean }) {
     // A plain block that scrolls vertically: a flex column here let the inspector shrink instead of scroll.
     <div className="h-full min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain p-2 text-xs text-muted-foreground bg-card/40" data-testid="properties-scroll">
       <PropertiesPanel
-        layers={ctx.layers}
+        nodes={ctx.nodes ?? NO_NODES}
         activeLayerId={ctx.activeLayerId}
-        updateLayers={ctx.updateLayers}
+        editNode={ctx.editNode}
         entities={ctx.entities}
         selectedEntityId={entityMode ? ctx.selectedEntityId : null}
         renameEntity={ctx.handleRenameEntity}
@@ -296,8 +182,6 @@ export function LookWrapper(_props: IDockviewPanelProps) {
 const selectCanvas = (c: EditorContextValue) => ({
   activeMap: c.activeMap,
   maps: c.maps,
-  layers: c.layers,
-  entities: c.entities,
   onSelectMap: c.onSelectMap,
   activeTool: c.activeTool,
   paintMode: c.paintMode,
@@ -327,14 +211,12 @@ const selectCanvas = (c: EditorContextValue) => ({
   handleDeleteEntity: c.handleDeleteEntity,
   handleUpdateComponentProp: c.handleUpdateComponentProp,
   handleUpdateComponentProps: c.handleUpdateComponentProps,
-  showEntities: c.showEntities,
-  entityFolders: c.entityFolders,
   pinSelection: c.pinSelection,
   selectedLayerIds: c.selectedLayerIds,
   pendingImage: c.pendingImage,
   cancelImagePlacement: c.cancelImagePlacement,
   selectedImageId: c.selectedImageId,
-  setSelectedImageId: c.setSelectedImageId,
+  clearSelection: c.clearSelection,
   pickedImageIds: c.pickedImageIds,
   selectImage: c.selectImage,
   moveImages: c.moveImages,
@@ -343,7 +225,8 @@ const selectCanvas = (c: EditorContextValue) => ({
   setActiveLayerId: c.setActiveLayerId,
   addImage: c.addImage,
   updateImage: c.updateImage,
-  updateLayers: c.updateLayers,
+  setCollisionShapes: c.setCollisionShapes,
+  deleteNodes: c.deleteNodes,
 });
 
 export function CanvasWrapper(props: IDockviewPanelProps) {
@@ -365,9 +248,6 @@ export function CanvasWrapper(props: IDockviewPanelProps) {
       ) || null
     );
   }, [isActive, ctx.activeMap, ctx.maps, fileName, folderPath]);
-
-  const currentLayers = isActive ? ctx.layers : targetMap?.layers || [];
-  const currentEntities = isActive ? ctx.entities : targetMap?.entities || [];
 
   const { addImage, updateImage, activeLayerId, pendingImage } = ctx;
   const placeKeys = describeBindings('image.placeMultiple', useBindings());
@@ -404,7 +284,6 @@ export function CanvasWrapper(props: IDockviewPanelProps) {
         activeTool={ctx.activeTool}
         paintMode={ctx.paintMode}
         activeMap={targetMap}
-        layers={currentLayers}
         tilesets={ctx.tilesets}
         tileSelection={isActive ? ctx.tileSelection : null}
         setTileSelection={ctx.setTileSelection}
@@ -417,7 +296,6 @@ export function CanvasWrapper(props: IDockviewPanelProps) {
         handlePaintBucket={isActive ? ctx.handlePaintBucket : noop}
         handleRectangleFill={isActive ? ctx.handleRectangleFill : noop}
         handleCommit={isActive ? ctx.handleCommit : noop}
-        entities={currentEntities}
         selectedEntityId={isActive ? ctx.selectedEntityId : null}
         setSelectedEntityId={isActive ? ctx.setSelectedEntityId : noop}
         moveEntity={isActive ? ctx.handleMoveEntity : noop}
@@ -432,15 +310,13 @@ export function CanvasWrapper(props: IDockviewPanelProps) {
         deleteEntity={ctx.handleDeleteEntity}
         updateComponentProp={ctx.handleUpdateComponentProp}
         updateComponentProps={ctx.handleUpdateComponentProps}
-        showEntities={ctx.showEntities}
-        entityFolders={ctx.entityFolders}
         pinSelection={isActive ? ctx.pinSelection : false}
         selectedLayerIds={isActive ? ctx.selectedLayerIds : []}
         pendingImage={isActive ? ctx.pendingImage : null}
         commitImagePlacement={isActive ? commitImagePlacement : noop}
         cancelImagePlacement={isActive ? ctx.cancelImagePlacement : noop}
         selectedImageId={isActive ? ctx.selectedImageId : null}
-        setSelectedImageId={isActive ? ctx.setSelectedImageId : noop}
+        clearImageSelection={isActive ? () => ctx.setActiveLayerId(ctx.activeLayerId) : undefined}
         pickedImageIds={isActive ? ctx.pickedImageIds : undefined}
         selectImage={isActive ? ctx.selectImage : noop}
         moveImages={isActive ? ctx.moveImages : noop}
@@ -450,7 +326,8 @@ export function CanvasWrapper(props: IDockviewPanelProps) {
         moveImage={isActive ? moveImage : noop}
         resizingImageId={isActive ? ctx.resizingImageId : null}
         resizeImage={isActive ? resizeImage : noop}
-        updateLayers={isActive ? ctx.updateLayers : undefined}
+        setCollisionShapes={isActive ? ctx.setCollisionShapes : undefined}
+        deleteCollisionItem={isActive ? (id: string) => ctx.deleteNodes([id]) : undefined}
       />
     </div>
   );

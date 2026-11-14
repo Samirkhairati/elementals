@@ -1,14 +1,16 @@
 import { useCallback } from 'react'
-import { Layer, TileSelection, ActiveTool, PaintMode, DebugInfo, MapData, Pos } from '@/types/editor'
+import { TileSelection, ActiveTool, PaintMode, DebugInfo, MapData, Pos } from '@/types/editor'
 import { brushPaint, bucketFill, erase, fillCells, floodRegion, rectangleFill, type TileMap } from '@/lib/paintOps'
 import { fitSelectionToLayer, partSelection, targetLayerIndex } from '@/lib/layerSelection'
-import { assignNewCells, hasNewCells, nextTileGroupName } from '../../../shared/collisionLayers'
+import { paintCollision } from '@/lib/sceneOps'
+import { lockedNode, shown, type SceneIndex } from '@/lib/sceneIndex'
 import { polygonEditStore } from '@/lib/polygonEditStore'
+import { isDataLayer, updateNode, type DataLayerNode, type SceneNode } from '../../../shared/sceneTree'
 
 const COLLISION_MARKER: TileSelection = { width: 1, height: 1, tiles: [{ tilesetId: '__collision__', x: 0, y: 0 }] }
 
 /** What a layer paints with: a collision layer always takes the collision marker (fitted from the selection, or the marker itself). */
-function selectionFor(layer: Layer, selection: TileSelection | null): TileSelection | null {
+function selectionFor(layer: DataLayerNode, selection: TileSelection | null): TileSelection | null {
   if (layer.type === 'collision') return (selection && fitSelectionToLayer('collision', selection)) || COLLISION_MARKER
   return selection && fitSelectionToLayer(layer.type, selection)
 }
@@ -17,19 +19,11 @@ function selectionFor(layer: Layer, selection: TileSelection | null): TileSelect
  * The layer with its newly painted data. On a collision layer the new cells join the picked tiles item of the Collision
  * panel; with none picked (or a shape picked) a new tiles item is made and picked, so every painted tile is in an item.
  */
-export function withPaintedData(layer: Layer, data: TileMap): Layer {
-  if (layer.type !== 'collision' || !hasNewCells(layer, data)) return { ...layer, data }
-  const groups = layer.tileGroups ?? []
-  const picked = polygonEditStore.get().selectedShapeId
-  let groupId = picked && groups.some((g) => g.id === picked) ? picked : null
-  let tileGroups = groups
-  if (!groupId) {
-    const group = { id: crypto.randomUUID(), name: nextTileGroupName(layer) }
-    tileGroups = [...groups, group]
-    groupId = group.id
-    polygonEditStore.set({ selectedShapeId: group.id, brush: 'tiles' })
-  }
-  return { ...layer, tileGroups, data: assignNewCells(layer, data, groupId) }
+export function withPaintedData(layer: DataLayerNode, data: TileMap): DataLayerNode {
+  if (layer.type !== 'collision') return { ...layer, data }
+  const painted = paintCollision(layer, data, polygonEditStore.get().selectedShapeId, () => crypto.randomUUID())
+  if (painted.created && painted.tilesId) polygonEditStore.set({ selectedShapeId: painted.tilesId, brush: 'tiles' })
+  return painted.layer
 }
 
 interface UsePaintToolsProps {
@@ -41,43 +35,41 @@ interface UsePaintToolsProps {
   activeTool: ActiveTool
   paintMode: PaintMode
   paintStartPos: Pos | null
-  /** Latest layers, read synchronously so several paint calls in one tick compose. */
-  getLayers: () => Layer[]
-  setLayers: (layers: Layer[]) => void
-  /** Record a history step for the current layers + entities (no arguments: the caller reads its own refs). */
-  commitHistory: () => void
+  /** The latest scene tree index, read synchronously so several paint calls in one tick compose. */
+  getIndex: () => SceneIndex
+  /** Changes the tree: with a history step (`commit`) or without one (`commitView`, a stroke in progress). */
+  commit: (updater: (prev: SceneNode[]) => SceneNode[]) => void
+  commitView: (updater: (prev: SceneNode[]) => SceneNode[]) => void
   setDebugInfo: (info: DebugInfo) => void
-  setActiveMap: React.Dispatch<React.SetStateAction<MapData | null>>
 }
 
 /** The active layer if it can be painted, otherwise the reason it cannot. */
-function locatePaintableLayer(layers: Layer[], layerId: string) {
-  const layerIndex = layers.findIndex(l => l.id === layerId)
-  if (layerIndex === -1) return 'Layer not found'
-  const layer = layers[layerIndex]
-  if (layer.type === 'image') return 'Image layers hold images, not tiles'
-  if (layer.type === 'folder') return 'Folders hold layers, not tiles'
-  if (layer.locked || !layer.visible) return 'Layer locked/hidden'
-  return { layers, layerIndex, layer }
+function locatePaintableLayer(index: SceneIndex, layerId: string): string | DataLayerNode {
+  const node = index.byId.get(layerId)?.node
+  if (!node) return 'Layer not found'
+  if (node.type === 'image') return 'Image layers hold images, not tiles'
+  if (node.type === 'group') return 'Groups hold layers, not tiles'
+  if (!isDataLayer(node)) return 'Only layers can be painted'
+  if (lockedNode(index, layerId) || !shown(index, layerId)) return 'Layer locked/hidden'
+  return node
 }
 
 interface MultiTarget {
-  layerIndex: number
-  layer: Layer
+  layer: DataLayerNode
   selection: TileSelection
 }
 
 /** The paintable layers of a multi-layer selection, each with the cells it contributed. */
-function multiTargets(layers: Layer[], selection: TileSelection): MultiTarget[] {
-  const seen = new Set<number>()
+function multiTargets(index: SceneIndex, selection: TileSelection): MultiTarget[] {
+  const seen = new Set<string>()
   const targets: MultiTarget[] = []
   for (const part of selection.layers || []) {
-    const layerIndex = targetLayerIndex(layers, part)
-    if (layerIndex === -1 || seen.has(layerIndex)) continue
-    const layer = layers[layerIndex]
-    if (layer.type === 'image' || layer.type === 'folder' || layer.locked || !layer.visible) continue
-    seen.add(layerIndex)
-    targets.push({ layerIndex, layer, selection: partSelection(selection, part) })
+    const at = targetLayerIndex(index.layers, part)
+    if (at === -1) continue
+    const layer = index.layers[at]
+    if (seen.has(layer.id) || !isDataLayer(layer) || locatePaintableLayer(index, layer.id) === 'Layer locked/hidden') continue
+    seen.add(layer.id)
+    targets.push({ layer, selection: partSelection(selection, part) })
   }
   return targets
 }
@@ -85,7 +77,7 @@ function multiTargets(layers: Layer[], selection: TileSelection): MultiTarget[] 
 /**
  * Thin React wrapper around the pure operations in `lib/paintOps`:
  * validates the target layer, runs the op, then publishes the result once
- * (layers state, active map, optional history step). No side effects run inside React updaters.
+ * (tree change, optional history step). No side effects run inside React updaters.
  */
 export function usePaintTools({
   activeMap,
@@ -95,11 +87,10 @@ export function usePaintTools({
   activeTool,
   paintMode,
   paintStartPos,
-  getLayers,
-  setLayers,
-  commitHistory,
+  getIndex,
+  commit,
+  commitView,
   setDebugInfo,
-  setActiveMap,
 }: UsePaintToolsProps) {
   const mapWidth = activeMap?.width ?? 0
   const mapHeight = activeMap?.height ?? 0
@@ -110,33 +101,27 @@ export function usePaintTools({
   // Several layers painted at once stay in step: per-cell randomness would give each layer a different pick.
   const multiMode: PaintMode = paintMode === 'random' ? 'discontinuous' : paintMode
 
-  const publish = useCallback(
-    (layers: Layer[], layerIndex: number, layer: Layer, data: TileMap, withHistory: boolean) => {
-      const next = [...layers]
-      next[layerIndex] = withPaintedData(layer, data)
-      setLayers(next)
-      setActiveMap(m => (m ? { ...m, layers: next } : m))
-      if (withHistory) commitHistory()
+  const publishMany = useCallback(
+    (updates: Map<string, TileMap>, withHistory: boolean) => {
+      const apply = (prev: SceneNode[]) => {
+        let next = prev
+        for (const [id, data] of updates) next = updateNode(next, id, (n) => (isDataLayer(n) ? withPaintedData(n, data) : n))
+        return next
+      }
+      if (withHistory) commit(apply)
+      else commitView(apply)
     },
-    [setLayers, setActiveMap, commitHistory]
+    [commit, commitView]
   )
 
-  const publishMany = useCallback(
-    (layers: Layer[], updates: Map<number, TileMap>, withHistory: boolean) => {
-      const next = layers.map((layer, index) => (updates.has(index) ? withPaintedData(layer, updates.get(index)!) : layer))
-      setLayers(next)
-      setActiveMap(m => (m ? { ...m, layers: next } : m))
-      if (withHistory) commitHistory()
-    },
-    [setLayers, setActiveMap, commitHistory]
-  )
+  const publish = useCallback((layerId: string, data: TileMap, withHistory: boolean) => publishMany(new Map([[layerId, data]]), withHistory), [publishMany])
 
   const handlePaint = useCallback(
     (gridX: number, gridY: number) => {
       const time = Date.now()
       if (!hasMap) { setDebugInfo({ action: 'paint', error: 'No active map', time }); return }
       if (!activeLayerId) { setDebugInfo({ action: 'paint', error: 'No active layer', time }); return }
-      const activeIsCollision = getLayers().some(l => l.id === activeLayerId && l.type === 'collision')
+      const activeIsCollision = getIndex().byId.get(activeLayerId)?.node.type === 'collision'
       if (activeTool === 'brush' && !tileSelection && !activeIsCollision) { setDebugInfo({ action: 'paint', error: 'No tile selected', time }); return }
       if (gridX < 0 || gridX >= mapWidth || gridY < 0 || gridY >= mapHeight) {
         setDebugInfo({ action: 'paint', error: 'Out of bounds', x: gridX, y: gridY, time })
@@ -144,10 +129,9 @@ export function usePaintTools({
       }
 
       if (isMulti && tileSelection) {
-        const layers = getLayers()
-        const targets = multiTargets(layers, tileSelection)
+        const targets = multiTargets(getIndex(), tileSelection)
         if (targets.length === 0) { setDebugInfo({ action: 'paint', error: 'No paintable layer in the selection', time }); return }
-        const updates = new Map<number, TileMap>()
+        const updates = new Map<string, TileMap>()
         for (const t of targets) {
           const data =
             activeTool === 'brush'
@@ -155,16 +139,15 @@ export function usePaintTools({
               : activeTool === 'eraser'
                 ? erase(t.layer.data, size, gridX, gridY)
                 : null
-          if (data) updates.set(t.layerIndex, data)
+          if (data) updates.set(t.layer.id, data)
         }
-        if (updates.size > 0) publishMany(layers, updates, false)
+        if (updates.size > 0) publishMany(updates, false)
         setDebugInfo({ action: activeTool, error: 'Success', x: gridX, y: gridY, time })
         return
       }
 
-      const target = locatePaintableLayer(getLayers(), activeLayerId)
-      if (typeof target === 'string') { setDebugInfo({ action: 'paint', error: target, time }); return }
-      const { layers, layerIndex, layer } = target
+      const layer = locatePaintableLayer(getIndex(), activeLayerId)
+      if (typeof layer === 'string') { setDebugInfo({ action: 'paint', error: layer, time }); return }
 
       let data: TileMap | null = null
       if (activeTool === 'brush') {
@@ -179,11 +162,11 @@ export function usePaintTools({
         }
       }
 
-      if (data) publish(layers, layerIndex, layer, data, false)
+      if (data) publish(layer.id, data, false)
       setDebugInfo({ action: activeTool, error: 'Success', x: gridX, y: gridY, time })
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [hasMap, mapWidth, mapHeight, activeLayerId, tileSelection, activeTool, paintMode, paintStartPos, isMulti, multiMode, getLayers, publish, publishMany, setDebugInfo]
+    [hasMap, mapWidth, mapHeight, activeLayerId, tileSelection, activeTool, paintMode, paintStartPos, isMulti, multiMode, getIndex, publish, publishMany, setDebugInfo]
   )
 
   const handlePaintBucket = useCallback(
@@ -191,33 +174,31 @@ export function usePaintTools({
       if (!hasMap || !activeLayerId) return
 
       if (isMulti && tileSelection) {
-        const layers = getLayers()
-        const targets = multiTargets(layers, tileSelection)
+        const targets = multiTargets(getIndex(), tileSelection)
         // The region is decided on the active layer (or the first one in the selection) and filled on all of them.
-        const primary = targets.find(t => t.layer.id === activeLayerId) ?? targets[0]
+        const primary = targets.find((t) => t.layer.id === activeLayerId) ?? targets[0]
         if (!primary) return
         const region = floodRegion(primary.layer.data, size, gridX, gridY)
         if (!region) return
         const anchor = paintStartPos ?? { x: gridX, y: gridY }
-        const updates = new Map<number, TileMap>()
+        const updates = new Map<string, TileMap>()
         for (const t of targets) {
           const data = fillCells(t.layer.data, size, region, t.selection, multiMode, anchor)
-          if (data) updates.set(t.layerIndex, data)
+          if (data) updates.set(t.layer.id, data)
         }
-        if (updates.size > 0) publishMany(layers, updates, true)
+        if (updates.size > 0) publishMany(updates, true)
         return
       }
 
-      const target = locatePaintableLayer(getLayers(), activeLayerId)
-      if (typeof target === 'string') return
-      const { layers, layerIndex, layer } = target
+      const layer = locatePaintableLayer(getIndex(), activeLayerId)
+      if (typeof layer === 'string') return
       const fitted = selectionFor(layer, tileSelection)
       if (!fitted) return
       const data = bucketFill(layer.data, size, gridX, gridY, fitted, paintMode, paintStartPos)
-      if (data) publish(layers, layerIndex, layer, data, true)
+      if (data) publish(layer.id, data, true)
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [hasMap, mapWidth, mapHeight, activeLayerId, tileSelection, paintMode, paintStartPos, isMulti, multiMode, getLayers, publish, publishMany]
+    [hasMap, mapWidth, mapHeight, activeLayerId, tileSelection, paintMode, paintStartPos, isMulti, multiMode, getIndex, publish, publishMany]
   )
 
   const handleRectangleFill = useCallback(
@@ -225,26 +206,24 @@ export function usePaintTools({
       if (!hasMap || !activeLayerId) return
 
       if (isMulti && tileSelection) {
-        const layers = getLayers()
-        const updates = new Map<number, TileMap>()
-        for (const t of multiTargets(layers, tileSelection)) {
+        const updates = new Map<string, TileMap>()
+        for (const t of multiTargets(getIndex(), tileSelection)) {
           const data = rectangleFill(t.layer.data, size, startPos, endPos, t.selection, multiMode)
-          if (data) updates.set(t.layerIndex, data)
+          if (data) updates.set(t.layer.id, data)
         }
-        if (updates.size > 0) publishMany(layers, updates, true)
+        if (updates.size > 0) publishMany(updates, true)
         return
       }
 
-      const target = locatePaintableLayer(getLayers(), activeLayerId)
-      if (typeof target === 'string') return
-      const { layers, layerIndex, layer } = target
+      const layer = locatePaintableLayer(getIndex(), activeLayerId)
+      if (typeof layer === 'string') return
       const fitted = selectionFor(layer, tileSelection)
       if (!fitted) return
       const data = rectangleFill(layer.data, size, startPos, endPos, fitted, paintMode)
-      if (data) publish(layers, layerIndex, layer, data, true)
+      if (data) publish(layer.id, data, true)
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [hasMap, mapWidth, mapHeight, activeLayerId, tileSelection, paintMode, isMulti, multiMode, getLayers, publish, publishMany]
+    [hasMap, mapWidth, mapHeight, activeLayerId, tileSelection, paintMode, isMulti, multiMode, getIndex, publish, publishMany]
   )
 
   return { handlePaint, handlePaintBucket, handleRectangleFill }

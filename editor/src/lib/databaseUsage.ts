@@ -3,12 +3,13 @@
 
 import type { Command, Condition, EventState } from '../../../shared/engine/types'
 import { getCommandDef, isFieldVisible } from '../../../shared/engine/commands'
+import { entitiesOfMap } from '../../../shared/sceneTreeMigrate'
 
-/** The slice of a map this scanner needs (a `MapData` fits). */
+/** The slice of a map this scanner needs (a `MapData` fits): the entities are read from its scene tree. */
 export interface UsageMap {
   fileName: string
   name: string
-  entities?: UsageEntity[]
+  nodes?: readonly unknown[]
 }
 
 export interface UsageEntity {
@@ -134,7 +135,7 @@ export function scanDatabaseUsage(maps: readonly UsageMap[]): DatabaseUsage {
   }
 
   for (const map of maps) {
-    for (const entity of map.entities ?? []) {
+    for (const entity of entitiesOfMap(map) as UsageEntity[]) {
       const event = entity.components?.Event
       if (!isObject(event) || !Array.isArray(event.states)) continue
       ;(event.states as EventState[]).forEach((state, stateIndex) => {
@@ -186,7 +187,7 @@ export function scanCommonEventUsage(maps: readonly UsageMap[], events: readonly
     return ids
   }
   for (const map of maps) {
-    for (const entity of map.entities ?? []) {
+    for (const entity of entitiesOfMap(map) as UsageEntity[]) {
       const event = entity.components?.Event
       if (!isObject(event) || !Array.isArray(event.states)) continue
       ;(event.states as EventState[]).forEach((state, i) => {

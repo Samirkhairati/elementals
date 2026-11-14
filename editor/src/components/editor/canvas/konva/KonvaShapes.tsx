@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type Konva from 'konva'
 import { Group, Rect, Shape } from 'react-konva'
-import type { CollisionShape, EntityData, Layer, ShapePoint } from '@/types/editor'
+import type { CollisionShape, EntityData, ShapePoint } from '@/types/editor'
+import { collisionLayerLike, collisionShapeNodes, collisionTileNodes, type CollisionLayerNode } from '../../../../../../shared/sceneTree'
+import { lockedNode, shown, type SceneIndex } from '@/lib/sceneIndex'
 import { translatePoints } from '../../../../../../shared/collisionShapes'
-import { removeCollisionItem, tileGroupCells } from '../../../../../../shared/collisionLayers'
+import { tileGroupCells } from '../../../../../../shared/collisionLayers'
 import { colliderLocalRect, colliderPolygon, normalizeCollider } from '@/lib/entityVisuals'
 import {
   alignmentGuides,
@@ -33,9 +35,10 @@ const GUIDE_EXACT = '#22d3ee'
 const GUIDE_NEAR = 'rgba(34,211,238,0.55)'
 
 interface Props {
-  layers: Layer[]
+  /** The scene tree's index (the collision layers, and whether they are shown or locked). */
+  index: SceneIndex
   activeLayerId: string | null
-  entities: EntityData[]
+  entities: readonly EntityData[]
   /** While an entity is selected the layer's shapes are not edited (clicks pick and drag entities). */
   selectedEntityId?: string | null
   /** Tiles across, to find the cells of the picked tiles item. */
@@ -44,8 +47,10 @@ interface Props {
   enabled?: boolean
   /** An entity or a picture is being placed: clicks go to the placement, not to the shapes. */
   placing?: boolean
-  /** Replaces the layer list (one undo step). */
-  updateLayers?: (layers: Layer[]) => void
+  /** Replaces the shapes of a collision layer (one undo step). */
+  setShapes?: (layerId: string, shapes: readonly CollisionShape[]) => void
+  /** Removes an item (a tiles item with its cells, or a shape) of a collision layer (one undo step). */
+  deleteItem?: (itemId: string) => void
   updateComponentProps?: (entityId: string, type: 'Collider', props: Record<string, unknown>) => void
 }
 
@@ -64,14 +69,15 @@ const isTyping = (t: EventTarget | null) => t instanceof HTMLElement && (t.isCon
  * Delete removes the picked shape. Guides show while a point lines up with another collider's points; nothing snaps.
  */
 export const KonvaShapes = React.memo(function KonvaShapes({
-  layers,
+  index,
   activeLayerId,
   entities,
   selectedEntityId = null,
   mapWidth = 0,
   enabled = true,
   placing = false,
-  updateLayers,
+  setShapes,
+  deleteItem,
   updateComponentProps,
 }: Props) {
   const { selectedShapeId, colliderEntityId, brush } = usePolygonEdit()
@@ -86,13 +92,16 @@ export const KonvaShapes = React.memo(function KonvaShapes({
   const spaceDown = useRef(false)
 
   const colliderEntity = enabled && colliderEntityId ? entities.find((e) => e.id === colliderEntityId) ?? null : null
-  const activeLayer = layers.find((l) => l.id === activeLayerId) ?? null
-  const collisionLayer = enabled && !colliderEntity && activeLayer?.type === 'collision' ? activeLayer : null
+  const activeNode = index.byId.get(activeLayerId ?? '')?.node
+  const activeLayer: CollisionLayerNode | null = activeNode?.type === 'collision' ? activeNode : null
+  const activeShown = !!activeLayer && shown(index, activeLayer.id)
+  const activeLocked = !!activeLayer && lockedNode(index, activeLayer.id)
+  const collisionLayer = enabled && !colliderEntity ? activeLayer : null
   const layerMode = collisionLayer !== null && brush === 'shape' && !selectedEntityId
-  const editable = colliderEntity !== null || (layerMode && !!activeLayer && activeLayer.visible && !activeLayer.locked)
+  const editable = colliderEntity !== null || (layerMode && !!activeLayer && activeShown && !activeLocked)
   const active = !placing && (colliderEntity !== null || layerMode)
   // The picked tiles item of the active collision layer (highlighted; Delete removes it).
-  const pickedTiles = collisionLayer?.tileGroups?.some((g) => g.id === selectedShapeId) ? selectedShapeId : null
+  const pickedTiles = collisionLayer && collisionTileNodes(collisionLayer).some((g) => g.id === selectedShapeId) ? selectedShapeId : null
 
   // The collider mode ends when its entity goes away.
   useEffect(() => {
@@ -118,14 +127,14 @@ export const KonvaShapes = React.memo(function KonvaShapes({
       const poly = colliderPolygon(colliderEntity.components.Collider)
       return poly.points ? [{ id: COLLIDER_SHAPE_ID, points: translatePoints(poly.points, colliderEntity.x, colliderEntity.y), closed: poly.closed !== false }] : []
     }
-    return layerMode ? activeLayer?.shapes ?? [] : []
+    return layerMode && activeLayer ? collisionShapeNodes(activeLayer) : []
   }, [colliderEntity, layerMode, activeLayer])
-  const shown = useMemo(() => (preview ? shapes.map((s) => (s.id === preview.id ? preview : s)) : shapes), [shapes, preview])
+  const shownShapes = useMemo(() => (preview ? shapes.map((s) => (s.id === preview.id ? preview : s)) : shapes), [shapes, preview])
 
   /** Every collider point on the map, for the guides. */
   const anchors = useMemo<ShapePoint[]>(() => {
     const out: ShapePoint[] = []
-    for (const l of layers) if (l.type === 'collision' && l.visible) for (const s of l.shapes ?? []) out.push(...s.points)
+    for (const l of index.layers) if (l.type === 'collision' && shown(index, l.id)) for (const s of collisionShapeNodes(l)) out.push(...s.points)
     for (const e of entities) {
       const c = e.components.Collider
       if (!c) continue
@@ -137,7 +146,7 @@ export const KonvaShapes = React.memo(function KonvaShapes({
       }
     }
     return out
-  }, [layers, entities])
+  }, [index, entities])
 
   const commit = useCallback(
     (next: CollisionShape[]) => {
@@ -152,9 +161,9 @@ export const KonvaShapes = React.memo(function KonvaShapes({
         return
       }
       if (!activeLayer) return
-      updateLayers?.(layers.map((l) => (l.id === activeLayer.id ? { ...l, shapes: next } : l)))
+      setShapes?.(activeLayer.id, next)
     },
-    [colliderEntity, activeLayer, layers, updateLayers, updateComponentProps]
+    [colliderEntity, activeLayer, setShapes, updateComponentProps]
   )
 
   const finish = useCallback(
@@ -315,22 +324,22 @@ export const KonvaShapes = React.memo(function KonvaShapes({
     return alignmentGuides(pool, live, 5 / (groupRef.current?.getStage()?.scaleX() || 1))
   }, [live?.x, live?.y, anchors, draft, d]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const otherLayers = useMemo(() => layers.filter((l) => l.type === 'collision' && l.visible && (!layerMode || l.id !== activeLayerId)), [layers, activeLayerId, layerMode])
-  const pickedCells = useMemo(() => (collisionLayer && pickedTiles && mapWidth > 0 ? tileGroupCells(collisionLayer, pickedTiles) : []), [collisionLayer, pickedTiles, mapWidth])
+  const otherLayers = useMemo(() => index.layers.filter((l): l is CollisionLayerNode => l.type === 'collision' && shown(index, l.id) && (!layerMode || l.id !== activeLayerId)), [index, activeLayerId, layerMode])
+  const pickedCells = useMemo(() => (collisionLayer && pickedTiles && mapWidth > 0 ? tileGroupCells(collisionLayerLike(collisionLayer), pickedTiles) : []), [collisionLayer, pickedTiles, mapWidth])
 
   // Delete removes the picked tiles item (with either brush); the shape editor's own keys handle shapes.
   useEffect(() => {
-    if (!collisionLayer || !pickedTiles || collisionLayer.locked) return
+    if (!collisionLayer || !pickedTiles || activeLocked) return
     const onKey = (e: KeyboardEvent) => {
       if (isTyping(e.target) || (e.key !== 'Delete' && e.key !== 'Backspace')) return
       e.preventDefault()
       e.stopImmediatePropagation()
-      updateLayers?.(layers.map((l) => (l.id === collisionLayer.id ? removeCollisionItem(l, pickedTiles) : l)))
+      deleteItem?.(pickedTiles)
       polygonEditStore.set({ selectedShapeId: null })
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
-  }, [collisionLayer, pickedTiles, layers, updateLayers])
+  }, [collisionLayer, pickedTiles, activeLocked, deleteItem])
   const closable = draft.length >= 3 && pointer !== null && closesAt(draft, pointer, 8 / (groupRef.current?.getStage()?.scaleX() || 1))
 
   return (
@@ -369,7 +378,7 @@ export const KonvaShapes = React.memo(function KonvaShapes({
           }
 
           // The picked tiles item: its cells outlined.
-          if (pickedCells.length > 0 && collisionLayer?.visible) {
+          if (pickedCells.length > 0 && activeShown) {
             ctx.save()
             ctx.lineWidth = 2 / s
             ctx.strokeStyle = SELECTED
@@ -382,8 +391,8 @@ export const KonvaShapes = React.memo(function KonvaShapes({
             }
             ctx.restore()
           }
-          for (const l of otherLayers) for (const shape of l.shapes ?? []) drawShape(shape, active ? 0.45 : 1, !layerMode && shape.id === selectedShapeId)
-          for (const shape of layerMode && !activeLayer?.visible ? [] : shown) {
+          for (const l of otherLayers) for (const shape of collisionShapeNodes(l)) drawShape(shape, active ? 0.45 : 1, !layerMode && shape.id === selectedShapeId)
+          for (const shape of layerMode && !activeShown ? [] : shownShapes) {
             const sel = shape.id === selectedShapeId
             drawShape(shape, 1, sel)
             if (active) for (const p of shape.points) handle(p, sel ? 7 : 5, sel ? SELECTED : '#fff')

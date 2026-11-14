@@ -1,4 +1,4 @@
-import { Layer, MapData, TilesetData } from '@/types/editor'
+import { MapData, TilesetData } from '@/types/editor'
 // The conversion and validation live in /shared so the editor and scripts/export-maps.mjs use the same code.
 import { collectUsedTilesetIds, convertEditorMapToTiled, serializeTiledMap } from '../../../shared/mapExport'
 import { validateEditorMap, validateTiledMap } from '../../../shared/mapSchema'
@@ -25,11 +25,11 @@ export type BuiltMap = { ok: true; json: string } | { ok: false; error: string }
 export async function buildGameMapJson(
   mapToExportRaw: MapData,
   tilesets: TilesetData[],
-  activeMap: MapData | null,
-  layers: Layer[]
+  activeMap: MapData | null
 ): Promise<BuiltMap> {
+  // The open map is the one being edited: its scene tree is the latest, whatever the copy in the maps list says.
   const mapToExport: EditorMap = (activeMap && mapToExportRaw.fileName === activeMap.fileName)
-    ? { ...mapToExportRaw, layers, entities: activeMap.entities || [] }
+    ? { ...mapToExportRaw, nodes: activeMap.nodes }
     : mapToExportRaw
 
   // Measure the images of the tilesets the map actually uses.
@@ -66,11 +66,10 @@ export async function buildGameMapJson(
 export async function exportMap(
   mapToExportRaw: MapData,
   tilesets: TilesetData[],
-  activeMap: MapData | null,
-  layers: Layer[]
+  activeMap: MapData | null
 ): Promise<void> {
   if (!window.electronAPI) return
-  const built = await buildGameMapJson(mapToExportRaw, tilesets, activeMap, layers)
+  const built = await buildGameMapJson(mapToExportRaw, tilesets, activeMap)
   if (!built.ok) {
     alert('Export failed: ' + built.error)
     return
@@ -88,8 +87,7 @@ export type GameExportOutcome = { ok: true; id: string; changed: boolean; assets
 export async function exportMapToGame(
   mapToExportRaw: MapData,
   tilesets: TilesetData[],
-  activeMap: MapData | null,
-  layers: Layer[]
+  activeMap: MapData | null
 ): Promise<GameExportOutcome> {
   if (!window.electronAPI) return { ok: false, error: 'The editor is not connected to the project files.' }
   // A window started before this feature existed has the old preload: say so instead of failing silently.
@@ -97,7 +95,7 @@ export async function exportMapToGame(
     return { ok: false, error: 'This editor window is out of date. Restart the editor (npm run dev) and try again.' }
   }
   try {
-    const built = await buildGameMapJson(mapToExportRaw, tilesets, activeMap, layers)
+    const built = await buildGameMapJson(mapToExportRaw, tilesets, activeMap)
     if (!built.ok) return built
 
     const res = await window.electronAPI.exportMapToGame(mapToExportRaw.fileName, built.json)

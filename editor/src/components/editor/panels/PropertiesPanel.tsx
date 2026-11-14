@@ -8,7 +8,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Layer, EntityData, ComponentType, type PropBag } from '@/types/editor'
+import { EntityData, ComponentType, type PropBag } from '@/types/editor'
+import type { SceneNode } from '../../../../../shared/sceneTree'
+import { sceneIndex } from '@/lib/sceneIndex'
 import { COMPONENT_REGISTRY } from '@/lib/componentRegistry'
 import { COMPONENT_TYPES } from '../../../../../shared/engine/components'
 import { entityIconName, pxToTile, summarizeEntity, tileToPxClamped } from '@/lib/entityVisuals'
@@ -19,9 +21,11 @@ import { SpriteThumb } from '../sprites/SpriteThumb'
 import { useEditorSelector, type EditorContextValue } from '../layout/EditorContext'
 
 interface PropertiesPanelProps {
-  layers: Layer[]
+  /** The map's scene tree (the active layer or group is looked up in it). */
+  nodes: readonly SceneNode[]
   activeLayerId: string | null
-  updateLayers: (newLayers: Layer[]) => void
+  /** Applies a patch of fields (name, z) to a node in one undo step. */
+  editNode: (id: string, patch: Record<string, unknown>) => void
   entities?: EntityData[]
   selectedEntityId?: string | null
   renameEntity?: (id: string, name: string) => void
@@ -89,9 +93,9 @@ function AddComponentMenu({ entity, addComponent }: { entity: EntityData; addCom
 }
 
 export function PropertiesPanel({
-  layers,
+  nodes,
   activeLayerId,
-  updateLayers,
+  editNode,
   entities = [],
   selectedEntityId = null,
   renameEntity,
@@ -199,21 +203,21 @@ export function PropertiesPanel({
 
   // ── Layer Properties View (Fallback) ──────────────────────────────────────
   if (activeLayerId) {
-    const layer = layers.find((l) => l.id === activeLayerId)
+    const layer = sceneIndex(nodes).byId.get(activeLayerId)?.node
     if (layer) {
       return (
         <div className="flex w-full flex-col gap-3 text-left">
-          <Card caps title="Layer">
+          <Card caps title={layer.type === 'group' ? 'Group' : 'Layer'}>
               <Field label="Name">
-                <TextField value={layer.name} onCommit={(name) => updateLayers(layers.map((l) => (l.id === activeLayerId ? { ...l, name } : l)))} aria-label="Layer name" />
+                <TextField value={layer.name} onCommit={(name) => name.trim() && editNode(layer.id, { name: name.trim() })} aria-label="Layer name" />
               </Field>
-              {layer.type !== 'collision' && (
+              {layer.type !== 'collision' && layer.type !== 'group' && layer.type !== 'entity' && layer.type !== 'picture' && layer.type !== 'collisionTiles' && layer.type !== 'collisionShape' && (
                 <Field label="Z-index" hint="Draw order of the layer: higher draws on top, equal keeps the list order">
                   <NumberField
-                    value={layer.z ?? 0}
+                    value={(layer as { z?: number }).z ?? 0}
                     integer
                     aria-label="Layer z-index"
-                    onCommit={(z) => updateLayers(layers.map((l) => (l.id === activeLayerId ? { ...l, z } : l)))}
+                    onCommit={(z) => editNode(layer.id, { z })}
                   />
                 </Field>
               )}

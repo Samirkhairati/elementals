@@ -1,4 +1,5 @@
-import type { CopiedTile, Layer, PaintMode, Pos, TileSelection } from '@/types/editor'
+import type { CopiedTile, PaintMode, Pos, TileSelection } from '@/types/editor'
+import type { CellLayerNode } from '../../../shared/sceneTree'
 
 /**
  * Pure tile-painting operations. They take plain layer data and return a *new*
@@ -6,7 +7,7 @@ import type { CopiedTile, Layer, PaintMode, Pos, TileSelection } from '@/types/e
  * Nothing here touches React, IPC or global state (other than `Math.random`).
  */
 
-export type TileMap = NonNullable<Layer['data']>
+export type TileMap = NonNullable<CellLayerNode['data']>
 
 export interface GridSize {
   width: number

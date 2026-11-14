@@ -1,16 +1,17 @@
 import type { CopiedTile, Layer, SelectionLayerPart, TileSelection } from '@/types/editor'
+import { isDataLayer, type DataLayerNode } from '../../../shared/sceneTree'
 
 /** Layers that hold tile cells and so can be sampled into / painted from a selection (image layers cannot). */
-export const isSampleableLayer = (layer: Pick<Layer, 'type'>) => layer.type !== 'image' && layer.type !== 'objects' && layer.type !== 'folder'
+export const isSampleableLayer = (layer: Pick<Layer, 'type'>) => layer.type !== 'image' && layer.type !== 'objects'
 
 /**
  * The layers a pinned right-drag samples: the active layer plus every multi-selected one, in list order
  * (topmost first), without image layers.
  */
-export function sampledLayers(layers: Layer[], activeLayerId: string | null, selectedLayerIds: readonly string[]): Layer[] {
+export function sampledLayers(layers: readonly Layer[], activeLayerId: string | null, selectedLayerIds: readonly string[]): DataLayerNode[] {
   const wanted = new Set(selectedLayerIds)
   if (activeLayerId) wanted.add(activeLayerId)
-  return layers.filter((layer) => wanted.has(layer.id) && isSampleableLayer(layer))
+  return layers.filter((layer): layer is DataLayerNode => wanted.has(layer.id) && isSampleableLayer(layer) && isDataLayer(layer))
 }
 
 const COLLISION = '__collision__'
@@ -21,7 +22,7 @@ const COLLISION = '__collision__'
  * and a composite `tiles` (the topmost real tile of each cell, collision markers only where nothing else is).
  */
 export function sampleSelection(
-  layers: Layer[],
+  layers: readonly DataLayerNode[],
   mapWidth: number,
   box: { minX: number; minY: number; width: number; height: number }
 ): TileSelection {
@@ -62,7 +63,7 @@ export function compositeTiles(parts: SelectionLayerPart[], cellCount: number): 
 }
 
 /** The layer a part writes back to: the layer it was sampled from, else the first layer of the same type. */
-export function targetLayerIndex(layers: Layer[], part: SelectionLayerPart): number {
+export function targetLayerIndex(layers: readonly Layer[], part: SelectionLayerPart): number {
   const byId = layers.findIndex((l) => l.id === part.layerId)
   if (byId !== -1) return byId
   return layers.findIndex((l) => l.type === part.layerType)

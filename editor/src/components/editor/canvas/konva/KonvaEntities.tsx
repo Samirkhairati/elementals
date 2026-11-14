@@ -9,7 +9,7 @@
 
 import React, { useMemo, useRef } from 'react'
 import { Group, Rect, Shape } from 'react-konva'
-import { EntityData, EntityFolder, MapData } from '@/types/editor'
+import type { EntityData, MapData } from '@/types/editor'
 import type { SpriteAssetInfo } from '../../../../../../shared/engine/types'
 import {
   entityBounds,
@@ -42,7 +42,8 @@ import { setStageCursor } from '../canvasUtils'
 const EMPTY_ASSETS: Record<string, SpriteAssetInfo> = {}
 
 interface KonvaEntitiesProps {
-  entities: EntityData[]
+  /** The entities to handle: the shown ones of a run of the draw order (`sprites`), or of the whole map (`hits`, `overlays`). */
+  entities: readonly EntityData[]
   selectedEntityId: string | null
   setSelectedEntityId: (id: string | null) => void
   moveEntity: (id: string, x: number, y: number) => void
@@ -50,16 +51,14 @@ interface KonvaEntitiesProps {
   /** The magnet: on, a dragged entity's area lands on grid lines; off, on whole pixels. */
   snapToGrid?: boolean
   onRightClickEntity?: (entity: EntityData, clientX: number, clientY: number) => void
-  showEntities?: boolean
-  entityFolders?: EntityFolder[]
   spriteAssets?: Record<string, SpriteAssetInfo>
   view: CanvasViewSettings
   /** Double-click on an entity that has an Event. */
   onOpenEvent?: (entityId: string) => void
   /**
-   * The entities can be drawn in two places of the canvas: the sprites (and their pick/drag handles) sit between
-   * the layers where the Entities row of the layer list is, the editing overlays (areas, selection, badges, labels)
-   * go on top of everything so they stay readable. Both parts share `visuals`. Default: everything in one place.
+   * The entities can be drawn in several places of the canvas: the sprites sit in the tree's draw order where the entities
+   * are, the editing overlays (areas, selection, badges, labels) go on top of everything so they stay readable. The parts
+   * share `visuals`. Default: everything in one place.
    */
   /**
    * Which of the entity layers to render. `sprites` only draws, `hits` is the invisible part that picks, drags and
@@ -299,8 +298,6 @@ export const KonvaEntities = React.memo(function KonvaEntities({
   activeMap,
   snapToGrid = true,
   onRightClickEntity,
-  showEntities = true,
-  entityFolders = [],
   spriteAssets = EMPTY_ASSETS,
   view,
   onOpenEvent,
@@ -314,15 +311,10 @@ export const KonvaEntities = React.memo(function KonvaEntities({
   const mapWidthPx = activeMap.width * 32
   const mapHeightPx = activeMap.height * 32
 
-  const infos = useMemo(() => {
-    const hiddenFolders = new Set((entityFolders || []).filter((f) => f.visible === false).map((f) => f.id))
-    const visible = entities.filter((entity) => entity.visible !== false && !(entity.folder && hiddenFolders.has(entity.folder)))
-    return sortByDepth(visible).map((e) => buildInfo(e, spriteAssets))
-  }, [entities, entityFolders, spriteAssets])
+  // Per-entity geometry, once per entities / assets change. Entities of a part are all shown ones (hidden ones are left out upstream).
+  const infos = useMemo(() => sortByDepth(entities).map((e) => buildInfo(e, spriteAssets)), [entities, spriteAssets])
 
   const selected = useMemo(() => infos.find((i) => i.id === selectedEntityId) ?? null, [infos, selectedEntityId])
-
-  if (showEntities === false) return null
 
   return (
     <Group>

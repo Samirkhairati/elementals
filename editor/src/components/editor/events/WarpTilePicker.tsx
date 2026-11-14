@@ -8,7 +8,8 @@ import { useTilesetImages } from '@/hooks/editor/useTilesetImages'
 import { drawResolvedSprite, resolveSprite, useSpriteImagesVersion } from '@/lib/spriteImages'
 import { drawMapScenery } from '@/lib/mapScenery'
 import { prepareCanvas } from '@/lib/canvas2d'
-import type { MapData } from '@/types/editor'
+import type { EntityData, MapData } from '@/types/editor'
+import { drawPlan, sceneIndex } from '@/lib/sceneIndex'
 import { useEventEnv } from './eventEnv'
 
 /** Longest side of the preview in CSS px; a cell is at least 4px so big maps stay legible when scrolled. */
@@ -82,8 +83,7 @@ export function WarpTilePicker({ mapId, x, y, free = false, onPick }: Props) {
     ctx.restore()
 
     // Entities: their sprite, or a dot where they stand.
-    for (const entity of map.entities ?? []) {
-      if (entity.visible === false) continue
+    for (const entity of drawPlan(sceneIndex(map.nodes)).entities as unknown as EntityData[]) {
       const sprite = entity.components.Sprite
       const asset = sprite && typeof sprite.asset === 'string' && sprite.asset ? env.getSpriteAsset(sprite.asset) : undefined
       const resolved = asset ? resolveSprite(asset, sprite ?? {}, 0) : null

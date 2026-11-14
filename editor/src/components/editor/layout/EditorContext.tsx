@@ -11,7 +11,9 @@ import type { usePaintTools } from '@/hooks/usePaintTools'
 import type { useSpriteAssets } from '@/hooks/useSpriteAssets'
 import type { useDatabase } from '@/hooks/useDatabase'
 import type { useCommonEvents } from '@/hooks/useCommonEvents'
-import type { LayerType, MapData } from '@/types/editor'
+import type { MapData } from '@/types/editor'
+import type { SelectMode, SelectionView } from '@/lib/sceneSelection'
+import type { NewNodeType } from '@/lib/sceneOps'
 import type { LookSet } from '../../../../../shared/look/types'
 import type { LookSubjectRef } from '@/lib/look/lookView'
 
@@ -56,17 +58,6 @@ export interface EditorBaseContextValue
     >,
     Pick<
       LayerManager,
-      | 'layers'
-      | 'activeLayerId'
-      | 'toggleLayerVisibility'
-      | 'toggleLayerLock'
-      | 'setLayerYSort'
-      | 'handleDeleteLayer'
-      | 'handleReorderLayers'
-      | 'handleCreateLayer'
-      | 'handleRenameLayer'
-      | 'updateLayers'
-      | 'setEntitiesIndex'
       | 'activeLayerType'
       | 'activeTool'
       | 'paintMode'
@@ -74,65 +65,42 @@ export interface EditorBaseContextValue
       | 'setPaintMode'
       | 'tileSelection'
       | 'setTileSelection'
-      | 'selectedLayerIds'
       | 'justCreatedLayer'
       | 'pinSelection'
       | 'setPinSelection'
       | 'pendingImage'
       | 'startImagePlacement'
       | 'cancelImagePlacement'
-      | 'selectedImageId'
       | 'resizingImageId'
       | 'setResizingImageId'
-      | 'setSelectedImageId'
-      | 'pickedImageIds'
-      | 'selectImage'
-      | 'openImageGroupId'
-      | 'selectImageGroup'
-      | 'groupPickedImages'
-      | 'createImageGroup'
-      | 'setImagesGroup'
-      | 'deleteImageGroup'
-      | 'ungroupImageGroup'
-      | 'renameImageGroup'
-      | 'setImageGroupLocked'
-      | 'setImageGroupYSort'
-      | 'setImagesYSort'
-      | 'moveImageGroupTo'
-      | 'moveImages'
-      | 'deleteImages'
-      | 'duplicateImages'
       | 'placeMultiple'
-      | 'copyImages'
-      | 'pasteImages'
       | 'addImage'
       | 'updateImage'
-      | 'deleteImage'
-      | 'duplicateImage'
       | 'reorderImage'
-      | 'moveImageTo'
+      | 'moveImages'
+      | 'setNodesYSort'
+      | 'renameNode'
+      | 'editNode'
+      | 'addCollisionTiles'
+      | 'setCollisionShapes'
+      | 'toggleNodeVisibility'
+      | 'toggleNodeLock'
+      | 'setNodeYSort'
+      | 'toggleCollapsed'
+      | 'deleteNodes'
+      | 'copyNodes'
+      | 'pasteNodes'
+      | 'duplicateNodes'
+      | 'groupNodes'
+      | 'ungroupNode'
+      | 'moveNodes'
       | 'isPainting'
       | 'setIsPainting'
       | 'paintStartPos'
       | 'setPaintStartPos'
       | 'debugInfo'
     >,
-    Pick<
-      EntityManager,
-      | 'entities'
-      | 'selectedEntityId'
-      | 'showEntities'
-      | 'setShowEntities'
-      | 'toggleShowEntities'
-      | 'entityFolders'
-      | 'createEntityFolder'
-      | 'renameEntityFolder'
-      | 'deleteEntityFolder'
-      | 'toggleEntityFolderVisibility'
-      | 'toggleEntityFolderExpanded'
-      | 'toggleEntityVisibility'
-      | 'moveEntityToFolder'
-    >,
+    Pick<EntityManager, 'entities' | 'toggleEntityVisibility'>,
     Pick<PaintTools, 'handlePaint' | 'handlePaintBucket' | 'handleRectangleFill'>,
     Pick<
       GridSettings,
@@ -181,26 +149,33 @@ export interface EditorBaseContextValue
   /** Called by the dock when the last map tab closed: persists pending edits, then clears the editor state. */
   onClearActiveMap: () => void
 
-  // Layers (wrapped to also move focus / clear entity selection)
+  // The scene tree's selection (wrapped to also move focus)
+  /** What is selected, from the scene tree: the active layer, the picked pictures, the selected entity... */
+  selectionView: SelectionView
+  activeLayerId: string | null
+  selectedLayerIds: readonly string[]
+  selectedImageId: string | null
+  pickedImageIds: readonly string[]
+  openImageGroupId: string | null
   setActiveLayerId: (layerId: string | null) => void
-  /** Plain click selects one layer; `additive` (Ctrl/Cmd+click) toggles it in the multi-selection. */
-  selectLayer: (layerId: string, additive?: boolean | 'range') => void
-  handleCreateLayerOfType: (type: LayerType, folderId?: string) => void
-  handleDuplicateLayer: (id: string) => void
-  /** Copy tile / image layers and folders (with what they hold) to the editor clipboard. */
-  copyLayers: (ids: readonly string[]) => void
-  /** Paste copied layers next to `afterId`, at its depth (in its folder). */
-  pasteLayers: (afterId: string | null) => void
-  toggleFolderCollapsed: (id: string) => void
+  /** A click on a node: only it, added or removed (`toggle`), or the range to it (`range`). */
+  selectNode: (id: string, mode?: SelectMode) => void
+  clearSelection: () => void
+  /** A click on a picture of an image layer (the canvas and the Scene panel). */
+  selectImage: (layerId: string, imageId: string, mode?: SelectMode) => void
+  /** Makes a node (inside `anchorId` when it holds that type, else next to it; null = the top of the map); undefined = next to the selection. */
+  createNode: (type: NewNodeType, anchorId?: string | null) => void
+  /** Deletes nodes with a confirmation (none for pictures and collision items, which undo brings back). */
+  requestDeleteNodes: (ids: readonly string[]) => void
 
   // Entities
   setSelectedEntityId: (entityId: string | null) => void
+  selectedEntityId: string | null
   handleCreateEntity: EntityManager['createEntity']
   handleDuplicateEntity: EntityManager['duplicateEntity']
   handleDeleteEntity: EntityManager['deleteEntity']
   handleRenameEntity: EntityManager['renameEntity']
   handleMoveEntity: EntityManager['moveEntity']
-  handleReorderEntities: EntityManager['reorderEntities']
   handleAddComponent: EntityManager['addComponent']
   handleRemoveComponent: EntityManager['removeComponent']
   handleUpdateComponentProp: EntityManager['updateComponentProp']

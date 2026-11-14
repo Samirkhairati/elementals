@@ -9,7 +9,6 @@ import { applyAxisLock, type Axis, type AxisLock } from '@/lib/axisLock'
 import type { SpriteAssetInfo } from '../../../../../shared/engine/types'
 import Konva from 'konva'
 import {
-  Layer,
   MapData,
   TileSelection,
   ActiveTool,
@@ -20,6 +19,8 @@ import {
 } from '@/types/editor'
 import { getBoundingBox } from '@/components/editor/canvas/canvasUtils'
 import { sampleSelection, sampledLayers } from '@/lib/layerSelection'
+import { lockedNode, shown, type SceneIndex } from '@/lib/sceneIndex'
+import { isDataLayer, type DataLayerNode } from '../../../../../shared/sceneTree'
 import { TileCoords } from './useCanvasViewport'
 import { PendingEntityPlacement } from '@/hooks/editor/useEntityPlacement'
 import {
@@ -28,7 +29,8 @@ import {
 
 interface UseCanvasInteractionProps {
   activeMap: MapData | null
-  layers: Layer[]
+  /** The scene tree's index: layers, and what is hidden or locked. */
+  index: SceneIndex
   activeTool: ActiveTool
   paintMode: PaintMode
   activeLayerId: string | null
@@ -92,7 +94,7 @@ function lockToContinue(lock: AxisLock | null, lastPlaced: { x: number; y: numbe
 
 export function useCanvasInteraction({
   activeMap,
-  layers,
+  index,
   activeTool,
   paintMode,
   activeLayerId,
@@ -228,8 +230,8 @@ export function useCanvasInteraction({
   const activeToolRef = useRef(activeTool)
   useEffect(() => { activeToolRef.current = activeTool }, [activeTool])
 
-  const layersRef = useRef(layers)
-  useEffect(() => { layersRef.current = layers }, [layers])
+  const indexRef = useRef(index)
+  useEffect(() => { indexRef.current = index }, [index])
 
   const activeLayerIdRef = useRef(activeLayerId)
   useEffect(() => { activeLayerIdRef.current = activeLayerId }, [activeLayerId])
@@ -253,8 +255,8 @@ export function useCanvasInteraction({
     if (box) {
       // Pinned: every selected layer joins the selection. Otherwise only the active one is sampled.
       const sourceLayers = pinSelectionRef.current
-        ? sampledLayers(layersRef.current, layerId, selectedLayerIdsRef.current)
-        : layersRef.current.filter(l => l.id === layerId && l.type !== 'image')
+        ? sampledLayers(indexRef.current.layersTopFirst, layerId, selectedLayerIdsRef.current)
+        : indexRef.current.layersTopFirst.filter((l): l is DataLayerNode => l.id === layerId && isDataLayer(l))
       if (sourceLayers.length > 0) setTileSelection(sampleSelection(sourceLayers, map.width, box))
     }
 
@@ -269,9 +271,9 @@ export function useCanvasInteraction({
       const layerId = activeLayerIdRef.current
       if (!map || !layerId) return
 
-      const layer = layersRef.current.find((l) => l.id === layerId)
-      if (layer?.type === 'image') return
-      const currentData = layer?.data || {}
+      const layer = indexRef.current.byId.get(layerId)?.node
+      if (!layer || !isDataLayer(layer)) return
+      const currentData = layer.data || {}
       const tileIndex = tileY * map.width + tileX
       const existing = currentData[tileIndex]
       if (existing) {
@@ -406,11 +408,11 @@ export function useCanvasInteraction({
       }
 
       // Image layer: a click drops the pending image, otherwise it only deselects (tiles are never painted here).
-      const activeLayer = layersRef.current.find((l) => l.id === activeLayerIdRef.current)
+      const activeLayer = indexRef.current.byId.get(activeLayerIdRef.current ?? '')?.node
       if (activeLayer?.type === 'image') {
         if (button === 0) {
           // Anywhere, the map's edge included: pictures can sit partly or wholly outside the map.
-          if (pendingImage && !activeLayer.locked && activeLayer.visible) {
+          if (pendingImage && !lockedNode(indexRef.current, activeLayer.id) && shown(indexRef.current, activeLayer.id)) {
             // Same maths as the ghost preview, so the image lands where the preview showed it.
             const p = stageRef?.current?.getPointerPosition()
             const stage = stageRef?.current

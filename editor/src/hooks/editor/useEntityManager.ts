@@ -1,183 +1,71 @@
-import { useState, useEffect, useCallback } from 'react'
-import { EntityData, ComponentType, MapData, EntityFolder, type PropBag } from '@/types/editor'
+// The entities of the open map: `entity` nodes anywhere in the scene tree. This manager creates, edits, copies and deletes
+// them through the tree's `commit` (one undo step each) and exposes the selected one. Where an entity sits in the tree is
+// where it draws (see lib/sceneIndex `drawPlan`); groups, order and visibility are the tree's own.
+
+import { useCallback, useMemo } from 'react'
+import type { EntityData, ComponentType, PropBag } from '@/types/editor'
 import { COMPONENT_REGISTRY } from '@/lib/componentRegistry'
-import { cloneEntity, createDefaultComponent } from '../../../../shared/engine/components'
+import { createDefaultComponent } from '../../../../shared/engine/components'
 import { withDerivedFree } from '../../../../shared/engine/placement'
-import type { EngineEntity } from '../../../../shared/engine/types'
-import { useSyncedState } from '@/hooks/useSyncedState'
 import { withCharacterDepth } from '@/lib/entityDepth'
+import { addEntity, deleteNodes, duplicateNodes, patchNode, renameNode, setVisible } from '@/lib/sceneOps'
+import { sceneIndex } from '@/lib/sceneIndex'
+import { pruneSelection } from '@/lib/sceneSelection'
+import { updateNode, type EntityNode } from '../../../../shared/sceneTree'
+import { useStableArray } from '@/hooks/useShallowStable'
+import type { SceneTreeApi } from './useSceneTree'
 
-/** How far a duplicate or a pasted copy lands from its original: one whole tile, so an entity on the tile grid stays on it. */
-const COPY_OFFSET = 32
+const newId = () => crypto.randomUUID()
 
-interface UseEntityManagerOptions {
-  /** Read-only: used to (re)synchronise local state when the active map changes. */
-  activeMap: MapData | null
-  /** Functional updates only: mutations never close over the current map. */
-  setActiveMap: React.Dispatch<React.SetStateAction<MapData | null>>
-  /** Called once per committed entity mutation (not for folder-only changes), after `getEntities()` is up to date. */
-  onCommitHistory?: (entities: EntityData[]) => void
-}
+export function useEntityManager(tree: SceneTreeApi) {
+  const { commit, index, view, getSelection, getIndex, select, selectMany, setSelection } = tree
 
-export function useEntityManager(options: UseEntityManagerOptions) {
-  const { activeMap, setActiveMap, onCommitHistory } = options
+  /** Every entity of the map, in tree order. */
+  const entities = useStableArray(index.entities) as unknown as EntityData[]
+  const selectedEntityId = view.selectedEntityId
 
-  const [entities, setEntities, entitiesRef] = useSyncedState<EntityData[]>(activeMap?.entities || [])
-  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null)
-  const [showEntities, setShowEntities] = useState<boolean>(true)
-  const [entityFolders, setEntityFolders, foldersRef] = useSyncedState<EntityFolder[]>(activeMap?.entityFolders || [])
-
-  /** Latest entities / folders, readable synchronously (history snapshots, tests). */
-  const getEntities = useCallback(() => entitiesRef.current, [entitiesRef])
-  const getFolders = useCallback(() => foldersRef.current, [foldersRef])
-
-  const toggleShowEntities = useCallback(() => {
-    setShowEntities(prev => !prev)
-  }, [])
-
-  // Synchronize local entities & folders when activeMap changes
-  useEffect(() => {
-    const mapEntities = activeMap?.entities || []
-    setEntities(mapEntities)
-    setEntityFolders(activeMap?.entityFolders || [])
-    setSelectedEntityId(prev => {
-      if (prev && !mapEntities.some(e => e.id === prev)) {
-        return null
+  /** Picks an entity; `null` lets go of it (the layer that was active before comes back). */
+  const setSelectedEntityId = useCallback(
+    (id: string | null) => {
+      if (id) {
+        select(id)
+        return
       }
-      return prev
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeMap?.fileName, activeMap?.folderPath, activeMap?.entities, activeMap?.entityFolders])
-
-  // ── Unified Entity Mutation Pipeline ──────────────────────────────────────
-  const commitNewEntities = useCallback(
-    (updater: (prev: EntityData[]) => EntityData[], onAfter?: (next: EntityData[]) => void) => {
-      // Computed from the ref, *outside* of any React updater: side effects below run exactly once.
-      const prev = entitiesRef.current
-      const next = updater(prev)
-      if (next === prev) return
-      setEntities(next)
-      setActiveMap(m => (m ? { ...m, entities: next } : m))
-      onCommitHistory?.(next)
-      onAfter?.(next)
+      const sel = getSelection()
+      if (getIndex().byId.get(sel.primary ?? '')?.node.type !== 'entity') return
+      const back = sel.lastLayerId && getIndex().byId.has(sel.lastLayerId) ? sel.lastLayerId : null
+      if (back) select(back)
+      else setSelection((s) => ({ ...s, ids: [], primary: null, anchor: null, openGroupId: null }))
     },
-    [entitiesRef, setEntities, setActiveMap, onCommitHistory]
+    [select, getSelection, getIndex, setSelection]
   )
 
-  const commitFolders = useCallback(
-    (updater: (prev: EntityFolder[]) => EntityFolder[]) => {
-      // Folders are deliberately not part of undo history (expand/collapse must not create steps).
-      const prev = foldersRef.current
-      const next = updater(prev)
-      if (next === prev) return
-      setEntityFolders(next)
-      setActiveMap(m => (m ? { ...m, entityFolders: next } : m))
-    },
-    [foldersRef, setEntityFolders, setActiveMap]
-  )
-
-  const updateEntities = useCallback(
-    (newEntities: EntityData[]) => {
-      commitNewEntities(() => newEntities)
-    },
-    [commitNewEntities]
-  )
-
-  // ── Folder Management ─────────────────────────────────────────────────────
-  const createEntityFolder = useCallback(
-    (name?: string) => {
-      commitFolders(prev => {
-        let cleanName = (name || '').trim()
-        if (!cleanName) {
-          let counter = 1
-          while (prev.some(f => f.name === `Folder ${counter}`)) {
-            counter++
-          }
-          cleanName = `Folder ${counter}`
-        }
-        const newFolder: EntityFolder = {
-          id: crypto.randomUUID(),
-          name: cleanName,
-          expanded: true,
-          visible: true,
-        }
-        return [...prev, newFolder]
-      })
-    },
-    [commitFolders]
-  )
-
-  const renameEntityFolder = useCallback(
-    (folderId: string, newName: string) => {
-      const cleanName = newName.trim()
-      if (!cleanName) return
-      commitFolders(prev => prev.map(f => (f.id === folderId ? { ...f, name: cleanName } : f)))
-    },
-    [commitFolders]
-  )
-
-  const deleteEntityFolder = useCallback(
-    (folderId: string) => {
-      commitFolders(prev => prev.filter(f => f.id !== folderId))
-      commitNewEntities(prev => prev.map(e => (e.folder === folderId ? { ...e, folder: null } : e)))
-    },
-    [commitFolders, commitNewEntities]
-  )
-
-  const toggleEntityFolderVisibility = useCallback(
-    (folderId: string) => {
-      commitFolders(prev =>
-        prev.map(f => (f.id === folderId ? { ...f, visible: f.visible !== false ? false : true } : f))
+  /** Applies `fn` to one entity (not to anything else with that id). */
+  const editEntity = useCallback(
+    (id: string, fn: (entity: EntityData) => EntityData) => {
+      commit((prev) =>
+        updateNode(prev, id, (n) => {
+          if (n.type !== 'entity') return n
+          const next = fn(n as unknown as EntityData)
+          return next === (n as unknown as EntityData) ? n : (next as unknown as EntityNode)
+        })
       )
     },
-    [commitFolders]
-  )
-
-  const toggleEntityFolderExpanded = useCallback(
-    (folderId: string) => {
-      commitFolders(prev =>
-        prev.map(f => (f.id === folderId ? { ...f, expanded: f.expanded === false ? true : false } : f))
-      )
-    },
-    [commitFolders]
-  )
-
-  const toggleEntityVisibility = useCallback(
-    (entityId: string) => {
-      commitNewEntities(prev =>
-        prev.map(e => (e.id === entityId ? { ...e, visible: e.visible !== false ? false : true } : e))
-      )
-    },
-    [commitNewEntities]
-  )
-
-  const moveEntityToFolder = useCallback(
-    (entityId: string, folderId: string | null) => {
-      commitNewEntities(prev =>
-        prev.map(e => (e.id === entityId ? { ...e, folder: folderId } : e))
-      )
-    },
-    [commitNewEntities]
+    [commit]
   )
 
   // ── Entity CRUD ───────────────────────────────────────────────────────────
+  /** Makes an entity at (x, y): inside the selected group, after the selected entity, else in the "Entities" group (see `addEntity`). */
   const createEntity = useCallback(
-    (
-      name: string,
-      x: number = 0,
-      y: number = 0,
-      initialComponents?: Partial<Record<ComponentType, PropBag>>,
-      folderId?: string | null
-    ) => {
+    (name: string, x: number = 0, y: number = 0, initialComponents?: Partial<Record<ComponentType, PropBag>>, anchorId?: string | null) => {
       let createdId: string | null = null
-      commitNewEntities(
-        prev => {
+      commit(
+        (prev) => {
           let cleanName = name.trim()
           if (!cleanName) {
             let counter = 1
-            while (prev.some(e => e.name === `Entity ${counter}`)) {
-              counter++
-            }
+            const names = new Set(sceneIndex(prev).entities.map((e) => e.name))
+            while (names.has(`Entity ${counter}`)) counter++
             cleanName = `Entity ${counter}`
           }
 
@@ -192,296 +80,179 @@ export function useEntityManager(options: UseEntityManagerOptions) {
           // Entity position and Transform are one thing: prefabs carry a placeholder Transform.
           defaultComponents.Transform = { ...defaultComponents.Transform, x, y }
 
-          const newEntity: EntityData = {
+          const entity = withDerivedFree({
             id: crypto.randomUUID(),
+            type: 'entity',
             name: cleanName,
             x,
             y,
-            visible: true,
-            folder: folderId || null,
             components: JSON.parse(JSON.stringify(defaultComponents)),
-          }
-          createdId = newEntity.id
-          return [...prev, withDerivedFree(newEntity)]
-        },
-        () => {
-          if (createdId) setSelectedEntityId(createdId)
-        }
-      )
-    },
-    [commitNewEntities]
-  )
-
-  const duplicateEntity = useCallback(
-    (id: string) => {
-      let createdId: string | null = null
-      commitNewEntities(
-        prev => {
-          const targetIndex = prev.findIndex(e => e.id === id)
-          if (targetIndex === -1) return prev
-          const target = prev[targetIndex]
-
-          const cloned: EntityData = {
-            ...target,
-            id: crypto.randomUUID(),
-            name: `${target.name} Copy`,
-            x: target.x + COPY_OFFSET,
-            y: target.y + COPY_OFFSET,
-            visible: target.visible !== false,
-            folder: target.folder || null,
-            // fresh event state / command ids so the copy is independent of the original
-            components: cloneEntity(target as unknown as EngineEntity, true).components as EntityData['components'],
-          }
-
-          if (cloned.components.Transform) {
-            cloned.components.Transform.x = cloned.x
-            cloned.components.Transform.y = cloned.y
-          }
-
-          createdId = cloned.id
-          const next = [...prev]
-          next.splice(targetIndex + 1, 0, withDerivedFree(cloned))
+          } as EntityNode)
+          const next = addEntity(prev, entity, anchorId === undefined ? getSelection().primary : anchorId)
+          if (next !== prev) createdId = entity.id
           return next
         },
         () => {
-          if (createdId) setSelectedEntityId(createdId)
+          if (createdId) select(createdId)
         }
       )
     },
-    [commitNewEntities]
+    [commit, getSelection, select]
   )
 
-  /** Put copies of `entities` on the map (one undo step), one tile down-right of where they were, and pick the last. */
-  const pasteEntities = useCallback(
-    (entities: readonly EntityData[]) => {
-      let last: string | null = null
-      commitNewEntities(
-        prev => {
-          if (entities.length === 0) return prev
-          const taken = new Set(prev.map(e => e.name))
-          const copies = entities.map(source => {
-            let name = `${source.name} Copy`
-            for (let n = 2; taken.has(name); n++) name = `${source.name} Copy ${n}`
-            taken.add(name)
-            const copy: EntityData = {
-              ...source,
-              id: crypto.randomUUID(),
-              name,
-              x: source.x + COPY_OFFSET,
-              y: source.y + COPY_OFFSET,
-              visible: source.visible !== false,
-              folder: source.folder || null,
-              components: cloneEntity(source as unknown as EngineEntity, true).components as EntityData['components'],
-            }
-            if (copy.components.Transform) {
-              copy.components.Transform.x = copy.x
-              copy.components.Transform.y = copy.y
-            }
-            return withDerivedFree(copy)
-          })
-          last = copies[copies.length - 1].id
-          return [...prev, ...copies]
+  /** A copy of an entity right after the original, one tile down-right, with fresh event state; it is picked. */
+  const duplicateEntity = useCallback(
+    (id: string) => {
+      let made: string[] = []
+      commit(
+        (prev) => {
+          const result = duplicateNodes(prev, [id], newId)
+          made = result.ids
+          return result.nodes
         },
         () => {
-          if (last) setSelectedEntityId(last)
+          if (made.length > 0) selectMany(made[made.length - 1], made)
         }
       )
     },
-    [commitNewEntities]
+    [commit, selectMany]
   )
 
   const deleteEntity = useCallback(
     (id: string) => {
-      commitNewEntities(
-        prev => prev.filter(e => e.id !== id),
-        next => {
-          setSelectedEntityId(current => (current === id ? (next.length > 0 ? next[0].id : null) : current))
-        }
+      commit(
+        (prev) => deleteNodes(prev, [id]),
+        (next) => setSelection((sel) => pruneSelection(sel, sceneIndex(next)))
       )
     },
-    [commitNewEntities]
+    [commit, setSelection]
   )
 
-  const renameEntity = useCallback(
-    (id: string, newName: string) => {
-      const cleanName = newName.trim()
-      if (!cleanName) return
-      commitNewEntities(prev => prev.map(e => (e.id === id ? { ...e, name: cleanName } : e)))
+  const renameEntity = useCallback((id: string, newName: string) => commit((prev) => renameNode(prev, id, newName)), [commit])
+
+  const toggleEntityVisibility = useCallback(
+    (id: string) => {
+      commit((prev) => {
+        const node = sceneIndex(prev).byId.get(id)?.node
+        return node ? setVisible(prev, id, node.visible === false) : prev
+      })
     },
-    [commitNewEntities]
+    [commit]
   )
 
   const moveEntity = useCallback(
     (id: string, x: number, y: number) => {
-      commitNewEntities(prev =>
-        prev.map(e => {
-          if (e.id !== id) return e
-          const updatedComponents = { ...e.components }
-          if (updatedComponents.Transform) {
-            updatedComponents.Transform = {
-              ...updatedComponents.Transform,
-              x,
-              y,
-            }
-          }
-          return withDerivedFree({
-            ...e,
-            x,
-            y,
-            components: updatedComponents,
-          })
-        })
-      )
+      editEntity(id, (e) => {
+        const components = { ...e.components }
+        if (components.Transform) components.Transform = { ...components.Transform, x, y }
+        return withDerivedFree({ ...e, x, y, components } as unknown as EntityNode) as unknown as EntityData
+      })
     },
-    [commitNewEntities]
-  )
-
-  const reorderEntities = useCallback(
-    (newEntities: EntityData[]) => {
-      updateEntities(newEntities)
-    },
-    [updateEntities]
+    [editEntity]
   )
 
   // ── Component Management on Selected Entity ───────────────────────────────
   const addComponent = useCallback(
     (entityId: string, type: ComponentType) => {
-      commitNewEntities(prev =>
-        prev.map(e => {
-          if (e.id !== entityId) return e
-          const schema = COMPONENT_REGISTRY[type]
-          if (!schema) return e
+      editEntity(entityId, (e) => {
+        const schema = COMPONENT_REGISTRY[type]
+        if (!schema) return e
 
-          // Check singleton constraint
-          if (schema.singleton && e.components[type]) {
-            return e
-          }
+        // Check singleton constraint
+        if (schema.singleton && e.components[type]) return e
 
-          const defaultProps = createDefaultComponent(type) as unknown as PropBag
-          if (type === 'Transform') {
-            defaultProps.x = e.x
-            defaultProps.y = e.y
-          }
-
-          return {
-            ...e,
-            components: {
-              ...e.components,
-              [type]: defaultProps,
-            },
-          }
-        })
-      )
+        const defaultProps = createDefaultComponent(type) as unknown as PropBag
+        if (type === 'Transform') {
+          defaultProps.x = e.x
+          defaultProps.y = e.y
+        }
+        return { ...e, components: { ...e.components, [type]: defaultProps } }
+      })
     },
-    [commitNewEntities]
+    [editEntity]
   )
 
   const removeComponent = useCallback(
     (entityId: string, type: ComponentType) => {
-      commitNewEntities(prev =>
-        prev.map(e => {
-          if (e.id !== entityId) return e
-          const updated = { ...e.components }
-          delete updated[type]
-          return {
-            ...e,
-            components: updated,
-          }
-        })
-      )
+      editEntity(entityId, (e) => {
+        const updated = { ...e.components }
+        delete updated[type]
+        return { ...e, components: updated }
+      })
     },
-    [commitNewEntities]
+    [editEntity]
   )
 
   const updateComponentProp = useCallback(
     (entityId: string, type: ComponentType, key: string, value: unknown) => {
-      commitNewEntities(prev =>
-        prev.map(e => {
-          if (e.id !== entityId) return e
-          const currentCompProps = e.components[type] || {}
-          const updatedCompProps = {
-            ...currentCompProps,
-            [key]: value,
-          }
+      editEntity(entityId, (e) => {
+        const updatedCompProps = { ...(e.components[type] || {}), [key]: value }
 
-          // If updating position on Transform, keep entity.x and entity.y in sync
-          let nextX = e.x
-          let nextY = e.y
-          if (type === 'Transform') {
-            if (key === 'x') nextX = Number(value) || 0
-            if (key === 'y') nextY = Number(value) || 0
-          }
+        // If updating position on Transform, keep entity.x and entity.y in sync
+        let nextX = e.x
+        let nextY = e.y
+        if (type === 'Transform') {
+          if (key === 'x') nextX = Number(value) || 0
+          if (key === 'y') nextY = Number(value) || 0
+        }
 
-          const components = { ...e.components, [type]: updatedCompProps }
-          return withDerivedFree({
-            ...e,
-            x: nextX,
-            y: nextY,
-            components: type === 'Sprite' && key === 'asset' ? withCharacterDepth(components, value) : components,
-          })
-        })
-      )
+        const components = { ...e.components, [type]: updatedCompProps }
+        return withDerivedFree({
+          ...e,
+          x: nextX,
+          y: nextY,
+          components: type === 'Sprite' && key === 'asset' ? withCharacterDepth(components, value) : components,
+        } as unknown as EntityNode) as unknown as EntityData
+      })
     },
-    [commitNewEntities]
+    [editEntity]
   )
 
   /** Set several props of one component in a single commit (one history step, one save). */
   const updateComponentProps = useCallback(
     (entityId: string, type: ComponentType, props: PropBag) => {
-      commitNewEntities(prev =>
-        prev.map(e => {
-          if (e.id !== entityId) return e
-          let nextX = e.x
-          let nextY = e.y
-          if (type === 'Transform') {
-            if ('x' in props) nextX = Number(props.x) || 0
-            if ('y' in props) nextY = Number(props.y) || 0
-          }
-          return withDerivedFree({
-            ...e,
-            x: nextX,
-            y: nextY,
-            components: (() => {
-              const components = { ...e.components, [type]: { ...(e.components[type] || {}), ...props } }
-              return type === 'Sprite' && 'asset' in props ? withCharacterDepth(components, props.asset) : components
-            })(),
-          })
-        })
-      )
+      editEntity(entityId, (e) => {
+        let nextX = e.x
+        let nextY = e.y
+        if (type === 'Transform') {
+          if ('x' in props) nextX = Number(props.x) || 0
+          if ('y' in props) nextY = Number(props.y) || 0
+        }
+        const components = { ...e.components, [type]: { ...(e.components[type] || {}), ...props } }
+        return withDerivedFree({
+          ...e,
+          x: nextX,
+          y: nextY,
+          components: type === 'Sprite' && 'asset' in props ? withCharacterDepth(components, props.asset) : components,
+        } as unknown as EntityNode) as unknown as EntityData
+      })
     },
-    [commitNewEntities]
+    [editEntity]
   )
 
-  return {
-    entities,
-    getEntities,
-    getFolders,
-    setEntities,
-    selectedEntityId,
-    setSelectedEntityId,
-    showEntities,
-    setShowEntities,
-    toggleShowEntities,
-    entityFolders,
-    setEntityFolders,
-    createEntityFolder,
-    renameEntityFolder,
-    deleteEntityFolder,
-    toggleEntityFolderVisibility,
-    toggleEntityFolderExpanded,
-    toggleEntityVisibility,
-    moveEntityToFolder,
-    createEntity,
-    duplicateEntity,
-    pasteEntities,
-    deleteEntity,
-    renameEntity,
-    moveEntity,
-    reorderEntities,
-    addComponent,
-    removeComponent,
-    updateComponentProp,
-    updateComponentProps,
-    updateEntities,
-  }
+  /** A patch of node fields (`name`, `x`, ...) for an entity. */
+  const patchEntity = useCallback((id: string, patch: Record<string, unknown>) => commit((prev) => patchNode(prev, id, patch)), [commit])
+
+  const getEntities = useCallback(() => getIndex().entities as unknown as EntityData[], [getIndex])
+
+  return useMemo(
+    () => ({
+      entities,
+      getEntities,
+      selectedEntityId,
+      setSelectedEntityId,
+      createEntity,
+      duplicateEntity,
+      deleteEntity,
+      renameEntity,
+      toggleEntityVisibility,
+      moveEntity,
+      addComponent,
+      removeComponent,
+      updateComponentProp,
+      updateComponentProps,
+      patchEntity,
+    }),
+    [entities, getEntities, selectedEntityId, setSelectedEntityId, createEntity, duplicateEntity, deleteEntity, renameEntity, toggleEntityVisibility, moveEntity, addComponent, removeComponent, updateComponentProp, updateComponentProps, patchEntity]
+  )
 }

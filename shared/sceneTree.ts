@@ -12,7 +12,8 @@
 import type { ShapePoint } from './collisionShapes.ts'
 import type { LookSet } from './look/types.ts'
 import type { EditorImageCrop, EditorTile } from './mapTypes.ts'
-import { cellGroupId } from './collisionLayers.ts'
+import { cellGroupId, collisionItems } from './collisionLayers.ts'
+import type { CollisionItem, CollisionLayerLike } from './collisionLayers.ts'
 import { cloneJson } from './engine/util.ts'
 
 // ── node types ─────────────────────────────────────────────────────────────────────────────────────
@@ -160,6 +161,8 @@ export type ContainerNode = GroupNode | ImageLayerNode | CollisionLayerNode
 export type LayerNode = TileLayerNode | ImageLayerNode | CollisionLayerNode | TerrainNode | EncountersNode | ObjectsLayerNode
 /** Layers that hold painted cells of a tileset (everything but image and collision layers). */
 export type CellLayerNode = TileLayerNode | TerrainNode | EncountersNode | ObjectsLayerNode
+/** Layers that hold painted cells (`data`): the cell layers and the collision layer. */
+export type DataLayerNode = CellLayerNode | CollisionLayerNode
 
 // ── the type table ─────────────────────────────────────────────────────────────────────────────────
 
@@ -201,6 +204,7 @@ export const NODE_TYPE_LIST: readonly SceneNodeType[] = ['group', 'tile', 'image
 export const isContainer = (node: SceneNode): node is ContainerNode => node.type === 'group' || node.type === 'image' || node.type === 'collision'
 export const isLayerNode = (node: SceneNode): node is LayerNode =>
   node.type === 'tile' || node.type === 'image' || node.type === 'collision' || node.type === 'terrain' || node.type === 'encounters' || node.type === 'objects'
+export const isDataLayer = (node: SceneNode): node is DataLayerNode => isCellLayer(node) || node.type === 'collision'
 export const isCellLayer = (node: SceneNode): node is CellLayerNode => node.type === 'tile' || node.type === 'terrain' || node.type === 'encounters' || node.type === 'objects'
 export const isEntityNode = (node: SceneNode): node is EntityNode => node.type === 'entity'
 export const isPictureNode = (node: SceneNode): node is PictureNode => node.type === 'picture'
@@ -426,6 +430,14 @@ export const collisionTileNodes = (layer: CollisionLayerNode): CollisionTilesNod
 /** The shapes of a collision layer, in list order. */
 export const collisionShapeNodes = (layer: CollisionLayerNode): CollisionShapeNode[] => layer.children.filter((c): c is CollisionShapeNode => c.type === 'collisionShape')
 
+/** A collision layer node as the layer shape the cell helpers of collisionLayers.ts work on (`tileGroups`, `shapes`). */
+export function collisionLayerLike(layer: CollisionLayerNode): CollisionLayerLike & { id: string } {
+  return { id: layer.id, type: 'collision', data: layer.data, tileGroups: collisionTileNodes(layer).map((t) => ({ id: t.id, name: t.name })), shapes: collisionShapeNodes(layer) }
+}
+
+/** The item list of a collision layer node: the tiles items (with their cell counts), then the shapes. */
+export const collisionItemsOf = (layer: CollisionLayerNode): CollisionItem[] => collisionItems(collisionLayerLike(layer))
+
 /**
  * The tree without the nodes `ids` (and everything below them). A `collisionTiles` node takes its cells with it. Ids
  * that are not in the tree are ignored; the same array comes back when nothing was removed.
@@ -626,6 +638,17 @@ export function layerNodesInListOrder(nodes: readonly SceneNode[]): LayerNode[] 
 /** The pictures of an image layer (or of a group of pictures), in tree order, groups looked into. */
 export function picturesOf(node: SceneNode): PictureNode[] {
   return walk(childrenOf(node)).filter((e): e is WalkEntry & { node: PictureNode } => e.node.type === 'picture').map((e) => e.node)
+}
+
+/**
+ * The pictures of an image layer in the order they draw: `z` first, tree order for ties (the order the exporter writes
+ * them in). Groups are looked into.
+ */
+export function drawOrderPictures(node: SceneNode): PictureNode[] {
+  return picturesOf(node)
+    .map((picture, index) => ({ picture, index }))
+    .sort((a, b) => (a.picture.z ?? 0) - (b.picture.z ?? 0) || a.index - b.index)
+    .map((entry) => entry.picture)
 }
 
 /** Every picture of every image layer, in tree order. */

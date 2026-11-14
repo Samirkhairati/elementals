@@ -1,20 +1,20 @@
 import { useState, useCallback } from 'react'
-import { MapData, Layer, EntityData } from '@/types/editor'
+import { MapData } from '@/types/editor'
 import { mapSaveQueue } from '@/lib/saveQueue'
 import { useSyncedState } from '@/hooks/useSyncedState'
-import { migrateMap, migrateMapToLegacy } from '../../../../shared/engine/migrate'
-import { hasNodeTree, nodeTreeToLegacy } from '../../../../shared/sceneTreeMigrate'
+import { migrateMap } from '../../../../shared/engine/migrate'
 
-/** Legacy maps (SpriteView, Interactable ...) become canonical (schemaVersion 2) the moment the editor loads them. */
+/**
+ * Old maps (SpriteView, Interactable, layers and entities of schema 5 ...) become canonical, as one scene tree
+ * (schema 6), the moment the editor loads them. Nothing is written back until the author edits.
+ */
 export function migrateLoadedMap(map: MapData): MapData {
-  // TEMPORARY bridge until the editor works on nodes (phase 2): the editor still edits `layers` and `entities` (schema 5),
-  // so a schema 6 file (`nodes`) is turned back into that shape; older files are migrated as they always were.
-  if (hasNodeTree(map)) return nodeTreeToLegacy(migrateMap(map).value) as unknown as MapData
-  return migrateMapToLegacy(map).value
+  return migrateMap(map).value
 }
 
 interface UseMapManagerOptions {
-  onMapSelected?: (layers: Layer[], entities?: EntityData[], size?: { width: number; height: number }) => void
+  /** The map that was just opened (migrated, with its scene tree): the editor resets its selection and history. */
+  onMapSelected?: (map: MapData) => void
   /** Called after the active map was removed (deleted) on disk. */
   onClearActiveMap?: () => void
   onOpenConfirmDialog?: (config: { title: string; description: string; action: () => void }) => void
@@ -96,9 +96,7 @@ export function useMapManager(options: UseMapManagerOptions = {}) {
   const onSelectMap = useCallback((raw: MapData) => {
     const m = migrateLoadedMap(raw)
     setActiveMapAndSync(m)
-    const initLayers = m.layers || []
-    const initEntities = m.entities || []
-    onMapSelected?.(initLayers, initEntities, { width: m.width, height: m.height })
+    onMapSelected?.(m)
   }, [onMapSelected, setActiveMapAndSync])
 
   const handleDeleteMap = useCallback((folderPath: string | null, fileName: string) => {

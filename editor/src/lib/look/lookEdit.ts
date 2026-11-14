@@ -3,25 +3,29 @@
 
 import { lookId, MAX_COMPONENTS, MAX_MASKS } from '../../../../shared/look/schema'
 import type { Look, LookAdjust, LookMask, LookSet, LookShadow, MaskComponent, MaskComponentType, MaskMode } from '../../../../shared/look/types'
-import type { ImageItem, Layer } from '@/types/editor'
+import type { ImageItem } from '@/types/editor'
+import type { SceneNode } from '../../../../shared/sceneTree'
+import { sceneIndex } from '../sceneIndex'
 import { layerHasLook, ownLook, withProfileLook } from './lookSubjects'
 import type { LookSubjectRef } from './lookView'
 
 type Box = { x: number; y: number; w: number; h: number }
 
 /** The subject the selection points at: the picked picture, else the active tile / image layer, else the map. */
-export function selectedSubject(layers: readonly Layer[], activeLayerId: string | null, selectedImageId: string | null): LookSubjectRef {
-  const layer = activeLayerId ? layers.find((l) => l.id === activeLayerId) : undefined
+export function selectedSubject(nodes: readonly SceneNode[], activeLayerId: string | null, selectedImageId: string | null): LookSubjectRef {
+  const index = sceneIndex(nodes)
+  const layer = activeLayerId ? index.byId.get(activeLayerId)?.node : undefined
   if (!layer || !layerHasLook(layer)) return { kind: 'map' }
-  if (layer.type === 'image' && selectedImageId && layer.images?.some((i) => i.id === selectedImageId)) {
+  if (layer.type === 'image' && selectedImageId && index.byId.get(selectedImageId)?.ancestors.some((a) => a.id === layer.id)) {
     return { kind: 'picture', layerId: layer.id, imageId: selectedImageId }
   }
   return { kind: 'layer', layerId: layer.id }
 }
 
-export function findPicture(layers: readonly Layer[], ref: LookSubjectRef): ImageItem | undefined {
+export function findPicture(nodes: readonly SceneNode[], ref: LookSubjectRef): ImageItem | undefined {
   if (ref.kind !== 'picture') return undefined
-  return layers.find((l) => l.id === ref.layerId)?.images?.find((i) => i.id === ref.imageId)
+  const node = sceneIndex(nodes).byId.get(ref.imageId)?.node
+  return node?.type === 'picture' ? node : undefined
 }
 
 /**

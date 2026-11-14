@@ -1,4 +1,6 @@
-import type { EntityData, Layer, MapData } from '@/types/editor'
+import type { MapData } from '@/types/editor'
+import { isDataLayer, mapTree, type DataLayerNode, type EntityNode, type SceneNode } from '../../../shared/sceneTree'
+import { sceneIndex } from './sceneIndex'
 import { TILE_SIZE } from '../../../shared/engine/constants'
 import { mapPixelSize } from '../../../shared/mapSize'
 import { translatePoints } from '../../../shared/collisionShapes'
@@ -26,7 +28,10 @@ export interface ResizeEdges {
   bottom: number
 }
 
-export type ResizableMap = Pick<MapData, 'width' | 'height' | 'layers' | 'pixelWidth' | 'pixelHeight'> & { entities?: EntityData[] }
+export type ResizableMap = Pick<MapData, 'width' | 'height' | 'nodes' | 'pixelWidth' | 'pixelHeight'>
+
+/** The layers of the map that hold painted cells (tile, terrain, encounters, objects and collision layers). */
+const cellLayers = (map: Pick<MapData, 'nodes'>): DataLayerNode[] => sceneIndex(map.nodes).layers.filter(isDataLayer)
 
 export const NO_RESIZE: ResizeEdges = { left: 0, top: 0, right: 0, bottom: 0 }
 /** At most this many tiles on each side. */
@@ -65,7 +70,7 @@ const inside = (x: number, y: number, w: number, h: number) => x >= 0 && y >= 0 
 
 export interface ResizeLoss {
   /** Painted tiles that fall off the new tile grid, per layer (only layers that lose some). */
-  layers: { layerId: string; name: string; type: Layer['type']; tiles: number }[]
+  layers: { layerId: string; name: string; type: DataLayerNode['type']; tiles: number }[]
   tiles: number
 }
 
@@ -77,7 +82,7 @@ export function resizeLoss(map: ResizableMap, e: ResizeEdges): ResizeLoss {
   const dc = tileShift(e.left)
   const dr = tileShift(e.top)
   const loss: ResizeLoss = { layers: [], tiles: 0 }
-  for (const layer of map.layers) {
+  for (const layer of cellLayers(map)) {
     let tiles = 0
     for (const key of Object.keys(layer.data ?? {})) {
       const idx = Number(key)
@@ -98,7 +103,7 @@ export function hasLoss(loss: ResizeLoss): boolean {
 /** One flag per old tile cell (`y * width + x`): is a tile painted there (on any layer)? */
 export function occupiedCells(map: ResizableMap): Uint8Array {
   const cells = new Uint8Array(map.width * map.height)
-  for (const layer of map.layers) {
+  for (const layer of cellLayers(map)) {
     for (const key of Object.keys(layer.data ?? {})) {
       const idx = Number(key)
       if (idx >= 0 && idx < cells.length) cells[idx] = 1
@@ -107,27 +112,29 @@ export function occupiedCells(map: ResizableMap): Uint8Array {
   return cells
 }
 
-function shiftLayer(layer: Layer, map: ResizableMap, e: ResizeEdges, newW: number, newH: number): Layer {
-  const next: Layer = { ...layer }
+/** One node moved by the resize: painted cells to their new place (cropped off the grid), pixel positions by (left, top). */
+function shiftNode(node: SceneNode, map: ResizableMap, e: ResizeEdges, newW: number, newH: number): SceneNode {
   const dc = tileShift(e.left)
   const dr = tileShift(e.top)
-  if (layer.data) {
-    const data: NonNullable<Layer['data']> = {}
-    for (const [key, tile] of Object.entries(layer.data)) {
+  if (isDataLayer(node)) {
+    if (!node.data) return node
+    const data: NonNullable<DataLayerNode['data']> = {}
+    for (const [key, tile] of Object.entries(node.data)) {
       const idx = Number(key)
       const x = (idx % map.width) + dc
       const y = Math.floor(idx / map.width) + dr
       if (inside(x, y, newW, newH)) data[y * newW + x] = tile
     }
-    next.data = data
+    return { ...node, data }
   }
-  if (layer.images) next.images = layer.images.map((item) => ({ ...item, x: item.x + e.left, y: item.y + e.top }))
-  if (layer.shapes) next.shapes = layer.shapes.map((s) => ({ ...s, points: translatePoints(s.points, e.left, e.top) }))
-  return next
+  if (node.type === 'picture') return { ...node, x: node.x + e.left, y: node.y + e.top }
+  if (node.type === 'collisionShape') return { ...node, points: translatePoints(node.points, e.left, e.top) }
+  if (node.type === 'entity') return shiftEntity(node, e)
+  return node
 }
 
-function shiftEntity(ent: EntityData, e: ResizeEdges): EntityData {
-  const next: EntityData = { ...ent, x: ent.x + e.left, y: ent.y + e.top }
+function shiftEntity(ent: EntityNode, e: ResizeEdges): EntityNode {
+  const next: EntityNode = { ...ent, x: ent.x + e.left, y: ent.y + e.top }
   const transform = ent.components?.Transform
   if (transform && typeof transform.x === 'number' && typeof transform.y === 'number') {
     next.components = { ...ent.components, Transform: { ...transform, x: transform.x + e.left, y: transform.y + e.top } }
@@ -144,11 +151,10 @@ export function applyResize<T extends ResizableMap>(map: T, e: ResizeEdges): T {
   const size = resizedSize(map, e)
   const width = tilesFor(size.width)
   const height = tilesFor(size.height)
-  const layers = map.layers.map((l) => shiftLayer(l, map, e, width, height))
+  const nodes = mapTree(map.nodes, (n) => shiftNode(n, map, e, width, height))
   const { pixelWidth: _w, pixelHeight: _h, ...rest } = map
   const wholeTiles = size.width === width * TILE_SIZE && size.height === height * TILE_SIZE
-  const result = { ...rest, width, height, layers, ...(wholeTiles ? {} : { pixelWidth: size.width, pixelHeight: size.height }) } as T
-  if (map.entities) result.entities = map.entities.map((ent) => shiftEntity(ent, e))
+  const result = { ...rest, width, height, nodes, ...(wholeTiles ? {} : { pixelWidth: size.width, pixelHeight: size.height }) } as T
   return result
 }
 

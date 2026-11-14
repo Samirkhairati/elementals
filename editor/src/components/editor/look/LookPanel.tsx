@@ -18,6 +18,8 @@ import { useEditorSelector, type EditorContextValue } from '../layout/EditorCont
 import { Badge, Card, EdButton, EyeButton, Field, IconButton, InfoTip, Segmented, Toggle } from '../ui/controls'
 import { ColorField } from '../ui/fields'
 import { RenameInput } from '../ui/RenameInput'
+import { sceneIndex } from '@/lib/sceneIndex'
+import type { LookSet } from '../../../../../shared/look/types'
 import { LookAdjustEditor } from './LookAdjustEditor'
 import { LookMasksEditor } from './LookMasksEditor'
 import { LookShadersEditor } from './LookShadersEditor'
@@ -26,7 +28,7 @@ import { LookSection, LookSlider, type Change } from './lookControls'
 
 const selectLook = (c: EditorContextValue) => ({
   activeMap: c.activeMap,
-  layers: c.layers,
+  nodes: c.activeMap?.nodes,
   activeLayerId: c.activeLayerId,
   selectedImageId: c.selectedImageId,
   spriteAssets: c.spriteAssets,
@@ -212,12 +214,13 @@ export function LookPanel() {
   const map = ctx.activeMap
   if (!map) return <div className="ed-empty">No map open</div>
 
-  const followed = selectedSubject(ctx.layers, ctx.activeLayerId, ctx.selectedImageId)
-  const ref: LookSubjectRef = view.pinned && subjectExists(ctx.layers, view.pinned) ? view.pinned : followed
+  const nodes = ctx.nodes ?? []
+  const followed = selectedSubject(nodes, ctx.activeLayerId, ctx.selectedImageId)
+  const ref: LookSubjectRef = view.pinned && subjectExists(nodes, view.pinned) ? view.pinned : followed
   const subject = subjectKey(ref)
-  const layer = ref.kind !== 'map' ? ctx.layers.find((l) => l.id === ref.layerId) : undefined
-  const picture = findPicture(ctx.layers, ref)
-  const set = getLookSet(map, ctx.layers, ref)
+  const layer = ref.kind !== 'map' ? sceneIndex(nodes).byId.get(ref.layerId)?.node : undefined
+  const picture = findPicture(nodes, ref)
+  const set = getLookSet(map, nodes, ref)
   const profile = view.profile !== null && lib.file.profiles.some((p) => p.id === view.profile) ? view.profile : null
   const { look, inherited } = lookInView(set, profile)
   const shown: Look = look ?? {}
@@ -241,7 +244,7 @@ export function LookPanel() {
   const counts = { masks: shown.masks?.length ?? 0, shaders: shown.shaders?.length ?? 0 }
   const enabled = shown.enabled !== false
   // a picture without its own shadow gets its layer's
-  const layerShadow = ref.kind === 'picture' ? (resolveLook(layer?.look, profile)?.shadow ?? undefined) : undefined
+  const layerShadow = ref.kind === 'picture' ? (resolveLook((layer as { look?: LookSet } | undefined)?.look, profile)?.shadow ?? undefined) : undefined
 
   return (
     <div className="flex w-full flex-col gap-3 text-left" data-testid="look-panel">

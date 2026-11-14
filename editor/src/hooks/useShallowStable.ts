@@ -21,3 +21,13 @@ export function useShallowStable<T extends object>(value: T): T {
   if (!shallowEqual(ref.current, value)) ref.current = value
   return ref.current
 }
+
+/**
+ * The same array as last render while it holds the same items (`Object.is`, in the same order): a list derived from a
+ * bigger structure (the entities of the scene tree) keeps its identity while the structure changes elsewhere.
+ */
+export function useStableArray<T>(list: readonly T[]): readonly T[] {
+  const ref = useRef(list)
+  if (ref.current !== list && (ref.current.length !== list.length || ref.current.some((x, i) => !Object.is(x, list[i])))) ref.current = list
+  return ref.current
+}

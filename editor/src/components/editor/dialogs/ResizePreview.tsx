@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { sceneIndex, drawPlan } from '@/lib/sceneIndex'
+import { isDataLayer } from '../../../../../shared/sceneTree'
 import { Maximize, Minus, Plus } from 'lucide-react'
 import type { TilesetData } from '@/types/editor'
 import type { SpriteAssetInfo } from '../../../../../shared/engine/types'
@@ -48,7 +50,7 @@ function useTilesetImages(tilesets: TilesetData[], map: ResizableMap) {
   const [version, setVersion] = useState(0)
   useEffect(() => {
     const used = new Set<string>()
-    for (const l of map.layers) for (const t of Object.values(l.data ?? {})) used.add(t.tilesetId)
+    for (const l of sceneIndex(map.nodes).layers) if (isDataLayer(l)) for (const t of Object.values(l.data ?? {})) used.add(t.tilesetId)
     for (const ts of tilesets) {
       if (!used.has(ts.fileName) || images.current.has(ts.fileName)) continue
       const img = new Image()
@@ -56,7 +58,7 @@ function useTilesetImages(tilesets: TilesetData[], map: ResizableMap) {
       img.onload = () => setVersion((v) => v + 1)
       img.src = ts.dataUrl
     }
-  }, [tilesets, map.layers])
+  }, [tilesets, map.nodes])
   return { images: images.current, version }
 }
 
@@ -140,7 +142,7 @@ export function ResizePreview({ map, tilesets, spriteAssets, edges, onEdgesChang
       ctx.lineWidth = 2
       ctx.strokeRect(sx(col) + 2, sy(row) + 2, s - 4, s - 4)
     }
-    for (const e of map.entities ?? []) marker(e.x, e.y, 'rgba(251,191,36,0.95)')
+    for (const e of drawPlan(sceneIndex(map.nodes)).entities) marker(e.x, e.y, 'rgba(251,191,36,0.95)')
     for (const it of unresolved) marker(it.x, it.y, 'rgba(96,165,250,0.95)')
 
     // Faint tile grid over the new area.

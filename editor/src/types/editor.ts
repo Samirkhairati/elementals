@@ -1,87 +1,25 @@
 import type { ComponentSchema, ComponentType as EngineComponentType, FieldKind } from '../../../shared/engine/types'
-import type { CollisionShape } from '../../../shared/collisionShapes'
 import type { LookSet } from '../../../shared/look/types'
-import type { CollisionTileGroup } from '../../../shared/collisionLayers'
+import type { EditorImageCrop } from '../../../shared/mapTypes'
+import type { EntityNode, LayerNode, PictureNode, SceneNode } from '../../../shared/sceneTree'
 export type { CollisionShape, ShapePoint } from '../../../shared/collisionShapes'
 export type { CollisionTileGroup } from '../../../shared/collisionLayers'
+export type { EntityNode, GroupNode, LayerNode, PictureNode, SceneNode, SceneNodeType } from '../../../shared/sceneTree'
 
-/** A collision layer holds painted tiles and shapes (old `polygons` layers are migrated to it on load). */
-export type LayerType = 'tile' | 'collision' | 'terrain' | 'objects' | 'encounters' | 'image' | 'folder'
+/** The kinds of layer a map can hold (a collision layer holds painted tiles and shapes; old `polygons` layers are migrated to it on load). */
+export type LayerType = LayerNode['type']
 
 /** A rectangle of a picture in its own pixels. */
-export interface ImageCrop {
-  x: number
-  y: number
-  w: number
-  h: number
-}
+export type ImageCrop = EditorImageCrop
 
 /**
- * One freely placed image of an `image` layer, drawn at a pixel position (its anchor: bottom-centre of the picture).
- * It is either a sprite asset (`assetId`) or a plain picture from the graphics library (`graphicId`), never both.
+ * One freely placed picture of an `image` layer: a `picture` node of the scene tree (shared/sceneTree.ts). It is either a
+ * sprite asset (`assetId`) or a plain picture from the graphics library (`graphicId`), never both.
  */
-export interface ImageItem {
-  id: string
-  /** Sprite (character) id, e.g. `objects/chest`. */
-  assetId?: string
-  /** Graphic id (a picture under project/graphics), e.g. `scenery/clouds.png`. */
-  graphicId?: string
-  /** Shown name in the list (the picture's id when absent). */
-  name?: string
-  /** Only this part of the picture (graphic items): the same file is shared, nothing is copied. Absent = whole picture. */
-  crop?: ImageCrop
-  x: number
-  y: number
-  /** Draw order inside the layer (ties keep array order). */
-  z?: number
-  scale?: number
-  flipX?: boolean
-  flipY?: boolean
-  opacity?: number
-  /** The group of the layer's `groups` this picture belongs to (editor view only, not exported). */
-  groupId?: string
-  /** Y-sorted among the characters (shared/ySort.ts); absent = follow the group / layer / folder. */
-  ySort?: boolean
-  /** Colour grading, masks and shaders of this picture, per profile (docs/looks.md). */
-  look?: LookSet
-}
+export type ImageItem = PictureNode
 
-/** A named set of the pictures of one image layer: they are picked, duplicated and moved together (editor view only, not exported). */
-export interface ImageGroup {
-  id: string
-  name: string
-  /** Locked: clicking any member picks the whole group, until the group itself is the selected one. */
-  locked?: boolean
-  /** Y-sort for members without their own setting; absent = follow the layer. */
-  ySort?: boolean
-}
-
-export interface Layer {
-  id: string
-  name: string
-  type: LayerType
-  visible: boolean
-  locked: boolean
-  z?: number
-  /** Painted cells. On a collision layer each is the `__collision__` marker and `group` is its tiles item. */
-  data?: Record<number, { tilesetId: string; x: number; y: number; group?: string }>
-  /** `image` layers only. */
-  images?: ImageItem[]
-  /** `image` layers only: the groups the pictures can belong to. */
-  groups?: ImageGroup[]
-  /** Tile and image layers only: the `folder` layer that holds this one in the list. */
-  folderId?: string
-  /** `folder` layers only: shown closed in the list. */
-  collapsed?: boolean
-  /** Image layers and folders: y-sort the pictures; absent = follow the folder, else off. */
-  ySort?: boolean
-  /** `collision` layers only: collision shapes in map pixels, one item each. */
-  shapes?: CollisionShape[]
-  /** Tile and image layers: colour grading, masks and shaders, per profile (docs/looks.md). */
-  look?: LookSet
-  /** `collision` layers only: the tiles items, in list order (shared/collisionLayers.ts). */
-  tileGroups?: CollisionTileGroup[]
-}
+/** A layer node of the scene tree: tile, image, collision, terrain, encounters or objects. Groups are `GroupNode`s. */
+export type Layer = LayerNode
 
 export interface CopiedTile {
   tilesetId: string
@@ -141,22 +79,8 @@ export interface ComponentSchemaEntry {
   required?: boolean
 }
 
-export interface EntityData {
-  id: string
-  name: string
-  x: number
-  y: number
-  visible?: boolean
-  folder?: string | null
-  components: Partial<Record<ComponentType, PropBag>>
-}
-
-export interface EntityFolder {
-  id: string
-  name: string
-  expanded?: boolean
-  visible?: boolean
-}
+/** An entity node with its components typed by the editor's component registry. */
+export type EntityData = Omit<EntityNode, 'components'> & { components: Partial<Record<ComponentType, PropBag>> }
 
 export interface MapData {
   name: string
@@ -172,12 +96,9 @@ export interface MapData {
   settings?: MapSettings
   /** The whole map's look (colour grading, masks, shaders), per profile (docs/looks.md). */
   look?: LookSet
-  layers: Layer[]
-  entities?: EntityData[]
-  entityFolders?: EntityFolder[]
-  /** Editor view only: how many layers are above the Entities row in the layer list (0 or missing = on top). */
-  entitiesIndex?: number
-  /** 2 = canonical engine components. Set when the map is loaded/migrated. */
+  /** The scene tree: the children of the map root, in draw order (the first one draws first). Schema 6. */
+  nodes: SceneNode[]
+  /** 6 = one tree of nodes. Set when the map is loaded/migrated. */
   schemaVersion?: number
 }
 

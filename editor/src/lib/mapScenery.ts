@@ -6,9 +6,10 @@
 
 import type { SpriteAssetInfo } from '../../../shared/engine/types'
 import { TILE_SIZE } from '../../../shared/engine/constants'
-import type { Layer, LayerType, MapData } from '@/types/editor'
+import type { LayerType, MapData } from '@/types/editor'
+import { isDataLayer, isLayerNode, isVisible, type DataLayerNode } from '../../../shared/sceneTree'
 import { resolveImageItem } from './imageItems'
-import { sortedImages } from './layerOrder'
+import { sceneIndex, visiblePictures } from './sceneIndex'
 import { drawResolvedSprite } from './spriteImages'
 
 /** What a layer type contributes to how the map looks: painted tiles, placed pictures, or nothing a preview should draw. */
@@ -20,11 +21,10 @@ export const LAYER_SCENERY: Record<LayerType, 'tiles' | 'images' | 'none'> = {
   terrain: 'none',
   encounters: 'none',
   objects: 'none',
-  folder: 'none',
 }
 
 /** The part of a map the preview needs. */
-export type SceneryMap = Pick<MapData, 'width'> & { layers: Pick<Layer, 'type' | 'visible' | 'data' | 'images'>[] }
+export type SceneryMap = Pick<MapData, 'width' | 'nodes'>
 
 export interface SceneryOptions {
   /** Loaded tileset images by tileset id (a missing or unfinished one is skipped; draw again when it arrives). */
@@ -43,7 +43,7 @@ export interface ItemPoint {
 }
 
 /** Tilesets the visible tile layers use, so a preview can load just those. */
-export function usedTilesetIds(layers: Pick<Layer, 'data'>[]): Set<string> {
+export function usedTilesetIds(layers: readonly Pick<DataLayerNode, 'data'>[]): Set<string> {
   const used = new Set<string>()
   for (const l of layers) for (const t of Object.values(l.data ?? {})) used.add(t.tilesetId)
   used.delete('__collision__')
@@ -58,12 +58,12 @@ export function usedTilesetIds(layers: Pick<Layer, 'data'>[]): Set<string> {
 export function drawMapScenery(ctx: CanvasRenderingContext2D, map: SceneryMap, opts: SceneryOptions): ItemPoint[] {
   const unresolved: ItemPoint[] = []
   const bleed = opts.bleed ?? 0
-  // The layer list is top first; paint from the bottom up.
-  for (const layer of [...map.layers].reverse()) {
-    if (!layer.visible) continue
+  // The tree is in draw order: paint from the first node up, leaving out what a hidden group hides.
+  for (const { node: layer, ancestors } of sceneIndex(map.nodes).entries) {
+    if (!isLayerNode(layer) || !isVisible(layer, ancestors)) continue
     const kind = LAYER_SCENERY[layer.type]
     if (kind === 'images') {
-      for (const it of sortedImages(layer.images)) {
+      for (const it of visiblePictures(layer)) {
         const resolved = opts.assets ? resolveImageItem(it, opts.assets) : null
         if (!resolved) {
           unresolved.push(it)
@@ -71,7 +71,7 @@ export function drawMapScenery(ctx: CanvasRenderingContext2D, map: SceneryMap, o
         }
         drawResolvedSprite(ctx, resolved, { anchorX: it.x, anchorY: it.y, opacity: it.opacity, mirrorX: it.flipX, mirrorY: it.flipY, smooth: opts.smooth })
       }
-    } else if (kind === 'tiles') {
+    } else if (kind === 'tiles' && isDataLayer(layer)) {
       for (const [key, tile] of Object.entries(layer.data ?? {})) {
         if (tile.tilesetId === '__collision__') continue
         const img = opts.tileImages.get(tile.tilesetId)

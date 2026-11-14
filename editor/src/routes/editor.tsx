@@ -1,12 +1,12 @@
 import { useState, useEffect, useMemo } from 'react'
 import { graphicAssets } from '@/lib/graphicAssets'
-import { EntityData, Layer, LayerType, MapData } from '@/types/editor'
+import type { MapData } from '@/types/editor'
 import { mapSize, type HistorySnapshot } from '@/lib/history'
 import { mapSaveQueue } from '@/lib/saveQueue'
 
 // Hooks
 import { useHistory } from '@/hooks/useHistory'
-import { snapshot, useEditorClipboard } from '@/store/editorClipboard'
+import { useEditorClipboard } from '@/store/editorClipboard'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { usePaintTools } from '@/hooks/usePaintTools'
 import { useMapAutosave } from '@/hooks/useMapAutosave'
@@ -14,6 +14,7 @@ import { useStableCallback } from '@/hooks/useStableCallback'
 import { useShallowStable } from '@/hooks/useShallowStable'
 import { useTilesetManager } from '@/hooks/editor/useTilesetManager'
 import { useMapManager } from '@/hooks/editor/useMapManager'
+import { useSceneTree } from '@/hooks/editor/useSceneTree'
 import { useLayerManager } from '@/hooks/editor/useLayerManager'
 import { useEntityManager } from '@/hooks/editor/useEntityManager'
 import { useEditorDialogs } from '@/hooks/editor/useEditorDialogs'
@@ -29,7 +30,10 @@ import { MapSettingsDialog } from '@/components/editor/dialogs/MapSettingsDialog
 import type { MapSettings } from '@/types/editor'
 import type { LookSet } from '../../../shared/look/types'
 import type { LookSubjectRef } from '@/lib/look/lookView'
-import { setLayerLook, setMapLook } from '@/lib/look/lookSubjects'
+import { setMapLook, setNodeLook } from '@/lib/look/lookSubjects'
+import { carryView, countWithin, topLevelIds, type NewNodeType } from '@/lib/sceneOps'
+import { sceneIndex, pictureLocked } from '@/lib/sceneIndex'
+import { NO_SELECTION, selectNode as selectNodeOf, type SelectMode } from '@/lib/sceneSelection'
 
 // Layout
 import {
@@ -50,21 +54,18 @@ export function EditorPage() {
   // Callbacks handed to the managers are referentially stable (they always run the latest
   // closure), so the managers' own callbacks - and therefore the context value - stay stable too.
   // They may reference managers declared further down: they only run in event handlers.
-  const handleMapSelected = useStableCallback((initLayers: Layer[], initEntities?: EntityData[], size?: { width: number; height: number }) => {
-    layerManager.setLayers(initLayers)
-    layerManager.setActiveLayerId(initLayers?.[0]?.id || null)
-    entityManager.setEntities(initEntities || [])
-    entityManager.setSelectedEntityId(null)
-    historyState.resetHistory({ layers: initLayers, entities: initEntities || [], size, look: mapManager.getActiveMap()?.look ?? null })
+  const handleMapSelected = useStableCallback((map: MapData) => {
+    // Opening a map picks its topmost layer, like it always did.
+    const idx = sceneIndex(map.nodes)
+    const first = idx.layersTopFirst[0]
+    tree.setSelection(first ? selectNodeOf(NO_SELECTION, idx, first.id) : NO_SELECTION)
+    historyState.resetHistory({ nodes: map.nodes, size: { width: map.width, height: map.height }, look: map.look ?? null })
   })
 
   /** Reset every piece of per-map editor state (used once the active map is gone). */
   const clearEditorState = useStableCallback(() => {
     mapManager.setActiveMap(null)
-    layerManager.setLayers([])
-    layerManager.setActiveLayerId(null)
-    entityManager.setEntities([])
-    entityManager.setSelectedEntityId(null)
+    tree.setSelection(NO_SELECTION)
     historyState.resetHistory(null)
   })
 
@@ -87,21 +88,26 @@ export function EditorPage() {
   // ── Single autosave pipeline ─────────────────────────────────────────────
   useMapAutosave(mapManager.activeMap)
 
-  // One combined (layers + entities) history step, read from the managers' live refs.
+  // One history step of the map's scene tree (+ its size and look), read from the open map.
   const commitSnapshot = useStableCallback(() => {
+    const map = mapManager.getActiveMap()
     historyState.commitHistory({
-      layers: layerManager.getLayers(),
-      entities: entityManager.getEntities(),
-      size: mapSize(mapManager.getActiveMap()),
-      look: mapManager.getActiveMap()?.look ?? null,
+      nodes: map?.nodes ?? [],
+      size: mapSize(map),
+      look: map?.look ?? null,
     })
   })
 
-  // ── Layer Manager ────────────────────────────────────────────────────────
-  const layerManager = useLayerManager({
+  // ── Scene tree, layers and entities ──────────────────────────────────────
+  // The tree is the open map's `nodes`; the managers are thin wrappers around it.
+  const tree = useSceneTree({
+    activeMap: mapManager.activeMap,
+    getActiveMap: mapManager.getActiveMap,
     setActiveMap: mapManager.setActiveMap,
     onCommitHistory: commitSnapshot,
   })
+  const layerManager = useLayerManager(tree)
+  const entityManager = useEntityManager(tree)
 
   /**
    * Replaces the look of the map, a layer or a picture. While a slider is dragged `commit` is false (the canvas
@@ -111,21 +117,9 @@ export function EditorPage() {
     if (ref.kind === 'map') {
       mapManager.setActiveMap(m => (m ? setMapLook(m, set) : m))
     } else {
-      const prev = layerManager.getLayers()
-      const next = setLayerLook(prev, ref, set)
-      if (next !== prev) {
-        layerManager.setLayers(next)
-        mapManager.setActiveMap(m => (m ? { ...m, layers: next } : m))
-      }
+      tree.commitView(prev => setNodeLook(prev, ref, set))
     }
     if (commit) commitSnapshot()
-  })
-
-  // ── Entity Manager ───────────────────────────────────────────────────────
-  const entityManager = useEntityManager({
-    activeMap: mapManager.activeMap,
-    setActiveMap: mapManager.setActiveMap,
-    onCommitHistory: commitSnapshot,
   })
 
   // ── Grid & Snapping Settings ──────────────────────────────────────────────
@@ -171,29 +165,20 @@ export function EditorPage() {
     onMapCreated: (map) => {
       mapManager.onSelectMap(map)
     },
-    onRenameLayer: layerManager.handleRenameLayer,
+    onRenameLayer: layerManager.renameNode,
   })
 
   // ── Undo / Redo ──────────────────────────────────────────────────────────
-  /** Restore a history snapshot: layers + entities (and the mirrored active map) in one go. */
+  /** Restore a history snapshot: the scene tree, the map's size and look (selected ids that are gone are dropped). */
   const applySnapshot = useStableCallback((snapshot: HistorySnapshot) => {
-    // Entity folders are not part of history; drop references to folders that no longer exist.
-    const folderIds = new Set(entityManager.getFolders().map(f => f.id))
-    const entities = snapshot.entities.map(e => (e.folder && !folderIds.has(e.folder) ? { ...e, folder: null } : e))
-
-    layerManager.setLayers(snapshot.layers)
-    entityManager.setEntities(entities)
     mapManager.setActiveMap(m => {
       if (!m) return m
-      const next = { ...m, layers: snapshot.layers, entities, ...snapshot.size }
+      const next = { ...m, nodes: carryView(m.nodes, snapshot.nodes), ...snapshot.size }
       if (snapshot.look === undefined) return next
       const { look: _old, ...rest } = next
       return snapshot.look ? { ...rest, look: snapshot.look } : rest
     })
-    layerManager.setActiveLayerId(current =>
-      current && snapshot.layers.some(l => l.id === current) ? current : snapshot.layers[0]?.id ?? null
-    )
-    entityManager.setSelectedEntityId(current => (current && entities.some(e => e.id === current) ? current : null))
+    tree.pruneToTree(true)
   })
 
   const boundHandleUndo = useStableCallback(() => {
@@ -214,89 +199,56 @@ export function EditorPage() {
   // ── Focus Domain Tracking ───────────────────────────────────────────────
   const [focusedDomain, setFocusedDomain] = useState<FocusedDomain>(null)
 
-  const handleDeleteSelected = useStableCallback(() => {
-    const isEntitiesDomain = focusedDomain === 'entities' || (!focusedDomain && entityManager.selectedEntityId)
-    const isLayersDomain = focusedDomain === 'layers' || (!focusedDomain && layerManager.activeLayerId)
-    const isMapsDomain = focusedDomain === 'maps' || (!focusedDomain && mapManager.activeMap)
-
-    // A picked image on an image layer goes first (undoable, so no confirmation).
-    const imageLayerId = layerManager.activeLayerId
-    if (layerManager.pickedImageIds.length > 0 && imageLayerId && !entityManager.selectedEntityId) {
-      layerManager.deleteImages(imageLayerId, layerManager.pickedImageIds)
+  /** Deletes nodes: pictures and collision items at once (undo brings them back), anything else after asking. */
+  const requestDeleteNodes = useStableCallback((ids: readonly string[]) => {
+    const nodes = tree.getNodes()
+    const index = sceneIndex(nodes)
+    const tops = topLevelIds(nodes, ids)
+    if (tops.length === 0) return
+    const kinds = tops.map(id => index.byId.get(id)?.node.type)
+    if (kinds.every(k => k === 'picture' || k === 'collisionTiles' || k === 'collisionShape')) {
+      layerManager.deleteNodes(tops)
       return
     }
-
-    if (isEntitiesDomain && entityManager.selectedEntityId) {
-      const entity = entityManager.entities.find(e => e.id === entityManager.selectedEntityId)
-      if (entity) {
-        dialogs.setConfirmDialog({
-          open: true,
-          title: 'Delete Entity',
-          description: `Are you sure you want to delete entity "${entity.name}"?`,
-          action: () => entityManager.deleteEntity(entity.id),
-        })
-      }
-    } else if (isLayersDomain && layerManager.activeLayerId) {
-      const layer = layerManager.layers.find(l => l.id === layerManager.activeLayerId)
-      const ids = [layerManager.activeLayerId, ...layerManager.selectedLayerIds.filter(id => id !== layerManager.activeLayerId)]
-      if (layer && ids.length > 1) {
-        dialogs.setConfirmDialog({
-          open: true,
-          title: 'Delete Layers',
-          description: `Are you sure you want to delete these ${ids.length} layers?`,
-          action: () => layerManager.handleDeleteLayers(ids),
-        })
-      } else if (layer) {
-        dialogs.setConfirmDialog({
-          open: true,
-          title: 'Delete Layer',
-          description: `Are you sure you want to delete layer "${layer.name}"?`,
-          action: () => layerManager.handleDeleteLayer(layer.id),
-        })
-      }
-    } else if (isMapsDomain && mapManager.activeMap) {
-      mapManager.handleDeleteMap(mapManager.activeMap.folderPath, mapManager.activeMap.fileName)
-    }
+    const total = countWithin(nodes, tops)
+    const only = tops.length === 1 ? index.byId.get(tops[0])?.node : undefined
+    const noun = only?.type === 'entity' ? 'entity' : only?.type === 'group' ? 'group' : 'layer'
+    const inside = total > tops.length ? ` and ${only ? `the ${total - 1} node${total === 2 ? '' : 's'} inside it` : `what is inside ${tops.length === 1 ? 'it' : 'them'} (${total} in all)`}` : ''
+    setTimeout(() => {
+      dialogs.setConfirmDialog({
+        open: true,
+        title: only ? `Delete ${noun === 'entity' ? 'Entity' : noun === 'group' ? 'Group' : 'Layer'}` : 'Delete Nodes',
+        description: only ? `Are you sure you want to delete ${noun} "${only.name}"${inside}?` : `Are you sure you want to delete these ${tops.length} nodes${inside}?`,
+        action: () => layerManager.deleteNodes(tops),
+      })
+    }, 0)
   })
 
-  // What Ctrl/Cmd+C, +V and +D act on: picked pictures of the active image layer, else the picked entity, else the layers.
-  const selectionTarget = (): 'images' | 'entities' | 'layers' | null => {
-    if (layerManager.pickedImageIds.length > 0 && layerManager.activeLayerId && !entityManager.selectedEntityId) return 'images'
-    if (entityManager.selectedEntityId && (focusedDomain === 'entities' || !focusedDomain)) return 'entities'
-    if (layerManager.activeLayerId) return 'layers'
-    return null
-  }
-  const layerWorkingSet = () => (layerManager.activeLayerId ? [layerManager.activeLayerId, ...layerManager.selectedLayerIds.filter(id => id !== layerManager.activeLayerId)] : [])
+  const handleDeleteSelected = useStableCallback(() => {
+    const ids = tree.view.ids
+    if (focusedDomain === 'maps' || (ids.length === 0 && !focusedDomain && mapManager.activeMap)) {
+      if (mapManager.activeMap) mapManager.handleDeleteMap(mapManager.activeMap.folderPath, mapManager.activeMap.fileName)
+      return
+    }
+    if (ids.length > 0) requestDeleteNodes(ids)
+  })
 
+  // What Ctrl/Cmd+C, +V and +D act on: the selected nodes of the scene tree (pictures, entities, layers, groups...).
   const handleCopySelected = useStableCallback(() => {
-    const target = selectionTarget()
-    if (target === 'images' && layerManager.activeLayerId) layerManager.copyImages(layerManager.activeLayerId, layerManager.pickedImageIds)
-    else if (target === 'entities') {
-      const entity = entityManager.entities.find(e => e.id === entityManager.selectedEntityId)
-      if (entity) useEditorClipboard.getState().set({ kind: 'entities', entities: snapshot([entity]) })
-    } else if (target === 'layers') layerManager.copyLayers(layerWorkingSet())
+    if (tree.view.ids.length > 0) layerManager.copyNodes(tree.view.ids)
   })
 
   const handlePasteSelected = useStableCallback(() => {
-    const content = useEditorClipboard.getState().content
-    if (!content) return
-    if (content.kind === 'images') {
-      const layer = layerManager.layers.find(l => l.id === layerManager.activeLayerId)
-      if (layer?.type === 'image') layerManager.pasteImages(layer.id, null)
-    } else if (content.kind === 'entities') entityManager.pasteEntities(content.entities)
-    else layerManager.pasteLayers(layerManager.activeLayerId)
+    if (useEditorClipboard.getState().content) layerManager.pasteNodes(tree.view.primaryId)
   })
 
   const handlePlaceMultiple = useStableCallback(() => {
-    const layer = layerManager.layers.find(l => l.id === layerManager.activeLayerId)
-    if (layer?.type === 'image' && !layer.locked && layerManager.selectedImageId) layerManager.placeMultiple(layer.id, layerManager.selectedImageId)
+    const { selectedImageId } = tree.view
+    if (selectedImageId && !pictureLocked(tree.getIndex(), selectedImageId)) layerManager.placeMultiple('', selectedImageId)
   })
 
   const handleDuplicateSelected = useStableCallback(() => {
-    const target = selectionTarget()
-    if (target === 'images' && layerManager.activeLayerId) layerManager.duplicateImages(layerManager.activeLayerId, layerManager.pickedImageIds)
-    else if (target === 'entities' && entityManager.selectedEntityId) entityManager.duplicateEntity(entityManager.selectedEntityId)
-    else if (target === 'layers') layerManager.duplicateLayers(layerWorkingSet())
+    if (tree.view.ids.length > 0) layerManager.duplicateNodes(tree.view.ids)
   })
 
   // ── Keyboard Shortcuts ───────────────────────────────────────────────────
@@ -309,8 +261,8 @@ export function EditorPage() {
     handlePaste: handlePasteSelected,
     handleDuplicate: handleDuplicateSelected,
     handlePlaceMultiple,
-    handleNewLayer: () => mapManager.activeMap && handleCreateLayerOfType('tile'),
-    handleNewFolder: () => mapManager.activeMap && handleCreateLayerOfType('folder'),
+    handleNewLayer: () => mapManager.activeMap && handleCreateNode('tile'),
+    handleNewFolder: () => mapManager.activeMap && handleCreateNode('group'),
   })
 
   // ── Paint Tools Hook ─────────────────────────────────────────────────────
@@ -322,23 +274,20 @@ export function EditorPage() {
     activeTool: layerManager.activeTool,
     paintMode: layerManager.paintMode,
     paintStartPos: layerManager.paintStartPos,
-    getLayers: layerManager.getLayers,
-    setLayers: layerManager.setLayers,
-    commitHistory: commitSnapshot,
+    getIndex: tree.getIndex,
+    commit: tree.commit,
+    commitView: tree.commitView,
     setDebugInfo: layerManager.setDebugInfo,
-    setActiveMap: mapManager.setActiveMap,
   })
 
-  // ── Unified Layer & Entity Selection Handlers ─────────────────────────────
+  // ── Selection handlers (they also move the focus to the Scene panel) ──────
   const handleSelectLayer = useStableCallback((layerId: string | null) => {
     layerManager.setActiveLayerId(layerId)
-    entityManager.setSelectedEntityId(null)
     setFocusedDomain('layers')
   })
 
-  const handleSelectLayerExtended = useStableCallback((layerId: string, additive: boolean | 'range' = false) => {
-    layerManager.selectLayer(layerId, additive)
-    entityManager.setSelectedEntityId(null)
+  const handleSelectNode = useStableCallback((id: string, mode: SelectMode = 'replace') => {
+    tree.select(id, mode)
     setFocusedDomain('layers')
   })
 
@@ -349,20 +298,13 @@ export function EditorPage() {
     }
   })
 
-  const handleCreateLayerOfType = useStableCallback((type: LayerType, folderId?: string) => {
-    entityManager.setSelectedEntityId(null)
+  const handleCreateNode = useStableCallback((type: NewNodeType, anchorId?: string | null) => {
     setFocusedDomain('layers')
-    layerManager.handleCreateLayerOfType(type, folderId)
-  })
-
-  const handleDuplicateLayer = useStableCallback((id: string) => {
-    entityManager.setSelectedEntityId(null)
-    setFocusedDomain('layers')
-    layerManager.handleDuplicateLayer(id)
+    layerManager.createNode(type, anchorId)
   })
 
   const handleExportMap = useStableCallback((m: MapData) => {
-    exportMap(m, tilesetManager.tilesets, mapManager.getActiveMap(), layerManager.getLayers())
+    exportMap(m, tilesetManager.tilesets, mapManager.getActiveMap())
   })
 
   // ── Notices (small, self-dismissing messages) ────────────────────────────
@@ -375,7 +317,7 @@ export function EditorPage() {
 
   /** Right-click > "Export to game": writes game/public/data/maps/<id>.json straight away. */
   const handleExportMapToGame = useStableCallback(async (m: MapData) => {
-    const res = await exportMapToGame(m, tilesetManager.tilesets, mapManager.getActiveMap(), layerManager.getLayers())
+    const res = await exportMapToGame(m, tilesetManager.tilesets, mapManager.getActiveMap())
     setNotice(
       res.ok
         ? {
@@ -399,7 +341,7 @@ export function EditorPage() {
   const handleResizeMap = useStableCallback((m: MapData) => {
     const active = mapManager.getActiveMap()
     if (sameMap(active, m)) {
-      setResizeTarget({ ...active!, layers: layerManager.getLayers(), entities: entityManager.getEntities() })
+      setResizeTarget(active)
       return
     }
     mapManager.onSelectMap(m)
@@ -431,15 +373,10 @@ export function EditorPage() {
     const active = mapManager.getActiveMap()
     setResizeTarget(null)
     if (!active || !sameMap(active, resizeTarget)) return
-    const resized = applyResize(
-      { ...active, layers: layerManager.getLayers(), entities: entityManager.getEntities() },
-      edges
-    )
-    layerManager.setLayers(resized.layers)
-    entityManager.setEntities(resized.entities ?? [])
-    entityManager.setSelectedEntityId(current => (current && resized.entities?.some(e => e.id === current) ? current : null))
-    layerManager.setSelectedImageId(null)
+    const resized = applyResize(active, edges)
     mapManager.setActiveMap(resized)
+    // Nothing placed is ever removed, so the selection stays; positions moved under it.
+    tree.pruneToTree()
     commitSnapshot()
     const px = mapPixelSize(resized)
     setNotice({ kind: 'info', text: `Resized "${active.name}" to ${px.width} × ${px.height} px (${resized.width} × ${resized.height} tiles).` })
@@ -478,11 +415,12 @@ export function EditorPage() {
     onClearActiveMap: handleDockClearActiveMap,
     setConfirmDialog: dialogs.setConfirmDialog,
 
-    // Layers domain
-    layers: layerManager.layers,
+    // Scene tree: selection and node operations
+    selectionView: tree.view,
     activeLayerId: layerManager.activeLayerId,
     setActiveLayerId: handleSelectLayer,
-    selectLayer: handleSelectLayerExtended,
+    selectNode: handleSelectNode,
+    clearSelection: tree.clearSelection,
     selectedLayerIds: layerManager.selectedLayerIds,
     justCreatedLayer: layerManager.justCreatedLayer,
     pinSelection: layerManager.pinSelection,
@@ -493,70 +431,44 @@ export function EditorPage() {
     selectedImageId: layerManager.selectedImageId,
     resizingImageId: layerManager.resizingImageId,
     setResizingImageId: layerManager.setResizingImageId,
-    setSelectedImageId: layerManager.setSelectedImageId,
     pickedImageIds: layerManager.pickedImageIds,
-    selectImage: layerManager.selectImage,
     openImageGroupId: layerManager.openImageGroupId,
-    selectImageGroup: layerManager.selectImageGroup,
-    groupPickedImages: layerManager.groupPickedImages,
-    createImageGroup: layerManager.createImageGroup,
-    setImagesGroup: layerManager.setImagesGroup,
-    deleteImageGroup: layerManager.deleteImageGroup,
-    ungroupImageGroup: layerManager.ungroupImageGroup,
-    renameImageGroup: layerManager.renameImageGroup,
-    setImageGroupLocked: layerManager.setImageGroupLocked,
-    setImageGroupYSort: layerManager.setImageGroupYSort,
-    setImagesYSort: layerManager.setImagesYSort,
-    moveImageGroupTo: layerManager.moveImageGroupTo,
+    selectImage: layerManager.selectImage,
     moveImages: layerManager.moveImages,
-    deleteImages: layerManager.deleteImages,
-    duplicateImages: layerManager.duplicateImages,
     placeMultiple: layerManager.placeMultiple,
-    copyImages: layerManager.copyImages,
-    pasteImages: layerManager.pasteImages,
     addImage: layerManager.addImage,
     updateImage: layerManager.updateImage,
-    deleteImage: layerManager.deleteImage,
-    duplicateImage: layerManager.duplicateImage,
     reorderImage: layerManager.reorderImage,
-    moveImageTo: layerManager.moveImageTo,
-    toggleLayerVisibility: layerManager.toggleLayerVisibility,
-    toggleLayerLock: layerManager.toggleLayerLock,
-    setLayerYSort: layerManager.setLayerYSort,
-    handleDeleteLayer: layerManager.handleDeleteLayer,
-    handleReorderLayers: layerManager.handleReorderLayers,
-    toggleFolderCollapsed: layerManager.toggleFolderCollapsed,
-    handleCreateLayer: layerManager.handleCreateLayer,
-    handleCreateLayerOfType,
-    handleRenameLayer: layerManager.handleRenameLayer,
-    handleDuplicateLayer,
-    copyLayers: layerManager.copyLayers,
-    pasteLayers: layerManager.pasteLayers,
-    updateLayers: layerManager.updateLayers,
-    setEntitiesIndex: layerManager.setEntitiesIndex,
+    setNodesYSort: layerManager.setNodesYSort,
+    createNode: handleCreateNode,
+    renameNode: layerManager.renameNode,
+    editNode: layerManager.editNode,
+    addCollisionTiles: layerManager.addCollisionTiles,
+    setCollisionShapes: layerManager.setCollisionShapes,
+    toggleNodeVisibility: layerManager.toggleNodeVisibility,
+    toggleNodeLock: layerManager.toggleNodeLock,
+    setNodeYSort: layerManager.setNodeYSort,
+    toggleCollapsed: layerManager.toggleCollapsed,
+    deleteNodes: layerManager.deleteNodes,
+    requestDeleteNodes,
+    copyNodes: layerManager.copyNodes,
+    pasteNodes: layerManager.pasteNodes,
+    duplicateNodes: layerManager.duplicateNodes,
+    groupNodes: layerManager.groupNodes,
+    ungroupNode: layerManager.ungroupNode,
+    moveNodes: layerManager.moveNodes,
     activeLayerType: layerManager.activeLayerType,
 
     // Entities domain
     entities: entityManager.entities,
     selectedEntityId: entityManager.selectedEntityId,
     setSelectedEntityId: handleSelectEntity,
-    showEntities: entityManager.showEntities,
-    setShowEntities: entityManager.setShowEntities,
-    toggleShowEntities: entityManager.toggleShowEntities,
-    entityFolders: entityManager.entityFolders,
-    createEntityFolder: entityManager.createEntityFolder,
-    renameEntityFolder: entityManager.renameEntityFolder,
-    deleteEntityFolder: entityManager.deleteEntityFolder,
-    toggleEntityFolderVisibility: entityManager.toggleEntityFolderVisibility,
-    toggleEntityFolderExpanded: entityManager.toggleEntityFolderExpanded,
     toggleEntityVisibility: entityManager.toggleEntityVisibility,
-    moveEntityToFolder: entityManager.moveEntityToFolder,
     handleCreateEntity: entityManager.createEntity,
     handleDuplicateEntity: entityManager.duplicateEntity,
     handleDeleteEntity: entityManager.deleteEntity,
     handleRenameEntity: entityManager.renameEntity,
     handleMoveEntity: entityManager.moveEntity,
-    handleReorderEntities: entityManager.reorderEntities,
     handleAddComponent: entityManager.addComponent,
     handleRemoveComponent: entityManager.removeComponent,
     handleUpdateComponentProp: entityManager.updateComponentProp,

@@ -3,7 +3,8 @@
 
 import { characterGraphics, isValidGraphicId, validateCharacterSet, type CharacterInfo, type GraphicInfo } from '../../../shared/engine/graphics'
 import { TILE_SIZE } from '../../../shared/engine/constants'
-import type { Layer } from '@/types/editor'
+import { allEntities, isDataLayer, layerNodes, type SceneNode } from '../../../shared/sceneTree'
+import { nodesOfMap } from '../../../shared/sceneTreeMigrate'
 
 export type TableGroup = 'visual' | 'design' | 'world' | 'text' | 'game'
 
@@ -111,13 +112,13 @@ export interface TilesetUse {
   layers: string[]
 }
 
+/** A map as the database pages read it: its scene tree and size. */
 export interface MapLike {
   fileName: string
   name: string
   width: number
   height: number
-  layers: Layer[]
-  entities?: { components?: Record<string, unknown> }[]
+  nodes?: readonly SceneNode[]
 }
 
 /** Maps (and layers) that paint with each tileset, keyed by tileset id (the tileset's file name as maps store it). */
@@ -125,7 +126,8 @@ export function tilesetUsage(maps: readonly MapLike[]): Record<string, TilesetUs
   const out: Record<string, TilesetUse[]> = {}
   for (const m of maps) {
     const byTileset = new Map<string, Set<string>>()
-    for (const layer of m.layers ?? []) {
+    for (const layer of layerNodes(nodesOfMap(m) as SceneNode[])) {
+      if (!isDataLayer(layer)) continue
       for (const t of Object.values(layer.data ?? {})) {
         if (!byTileset.has(t.tilesetId)) byTileset.set(t.tilesetId, new Set())
         byTileset.get(t.tilesetId)?.add(layer.name)
@@ -156,9 +158,12 @@ export interface MapSummary {
 
 export function summarizeMap(map: MapLike): MapSummary {
   const tilesets = new Set<string>()
-  for (const layer of map.layers ?? []) for (const t of Object.values(layer.data ?? {})) tilesets.add(t.tilesetId)
+  const nodes = nodesOfMap(map) as SceneNode[]
+  const layers = layerNodes(nodes)
+  const entities = allEntities(nodes)
+  for (const layer of layers) if (isDataLayer(layer)) for (const t of Object.values(layer.data ?? {})) tilesets.add(t.tilesetId)
   const characters = new Set<string>()
-  for (const e of map.entities ?? []) {
+  for (const e of entities) {
     const sprite = e.components?.Sprite as { asset?: unknown } | undefined
     if (sprite && typeof sprite.asset === 'string' && sprite.asset) characters.add(sprite.asset)
   }
@@ -167,8 +172,8 @@ export function summarizeMap(map: MapLike): MapSummary {
     name: map.name,
     width: map.width,
     height: map.height,
-    layers: (map.layers ?? []).length,
-    entities: (map.entities ?? []).length,
+    layers: layers.length,
+    entities: entities.length,
     tilesets: [...tilesets].sort(),
     characters: [...characters].sort(),
   }

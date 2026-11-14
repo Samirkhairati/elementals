@@ -1,20 +1,21 @@
 import React, { useMemo, useRef, useState } from 'react'
 import { Group, Line, Rect, Shape } from 'react-konva'
-import type { ImageItem, Layer } from '@/types/editor'
+import type { ImageItem } from '@/types/editor'
+import type { ImageLayerNode } from '../../../../../../shared/sceneTree'
+import { lockedNode, pictureLocked, shown, visiblePictures, type SceneIndex } from '@/lib/sceneIndex'
 import type { SpriteAssetInfo } from '../../../../../../shared/engine/types'
 import { drawResolvedSprite, useSpriteImagesVersion } from '@/lib/spriteImages'
 import { flippedItemBounds, resolveImageItem } from '@/lib/imageItems'
 import { snapPicture } from '@/lib/imageSnap'
-import { sortedImages } from '@/lib/layerOrder'
 import type { ImagePick } from '@/lib/graphicAssets'
-import type { SelectMode } from '@/lib/imageSelection'
+import type { SelectMode } from '@/lib/sceneSelection'
 import type { ImageDrag } from './imageDrag'
 import { applyAxisLock, guideLines, type Axis, type AxisLock } from '@/lib/axisLock'
 import { setStageCursor } from '../canvasUtils'
 import { KonvaImageResize } from './KonvaImageResize'
 
 const NO_ASSETS: Record<string, SpriteAssetInfo> = {}
-const NO_LAYERS: Layer[] = []
+const NO_LAYERS: ImageLayerNode[] = []
 /** Guide lines are drawn this far to each side of the picture (further than any map). */
 const GUIDE_EXTENT = 100000
 const GUIDE_STROKE = '#38bdf8'
@@ -31,13 +32,14 @@ function AxisGuides({ axis, bounds, anchor }: { axis: Axis; bounds: { x: number;
 }
 
 interface KonvaImageItemsProps {
+  /** The scene tree's index: what is hidden or locked once the groups above are counted. */
+  index: SceneIndex
   /** The active image layer: its images can always be picked and dragged. */
-  layer: Layer | null
+  layer: ImageLayerNode | null
   /** Other image layers whose images can be picked too (the toolbar lock is off); picking one makes its layer the active one. */
-  otherLayers?: Layer[]
+  otherLayers?: readonly ImageLayerNode[]
   activateLayer?: (layerId: string) => void
   selectedImageId: string | null
-  setSelectedImageId: (id: string | null) => void
   /** Everything picked (Ctrl/Cmd+click adds or removes a picture); falls back to `selectedImageId` alone. */
   pickedImageIds?: readonly string[]
   selectImage?: (layerId: string, imageId: string, mode: SelectMode) => void
@@ -57,11 +59,11 @@ interface KonvaImageItemsProps {
 
 /** Pick/drag handles and the selection frame for the images of the active image layer (and of the other image layers when the toolbar lock is off). */
 export const KonvaImageItems = React.memo(function KonvaImageItems({
+  index,
   layer,
   otherLayers = NO_LAYERS,
   activateLayer,
   selectedImageId,
-  setSelectedImageId,
   pickedImageIds,
   selectImage,
   moveImages,
@@ -74,7 +76,10 @@ export const KonvaImageItems = React.memo(function KonvaImageItems({
   resizeImage,
 }: KonvaImageItemsProps) {
   // Other layers first (bottom-up), the active layer last: what is on top is picked first, and the active layer wins.
-  const layers = useMemo(() => [...otherLayers.filter((l) => l.type === 'image' && l.visible && !l.locked && l.id !== layer?.id).reverse(), ...(layer && layer.type === 'image' && layer.visible ? [layer] : [])], [otherLayers, layer])
+  const layers = useMemo(
+    () => [...otherLayers.filter((l) => shown(index, l.id) && !lockedNode(index, l.id) && l.id !== layer?.id).reverse(), ...(layer && shown(index, layer.id) ? [layer] : [])],
+    [otherLayers, layer, index]
+  )
   if (layers.length === 0) return null
 
   // Snapping puts the picture's edges on the grid, so the item's own size decides where its anchor goes.
@@ -87,15 +92,15 @@ export const KonvaImageItems = React.memo(function KonvaImageItems({
       {layers.map((l) => (
         <ImageLayerHandles
           key={l.id}
+          index={index}
           layer={l}
           active={l.id === layer?.id}
-          interactive={!l.locked && !placing}
+          interactive={!lockedNode(index, l.id) && !placing}
           selectedImageId={selectedImageId}
           pickedImageIds={pickedImageIds}
           selectImage={selectImage}
           moveImages={moveImages}
           activateLayer={activateLayer}
-          setSelectedImageId={setSelectedImageId}
           moveImage={moveImage}
           place={place}
           assets={spriteAssets}
@@ -109,6 +114,7 @@ export const KonvaImageItems = React.memo(function KonvaImageItems({
 })
 
 function ImageLayerHandles({
+  index,
   layer,
   active,
   interactive,
@@ -117,7 +123,6 @@ function ImageLayerHandles({
   selectImage,
   moveImages,
   activateLayer,
-  setSelectedImageId,
   moveImage,
   place,
   assets,
@@ -125,7 +130,8 @@ function ImageLayerHandles({
   resizingImageId,
   resizeImage,
 }: {
-  layer: Layer
+  index: SceneIndex
+  layer: ImageLayerNode
   active: boolean
   interactive: boolean
   selectedImageId: string | null
@@ -133,7 +139,6 @@ function ImageLayerHandles({
   selectImage?: (layerId: string, imageId: string, mode: SelectMode) => void
   moveImages?: (layerId: string, imageIds: readonly string[], dx: number, dy: number) => void
   activateLayer?: (layerId: string) => void
-  setSelectedImageId: (id: string | null) => void
   moveImage: (layerId: string, imageId: string, x: number, y: number) => void
   place: (item: ImageItem, x: number, y: number) => { x: number; y: number }
   assets: Record<string, SpriteAssetInfo>
@@ -141,14 +146,13 @@ function ImageLayerHandles({
   resizingImageId?: string | null
   resizeImage?: (layerId: string, imageId: string, change: { scale: number; x: number; y: number }) => void
 }) {
-  const items = useMemo(() => sortedImages(layer.images), [layer.images])
+  const items = useMemo(() => visiblePictures(layer), [layer])
   const resizing = active && interactive && resizingImageId && resizeImage ? items.find((i) => i.id === resizingImageId) : undefined
-  // Picking an image of another layer makes that layer the active one (which clears the selection, so select after).
+  // Picking a picture of another layer makes that layer the active one too (the active layer follows the picked picture).
   // Ctrl/Cmd+click adds or removes a picture from the picked set (Shift+click is the canvas's own gesture).
   const pick = (id: string, mode: SelectMode = 'replace') => {
-    if (!active) activateLayer?.(layer.id)
-    if (active && selectImage) selectImage(layer.id, id, mode)
-    else setSelectedImageId(id)
+    if (selectImage) selectImage(layer.id, id, mode)
+    else activateLayer?.(layer.id)
   }
   const picked = pickedImageIds ?? (selectedImageId ? [selectedImageId] : [])
   return (
@@ -162,7 +166,7 @@ function ImageLayerHandles({
           selected={active && picked.includes(item.id)}
           together={active && picked.length > 1 && picked.includes(item.id) ? picked : null}
           moveTogether={moveImages}
-          interactive={interactive}
+          interactive={interactive && !pictureLocked(index, item.id)}
           place={place}
           pick={pick}
           moveImage={moveImage}

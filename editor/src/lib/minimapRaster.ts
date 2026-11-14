@@ -1,4 +1,6 @@
-import type { EntityData, Layer } from '@/types/editor'
+import type { SceneNode } from '../../../shared/sceneTree'
+import { isVisible } from '../../../shared/sceneTree'
+import { sceneIndex } from './sceneIndex'
 import { TILE_SIZE, anchorToTile } from '../../../shared/engine/constants'
 
 /** Colour of one tile of a tileset as seen from far away (average of its pixels), or null for a fully transparent tile. */
@@ -9,12 +11,12 @@ export const MINIMAP_GROUND: readonly [number, number, number] = [34, 34, 34]
 export const MINIMAP_ENTITY: readonly [number, number, number] = [251, 191, 36]
 
 /**
- * One RGBA pixel per map tile for the minimap: the visible tile layers bottom-up (the layer list is top first) blended
+ * One RGBA pixel per map tile for the minimap: the visible tile layers bottom-up (the tree is in draw order) blended
  * over the dark ground, then an amber dot for every entity. Pure, so it is tested without a canvas.
  */
 export function rasterizeMap(
-  map: { width: number; height: number; layers: Layer[] },
-  entities: EntityData[],
+  map: { width: number; height: number; nodes: readonly SceneNode[] },
+  entities: readonly { x: number; y: number }[],
   colorOf: TileColorLookup
 ): Uint8ClampedArray<ArrayBuffer> {
   const { width, height } = map
@@ -26,8 +28,8 @@ export function rasterizeMap(
     px[i * 4 + 3] = 255
   }
 
-  for (const layer of [...map.layers].reverse()) {
-    if (layer.type !== 'tile' || !layer.visible) continue
+  for (const { node: layer, ancestors } of sceneIndex(map.nodes).entries) {
+    if (layer.type !== 'tile' || !isVisible(layer, ancestors)) continue
     for (const [key, tile] of Object.entries(layer.data ?? {})) {
       const idx = Number(key)
       if (!(idx >= 0 && idx < width * height)) continue

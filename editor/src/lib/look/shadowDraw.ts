@@ -15,7 +15,7 @@ import {
   shadowRadius,
   type ResolvedShadow,
 } from '../../../../shared/look/shadow'
-import type { Layer } from '@/types/editor'
+import type { TileLayerNode } from '../../../../shared/sceneTree'
 
 const TILE = 32
 
@@ -126,7 +126,7 @@ export function drawPictureShadow(ctx: CanvasRenderingContext2D, shadow: Resolve
 
 // ── Tile layers ─────────────────────────────────────────────────────────────────────────────────────
 
-type TileData = NonNullable<Layer['data']>
+type TileData = NonNullable<TileLayerNode['data']>
 
 interface ChunkEntry {
   data: TileData

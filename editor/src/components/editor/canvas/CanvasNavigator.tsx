@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { ChevronDown, ChevronUp, Map as MapIcon } from 'lucide-react'
-import type { EntityData, Layer } from '@/types/editor'
+import type { SceneNode } from '../../../../../shared/sceneTree'
+import { drawPlan, sceneIndex } from '@/lib/sceneIndex'
 import { ZoomControls } from '@/components/editor/ui/controls'
 import { TILE_SIZE } from '../../../../../shared/engine/constants'
 import {
@@ -34,8 +35,7 @@ interface Props {
   dimensions: Size
   mapWidth: number
   mapHeight: number
-  layers: Layer[]
-  entities: EntityData[]
+  nodes: readonly SceneNode[]
   images: Record<string, HTMLImageElement>
 }
 
@@ -53,8 +53,7 @@ export const CanvasNavigator = React.memo(function CanvasNavigator({
   dimensions,
   mapWidth,
   mapHeight,
-  layers,
-  entities,
+  nodes,
   images,
 }: Props) {
   const view = useSyncExternalStore(viewport.viewStore.subscribe, viewport.viewStore.getSnapshot)
@@ -106,8 +105,7 @@ export const CanvasNavigator = React.memo(function CanvasNavigator({
             dimensions={dimensions}
             mapWidth={mapWidth}
             mapHeight={mapHeight}
-            layers={layers}
-            entities={entities}
+            nodes={nodes}
             images={images}
             onCenter={viewport.panToWorld}
           />
@@ -133,13 +131,12 @@ interface MinimapProps {
   dimensions: Size
   mapWidth: number
   mapHeight: number
-  layers: Layer[]
-  entities: EntityData[]
+  nodes: readonly SceneNode[]
   images: Record<string, HTMLImageElement>
   onCenter: (wx: number, wy: number) => void
 }
 
-function Minimap({ view, dimensions, mapWidth, mapHeight, layers, entities, images, onCenter }: MinimapProps) {
+function Minimap({ view, dimensions, mapWidth, mapHeight, nodes, images, onCenter }: MinimapProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const layout = useMemo(() => minimapLayout(mapWidth, mapHeight, MINIMAP_MAX_W, MINIMAP_MAX_H), [mapWidth, mapHeight])
 
@@ -152,11 +149,11 @@ function Minimap({ view, dimensions, mapWidth, mapHeight, layers, entities, imag
       if (!canvas || !ctx) return
       canvas.width = mapWidth
       canvas.height = mapHeight
-      const pixels = rasterizeMap({ width: mapWidth, height: mapHeight, layers }, entities, colorLookup(images))
+      const pixels = rasterizeMap({ width: mapWidth, height: mapHeight, nodes }, drawPlan(sceneIndex(nodes)).entities, colorLookup(images))
       ctx.putImageData(new ImageData(pixels, mapWidth, mapHeight), 0, 0)
     }, 80)
     return () => clearTimeout(timer)
-  }, [mapWidth, mapHeight, layers, entities, images, loaded])
+  }, [mapWidth, mapHeight, nodes, images, loaded])
 
   const centerAt = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {

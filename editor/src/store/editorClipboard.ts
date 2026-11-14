@@ -1,11 +1,8 @@
 import { create } from 'zustand'
-import type { EntityData, ImageGroup, ImageItem, Layer } from '@/types/editor'
+import type { SceneNode } from '../../../shared/sceneTree'
 
-/** What Ctrl/Cmd+C copied inside the editor (kept in memory; pasting needs the same kind of target). */
-export type ClipboardContent =
-  | { kind: 'images'; items: ImageItem[]; /** The groups the copied pictures belonged to. */ groups?: ImageGroup[] }
-  | { kind: 'entities'; entities: EntityData[] }
-  | { kind: 'layers'; layers: Layer[] }
+/** What Ctrl/Cmd+C copied inside the editor (kept in memory): nodes of the scene tree, each with what is inside it. */
+export type ClipboardContent = { kind: 'nodes'; nodes: SceneNode[] }
 
 interface EditorClipboardState {
   content: ClipboardContent | null

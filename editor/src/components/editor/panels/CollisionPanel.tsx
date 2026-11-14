@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { Edit2, Grid3x3, Pentagon, Plus, Spline, Trash2 } from 'lucide-react'
-import type { Layer } from '@/types/editor'
 import { minPoints } from '../../../../../shared/collisionShapes'
-import { collisionItems, nextTileGroupName, removeCollisionItem, renameCollisionItem, type CollisionItem } from '../../../../../shared/collisionLayers'
+import type { CollisionItem } from '../../../../../shared/collisionLayers'
+import { collisionItemsOf, collisionShapeNodes } from '../../../../../shared/sceneTree'
+import { lockedNode, sceneIndex } from '@/lib/sceneIndex'
 import { polygonEditStore, usePolygonEdit, type CollisionBrush } from '@/lib/polygonEditStore'
 import { useEditorSelector, type EditorContextValue } from '../layout/EditorContext'
 import { Badge, Card, EdButton, Field, Segmented } from '../ui/controls'
@@ -11,9 +12,12 @@ import { ShapeEditorHelp } from './ShapeEditorHelp'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '@/components/ui/context-menu'
 
 const selectCollision = (c: EditorContextValue) => ({
-  layers: c.layers,
+  nodes: c.activeMap?.nodes,
   activeLayerId: c.activeLayerId,
-  updateLayers: c.updateLayers,
+  addCollisionTiles: c.addCollisionTiles,
+  renameNode: c.renameNode,
+  editNode: c.editNode,
+  deleteNodes: c.deleteNodes,
   selectedEntityId: c.selectedEntityId,
 })
 
@@ -35,26 +39,26 @@ export function pickCollisionItem(item: CollisionItem | null): void {
  * or draws and edits shapes with the Shape brush.
  */
 export function CollisionPanel() {
-  const { layers, activeLayerId, updateLayers, selectedEntityId } = useEditorSelector(selectCollision)
+  const { nodes, activeLayerId, addCollisionTiles, renameNode, editNode, deleteNodes, selectedEntityId } = useEditorSelector(selectCollision)
   const { selectedShapeId, brush, drawing } = usePolygonEdit()
   const [renaming, setRenaming] = useState<string | null>(null)
-  const layer = layers.find((l) => l.id === activeLayerId)
-  if (!layer || layer.type !== 'collision') return <div className="ed-empty">Select a collision layer</div>
+  const index = sceneIndex(nodes ?? [])
+  const node = index.byId.get(activeLayerId ?? '')?.node
+  const layer = node?.type === 'collision' ? node : null
+  if (!layer) return <div className="ed-empty">Select a collision layer</div>
 
-  const items = collisionItems(layer)
+  const items = collisionItemsOf(layer)
   const picked = items.find((i) => i.id === selectedShapeId) ?? null
-  const pickedShape = picked?.kind === 'shape' ? layer.shapes?.find((s) => s.id === picked.id) ?? null : null
-  const locked = layer.locked
-  const setLayer = (next: Layer) => updateLayers(layers.map((l) => (l.id === layer.id ? next : l)))
+  const pickedShape = picked?.kind === 'shape' ? collisionShapeNodes(layer).find((s) => s.id === picked.id) ?? null : null
+  const locked = lockedNode(index, layer.id)
 
   const addTiles = () => {
-    const group = { id: crypto.randomUUID(), name: nextTileGroupName(layer) }
-    setLayer({ ...layer, tileGroups: [...(layer.tileGroups ?? []), group] })
-    polygonEditStore.set({ selectedShapeId: group.id, brush: 'tiles' })
+    const id = addCollisionTiles(layer.id)
+    if (id) polygonEditStore.set({ selectedShapeId: id, brush: 'tiles' })
   }
   const addShape = () => polygonEditStore.set({ selectedShapeId: null, brush: 'shape' })
   const remove = (item: CollisionItem) => {
-    setLayer(removeCollisionItem(layer, item.id))
+    deleteNodes([item.id])
     if (selectedShapeId === item.id) polygonEditStore.set({ selectedShapeId: null })
   }
   const setBrush = (next: CollisionBrush) => {
@@ -134,7 +138,7 @@ export function CollisionPanel() {
                   >
                     <CollisionItemIcon item={item} />
                     {renaming === item.id ? (
-                      <RenameInput initial={item.name} label="Item name" onRename={(name) => setLayer(renameCollisionItem(layer, item.id, name))} onClose={() => setRenaming(null)} />
+                      <RenameInput initial={item.name} label="Item name" onRename={(name) => renameNode(item.id, name)} onClose={() => setRenaming(null)} />
                     ) : (
                       <span className="ed-row-label" title={item.name}>{item.name}</span>
                     )}
@@ -174,7 +178,7 @@ export function CollisionPanel() {
                 onChange={(v) => {
                   const toClosed = v === 'closed'
                   if (locked || (toClosed && pickedShape.points.length < minPoints(true))) return
-                  setLayer({ ...layer, shapes: (layer.shapes ?? []).map((s) => (s.id === pickedShape.id ? { ...s, closed: toClosed } : s)) })
+                  editNode(pickedShape.id, { closed: toClosed })
                 }}
               />
             </Field>

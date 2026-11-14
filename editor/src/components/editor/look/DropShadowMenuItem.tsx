@@ -9,7 +9,7 @@ import { useEditorSelector, type EditorContextValue } from '../layout/EditorCont
 
 type Subject = Exclude<LookSubjectRef, { kind: 'map' }>
 
-const select = (c: EditorContextValue) => ({ activeMap: c.activeMap, layers: c.layers, setLook: c.setLook, openPanel: c.openPanel })
+const select = (c: EditorContextValue) => ({ activeMap: c.activeMap, nodes: c.activeMap?.nodes, setLook: c.setLook, openPanel: c.openPanel })
 
 /**
  * "Add drop shadow" on a tile or image layer or a picture: gives it a shadow in every profile (unless it has one) and
@@ -18,7 +18,7 @@ const select = (c: EditorContextValue) => ({ activeMap: c.activeMap, layers: c.l
 export function useDropShadow(): (subject: Subject) => void {
   const ctx = useEditorSelector(select)
   return (subject) => {
-    const set = getLookSet(ctx.activeMap, ctx.layers, subject)
+    const set = getLookSet(ctx.activeMap, ctx.nodes ?? [], subject)
     if (!hasShadow(set)) ctx.setLook(subject, withShadowEverywhere(set, DEFAULT_SHADOW), true)
     setLookView({ pinned: subject })
     ctx.openPanel('look')
