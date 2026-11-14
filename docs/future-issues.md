@@ -83,3 +83,23 @@ Left for later:
   for town-sized maps; a very large map with soft layer shadows would want to bake chunks as the camera reaches them.
 - **Shadow silhouettes are read with `getImageData`**: one small `drawnPixels` helper exists in both the editor
   (`lib/look/shadowDraw.ts`) and the game (`look/LookShadows.ts`) because `shared/` stays DOM-free.
+
+## Node tree (schema 6)
+
+- **The editor still edits schema 5.** `migrateLoadedMap` turns a schema 6 file into `layers` / `entities` with the temporary bridge
+  `nodeTreeToLegacy` (`shared/sceneTreeMigrate.ts`) and saves schema 5 again, so a file is only ever schema 6 when something else wrote it.
+  Remove the bridge, `migrateMapToLegacy` and `LEGACY_SCHEMA_VERSION` with the editor move to nodes (phase 2/3).
+- **`maps:check` shows `market` as drifted after the bump**: the game copy still says `schemaVersion: 5` and keeps an entity's editor-only
+  `folder: null`. Re-export with `node scripts/export-maps.mjs --write --only market --force` (the game ignores both).
+- **Two exports can change when a schema 5 map migrates.** Pictures of equal `z` that a picture group pulls apart, and entities that interleave
+  with entity folders, end up grouped together (draw order of equal-`z` pictures, `entities` array order). Nothing in `project/maps` does either.
+- **A picture group's `locked` meant "click picks the whole group"**; migrated to the node's `locked` it will mean "cannot be edited" once the
+  tree is the editor's model. Decide what the old behaviour becomes (a `selectAsGroup` field, or drop it).
+- **A hidden folder with one shown layer** migrates to a shown group (the canvas honoured the layer's own eye); with inherited visibility the
+  author hides the layer too, or the group. Maps made before the tree never relied on the difference.
+- **Every node walk is O(tree)**: `locate`, `findNode`, `canHold` with a map-wide singleton check and `insertNode`'s duplicate-id check each
+  walk the whole tree. Fine at map sizes today (hundreds of nodes); the editor should index by id once per tree identity
+  (memoised, as the plan says) before running them per mouse move.
+- **`NODE_TYPES` icons and accents are placeholders** (lucide names, hex colours) until the Scene panel draws them; `LAYER_KINDS` in
+  `LayersPanel.tsx` still has its own copy.
+

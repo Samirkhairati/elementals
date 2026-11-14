@@ -7,7 +7,7 @@ that into what the game loads, and both sides share one data contract in `shared
 |---|---|
 | `game/` | Phaser 3 + TypeScript + Vite web game (ECS runtime) |
 | `editor/` | React + Dockview + react-konva + Electron editor (also runs in a plain browser, see the harness) |
-| `shared/` | The data contract used by both: `engine/` (components, commands, graphs, validation, migration), `mapExport.ts`, `mapSchema.ts`, `mapTypes.ts`, `png.ts` |
+| `shared/` | The data contract used by both: `engine/` (components, commands, graphs, validation, migration), `mapExport.ts`, `mapSchema.ts`, `mapTypes.ts`, `sceneTree.ts` (the map as a tree of nodes), `png.ts` |
 | `project/` | The author's data: `maps/`, `tilesets/`, `graphics/`, `database/`, `database.json` (editor reads/writes it) |
 | `scripts/` | Dev runner (`dev.mjs`), worktree launcher (`wt.mjs`), `export-maps.mjs`, `sync-assets.mjs` |
 | `docs/` | Design docs, read the matching one before changing a system (index at the bottom) |
@@ -60,7 +60,7 @@ editor  --writes-->  project/maps/*.json (editor map format, tile index keyed)
   `--only <name> --force`. Map id = source file name, lower-cased, non `a-z0-9` runs -> `-` (Export to Game uses the file name and also runs the asset sync into `game/public` when the repo scripts are beside the project; "Export as File…" uses the map's internal `name`, which can differ). Right-click a map > Resize… crops/grows it (`editor/src/lib/mapResize.ts`, see docs/maps.md).
 * `shared/` is imported by the editor with relative paths and by Node scripts with explicit `.ts` extensions (type stripping), and by the game via `@shared/*`.
   Keep it **free of enums, namespaces, parameter properties and DOM/Node imports**. If a doc and `shared/engine/types.ts` disagree, fix the types first.
-* Maps carry `schemaVersion` (current 5: events stored as graphs, trigger = start kind + `blocks`). Old data is migrated on load by pure, idempotent functions in `shared/engine/migrate.ts`
+* Maps carry `schemaVersion` (current 6: a map is one tree of `nodes`, see docs/maps.md; events stored as graphs, trigger = start kind + `blocks`). Old data is migrated on load by pure, idempotent functions in `shared/engine/migrate.ts`
   (editor on load, exporter on export, game defensively); nothing is written back until the author edits. Existing user data is never "fixed".
 * Tilesets and sprites: PNGs under `project/`; `assets:sync` copies the ones in use to `game/public/graphics/` and writes manifests. The tileset/layer named `collision` is data, never drawn. The editor runs this sync itself when you import a picture or tileset, save the game settings or Export to Game (`withAssetSync` in `editor/electron/ipc/projectApi.ts`; it runs the repo script in a child `node` because Electron's own Node cannot load the `shared/*.ts` it imports, so Node 24 must be on the PATH; skipped for project copies and packaged editors).
 * **Looks** (colour grading of the map, a layer or a picture, per profile, with masks, user shaders and drop shadows) are `shared/look/`, drawn by the same GLSL in the game and the editor; profiles in `project/looks.json`, shaders in `project/shaders/`; see docs/looks.md.

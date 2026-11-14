@@ -6,7 +6,7 @@ How a map gets from the editor into the game, and how to keep the two in sync.
 
 | Format | Where | Written by | Read by |
 | --- | --- | --- | --- |
-| **Editor map** (own JSON: `layers[].data` keyed by tile index, `entities`, ...) | `project/maps/**/*.json` (folders allowed) | the editor (Electron) | the editor, `scripts/export-maps.mjs` |
+| **Editor map** (own JSON: a tree of `nodes` since schema 6; before that `layers[].data` keyed by tile index and `entities`) | `project/maps/**/*.json` (folders allowed) | the editor (Electron) | the editor, `scripts/export-maps.mjs` |
 | **Tiled map** (Tiled 1.10 JSON with a non-standard top-level `entities` array) | `game/public/data/maps/<name>.json` | right-click a map > **Export to Game** (writes it straight there), or `npm run maps:export` | the game (`MapParser`) |
 | **Tilesets** (`*.png`, optional sibling `*.json` with a display `name`) | `project/tilesets/**` | the editor | the editor and the script (image size comes from the PNG header) |
 
@@ -18,13 +18,62 @@ Editing a map in the editor does **not** update the game by itself.
 `shared/` is the single implementation, used by both runtimes:
 
 - `shared/mapExport.ts` - `convertEditorMapToTiled(map, tilesets)` and `serializeTiledMap` (2-space JSON, no trailing newline).
-  Legacy entities are migrated (`shared/engine/migrate.ts`) and the output always has `schemaVersion: 2`.
-- `shared/mapSchema.ts` - `validateEditorMap` (also validates entities/events via `shared/engine`) and `validateTiledMap` (hand-written, no dependencies).
+  The map is migrated first (`migrateMap`, so a schema 5 map and a schema 6 map export the same file) and the output carries the
+  current `schemaVersion` (6). It walks the node tree (see "Map format, schema 6").
+- `shared/mapSchema.ts` - `validateEditorMap` (schema 6 `nodes`, or the older `layers`; also validates entities/events via `shared/engine`) and `validateTiledMap` (hand-written, no dependencies).
+- `shared/sceneTree.ts` - the node types and the pure tree operations; `shared/sceneTreeMigrate.ts` - schema 5 <-> 6.
 - `shared/png.ts` - `readPngSize`. `shared/mapTypes.ts` - types only.
 
 The editor imports it from `src/hooks/useExportMap.ts` (relative path, no extension); Node imports it with explicit `.ts`
 paths (type stripping). Keep the files free of enums, namespaces, parameter properties and DOM/Node imports.
 **Export to Game** (Maps panel context menu) validates the editor map and the converted map, then writes `game/public/data/maps/<id>.json` atomically with no dialog (`export-map-to-game` channel, `mapStore.exportMapToGame`; the id is the editor file name slugified, see below). It refuses to write (notice with the first errors) when either is invalid. **Export as File…** is the old save dialog. Run against a project copy (`ELEMENTALS_PROJECT_DIR`), the game folder is the one *beside that copy*, so the real game is never touched. Export to Game also runs the asset sync (what `npm run assets:sync` does: pictures, tilesets, sprites and manifests are copied into `game/public`, `electron/ipc/gameAssets.ts`), so the pictures and tilesets a map uses reach the game with it, and the notice says how many files were copied. It needs the repo's `scripts/lib/assets.mjs` next to the project; for a project copy (the harness) or a packaged editor it is skipped, the notice says so, and you run `npm run assets:sync` yourself. A failed sync never fails the export. `npm run dev` also syncs at start.
+
+## Map format, schema 6: one tree of nodes
+
+A map file (`schemaVersion: 6`) has `nodes`, the children of the map root, instead of `layers`, `entities`, `entityFolders`
+and `entitiesIndex`. The map itself keeps `name`, size, `pixelWidth` / `pixelHeight`, `settings` and `look`. The model lives in
+`shared/sceneTree.ts` (pure) and is described in docs/node-tree-plan.md ("Implementation decisions").
+
+* Every node has `id`, `type`, `name`, `visible?` (absent = shown) and `locked?`. Containers (`group`, `image`, `collision`) also
+  have `children` and `collapsed?` (list state). **Children are in draw order**: the first child draws first, at the back; the
+  panel lists them last-first, so the top row is drawn on top.
+* Types: `group` (`ySort?`), `tile` (`data`, `z?`, `look?`), `image` (`z?`, `ySort?`, `look?`; holds `picture` and `group`), `picture`
+  (today's picture fields), `collision` (`data`, `z?`; holds `collisionTiles` and `collisionShape`), `collisionTiles`, `collisionShape`
+  (`points`, `closed`), `terrain`, `encounters`, `objects` (`data`, `z?`) and `entity` (`x`, `y`, `components`, the node id is the
+  entity id). A collision layer's cells are its `data`; a cell's `group` is the id of a `collisionTiles` child (none or unknown =
+  the first one).
+* **Placement** (`canHold`): the root and groups outside image and collision layers hold everything but `picture`,
+  `collisionTiles` and `collisionShape`; an image layer (and the groups below it) holds `picture` and `group`; a collision layer
+  holds the two collision item types; leaves hold nothing; a map has at most one `terrain` and one `encounters` node.
+* **Inherited**: a node is hidden or locked when any ancestor is; y-sort is the nearest value set (picture, groups, image layer,
+  groups above), off when none; opacity multiplies down (`isVisible`, `isLocked`, `effectiveYSort`, `effectiveOpacity`).
+
+**Migration** (`migrateToNodeTree`, run by `migrateMap`; pure, idempotent, deterministic ids; the editor, the exporter and the
+scripts all call it, nothing is written back until the author edits). From schema 5 and older:
+
+* layers (top first) become root nodes in draw order (reversed); a `folder` becomes a group holding its `folderId` layers (a hidden
+  folder with a shown layer in it becomes a shown group: the layer's own eye is what the canvas always honoured);
+* an image layer's `images` become `picture` children in draw order (`z`, then array order) and its `groups` become groups: each sits where
+  its first picture is, empty ones go to the front; `locked` and `ySort` of a picture group carry over;
+* a collision layer's `tileGroups` and `shapes` become children (old `polygons` layers become collision layers first);
+* all entities go into one group named "Entities" (id `ENTITIES_GROUP_ID`), placed so that `entitiesIndex` layers are above it (missing = on top;
+  an index inside a folder puts it just below that folder); entity folders become groups inside it (`expanded: false` = collapsed), each
+  where its first entity is, empty ones first; the editor-only entity field `folder` is dropped. The group exists even without entities;
+* ids are the old ids; one that is already taken (two collision layers that each have a tiles item "tiles") gets a new deterministic id
+  and the cells follow.
+
+The exporter writes the same Tiled file as before the tree (a golden test, `shared/fixtures/golden-export`, compares the output of the
+schema 5 exporter with the tree exporter for the project's maps and synthetic ones covering folders, picture groups, y-sort, looks,
+entities and collision): the only differences are the stamped `schemaVersion` (5 -> 6) and the dropped entity field `folder`. Layers
+are written in list order (top first), each with what its ancestors pass down (a hidden group hides its layers; y-sort is resolved per
+picture). Pictures keep their draw order: sorted by `z`, ties in tree order. Two things can change an export when a schema 5 map is
+migrated: pictures of equal `z` that a group pulls apart (a group's pictures sit together), and entities that interleave with entity
+folders (an entity folder's entities sit together in the `entities` array).
+
+**Until the editor works on nodes** (phase 2 of docs/node-tree-plan.md) it loads every map through `migrateLoadedMap`, which keeps the
+schema 5 shape (`layers`, `entities`, ...) and stamps `schemaVersion: 5` on save: `nodeTreeToLegacy` turns a schema 6 file back into it (the exact
+inverse of the migration for any tree the migration can produce, temporary), and files the editor saved stay schema 5 on disk. The
+exporter, `validateEditorMap`, the reference scans (`shared/engine/references.ts`) and `scripts/lib/assets.mjs` read either schema.
 
 ## Looks
 
@@ -33,7 +82,7 @@ property `look` (JSON); see docs/looks.md.
 
 ## Layer folders
 
-A layer of type `folder` groups tile and image layers in the editor's layer list: the layers it holds follow it in `layers[]` and carry `folderId`; the folder has `collapsed` for its open/closed state. Folders are editor-only: `convertEditorMapToTiled` leaves them out (the held layers export as normal layers, in list order) and `validateEditorMap` only warns about a `folderId` that points at no folder or sits on a layer kind that cannot be held. Logic and drag rules: `editor/src/lib/layerFolders.ts`.
+*(Schema 5 and older; in schema 6 a folder is a `group` node, see above.)* A layer of type `folder` groups tile and image layers in the editor's layer list: the layers it holds follow it in `layers[]` and carry `folderId`; the folder has `collapsed` for its open/closed state. Folders are editor-only: `convertEditorMapToTiled` leaves them out (the held layers export as normal layers, in list order) and `validateEditorMap` only warns about a `folderId` that points at no folder or sits on a layer kind that cannot be held. Logic and drag rules: `editor/src/lib/layerFolders.ts`.
 
 ## Image layers
 
@@ -74,8 +123,7 @@ The exporter writes the painted cells of **every** collision layer into the one 
 An entity's area is its Collider box (any size), or one tile without a Collider. `components.Transform.free` is derived from the
 position, never chosen: `true` when the anchor (`x = col*32+16`, `y = (row+1)*32` on the tile grid) is off the grid, absent or `false`
 otherwise. The map format and the Tiled export carry it unchanged inside the entity's Transform (`convertEditorMapToTiled` never touches
-entities beyond migration), and a map written before the flag keeps validating and exporting byte for byte: `schemaVersion` is still 5
-and nothing is rewritten. Resizing a map (below) moves entities by whole tiles. See docs/engine-design.md (Coordinates) for how the
+entities beyond migration), and a map written before the flag keeps validating and exporting byte for byte: nothing is rewritten. Resizing a map (below) moves entities by whole tiles. See docs/engine-design.md (Coordinates) for how the
 editor snaps and resizes entities and how the game treats one off the grid.
 
 ## Checking and exporting

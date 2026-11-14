@@ -65,8 +65,9 @@ Legacy maps (no `schemaVersion`, or components named in `LegacyComponentType`) a
 `migrateEntity` / `migrateMap` in `shared/engine/migrate.ts` (pure, idempotent, never mutate their input, return
 `{ value, changed }`; `value` is the very same object when nothing changed). The editor migrates on load
 (`useMapManager.loadMaps` / `onSelectMap`, nothing is written back until the author edits), the exporter migrates
-on export (Tiled JSON always has canonical `entities` and `schemaVersion: 2`), and the game migrates defensively on
-load. Rules:
+on export (Tiled JSON always has canonical `entities` and the current `schemaVersion`, 6), and the game migrates defensively on
+load. `migrateMap` also turns a schema 5 map (`layers`, `entities`, ...) into a schema 6 map (one tree of `nodes`, see docs/maps.md);
+`migrateMapToLegacy` stops at the schema 5 shape. Rules for the entities:
 
 | Legacy | Becomes |
 |---|---|
