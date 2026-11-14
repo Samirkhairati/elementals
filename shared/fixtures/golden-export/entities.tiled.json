@@ -1,0 +1,390 @@
+{
+  "compressionlevel": -1,
+  "height": 6,
+  "infinite": false,
+  "layers": [
+    {
+      "data": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "height": 6,
+      "id": 1,
+      "name": "c",
+      "opacity": 1,
+      "type": "tilelayer",
+      "visible": true,
+      "width": 8,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "data": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "height": 6,
+      "id": 2,
+      "name": "b",
+      "opacity": 1,
+      "type": "tilelayer",
+      "visible": true,
+      "width": 8,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "data": [
+        0,
+        6,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "height": 6,
+      "id": 3,
+      "name": "a",
+      "opacity": 1,
+      "type": "tilelayer",
+      "visible": true,
+      "width": 8,
+      "x": 0,
+      "y": 0,
+      "properties": [
+        {
+          "name": "z",
+          "type": "int",
+          "value": 2
+        }
+      ]
+    }
+  ],
+  "nextlayerid": 4,
+  "nextobjectid": 1,
+  "orientation": "orthogonal",
+  "renderorder": "right-down",
+  "tiledversion": "1.10.2",
+  "tileheight": 32,
+  "tilesets": [
+    {
+      "columns": 4,
+      "firstgid": 1,
+      "image": "synth-a.png",
+      "imageheight": 128,
+      "imagewidth": 128,
+      "margin": 0,
+      "name": "synth-a",
+      "spacing": 0,
+      "tilecount": 16,
+      "tileheight": 32,
+      "tilewidth": 32
+    }
+  ],
+  "tilewidth": 32,
+  "type": "map",
+  "version": "1.10",
+  "width": 8,
+  "schemaVersion": 5,
+  "entities": [
+    {
+      "id": "e3",
+      "name": "Loose one",
+      "x": 64,
+      "y": 64,
+      "components": {
+        "Transform": {
+          "x": 64,
+          "y": 64,
+          "depth": 10
+        },
+        "Sprite": {
+          "asset": "objects/chest",
+          "facing": "down",
+          "animation": "",
+          "frame": 0,
+          "flipX": false,
+          "tint": "",
+          "opacity": 1,
+          "visible": true
+        }
+      }
+    },
+    {
+      "id": "e1",
+      "name": "Guard",
+      "x": 96,
+      "y": 64,
+      "folder": "ef1",
+      "components": {
+        "Transform": {
+          "x": 96,
+          "y": 64,
+          "depth": 10
+        },
+        "Sprite": {
+          "asset": "objects/chest",
+          "facing": "down",
+          "animation": "",
+          "frame": 0,
+          "flipX": false,
+          "tint": "",
+          "opacity": 1,
+          "visible": true
+        }
+      }
+    },
+    {
+      "id": "e2",
+      "name": "Shopkeeper",
+      "x": 128,
+      "y": 96,
+      "folder": "ef1",
+      "visible": true,
+      "components": {
+        "Transform": {
+          "x": 128,
+          "y": 96,
+          "depth": 10
+        },
+        "Sprite": {
+          "asset": "objects/chest",
+          "facing": "down",
+          "animation": "",
+          "frame": 0,
+          "flipX": false,
+          "tint": "",
+          "opacity": 1,
+          "visible": true
+        }
+      }
+    },
+    {
+      "id": "e5",
+      "name": "Barrel",
+      "x": 160,
+      "y": 96,
+      "folder": "ef2",
+      "visible": false,
+      "components": {
+        "Transform": {
+          "x": 160,
+          "y": 96,
+          "depth": 10
+        },
+        "Sprite": {
+          "asset": "objects/chest",
+          "facing": "down",
+          "animation": "",
+          "frame": 0,
+          "flipX": false,
+          "tint": "",
+          "opacity": 1,
+          "visible": true
+        }
+      }
+    },
+    {
+      "id": "e4",
+      "name": "Old sign",
+      "x": 32,
+      "y": 64,
+      "folder": null,
+      "components": {
+        "Transform": {
+          "x": 32,
+          "y": 64,
+          "depth": 10
+        },
+        "Sprite": {
+          "asset": "objects/door",
+          "facing": "down",
+          "animation": "",
+          "animSpeed": 1,
+          "frame": 0,
+          "offsetX": 0,
+          "offsetY": 0,
+          "scale": 1,
+          "flipX": false,
+          "tint": "",
+          "opacity": 1,
+          "visible": true
+        },
+        "Event": {
+          "states": [
+            {
+              "id": "6ad73eca-dfc3-4d84-882d-3333521af23f",
+              "name": "State 1",
+              "conditions": [],
+              "trigger": "interact",
+              "blocks": true,
+              "graph": {
+                "nodes": [
+                  {
+                    "id": "bce4c3e0-e9c0-4527-ba9e-e24dde51fd6e",
+                    "type": "start",
+                    "params": {},
+                    "out": {
+                      "next": "dce7884e-4cb4-4ac5-adf8-39f51f618187"
+                    },
+                    "x": 0,
+                    "y": 0
+                  },
+                  {
+                    "id": "dce7884e-4cb4-4ac5-adf8-39f51f618187",
+                    "type": "showText",
+                    "params": {
+                      "speaker": "",
+                      "text": "Hello there"
+                    },
+                    "out": {},
+                    "x": 260,
+                    "y": 0
+                  }
+                ],
+                "frames": []
+              },
+              "faceOnInteract": true,
+              "solid": null,
+              "appearance": {}
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

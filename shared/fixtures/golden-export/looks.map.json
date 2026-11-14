@@ -1,0 +1,140 @@
+{
+  "name": "looks",
+  "width": 8,
+  "height": 6,
+  "schemaVersion": 5,
+  "look": {
+    "default": {
+      "adjust": {
+        "exposure": 0.25,
+        "contrast": 10
+      }
+    },
+    "profiles": {
+      "night": {
+        "adjust": {
+          "temperature": -30
+        }
+      }
+    }
+  },
+  "layers": [
+    {
+      "id": "t1",
+      "name": "lit",
+      "type": "tile",
+      "visible": true,
+      "locked": false,
+      "look": {
+        "default": {
+          "adjust": {
+            "exposure": 2,
+            "contrast": 10
+          }
+        },
+        "profiles": {
+          "night": {
+            "adjust": {
+              "temperature": -30
+            }
+          }
+        }
+      },
+      "data": {
+        "0": {
+          "tilesetId": "synth-b.png",
+          "x": 0,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": "t2",
+      "name": "dark",
+      "type": "tile",
+      "visible": true,
+      "locked": false,
+      "look": {
+        "default": {}
+      },
+      "data": {}
+    },
+    {
+      "id": "i1",
+      "name": "pics",
+      "type": "image",
+      "visible": true,
+      "locked": false,
+      "look": {
+        "default": {
+          "adjust": {
+            "exposure": 3,
+            "contrast": 10
+          }
+        },
+        "profiles": {
+          "night": {
+            "adjust": {
+              "temperature": -30
+            }
+          }
+        }
+      },
+      "images": [
+        {
+          "id": "p1",
+          "graphicId": "x/y.png",
+          "x": 1,
+          "y": 2,
+          "look": {
+            "default": {
+              "adjust": {
+                "exposure": 4,
+                "contrast": 10
+              }
+            },
+            "profiles": {
+              "night": {
+                "adjust": {
+                  "temperature": -30
+                }
+              }
+            }
+          }
+        },
+        {
+          "id": "p2",
+          "graphicId": "x/y.png",
+          "x": 3,
+          "y": 4,
+          "look": {
+            "profiles": {}
+          }
+        }
+      ]
+    },
+    {
+      "id": "te",
+      "name": "terrain",
+      "type": "terrain",
+      "visible": true,
+      "locked": false,
+      "look": {
+        "default": {
+          "adjust": {
+            "exposure": 9,
+            "contrast": 10
+          }
+        },
+        "profiles": {
+          "night": {
+            "adjust": {
+              "temperature": -30
+            }
+          }
+        }
+      },
+      "data": {}
+    }
+  ]
+}

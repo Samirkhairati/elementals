@@ -1,0 +1,122 @@
+{
+  "compressionlevel": -1,
+  "height": 6,
+  "infinite": false,
+  "layers": [
+    {
+      "id": 1,
+      "name": "barriers",
+      "objects": [
+        {
+          "id": 1,
+          "name": "",
+          "type": "",
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "polyline": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 64,
+              "y": 0
+            }
+          ]
+        }
+      ],
+      "opacity": 1,
+      "type": "objectgroup",
+      "visible": true,
+      "width": 8,
+      "height": 6,
+      "x": 0,
+      "y": 0,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "collision"
+        }
+      ]
+    },
+    {
+      "data": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "height": 6,
+      "id": 2,
+      "name": "ground",
+      "opacity": 1,
+      "type": "tilelayer",
+      "visible": true,
+      "width": 8,
+      "x": 0,
+      "y": 0
+    }
+  ],
+  "nextlayerid": 3,
+  "nextobjectid": 2,
+  "orientation": "orthogonal",
+  "renderorder": "right-down",
+  "tiledversion": "1.10.2",
+  "tileheight": 32,
+  "tilesets": [],
+  "tilewidth": 32,
+  "type": "map",
+  "version": "1.10",
+  "width": 8,
+  "schemaVersion": 5,
+  "entities": []
+}

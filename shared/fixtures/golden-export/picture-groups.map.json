@@ -1,0 +1,217 @@
+{
+  "name": "picture-groups",
+  "width": 8,
+  "height": 6,
+  "schemaVersion": 5,
+  "layers": [
+    {
+      "id": "FY",
+      "name": "Sorted",
+      "type": "folder",
+      "visible": true,
+      "locked": false,
+      "ySort": true
+    },
+    {
+      "id": "IL1",
+      "name": "Props",
+      "type": "image",
+      "visible": true,
+      "locked": false,
+      "folderId": "FY",
+      "z": 7,
+      "groups": [
+        {
+          "id": "G1",
+          "name": "Off",
+          "ySort": false
+        },
+        {
+          "id": "G2",
+          "name": "Follow",
+          "locked": true
+        },
+        {
+          "id": "G3",
+          "name": "Empty"
+        },
+        {
+          "id": "G4",
+          "name": "On",
+          "ySort": true
+        }
+      ],
+      "images": [
+        {
+          "id": "a1",
+          "graphicId": "scenery/a.png",
+          "x": 10,
+          "y": 20,
+          "z": 1
+        },
+        {
+          "id": "a2",
+          "graphicId": "scenery/b.png",
+          "x": 30,
+          "y": 40,
+          "z": 2,
+          "groupId": "G1"
+        },
+        {
+          "id": "a3",
+          "graphicId": "scenery/c.png",
+          "x": 50,
+          "y": 60,
+          "z": 2,
+          "groupId": "G1",
+          "ySort": true
+        },
+        {
+          "id": "a4",
+          "graphicId": "scenery/d.png",
+          "x": 70,
+          "y": 80,
+          "z": 3,
+          "groupId": "G2",
+          "name": "Named"
+        },
+        {
+          "id": "a5",
+          "graphicId": "scenery/e.png",
+          "x": 90,
+          "y": 100,
+          "z": 4,
+          "groupId": "G4",
+          "ySort": false
+        },
+        {
+          "id": "a6",
+          "graphicId": "scenery/f.png",
+          "x": 110,
+          "y": 120,
+          "z": 5,
+          "crop": {
+            "x": 0,
+            "y": 0,
+            "w": 16,
+            "h": 16
+          }
+        },
+        {
+          "id": "a7",
+          "graphicId": "scenery/g.png",
+          "x": 130,
+          "y": 140,
+          "z": 6
+        },
+        {
+          "id": "a8",
+          "graphicId": "scenery/h.png",
+          "x": 150,
+          "y": 160,
+          "z": 6
+        },
+        {
+          "id": "a9",
+          "graphicId": "scenery/i.png",
+          "x": 170,
+          "y": 180,
+          "z": 8,
+          "groupId": "nope"
+        }
+      ]
+    },
+    {
+      "id": "IL2",
+      "name": "Sky",
+      "type": "image",
+      "visible": true,
+      "locked": false,
+      "ySort": true,
+      "look": {
+        "default": {
+          "adjust": {
+            "exposure": 1,
+            "contrast": 10
+          }
+        },
+        "profiles": {
+          "night": {
+            "adjust": {
+              "temperature": -30
+            }
+          }
+        }
+      },
+      "groups": [
+        {
+          "id": "H1",
+          "name": "Hard",
+          "ySort": false
+        },
+        {
+          "id": "H2",
+          "name": "Plain"
+        }
+      ],
+      "images": [
+        {
+          "id": "b1",
+          "assetId": "objects/chest",
+          "x": 12,
+          "y": 24,
+          "scale": 2,
+          "flipX": true,
+          "flipY": true,
+          "opacity": 0.5,
+          "look": {
+            "default": {
+              "adjust": {
+                "exposure": -1,
+                "contrast": 10
+              }
+            },
+            "profiles": {
+              "night": {
+                "adjust": {
+                  "temperature": -30
+                }
+              }
+            }
+          }
+        },
+        {
+          "id": "b2",
+          "graphicId": "sky/clouds.png",
+          "x": 200,
+          "y": 10,
+          "groupId": "H1"
+        },
+        {
+          "id": "b3",
+          "graphicId": "sky/clouds.png",
+          "x": 220,
+          "y": 10,
+          "groupId": "H2",
+          "opacity": 1,
+          "scale": 1
+        },
+        {
+          "id": "b4",
+          "graphicId": "sky/moon.png",
+          "x": 240,
+          "y": 10,
+          "z": -3.4
+        }
+      ]
+    },
+    {
+      "id": "IL3",
+      "name": "Plain",
+      "type": "image",
+      "visible": true,
+      "locked": false,
+      "images": []
+    }
+  ]
+}

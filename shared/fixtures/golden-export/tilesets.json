@@ -1,0 +1,50 @@
+[
+  {
+    "name": "interior",
+    "fileName": "interior.png",
+    "width": 384,
+    "height": 320
+  },
+  {
+    "name": "bush",
+    "fileName": "bush.png",
+    "width": 64,
+    "height": 64
+  },
+  {
+    "name": "grass",
+    "fileName": "grass.png",
+    "width": 64,
+    "height": 64
+  },
+  {
+    "name": "house",
+    "fileName": "house.png",
+    "width": 128,
+    "height": 96
+  },
+  {
+    "name": "outside",
+    "fileName": "outside.png",
+    "width": 256,
+    "height": 256
+  },
+  {
+    "name": "city-pavement",
+    "fileName": "city-pavement.png",
+    "width": 128,
+    "height": 256
+  },
+  {
+    "name": "synth-a",
+    "fileName": "synth-a.png",
+    "width": 128,
+    "height": 128
+  },
+  {
+    "name": "synth-b",
+    "fileName": "synth-b.png",
+    "width": 96,
+    "height": 64
+  }
+]

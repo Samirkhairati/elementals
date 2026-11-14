@@ -1,0 +1,183 @@
+{
+  "name": "entities",
+  "width": 8,
+  "height": 6,
+  "schemaVersion": 5,
+  "layers": [
+    {
+      "id": "c",
+      "name": "c",
+      "type": "tile",
+      "visible": true,
+      "locked": false,
+      "data": {
+        "0": {
+          "tilesetId": "synth-a.png",
+          "x": 0,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": "b",
+      "name": "b",
+      "type": "tile",
+      "visible": true,
+      "locked": false,
+      "data": {}
+    },
+    {
+      "id": "a",
+      "name": "a",
+      "type": "tile",
+      "visible": true,
+      "locked": false,
+      "z": 2,
+      "data": {
+        "1": {
+          "tilesetId": "synth-a.png",
+          "x": 1,
+          "y": 1
+        }
+      }
+    }
+  ],
+  "entitiesIndex": 1,
+  "entityFolders": [
+    {
+      "id": "ef1",
+      "name": "NPCs",
+      "expanded": false
+    },
+    {
+      "id": "ef2",
+      "name": "Props",
+      "visible": false
+    },
+    {
+      "id": "ef3",
+      "name": "Empty"
+    }
+  ],
+  "entities": [
+    {
+      "id": "e3",
+      "name": "Loose one",
+      "x": 64,
+      "y": 64,
+      "components": {
+        "Transform": {
+          "x": 64,
+          "y": 64,
+          "depth": 10
+        },
+        "Sprite": {
+          "asset": "objects/chest",
+          "facing": "down",
+          "animation": "",
+          "frame": 0,
+          "flipX": false,
+          "tint": "",
+          "opacity": 1,
+          "visible": true
+        }
+      }
+    },
+    {
+      "id": "e1",
+      "name": "Guard",
+      "x": 96,
+      "y": 64,
+      "folder": "ef1",
+      "components": {
+        "Transform": {
+          "x": 96,
+          "y": 64,
+          "depth": 10
+        },
+        "Sprite": {
+          "asset": "objects/chest",
+          "facing": "down",
+          "animation": "",
+          "frame": 0,
+          "flipX": false,
+          "tint": "",
+          "opacity": 1,
+          "visible": true
+        }
+      }
+    },
+    {
+      "id": "e2",
+      "name": "Shopkeeper",
+      "x": 128,
+      "y": 96,
+      "folder": "ef1",
+      "visible": true,
+      "components": {
+        "Transform": {
+          "x": 128,
+          "y": 96,
+          "depth": 10
+        },
+        "Sprite": {
+          "asset": "objects/chest",
+          "facing": "down",
+          "animation": "",
+          "frame": 0,
+          "flipX": false,
+          "tint": "",
+          "opacity": 1,
+          "visible": true
+        }
+      }
+    },
+    {
+      "id": "e5",
+      "name": "Barrel",
+      "x": 160,
+      "y": 96,
+      "folder": "ef2",
+      "visible": false,
+      "components": {
+        "Transform": {
+          "x": 160,
+          "y": 96,
+          "depth": 10
+        },
+        "Sprite": {
+          "asset": "objects/chest",
+          "facing": "down",
+          "animation": "",
+          "frame": 0,
+          "flipX": false,
+          "tint": "",
+          "opacity": 1,
+          "visible": true
+        }
+      }
+    },
+    {
+      "id": "e4",
+      "name": "Old sign",
+      "x": 32,
+      "y": 64,
+      "folder": null,
+      "components": {
+        "Transform": {
+          "x": 32,
+          "y": 64,
+          "depth": 10
+        },
+        "SpriteView": {
+          "texture": "door",
+          "frame": 0
+        },
+        "Interactable": {
+          "type": "on_interact",
+          "message": "Hello there"
+        }
+      }
+    }
+  ]
+}

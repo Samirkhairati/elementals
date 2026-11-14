@@ -1,0 +1,185 @@
+{
+  "name": "collision",
+  "width": 8,
+  "height": 6,
+  "schemaVersion": 5,
+  "pixelWidth": 250,
+  "pixelHeight": 190,
+  "settings": {
+    "playerZ": 12.6
+  },
+  "layers": [
+    {
+      "id": "c1",
+      "name": "walls",
+      "type": "collision",
+      "visible": true,
+      "locked": false,
+      "z": 4,
+      "tileGroups": [
+        {
+          "id": "tg1",
+          "name": "Houses"
+        },
+        {
+          "id": "tg2",
+          "name": "Fences"
+        }
+      ],
+      "data": {
+        "0": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0,
+          "group": "tg1"
+        },
+        "1": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0,
+          "group": "tg2"
+        },
+        "9": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        }
+      },
+      "shapes": [
+        {
+          "id": "sh1",
+          "name": "Pond",
+          "closed": true,
+          "points": [
+            {
+              "x": 10,
+              "y": 10
+            },
+            {
+              "x": 60,
+              "y": 10
+            },
+            {
+              "x": 60,
+              "y": 50
+            },
+            {
+              "x": 10,
+              "y": 50
+            }
+          ]
+        },
+        {
+          "id": "sh2",
+          "closed": false,
+          "points": [
+            {
+              "x": 100,
+              "y": 100
+            },
+            {
+              "x": 150,
+              "y": 120
+            }
+          ]
+        },
+        {
+          "id": "sh3",
+          "closed": true,
+          "points": [
+            {
+              "x": 1,
+              "y": 1
+            },
+            {
+              "x": 2,
+              "y": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "t",
+      "name": "ground",
+      "type": "tile",
+      "visible": true,
+      "locked": false,
+      "data": {
+        "0": {
+          "tilesetId": "synth-a.png",
+          "x": 0,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": "c2",
+      "name": "old shapes",
+      "type": "polygons",
+      "visible": true,
+      "locked": false,
+      "shapes": [
+        {
+          "id": "sh4",
+          "closed": true,
+          "points": [
+            {
+              "x": 5,
+              "y": 5
+            },
+            {
+              "x": 40,
+              "y": 5
+            },
+            {
+              "x": 40,
+              "y": 40
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "c3",
+      "name": "extra",
+      "type": "collision",
+      "visible": true,
+      "locked": false,
+      "data": {
+        "20": {
+          "tilesetId": "__collision__",
+          "x": 0,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": "c4",
+      "name": "hidden",
+      "type": "collision",
+      "visible": false,
+      "locked": false,
+      "shapes": [
+        {
+          "id": "sh5",
+          "closed": false,
+          "points": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 9,
+              "y": 9
+            },
+            {
+              "x": 18,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "name": "collision-shapes-only",
+  "width": 8,
+  "height": 6,
+  "schemaVersion": 5,
+  "layers": [
+    {
+      "id": "c1",
+      "name": "barriers",
+      "type": "collision",
+      "visible": true,
+      "locked": false,
+      "shapes": [
+        {
+          "id": "s1",
+          "closed": false,
+          "points": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 64,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "t",
+      "name": "ground",
+      "type": "tile",
+      "visible": true,
+      "locked": false,
+      "data": {}
+    }
+  ]
+}

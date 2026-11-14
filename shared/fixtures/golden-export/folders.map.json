@@ -1,0 +1,211 @@
+{
+  "name": "folders",
+  "width": 8,
+  "height": 6,
+  "schemaVersion": 5,
+  "layers": [
+    {
+      "id": "F1",
+      "name": "Front",
+      "type": "folder",
+      "visible": true,
+      "locked": false,
+      "collapsed": true,
+      "ySort": true
+    },
+    {
+      "id": "t1",
+      "name": "Props",
+      "type": "tile",
+      "visible": true,
+      "locked": false,
+      "folderId": "F1",
+      "z": 5,
+      "data": {
+        "0": {
+          "tilesetId": "synth-a.png",
+          "x": 0,
+          "y": 0
+        },
+        "1": {
+          "tilesetId": "synth-a.png",
+          "x": 1,
+          "y": 0
+        },
+        "9": {
+          "tilesetId": "synth-a.png",
+          "x": 2,
+          "y": 1
+        }
+      }
+    },
+    {
+      "id": "i1",
+      "name": "Trees",
+      "type": "image",
+      "visible": true,
+      "locked": false,
+      "folderId": "F1",
+      "z": 6,
+      "images": [
+        {
+          "id": "p1",
+          "graphicId": "scenery/tree.png",
+          "x": 64,
+          "y": 96,
+          "z": 2
+        },
+        {
+          "id": "p2",
+          "graphicId": "scenery/tree.png",
+          "x": 128,
+          "y": 96,
+          "z": 1
+        }
+      ]
+    },
+    {
+      "id": "i2",
+      "name": "NoSort",
+      "type": "image",
+      "visible": true,
+      "locked": false,
+      "folderId": "F1",
+      "ySort": false,
+      "images": [
+        {
+          "id": "p3",
+          "graphicId": "scenery/bush.png",
+          "x": 32,
+          "y": 64
+        }
+      ]
+    },
+    {
+      "id": "F2",
+      "name": "Hidden",
+      "type": "folder",
+      "visible": false,
+      "locked": true
+    },
+    {
+      "id": "t2",
+      "name": "HiddenTiles",
+      "type": "tile",
+      "visible": false,
+      "locked": true,
+      "folderId": "F2",
+      "data": {
+        "2": {
+          "tilesetId": "synth-b.png",
+          "x": 0,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": "i3",
+      "name": "HiddenImages",
+      "type": "image",
+      "visible": false,
+      "locked": true,
+      "folderId": "F2",
+      "images": [
+        {
+          "id": "p4",
+          "graphicId": "scenery/rock.png",
+          "x": 20,
+          "y": 40
+        }
+      ]
+    },
+    {
+      "id": "t3",
+      "name": "Loose",
+      "type": "tile",
+      "visible": true,
+      "locked": false,
+      "z": 1,
+      "look": {
+        "default": {
+          "adjust": {
+            "exposure": 0.5,
+            "contrast": 10
+          }
+        },
+        "profiles": {
+          "night": {
+            "adjust": {
+              "temperature": -30
+            }
+          }
+        }
+      },
+      "data": {
+        "0": {
+          "tilesetId": "synth-b.png",
+          "x": 1,
+          "y": 1
+        },
+        "5": {
+          "tilesetId": "synth-b.png",
+          "x": 0,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": "t3b",
+      "name": "Loose",
+      "type": "tile",
+      "visible": true,
+      "locked": false,
+      "data": {
+        "3": {
+          "tilesetId": "synth-a.png",
+          "x": 3,
+          "y": 3
+        }
+      }
+    },
+    {
+      "id": "te",
+      "name": "terrain",
+      "type": "terrain",
+      "visible": true,
+      "locked": false,
+      "data": {
+        "4": {
+          "tilesetId": "synth-a.png",
+          "x": 0,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": "en",
+      "name": "encounters",
+      "type": "encounters",
+      "visible": true,
+      "locked": false,
+      "z": 3,
+      "data": {}
+    },
+    {
+      "id": "ob",
+      "name": "objs",
+      "type": "objects",
+      "visible": true,
+      "locked": false,
+      "data": {}
+    },
+    {
+      "id": "F3",
+      "name": "Empty",
+      "type": "folder",
+      "visible": true,
+      "locked": false
+    }
+  ],
+  "entities": []
+}

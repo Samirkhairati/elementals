@@ -1,0 +1,353 @@
+{
+  "properties": [
+    {
+      "name": "pixelWidth",
+      "type": "int",
+      "value": 250
+    },
+    {
+      "name": "pixelHeight",
+      "type": "int",
+      "value": 190
+    },
+    {
+      "name": "playerZ",
+      "type": "int",
+      "value": 13
+    }
+  ],
+  "compressionlevel": -1,
+  "height": 6,
+  "infinite": false,
+  "layers": [
+    {
+      "data": [
+        17,
+        17,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        17,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        17,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "height": 6,
+      "id": 1,
+      "name": "collision",
+      "opacity": 1,
+      "type": "tilelayer",
+      "visible": true,
+      "width": 8,
+      "x": 0,
+      "y": 0,
+      "properties": [
+        {
+          "name": "z",
+          "type": "int",
+          "value": 4
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "walls",
+      "objects": [
+        {
+          "id": 1,
+          "name": "",
+          "type": "",
+          "x": 10,
+          "y": 10,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "polygon": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 50,
+              "y": 0
+            },
+            {
+              "x": 50,
+              "y": 40
+            },
+            {
+              "x": 0,
+              "y": 40
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "name": "",
+          "type": "",
+          "x": 100,
+          "y": 100,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "polyline": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 50,
+              "y": 20
+            }
+          ]
+        }
+      ],
+      "opacity": 1,
+      "type": "objectgroup",
+      "visible": true,
+      "width": 8,
+      "height": 6,
+      "x": 0,
+      "y": 0,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "collision"
+        }
+      ]
+    },
+    {
+      "data": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "height": 6,
+      "id": 3,
+      "name": "ground",
+      "opacity": 1,
+      "type": "tilelayer",
+      "visible": true,
+      "width": 8,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": 4,
+      "name": "old shapes",
+      "objects": [
+        {
+          "id": 3,
+          "name": "",
+          "type": "",
+          "x": 5,
+          "y": 5,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "polygon": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 35,
+              "y": 0
+            },
+            {
+              "x": 35,
+              "y": 35
+            }
+          ]
+        }
+      ],
+      "opacity": 1,
+      "type": "objectgroup",
+      "visible": true,
+      "width": 8,
+      "height": 6,
+      "x": 0,
+      "y": 0,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "collision"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "name": "hidden",
+      "objects": [
+        {
+          "id": 4,
+          "name": "",
+          "type": "",
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "polyline": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 9,
+              "y": 9
+            },
+            {
+              "x": 18,
+              "y": 0
+            }
+          ]
+        }
+      ],
+      "opacity": 1,
+      "type": "objectgroup",
+      "visible": false,
+      "width": 8,
+      "height": 6,
+      "x": 0,
+      "y": 0,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "collision"
+        }
+      ]
+    }
+  ],
+  "nextlayerid": 6,
+  "nextobjectid": 5,
+  "orientation": "orthogonal",
+  "renderorder": "right-down",
+  "tiledversion": "1.10.2",
+  "tileheight": 32,
+  "tilesets": [
+    {
+      "columns": 4,
+      "firstgid": 1,
+      "image": "synth-a.png",
+      "imageheight": 128,
+      "imagewidth": 128,
+      "margin": 0,
+      "name": "synth-a",
+      "spacing": 0,
+      "tilecount": 16,
+      "tileheight": 32,
+      "tilewidth": 32
+    },
+    {
+      "columns": 1,
+      "firstgid": 17,
+      "image": "collision_dummy.png",
+      "imageheight": 32,
+      "imagewidth": 32,
+      "margin": 0,
+      "name": "collision_dummy",
+      "spacing": 0,
+      "tilecount": 1,
+      "tileheight": 32,
+      "tilewidth": 32
+    }
+  ],
+  "tilewidth": 32,
+  "type": "map",
+  "version": "1.10",
+  "width": 8,
+  "schemaVersion": 5,
+  "entities": []
+}
