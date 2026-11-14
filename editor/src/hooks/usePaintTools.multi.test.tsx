@@ -1,9 +1,10 @@
-import { StrictMode, useState, type ReactNode } from 'react'
+import { StrictMode, type ReactNode } from 'react'
 import { describe, it, expect, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
-import type { DebugInfo, Layer, MapData, TileSelection } from '@/types/editor'
-import { useSyncedState } from '@/hooks/useSyncedState'
-import { makeLayer, makeMap } from '@/test/helpers'
+import type { DebugInfo, TileSelection } from '@/types/editor'
+import { collisionTileNodes, type CollisionLayerNode, type SceneNode } from '../../../shared/sceneTree'
+import { makeImageLayer, makeLayer, makeMap } from '@/test/helpers'
+import { useSceneHarness } from '@/test/sceneHarness'
 import { usePaintTools } from './usePaintTools'
 
 const wrapper = ({ children }: { children: ReactNode }) => <StrictMode>{children}</StrictMode>
@@ -21,43 +22,42 @@ const multi: TileSelection = {
   ],
 }
 
-function setup(opts: { pinned?: boolean; tool?: 'brush' | 'eraser'; layers?: Layer[]; selection?: TileSelection | null } = {}) {
-  const initial = opts.layers ?? [makeLayer('col', { type: 'collision' }), makeLayer('ground'), makeLayer('img', { type: 'image', images: [] })]
+function setup(opts: { pinned?: boolean; tool?: 'brush' | 'eraser'; layers?: SceneNode[]; selection?: TileSelection | null } = {}) {
+  // The tree is in draw order: the collision layer listed first at the top of the old lists is now the last one.
+  const initial = opts.layers ?? [makeImageLayer('img'), makeLayer('ground'), makeLayer('col', { type: 'collision', children: [] })]
   const commitHistory = vi.fn()
   const hook = renderHook(
     () => {
-      const [activeMap, setActiveMap] = useState<MapData | null>(makeMap({ width: 4, height: 4, layers: initial }))
-      const [layers, setLayers, layersRef] = useSyncedState<Layer[]>(initial)
+      const scene = useSceneHarness(makeMap({ width: 4, height: 4, nodes: initial }), commitHistory)
       const tools = usePaintTools({
-        activeMap,
+        activeMap: scene.activeMap,
         activeLayerId: 'ground',
         tileSelection: opts.selection === undefined ? multi : opts.selection,
         pinSelection: opts.pinned ?? true,
         activeTool: opts.tool ?? 'brush',
         paintMode: 'discontinuous',
         paintStartPos: null,
-        getLayers: () => layersRef.current,
-        setLayers,
-        commitHistory,
+        getIndex: scene.tree.getIndex,
+        commit: scene.tree.commit,
+        commitView: scene.tree.commitView,
         setDebugInfo: vi.fn() as (i: DebugInfo) => void,
-        setActiveMap,
       })
-      return { tools, layers }
+      return { tools, nodes: scene.activeMap!.nodes }
     },
     { wrapper }
   )
   return { ...hook, commitHistory }
 }
 
-const layer = (r: ReturnType<typeof setup>, id: string) => r.result.current.layers.find((l) => l.id === id)!
+const layer = (r: ReturnType<typeof setup>, id: string) => r.result.current.nodes.find((l) => l.id === id)! as CollisionLayerNode & { data?: Record<number, unknown> }
 
 describe('usePaintTools: pinned multi-layer selection', () => {
   it('a brush stroke writes each part to the layer it came from', () => {
     const r = setup()
     act(() => r.result.current.tools.handlePaint(1, 2))
     // A collision cell joins a tiles item (a new one, as none was picked).
-    expect(layer(r, 'col').data).toEqual({ 9: { ...COL, group: layer(r, 'col').tileGroups?.[0]?.id } })
-    expect(layer(r, 'col').tileGroups).toHaveLength(1)
+    expect(layer(r, 'col').data).toEqual({ 9: { ...COL, group: collisionTileNodes(layer(r, 'col'))[0]?.id } })
+    expect(collisionTileNodes(layer(r, 'col'))).toHaveLength(1)
     expect(layer(r, 'ground').data).toEqual({ 9: t(1), 10: t(2) })
     expect(layer(r, 'img').data).toBeUndefined()
   })
@@ -65,7 +65,7 @@ describe('usePaintTools: pinned multi-layer selection', () => {
   it('the eraser clears the cell on every layer of the selection', () => {
     const r = setup({
       tool: 'eraser',
-      layers: [makeLayer('col', { type: 'collision', data: { 9: COL } }), makeLayer('ground', { data: { 9: t(1) } })],
+      layers: [makeLayer('ground', { data: { 9: t(1) } }), makeLayer('col', { type: 'collision', children: [{ id: 'tiles', type: 'collisionTiles', name: 'Tiles' }], data: { 9: COL } })],
     })
     act(() => r.result.current.tools.handlePaint(1, 2))
     expect(layer(r, 'col').data).toEqual({})
@@ -73,7 +73,7 @@ describe('usePaintTools: pinned multi-layer selection', () => {
   })
 
   it('skips locked layers but still paints the others', () => {
-    const r = setup({ layers: [makeLayer('col', { type: 'collision', locked: true }), makeLayer('ground')] })
+    const r = setup({ layers: [makeLayer('ground'), makeLayer('col', { type: 'collision', children: [], locked: true })] })
     act(() => r.result.current.tools.handlePaint(0, 0))
     expect(layer(r, 'col').data).toBeUndefined()
     expect(layer(r, 'ground').data).toEqual({ 0: t(1), 1: t(2) })
@@ -90,7 +90,7 @@ describe('usePaintTools: pinned multi-layer selection', () => {
   it('bucket fill decides the region on the active layer and fills it on all of them', () => {
     // ground has a wall column at x=2, so the region of (0,0) is x<2 on ground; the collision layer is empty
     const wall = { 2: t(9), 6: t(9), 10: t(9), 14: t(9) }
-    const r = setup({ layers: [makeLayer('col', { type: 'collision' }), makeLayer('ground', { data: wall })] })
+    const r = setup({ layers: [makeLayer('ground', { data: wall }), makeLayer('col', { type: 'collision', children: [] })] })
     act(() => r.result.current.tools.handlePaintBucket(0, 0))
     expect(Object.keys(layer(r, 'col').data!).map(Number).sort((a, b) => a - b)).toEqual([0, 4, 8, 12]) // marker lands in the first column of each row
     expect(layer(r, 'ground').data![2]).toEqual(t(9)) // the wall is untouched
@@ -107,7 +107,7 @@ describe('usePaintTools: pinned multi-layer selection', () => {
 
 describe('usePaintTools: image layers and collision markers', () => {
   it('never paints tiles onto an image layer', () => {
-    const r = setup({ layers: [makeLayer('ground', { type: 'image', images: [] })], pinned: false, selection: { width: 1, height: 1, tiles: [t(1)] } })
+    const r = setup({ layers: [makeImageLayer('ground')], pinned: false, selection: { width: 1, height: 1, tiles: [t(1)] } })
     act(() => r.result.current.tools.handlePaint(0, 0))
     expect(layer(r, 'ground').data).toBeUndefined()
   })

@@ -3,6 +3,8 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { commandNodes } from '../../../../shared/engine/graph'
 import { mapSaveQueue } from '@/lib/saveQueue'
+import type { EntityNode } from '../../../../shared/sceneTree'
+import { allEntities } from '../../../../shared/sceneTree'
 import { installElectronAPI, makeEntity, makeLayer, makeMap, uninstallElectronAPI } from '@/test/helpers'
 import { useMapManager } from './useMapManager'
 import { ENTITIES_GROUP_ID } from '../../../../shared/sceneTreeMigrate'
@@ -23,64 +25,71 @@ describe('useMapManager', () => {
     act(() => result.current.setActiveMap(a))
     expect(result.current.activeMap).toBe(a)
     act(() => {
-      result.current.setActiveMap(m => (m ? { ...m, layers: [makeLayer('X')] } : m))
+      result.current.setActiveMap(m => (m ? { ...m, nodes: [makeLayer('X')] } : m))
       result.current.setActiveMap(m => (m ? { ...m, name: 'renamed' } : m))
     })
-    expect(result.current.activeMap).toMatchObject({ name: 'renamed', layers: [{ id: 'X' }] })
+    expect(result.current.activeMap).toMatchObject({ name: 'renamed', nodes: [{ id: 'X' }] })
     expect(result.current.maps[0]).toBe(result.current.activeMap)
     expect(result.current.maps[1]).toBe(b)
     expect(result.current.getActiveMap()).toBe(result.current.activeMap)
   })
 
-  it('onSelectMap activates the map and reports its layers/entities once', () => {
+  it('onSelectMap activates the map and reports it once', () => {
     const onMapSelected = vi.fn()
-    const map = makeMap({ layers: [makeLayer('L')], entities: [] })
+    const map = makeMap({ nodes: [makeLayer('L')] })
     const { result } = renderHook(() => useMapManager({ onMapSelected }), { wrapper })
     act(() => result.current.onSelectMap(map))
     expect(result.current.activeMap).toBe(map)
     expect(onMapSelected).toHaveBeenCalledTimes(1)
-    expect(onMapSelected).toHaveBeenCalledWith(map.layers, map.entities, { width: map.width, height: map.height })
+    expect(onMapSelected).toHaveBeenCalledWith(map)
   })
 
-  it('onSelectMap migrates legacy entities and stamps the current schemaVersion', () => {
+  // An old map (schema 5: layers, entities, entity folders) as it is on disk.
+  const legacyMap = (extra: Record<string, unknown> = {}) => ({
+    name: 'Old',
+    fileName: 'old.json',
+    folderPath: null,
+    width: 4,
+    height: 4,
+    layers: [{ id: 'g', name: 'ground', type: 'tile', visible: true, locked: false }],
+    entities: [{ id: 'sign', name: 'Sign', x: 16, y: 32, components: { Transform: { x: 16, y: 32, depth: 10 }, Interactable: { type: 'on_interact', message: 'hello', eventKey: '' } } }],
+    ...extra,
+  })
+  const entityOf = (m: { nodes: unknown[] }, id: string) => allEntities(m.nodes as never).find((e) => e.id === id) as EntityNode
+
+  it('onSelectMap migrates an old map to the scene tree (entities canonical, schema 6)', () => {
     const onMapSelected = vi.fn()
-    const legacy = makeMap({
-      schemaVersion: undefined,
-      entities: [
-        makeEntity('sign', {
-          components: { Transform: { x: 0, y: 0, depth: 10 }, Interactable: { type: 'on_interact', message: 'hello', eventKey: '' } },
-        } as never),
-      ],
-    })
-    delete (legacy as { schemaVersion?: number }).schemaVersion
+    const legacy = legacyMap({ schemaVersion: 2 }) as never as ReturnType<typeof makeMap>
     const { result } = renderHook(() => useMapManager({ onMapSelected }), { wrapper })
     act(() => result.current.onSelectMap(legacy))
     const active = result.current.activeMap!
-    expect(active.schemaVersion).toBe(5)
-    expect(Object.keys(active.entities![0].components)).toEqual(['Transform', 'Event'])
-    expect(commandNodes(active.entities![0].components.Event!.states[0].graph)[0]).toMatchObject({ type: 'showText', params: { text: 'hello' } })
-    expect(legacy.entities![0].components).toHaveProperty('Interactable') // input untouched
-    expect(onMapSelected).toHaveBeenCalledWith(active.layers, active.entities, { width: active.width, height: active.height })
+    expect(active.schemaVersion).toBe(6)
+    expect(active).not.toHaveProperty('layers')
+    expect(active).not.toHaveProperty('entities')
+    expect(active.nodes.map((n) => [n.type, n.name])).toEqual([['tile', 'ground'], ['group', 'Entities']])
+    const sign = entityOf(active, 'sign')
+    expect(Object.keys(sign.components)).toEqual(['Transform', 'Event'])
+    expect(commandNodes((sign.components.Event as never as { states: { graph: never }[] }).states[0].graph)[0]).toMatchObject({ type: 'showText', params: { text: 'hello' } })
+    expect(legacy as unknown as { entities: { components: object }[] }).toHaveProperty('entities.0.components.Interactable') // input untouched
+    expect(onMapSelected).toHaveBeenCalledWith(active)
   })
 
-  it('loadMaps migrates every map it loads', async () => {
-    const legacy = {
-      ...makeMap({ fileName: 'old.json' }),
-      entities: [makeEntity('p', { components: { Transform: { x: 0, y: 0 }, PlayerControl: {}, SpriteView: { texture: 'player-walk' } } } as never)],
-    }
-    delete (legacy as { schemaVersion?: number }).schemaVersion
-    installElectronAPI({ getMaps: () => Promise.resolve({ success: true, folders: [], maps: [legacy] }) })
+  it('loadMaps migrates every map it loads, without writing anything back', async () => {
+    const legacy = legacyMap({ entities: [{ id: 'p', name: 'p', x: 0, y: 0, components: { Transform: { x: 0, y: 0 }, PlayerControl: {}, SpriteView: { texture: 'player-walk' } } }] })
+    const saveMap = vi.fn(() => Promise.resolve({ success: true }))
+    installElectronAPI({ saveMap, getMaps: () => Promise.resolve({ success: true, folders: [], maps: [legacy] }) })
     const { result } = renderHook(() => useMapManager(), { wrapper })
     await act(async () => {
       await result.current.loadMaps()
     })
     const loaded = result.current.maps[0]
-    expect(loaded.schemaVersion).toBe(5)
-    expect(loaded.entities![0].components.Movement).toMatchObject({ controller: 'player' })
-    expect(loaded.entities![0].components.Sprite).toMatchObject({ asset: 'characters/player' })
+    expect(loaded.schemaVersion).toBe(6)
+    expect(entityOf(loaded, 'p').components.Movement).toMatchObject({ controller: 'player' })
+    expect(entityOf(loaded, 'p').components.Sprite).toMatchObject({ asset: 'characters/player' })
+    expect(saveMap).not.toHaveBeenCalled()
   })
 
-  it('loads a schema 6 map (nodes) as the layers and entities the editor still works on', async () => {
+  it('loads a schema 6 map as the tree it is', async () => {
     const v6 = {
       name: 'Tree',
       fileName: 'tree.json',
@@ -99,14 +108,12 @@ describe('useMapManager', () => {
       await result.current.loadMaps()
     })
     const loaded = result.current.maps[0]
-    expect(loaded).not.toHaveProperty('nodes')
-    expect(loaded.schemaVersion).toBe(5)
-    expect(loaded.layers.map(l => [l.id, l.type, l.visible])).toEqual([['a', 'tile', true]])
-    expect(loaded.entities).toEqual([])
+    expect(loaded).toBe(v6)
+    expect(loaded.nodes.map((n) => [n.id, n.type])).toEqual([['a', 'tile'], [ENTITIES_GROUP_ID, 'group']])
   })
 
   it('already canonical maps are used as they are (same object, no churn)', async () => {
-    const map = makeMap({ entities: [makeEntity('a')] })
+    const map = makeMap({ nodes: [makeEntity('a')] })
     installElectronAPI({ getMaps: () => Promise.resolve({ success: true, folders: [], maps: [map] }) })
     const { result } = renderHook(() => useMapManager(), { wrapper })
     await act(async () => {
@@ -213,6 +220,6 @@ describe('useMapManager', () => {
     })
     expect(result.current.activeMap).toMatchObject({ name: 'new name', fileName: map.fileName })
     // other fields (unsaved edits) are kept untouched
-    expect(result.current.activeMap?.layers).toBe(map.layers)
+    expect(result.current.activeMap?.nodes).toBe(map.nodes)
   })
 })

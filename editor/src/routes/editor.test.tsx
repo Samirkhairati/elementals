@@ -3,6 +3,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { act, render, waitFor } from '@testing-library/react'
 import type { MapData } from '@/types/editor'
 import type { EditorContextValue } from '@/components/editor/layout/EditorContext'
+import type { TileLayerNode } from '../../../shared/sceneTree'
+import { sceneIndex } from '@/lib/sceneIndex'
 import { installElectronAPI, makeLayer, makeMap, uninstallElectronAPI } from '@/test/helpers'
 
 // Dockview needs real layout; replace the shell with a probe that exposes the real context.
@@ -23,11 +25,15 @@ import { EditorPage } from './editor'
 const SAVE_DELAY = 300
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
+/** The layers of the open map, in draw order (the first one is at the back); the tree is the map's `nodes`. */
+const layers = () => sceneIndex(ctx.activeMap!.nodes).layers
+const ground = () => layers()[0] as TileLayerNode
+
 let saveMap: ReturnType<typeof vi.fn>
 let initialMap: MapData
 
 beforeEach(() => {
-  initialMap = makeMap({ width: 6, height: 6, layers: [makeLayer('L1')], entities: [] })
+  initialMap = makeMap({ width: 6, height: 6, nodes: [makeLayer('L1')] })
   saveMap = vi.fn(() => Promise.resolve({ success: true }))
   installElectronAPI({
     getTilesets: () => Promise.resolve({ success: true, folders: [], tilesets: [] }),
@@ -67,16 +73,15 @@ describe('EditorPage wiring', () => {
       ctx.handlePaint(2, 3)
       ctx.handleCommit() // stroke end
     })
-    expect(ctx.layers[0].data).toEqual({ 20: { tilesetId: 'ts', x: 1, y: 1 } })
+    expect(ground().data).toEqual({ 20: { tilesetId: 'ts', x: 1, y: 1 } })
     expect(ctx.historyLength).toBe(3) // initial, entity, paint
     expect(ctx.historyIndex).toBe(2)
 
     // First undo reverts the paint only; the entity survives.
     act(() => ctx.handleUndo())
-    expect(ctx.layers[0].data).toBeUndefined()
+    expect(ground().data).toBeUndefined()
     expect(ctx.entities.map(e => e.name)).toEqual(['Hero'])
-    expect(ctx.activeMap?.layers[0].data).toBeUndefined()
-    expect(ctx.activeMap?.entities).toHaveLength(1)
+    expect(ctx.activeMap?.nodes).toHaveLength(2)
 
     // Nothing is written until the debounce elapses...
     expect(saveMap).not.toHaveBeenCalled()
@@ -84,8 +89,12 @@ describe('EditorPage wiring', () => {
     const firstPayload = saveMap.mock.calls[0][2] as MapData
     expect(saveMap.mock.calls[0][0]).toBeNull()
     expect(saveMap.mock.calls[0][1]).toBe('test.json')
-    expect(firstPayload.entities).toHaveLength(1)
-    expect(firstPayload.layers[0].data).toBeUndefined()
+    // schema 6: the tree is what is written, no layers / entities next to it
+    expect(firstPayload.schemaVersion).toBe(6)
+    expect(firstPayload).not.toHaveProperty('layers')
+    expect(firstPayload).not.toHaveProperty('entities')
+    expect(firstPayload.nodes.filter(n => n.type === 'entity')).toHaveLength(1)
+    expect((firstPayload.nodes[0] as TileLayerNode).data).toBeUndefined()
 
     // Second undo removes the entity as well.
     act(() => ctx.handleUndo())
@@ -97,12 +106,12 @@ describe('EditorPage wiring', () => {
     act(() => ctx.handleRedo())
     expect(ctx.entities.map(e => e.name)).toEqual(['Hero'])
     act(() => ctx.handleRedo())
-    expect(ctx.layers[0].data).toEqual({ 20: { tilesetId: 'ts', x: 1, y: 1 } })
+    expect(ground().data).toEqual({ 20: { tilesetId: 'ts', x: 1, y: 1 } })
 
     await waitFor(() => expect(saveMap).toHaveBeenCalledTimes(2), { timeout: 1500 })
     const last = saveMap.mock.calls[1][2] as MapData
-    expect(last.entities).toHaveLength(1)
-    expect(last.layers[0].data).toEqual({ 20: { tilesetId: 'ts', x: 1, y: 1 } })
+    expect(last.nodes.filter(n => n.type === 'entity')).toHaveLength(1)
+    expect((last.nodes[0] as TileLayerNode).data).toEqual({ 20: { tilesetId: 'ts', x: 1, y: 1 } })
     await sleep(SAVE_DELAY + 100)
     expect(saveMap).toHaveBeenCalledTimes(2)
   })
@@ -112,28 +121,41 @@ describe('EditorPage wiring', () => {
     act(() => {
       ctx.handleCreateEntity('A', 0, 0)
       ctx.handleCreateEntity('B', 32, 0)
-      ctx.handleCreateLayerOfType('objects')
+      ctx.createNode('objects')
     })
     expect(ctx.entities).toHaveLength(2)
-    expect(ctx.layers).toHaveLength(2)
+    expect(layers()).toHaveLength(2)
     expect(ctx.historyLength).toBe(4) // initial + 3 commits
 
     await waitFor(() => expect(saveMap).toHaveBeenCalledTimes(1), { timeout: 1500 })
     await sleep(SAVE_DELAY + 100)
     expect(saveMap).toHaveBeenCalledTimes(1)
     const payload = saveMap.mock.calls[0][2] as MapData
-    expect(payload.entities).toHaveLength(2)
-    expect(payload.layers).toHaveLength(2)
+    expect(payload.nodes.filter(n => n.type === 'entity')).toHaveLength(2)
+    expect(payload.nodes.filter(n => n.type === 'objects' || n.type === 'tile')).toHaveLength(2)
   })
 
-  it('entity folder changes are saved but are not undo steps', async () => {
+  it('opening or closing a group is saved but is not an undo step', async () => {
     await mount()
-    act(() => ctx.createEntityFolder('NPCs'))
-    const folder = ctx.entityFolders[0]
-    act(() => ctx.toggleEntityFolderExpanded(folder.id))
-    expect(ctx.historyLength).toBe(1)
+    act(() => ctx.createNode('group', null))
+    const group = ctx.activeMap!.nodes.find(n => n.type === 'group')!
+    const steps = ctx.historyLength
+    act(() => ctx.toggleCollapsed(group.id))
+    expect(ctx.historyLength).toBe(steps)
     await waitFor(() => expect(saveMap).toHaveBeenCalledTimes(1), { timeout: 1500 })
-    expect((saveMap.mock.calls[0][2] as MapData).entityFolders?.[0]).toMatchObject({ name: 'NPCs', expanded: false })
+    expect((saveMap.mock.calls[0][2] as MapData).nodes.find(n => n.type === 'group')).toMatchObject({ name: 'Group', collapsed: true })
+  })
+
+  it('moving an entity into a group and undoing it', async () => {
+    await mount()
+    act(() => ctx.handleCreateEntity('Hero', 0, 0))
+    act(() => ctx.createNode('group', null))
+    const group = ctx.activeMap!.nodes.find(n => n.type === 'group')!
+    const hero = ctx.entities[0]
+    act(() => ctx.moveNodes([hero.id], group.id, 'inside'))
+    expect(sceneIndex(ctx.activeMap!.nodes).byId.get(hero.id)?.ancestors.map(a => a.id)).toEqual([group.id])
+    act(() => ctx.handleUndo())
+    expect(sceneIndex(ctx.activeMap!.nodes).byId.get(hero.id)?.ancestors).toEqual([])
   })
 
   it('undoing an entity deletion restores the entity', async () => {
@@ -144,7 +166,7 @@ describe('EditorPage wiring', () => {
     expect(ctx.entities).toEqual([])
     act(() => ctx.handleUndo())
     expect(ctx.entities.map(e => e.id)).toEqual([id])
-    expect(ctx.activeMap?.entities?.map(e => e.id)).toEqual([id])
+    expect(ctx.activeMap?.nodes.map(n => n.id)).toContain(id)
   })
 
   describe('keyboard shortcuts', () => {
@@ -153,30 +175,31 @@ describe('EditorPage wiring', () => {
         window.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...init }))
       })
 
-    it('Ctrl+N makes a layer and Ctrl+Shift+N a folder, each one undo step, and the list is told to open its name', async () => {
+    it('Ctrl+N makes a layer and Ctrl+Shift+N a group, each one undo step, and the list is told to open its name', async () => {
       await mount()
-      const before = ctx.layers.length
+      const before = ctx.activeMap!.nodes.length
       press('n', { ctrlKey: true })
-      await waitFor(() => expect(ctx.layers).toHaveLength(before + 1))
-      expect(ctx.layers[0]).toMatchObject({ type: 'tile' })
-      expect(ctx.justCreatedLayer?.id).toBe(ctx.layers[0].id)
+      await waitFor(() => expect(ctx.activeMap!.nodes).toHaveLength(before + 1))
+      const top = () => ctx.activeMap!.nodes[ctx.activeMap!.nodes.length - 1]
+      expect(top()).toMatchObject({ type: 'tile' })
+      expect(ctx.justCreatedLayer?.id).toBe(top().id)
       press('N', { ctrlKey: true, shiftKey: true })
-      await waitFor(() => expect(ctx.layers).toHaveLength(before + 2))
-      expect(ctx.layers[0]).toMatchObject({ type: 'folder', name: 'Folder' })
-      expect(ctx.justCreatedLayer?.id).toBe(ctx.layers[0].id)
+      await waitFor(() => expect(ctx.activeMap!.nodes).toHaveLength(before + 2))
+      expect(top()).toMatchObject({ type: 'group', name: 'Group' })
+      expect(ctx.justCreatedLayer?.id).toBe(top().id)
       expect(ctx.justCreatedLayer?.n).toBe(2)
     })
 
     it('does not fire while typing in a field', async () => {
       await mount()
-      const before = ctx.layers.length
+      const before = ctx.activeMap!.nodes.length
       const input = document.createElement('input')
       document.body.appendChild(input)
       act(() => {
         input.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', ctrlKey: true, bubbles: true, cancelable: true }))
       })
       input.remove()
-      expect(ctx.layers).toHaveLength(before)
+      expect(ctx.activeMap!.nodes).toHaveLength(before)
     })
   })
 })

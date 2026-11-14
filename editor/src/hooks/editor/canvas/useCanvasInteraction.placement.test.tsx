@@ -1,16 +1,17 @@
 import { describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { useCanvasInteraction } from './useCanvasInteraction'
-import { makeLayer, makeMap } from '@/test/helpers'
+import { makeImageLayer, makeMap } from '@/test/helpers'
+import { sceneIndex } from '@/lib/sceneIndex'
 
 /** A stage whose pointer the test moves; the world position equals the pointer (no pan, no zoom). */
 function setup(over: Record<string, unknown> = {}) {
   const pointer = { x: 0, y: 0 }
   const stage = { getPointerPosition: () => ({ ...pointer }), x: () => 0, y: () => 0, scaleX: () => 1, getStage: () => stage, name: () => '', getParent: () => null }
-  const layer = makeLayer('I1', { type: 'image', name: 'Images', images: [] })
+  const layer = makeImageLayer('I1', [], { name: 'Images' })
   const props = {
-    activeMap: makeMap({ layers: [layer] }),
-    layers: [layer],
+    activeMap: makeMap({ nodes: [layer] }),
+    index: sceneIndex([layer]),
     activeTool: 'brush',
     paintMode: 'discontinuous',
     activeLayerId: 'I1',
