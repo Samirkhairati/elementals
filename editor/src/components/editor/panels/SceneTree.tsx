@@ -689,7 +689,11 @@ export function SceneTree() {
 
   // A layer or group that was just created opens its name for typing, so Ctrl+N then a name is all it takes.
   useEffect(() => {
-    if (ctx.justCreatedLayer) setEditingId(ctx.justCreatedLayer.id)
+    // After a beat: a right-click menu that made the node is still closing and would take the focus from the field.
+    if (!ctx.justCreatedLayer) return
+    const id = ctx.justCreatedLayer.id
+    const timer = setTimeout(() => setEditingId(id), 60)
+    return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ctx.justCreatedLayer?.n])
 
@@ -764,7 +768,7 @@ export function SceneTree() {
         setDragged(null)
         setDrop(null)
       },
-      renderMenu: (id) => <RowMenu id={id} onRename={(rid) => setEditingId(rid)} />,
+      renderMenu: (id) => <RowMenu id={id} onRename={(rid) => void setTimeout(() => setEditingId(rid), 60)} />,
     }),
     [selectNode, clearSelection, toggleCollapsed, renameNode, toggleNodeVisibility, toggleNodeLock, moveNodes]
   )

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { EntityData, Layer } from '@/types/editor'
+import { collisionShapeNodes, layerNodes, type CollisionLayerNode, type EntityNode, type ImageLayerNode, type PictureNode, type SceneNode, type TileLayerNode } from '../../../shared/sceneTree'
 import {
   applyResize,
   describeLoss,
@@ -21,20 +21,19 @@ const tile = (x = 0, y = 0) => ({ tilesetId: 'grass.png', x, y })
 
 // 4 x 3 map. Tile layer: (0,0) (3,0) (1,1) (3,2). Entity on (2,1), picture anchored on (0,2).
 function makeMap(): ResizableMap {
-  const ground: Layer = {
-    id: 'g', name: 'ground', type: 'tile', visible: true, locked: false,
-    data: { 0: tile(1), 3: tile(2), 5: tile(3), 11: tile(4) },
-  }
-  const pics: Layer = {
-    id: 'p', name: 'pics', type: 'image', visible: true, locked: false,
-    images: [{ id: 'i1', graphicId: 'a.png', x: 16, y: 96 }],
-  }
-  const ent: EntityData = {
-    id: 'e1', name: 'Sign', x: 2 * 32 + 16, y: 2 * 32,
+  const ground: TileLayerNode = { id: 'g', name: 'ground', type: 'tile', data: { 0: tile(1), 3: tile(2), 5: tile(3), 11: tile(4) } }
+  const pics: ImageLayerNode = { id: 'p', name: 'pics', type: 'image', children: [{ id: 'i1', type: 'picture', name: 'i1', graphicId: 'a.png', x: 16, y: 96 }] }
+  const ent: EntityNode = {
+    id: 'e1', type: 'entity', name: 'Sign', x: 2 * 32 + 16, y: 2 * 32,
     components: { Transform: { x: 2 * 32 + 16, y: 2 * 32, depth: 0 } },
   }
-  return { width: 4, height: 3, layers: [ground, pics], entities: [ent] }
+  return { width: 4, height: 3, nodes: [ground, pics, ent] }
 }
+
+const layerOf = (m: ResizableMap, id: string): SceneNode => layerNodes(m.nodes).find((l) => l.id === id)!
+const ground = (m: ResizableMap) => layerOf(m, 'g') as TileLayerNode
+const entityOf = (m: ResizableMap) => m.nodes.find((n) => n.type === 'entity') as EntityNode
+const pictureOf = (m: ResizableMap) => (layerOf(m, 'p') as ImageLayerNode).children[0] as PictureNode
 
 describe('resizedSize / resizeProblem', () => {
   it('adds the edges to the size in pixels', () => {
@@ -66,9 +65,9 @@ describe('applyResize', () => {
     expect(out.width).toBe(6)
     expect(out.height).toBe(4)
     // old (0,0) (3,0) (1,1) (3,2) -> index = y * 6 + x
-    expect(Object.keys(out.layers[0].data!).map(Number).sort((a, b) => a - b)).toEqual([0, 3, 7, 15])
-    expect(out.layers[0].data![15]).toEqual(tile(4))
-    expect(out.entities![0].x).toBe(80)
+    expect(Object.keys(ground(out).data!).map(Number).sort((a, b) => a - b)).toEqual([0, 3, 7, 15])
+    expect(ground(out).data![15]).toEqual(tile(4))
+    expect(entityOf(out).x).toBe(80)
     expect(out.pixelWidth).toBeUndefined()
     expect(hasLoss(resizeLoss(makeMap(), edges({ right: 2, bottom: 1 })))).toBe(false)
   })
@@ -78,20 +77,21 @@ describe('applyResize', () => {
     expect(out.width).toBe(6)
     expect(out.height).toBe(4)
     // (0,0) -> (2,1) = 1*6+2 = 8
-    expect(out.layers[0].data![8]).toEqual(tile(1))
-    expect(out.entities![0]).toMatchObject({ x: 80 + 64, y: 64 + 32 })
-    expect(out.entities![0].components.Transform).toMatchObject({ x: 80 + 64, y: 64 + 32 })
-    expect(out.layers[1].images![0]).toMatchObject({ x: 16 + 64, y: 96 + 32 })
+    expect(ground(out).data![8]).toEqual(tile(1))
+    expect(entityOf(out)).toMatchObject({ x: 80 + 64, y: 64 + 32 })
+    expect(entityOf(out).components.Transform).toMatchObject({ x: 80 + 64, y: 64 + 32 })
+    expect(pictureOf(out)).toMatchObject({ x: 16 + 64, y: 96 + 32 })
   })
 
   it('moves collision shapes by the exact pixels, and off-grid shifts put tiles on the nearest tile', () => {
     const m = makeMap()
-    m.layers.push({ id: 'p', name: 'Walls', type: 'polygons', visible: true, locked: false, shapes: [{ id: 's', closed: false, points: [{ x: 10, y: 20 }, { x: 50, y: 20 }] }] } as never)
+    const walls: CollisionLayerNode = { id: 'w', name: 'Walls', type: 'collision', children: [{ id: 's', type: 'collisionShape', name: '', closed: false, points: [{ x: 10, y: 20 }, { x: 50, y: 20 }] }] }
+    m.nodes.push(walls)
     const out = applyResize(m, px({ left: 40, top: 10 }))
-    expect(out.layers[out.layers.length - 1].shapes![0].points).toEqual([{ x: 50, y: 30 }, { x: 90, y: 30 }])
-    expect(out.entities![0]).toMatchObject({ x: 80 + 40, y: 64 + 10 })
+    expect(collisionShapeNodes(layerOf(out, 'w') as CollisionLayerNode)[0].points).toEqual([{ x: 50, y: 30 }, { x: 90, y: 30 }])
+    expect(entityOf(out)).toMatchObject({ x: 80 + 40, y: 64 + 10 })
     // 40 px = 1.25 tiles -> 1 tile; 10 px -> 0 tiles: (0,0) stays at row 0, column 1 -> width 4 + ceil(40/32)
-    expect(out.layers[0].data![1]).toEqual(tile(1))
+    expect(ground(out).data![1]).toEqual(tile(1))
   })
 
   it('cropping drops only the tiles that fall off; pictures and entities stay (outside the map if need be)', () => {
@@ -99,16 +99,16 @@ describe('applyResize', () => {
     expect(out.width).toBe(3)
     expect(out.height).toBe(2)
     // survivors: (3,0)->(2,0)=2, (1,1)->(0,1)=3. Lost: (0,0) and (3,2).
-    expect(Object.keys(out.layers[0].data!).map(Number).sort((a, b) => a - b)).toEqual([2, 3])
-    expect(out.layers[1].images).toEqual([{ id: 'i1', graphicId: 'a.png', x: 16 - 32, y: 96 }])
-    expect(out.entities![0].x).toBe(32 + 16)
+    expect(Object.keys(ground(out).data!).map(Number).sort((a, b) => a - b)).toEqual([2, 3])
+    expect(pictureOf(out)).toMatchObject({ id: 'i1', graphicId: 'a.png', x: 16 - 32, y: 96 })
+    expect(entityOf(out).x).toBe(32 + 16)
   })
 
   it('keeps an entity that is cropped off and does not mutate its input', () => {
     const m = makeMap()
     const before = JSON.stringify(m)
     const out = applyResize(m, edges({ right: -2 }))
-    expect(out.entities).toHaveLength(1)
+    expect(out.nodes.filter((n) => n.type === 'entity')).toHaveLength(1)
     expect(JSON.stringify(m)).toBe(before)
   })
 
@@ -144,7 +144,7 @@ describe('resizeLoss', () => {
 
   it('a cropped strip without tiles loses nothing', () => {
     const m = makeMap()
-    m.layers[0].data = { 0: tile() }
+    ground(m).data = { 0: tile() }
     expect(hasLoss(resizeLoss(m, edges({ right: -1, bottom: -1 })))).toBe(false)
   })
 })

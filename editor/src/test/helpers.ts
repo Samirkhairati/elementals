@@ -1,12 +1,27 @@
 import { fireEvent, screen, within } from '@testing-library/react'
-import type { EntityData, Layer, MapData } from '@/types/editor'
+import type { MapData } from '@/types/editor'
+import type { EntityNode, LayerNode, PictureNode, SceneNode } from '../../../shared/sceneTree'
 
-export function makeLayer(id: string, overrides: Partial<Layer> = {}): Layer {
-  return { id, name: id, type: 'tile', visible: true, locked: false, ...overrides }
+/** A layer node (a tile layer unless `type` says otherwise); `visible` / `locked` are only set when given. */
+export function makeLayer(id: string, overrides: Record<string, unknown> = {}): LayerNode {
+  return { id, name: id, type: 'tile', ...overrides } as LayerNode
 }
 
-export function makeEntity(id: string, overrides: Partial<EntityData> = {}): EntityData {
-  return { id, name: id, x: 0, y: 0, visible: true, folder: null, components: { Transform: { x: 0, y: 0 } }, ...overrides }
+/** An image layer holding `pictures` (nodes, or ids that become pictures of an asset). */
+export function makeImageLayer(id: string, pictures: (PictureNode | string)[] = [], overrides: Record<string, unknown> = {}): LayerNode {
+  return { id, name: id, type: 'image', children: pictures.map((p) => (typeof p === 'string' ? makePicture(p) : p)), ...overrides } as LayerNode
+}
+
+export function makePicture(id: string, overrides: Partial<PictureNode> = {}): PictureNode {
+  return { id, type: 'picture', name: id, assetId: 'objects/chest', x: 0, y: 0, ...overrides }
+}
+
+export function makeGroup(id: string, children: SceneNode[] = [], overrides: Record<string, unknown> = {}): SceneNode {
+  return { id, type: 'group', name: id, children, ...overrides } as SceneNode
+}
+
+export function makeEntity(id: string, overrides: Record<string, unknown> = {}): EntityNode {
+  return { id, type: 'entity', name: id, x: 0, y: 0, components: { Transform: { x: 0, y: 0 } }, ...overrides } as EntityNode
 }
 
 export function makeMap(overrides: Partial<MapData> = {}): MapData {
@@ -16,10 +31,8 @@ export function makeMap(overrides: Partial<MapData> = {}): MapData {
     folderPath: null,
     width: 10,
     height: 8,
-    layers: [makeLayer('L1')],
-    entities: [],
-    entityFolders: [],
-    schemaVersion: 5,
+    nodes: [makeLayer('L1')],
+    schemaVersion: 6,
     ...overrides,
   }
 }

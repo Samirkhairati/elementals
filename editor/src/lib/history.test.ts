@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import type { EntityData, Layer } from '@/types/editor'
+import type { EntityNode, SceneNode, TileLayerNode } from '../../../shared/sceneTree'
 import {
   EMPTY_HISTORY,
   MAX_HISTORY,
@@ -14,20 +14,27 @@ import {
   type HistorySnapshot,
 } from './history'
 
-const layer = (id: string, data?: Layer['data']): Layer => ({ id, name: id, type: 'tile', visible: true, locked: false, data })
-const entity = (id: string, x = 0): EntityData => ({ id, name: id, x, y: 0, components: {} })
-const snap = (n: number, entities: EntityData[] = []): HistorySnapshot => ({
-  layers: [layer('L', { [n]: { tilesetId: 't', x: n, y: 0 } })],
-  entities,
+const layer = (id: string, data?: TileLayerNode['data']): TileLayerNode => ({ id, name: id, type: 'tile', data })
+const entity = (id: string, x = 0): EntityNode => ({ id, type: 'entity', name: id, x, y: 0, components: {} })
+const snap = (n: number, entities: EntityNode[] = []): HistorySnapshot => ({
+  nodes: [layer('L', { [n]: { tilesetId: 't', x: n, y: 0 } }), ...entities],
 })
+const ids = (nodes: SceneNode[]) => nodes.filter((n) => n.type === 'entity').map((n) => n.id)
+const firstLayer = (s: HistorySnapshot) => s.nodes[0] as TileLayerNode
 
 describe('snapshotsEqual', () => {
-  it('compares layers and entities structurally', () => {
+  it('compares the scene tree structurally', () => {
     expect(snapshotsEqual(snap(1), snap(1))).toBe(true)
     expect(snapshotsEqual(snap(1), snap(2))).toBe(false)
     expect(snapshotsEqual(snap(1, [entity('a')]), snap(1, [entity('a')]))).toBe(true)
     expect(snapshotsEqual(snap(1, [entity('a')]), snap(1, [entity('a', 5)]))).toBe(false)
     expect(snapshotsEqual(snap(1), null)).toBe(false)
+  })
+
+  it('does not count opening or closing a group as a change', () => {
+    const open: HistorySnapshot = { nodes: [{ id: 'g', type: 'group', name: 'g', children: [layer('L')] }] }
+    const closed: HistorySnapshot = { nodes: [{ id: 'g', type: 'group', name: 'g', collapsed: true, children: [layer('L')] }] }
+    expect(snapshotsEqual(open, closed)).toBe(true)
   })
 })
 
@@ -42,8 +49,8 @@ describe('createHistory', () => {
   it('clones the initial snapshot', () => {
     const s = snap(1)
     const h = createHistory(s)
-    s.layers[0].name = 'mutated'
-    expect(h.entries[0].layers[0].name).toBe('L')
+    firstLayer(s).name = 'mutated'
+    expect(firstLayer(h.entries[0]).name).toBe('L')
   })
 })
 
@@ -68,9 +75,9 @@ describe('pushSnapshot', () => {
     expect(next.entries).toHaveLength(2)
   })
 
-  it('ignores snapshots with zero layers', () => {
+  it('ignores snapshots of an empty tree', () => {
     const h = createHistory(snap(0))
-    expect(pushSnapshot(h, { layers: [], entities: [entity('a')] })).toBe(h)
+    expect(pushSnapshot(h, { nodes: [] })).toBe(h)
   })
 
   it('drops the redo tail when pushing from the middle', () => {
@@ -81,7 +88,7 @@ describe('pushSnapshot', () => {
     expect(h.index).toBe(0)
     h = pushSnapshot(h, snap(9))
     expect(h.entries).toHaveLength(2)
-    expect(h.entries[1].layers[0].data).toEqual({ 9: { tilesetId: 't', x: 9, y: 0 } })
+    expect(firstLayer(h.entries[1]).data).toEqual({ 9: { tilesetId: 't', x: 9, y: 0 } })
     expect(canRedo(h)).toBe(false)
   })
 
@@ -90,15 +97,15 @@ describe('pushSnapshot', () => {
     for (let i = 1; i <= 60; i++) h = pushSnapshot(h, snap(i))
     expect(h.entries).toHaveLength(MAX_HISTORY)
     expect(h.index).toBe(MAX_HISTORY - 1)
-    expect(h.entries[0].layers[0].data).toEqual({ 11: { tilesetId: 't', x: 11, y: 0 } })
-    expect(h.entries[MAX_HISTORY - 1].layers[0].data).toEqual({ 60: { tilesetId: 't', x: 60, y: 0 } })
+    expect(firstLayer(h.entries[0]).data).toEqual({ 11: { tilesetId: 't', x: 11, y: 0 } })
+    expect(firstLayer(h.entries[MAX_HISTORY - 1]).data).toEqual({ 60: { tilesetId: 't', x: 60, y: 0 } })
   })
 
   it('stores a clone so later mutation of the input does not corrupt history', () => {
     const s = snap(1)
     const h = pushSnapshot(createHistory(snap(0)), s)
-    s.layers[0].visible = false
-    expect(h.entries[1].layers[0].visible).toBe(true)
+    firstLayer(s).visible = false
+    expect(firstLayer(h.entries[1]).visible).toBeUndefined()
   })
 
   it('does not mutate the previous state', () => {
@@ -109,23 +116,23 @@ describe('pushSnapshot', () => {
 })
 
 describe('undo / redo', () => {
-  it('walks back and forth, restoring layers AND entities', () => {
+  it('walks back and forth, restoring layers AND entities (they are one tree)', () => {
     let h = createHistory(snap(0, []))
     h = pushSnapshot(h, snap(1, [entity('a')]))
     h = pushSnapshot(h, snap(2, [entity('a'), entity('b')]))
 
     const u1 = undoHistory(h)
-    expect(u1.snapshot?.entities.map(e => e.id)).toEqual(['a'])
+    expect(ids(u1.snapshot!.nodes)).toEqual(['a'])
     expect(u1.state.index).toBe(1)
 
     const u2 = undoHistory(u1.state)
-    expect(u2.snapshot?.entities).toEqual([])
+    expect(ids(u2.snapshot!.nodes)).toEqual([])
     expect(canUndo(u2.state)).toBe(false)
 
     const r1 = redoHistory(u2.state)
-    expect(r1.snapshot?.entities.map(e => e.id)).toEqual(['a'])
+    expect(ids(r1.snapshot!.nodes)).toEqual(['a'])
     const r2 = redoHistory(r1.state)
-    expect(r2.snapshot?.entities.map(e => e.id)).toEqual(['a', 'b'])
+    expect(ids(r2.snapshot!.nodes)).toEqual(['a', 'b'])
     expect(canRedo(r2.state)).toBe(false)
   })
 
@@ -140,8 +147,8 @@ describe('undo / redo', () => {
     let h = createHistory(snap(0))
     h = pushSnapshot(h, snap(1))
     const { snapshot, state } = undoHistory(h)
-    snapshot!.layers[0].name = 'changed'
-    expect(state.entries[0].layers[0].name).toBe('L')
+    firstLayer(snapshot!).name = 'changed'
+    expect(firstLayer(state.entries[0]).name).toBe('L')
   })
 })
 
@@ -150,7 +157,7 @@ describe('cloneSnapshot', () => {
     const s = snap(1, [entity('a')])
     const c = cloneSnapshot(s)
     expect(c).toEqual(s)
-    expect(c.layers).not.toBe(s.layers)
-    expect(c.entities[0]).not.toBe(s.entities[0])
+    expect(c.nodes).not.toBe(s.nodes)
+    expect(c.nodes[1]).not.toBe(s.nodes[1])
   })
 })

@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { MAX_COMPONENTS, MAX_MASKS } from '../../../../shared/look/schema'
 import type { Look, LookMask, LookSet } from '../../../../shared/look/types'
-import type { Layer } from '@/types/editor'
+import type { SceneNode } from '../../../../shared/sceneTree'
 import { canAddComponent, canAddMask, editLookSet, hasShadow, withShadowEverywhere, lookInView, moveBy, newComponent, newMask, patchAdjust, selectedSubject, updateComponent, updateMask } from './lookEdit'
 
 const layers = [
   { id: 't', type: 'tile', name: 'T' },
-  { id: 'i', type: 'image', name: 'I', images: [{ id: 'p1' }] },
-  { id: 'c', type: 'collision', name: 'C' },
-  { id: 'f', type: 'folder', name: 'F' },
-] as unknown as Layer[]
+  { id: 'i', type: 'image', name: 'I', children: [{ id: 'p1', type: 'picture', name: 'P', x: 0, y: 0 }] },
+  { id: 'c', type: 'collision', name: 'C', children: [] },
+  { id: 'f', type: 'group', name: 'F', children: [] },
+] as SceneNode[]
 
 describe('selectedSubject', () => {
   it('maps the active layer / picture, and falls back to the map', () => {

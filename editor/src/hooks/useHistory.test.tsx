@@ -1,16 +1,16 @@
-import { StrictMode, useState, type ReactNode } from 'react'
+import { StrictMode, type ReactNode } from 'react'
 import { describe, it, expect } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
-import type { EntityData, Layer, MapData } from '@/types/editor'
+import type { SceneNode } from '../../../shared/sceneTree'
 import type { HistorySnapshot } from '@/lib/history'
-import { makeEntity, makeLayer, makeMap } from '@/test/helpers'
-import { useEntityManager } from '@/hooks/editor/useEntityManager'
-import { useLayerManager } from '@/hooks/editor/useLayerManager'
+import { makeEntity, makeImageLayer, makeLayer, makeMap, makePicture } from '@/test/helpers'
+import { useSceneHarness } from '@/test/sceneHarness'
+import { carryView } from '@/lib/sceneOps'
 import { useHistory } from './useHistory'
 
 const wrapper = ({ children }: { children: ReactNode }) => <StrictMode>{children}</StrictMode>
 
-const snap = (layers: Layer[], entities: EntityData[] = []): HistorySnapshot => ({ layers, entities })
+const snap = (nodes: SceneNode[]): HistorySnapshot => ({ nodes })
 
 describe('useHistory (StrictMode)', () => {
   it('starts empty', () => {
@@ -37,7 +37,7 @@ describe('useHistory (StrictMode)', () => {
       result.current.commitHistory(snap([makeLayer('L', { name: 'one' })]))
       result.current.commitHistory(snap([makeLayer('L', { name: 'one' })])) // duplicate
       result.current.commitHistory(snap([makeLayer('L', { name: 'two' })]))
-      result.current.commitHistory(snap([])) // ignored: no layers
+      result.current.commitHistory(snap([])) // ignored: empty tree
     })
     expect(result.current.history).toHaveLength(3)
     expect(result.current.historyIndex).toBe(2)
@@ -47,18 +47,18 @@ describe('useHistory (StrictMode)', () => {
     const { result } = renderHook(() => useHistory(), { wrapper })
     const seen: HistorySnapshot[] = []
     act(() => {
-      result.current.resetHistory(snap([makeLayer('L')], []))
-      result.current.commitHistory(snap([makeLayer('L')], [makeEntity('e1')]))
+      result.current.resetHistory(snap([makeLayer('L')]))
+      result.current.commitHistory(snap([makeLayer('L'), makeEntity('e1')]))
     })
     act(() => {
       expect(result.current.handleUndo(s => seen.push(s))).toBe(true)
     })
-    expect(seen[0].entities).toEqual([])
+    expect(seen[0].nodes.map(n => n.id)).toEqual(['L'])
     expect(result.current.historyIndex).toBe(0)
     act(() => {
       expect(result.current.handleRedo(s => seen.push(s))).toBe(true)
     })
-    expect(seen[1].entities.map(e => e.id)).toEqual(['e1'])
+    expect(seen[1].nodes.map(n => n.id)).toEqual(['L', 'e1'])
     expect(result.current.historyIndex).toBe(1)
     act(() => {
       expect(result.current.handleRedo(s => seen.push(s))).toBe(false)
@@ -80,72 +80,56 @@ describe('useHistory (StrictMode)', () => {
     expect(result.current.handleRedo(() => {})).toBe(false)
   })
 
-  describe('wired to the layer and entity managers', () => {
-    function setup() {
+  describe('wired to the scene tree', () => {
+    function setup(nodes: SceneNode[] = [makeLayer('L1')]) {
       return renderHook(
         () => {
           const history = useHistory()
-          const [activeMap, setActiveMap] = useState<MapData | null>(makeMap({ layers: [makeLayer('L1')], entities: [] }))
-          // eslint-disable-next-line prefer-const
-          let layers: ReturnType<typeof useLayerManager>
-          // eslint-disable-next-line prefer-const
-          let entities: ReturnType<typeof useEntityManager>
-          const commit = () =>
-            history.commitHistory({ layers: layers.getLayers(), entities: entities.getEntities() })
-          layers = useLayerManager({ setActiveMap, onCommitHistory: commit })
-          entities = useEntityManager({ activeMap, setActiveMap, onCommitHistory: commit })
-          return { history, layers, entities, activeMap, setActiveMap }
+          const scene = useSceneHarness(makeMap({ nodes }), (next) => history.commitHistory({ nodes: next }))
+          return { history, ...scene }
         },
         { wrapper }
       )
     }
+    const apply = (result: { current: ReturnType<typeof setup>['result']['current'] }) => (s: HistorySnapshot) =>
+      result.current.setActiveMap((m) => (m ? { ...m, nodes: carryView(m.nodes, s.nodes) } : m))
 
     it('undo/redo restore both layers and entities', () => {
       const { result } = setup()
-      act(() => {
-        result.current.layers.setLayers([makeLayer('L1')])
-        result.current.history.resetHistory({ layers: [makeLayer('L1')], entities: [] })
-      })
+      act(() => result.current.history.resetHistory({ nodes: result.current.activeMap!.nodes }))
 
       act(() => result.current.entities.createEntity('Hero', 1, 2))
       act(() => result.current.layers.handleCreateLayer())
       expect(result.current.history.historyIndex).toBe(2)
-
-      const apply = (s: HistorySnapshot) => {
-        result.current.layers.setLayers(s.layers)
-        result.current.entities.setEntities(s.entities)
-      }
-
-      act(() => {
-        result.current.history.handleUndo(apply)
-      })
-      expect(result.current.layers.layers).toHaveLength(1)
+      const count = () => result.current.tree.index.layers.length
+      expect(count()).toBe(2)
       expect(result.current.entities.entities).toHaveLength(1)
 
       act(() => {
-        result.current.history.handleUndo(apply)
+        result.current.history.handleUndo(apply(result))
       })
-      expect(result.current.layers.layers).toHaveLength(1)
+      expect(count()).toBe(1)
+      expect(result.current.entities.entities).toHaveLength(1)
+
+      act(() => {
+        result.current.history.handleUndo(apply(result))
+      })
+      expect(count()).toBe(1)
       expect(result.current.entities.entities).toHaveLength(0)
 
       act(() => {
-        result.current.history.handleRedo(apply)
-        result.current.history.handleRedo(apply)
+        result.current.history.handleRedo(apply(result))
+        result.current.history.handleRedo(apply(result))
       })
-      expect(result.current.layers.layers).toHaveLength(2)
+      expect(count()).toBe(2)
       expect(result.current.entities.entities.map(e => e.name)).toEqual(['Hero'])
     })
 
     it('scaling an image is one undo step: undo brings the old scale back, redo the new one', () => {
-      const { result } = setup()
-      const image = { id: 'img1', graphicId: 'a.png', x: 16, y: 32 }
-      const start = [makeLayer('I1', { type: 'image', images: [image] })]
-      act(() => {
-        result.current.layers.setLayers(start)
-        result.current.history.resetHistory({ layers: start, entities: [] })
-      })
-      const scaleOf = () => result.current.layers.layers[0].images![0].scale
-      const apply = (s: HistorySnapshot) => result.current.layers.setLayers(s.layers)
+      const start = [makeImageLayer('I1', [makePicture('img1', { assetId: undefined, graphicId: 'a.png', x: 16, y: 32 })])]
+      const { result } = setup(start)
+      act(() => result.current.history.resetHistory({ nodes: start }))
+      const scaleOf = () => result.current.tree.index.pictures[0].scale
 
       act(() => result.current.layers.updateImage('I1', 'img1', { scale: 2 }))
       act(() => result.current.layers.updateImage('I1', 'img1', { scale: 2 })) // unchanged: nothing recorded
@@ -154,16 +138,16 @@ describe('useHistory (StrictMode)', () => {
       expect(result.current.history.historyIndex).toBe(2)
 
       act(() => {
-        result.current.history.handleUndo(apply)
+        result.current.history.handleUndo(apply(result))
       })
       expect(scaleOf()).toBe(2)
       act(() => {
-        result.current.history.handleUndo(apply)
+        result.current.history.handleUndo(apply(result))
       })
       expect(scaleOf()).toBeUndefined()
       act(() => {
-        result.current.history.handleRedo(apply)
-        result.current.history.handleRedo(apply)
+        result.current.history.handleRedo(apply(result))
+        result.current.history.handleRedo(apply(result))
       })
       expect(scaleOf()).toBe(4)
     })

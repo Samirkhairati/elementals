@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import type { SpriteAssetInfo } from '../../../shared/engine/types'
 import type { LayerType } from '@/types/editor'
+import type { SceneNode } from '../../../shared/sceneTree'
 
 const drawn: { x: number; y: number }[] = []
 const order: string[] = []
@@ -31,9 +32,17 @@ const fakeCtx = () => {
   return { ctx, calls }
 }
 
+/** An image layer node holding pictures. */
+const image = (id: string, pictures: { id: string; graphicId: string; x: number; y: number; visible?: boolean }[]): SceneNode => ({
+  id,
+  name: id,
+  type: 'image',
+  children: pictures.map((p) => ({ type: 'picture', name: p.id, ...p })),
+}) as SceneNode
+
 describe('LAYER_SCENERY', () => {
   it('says what every layer type contributes: tiles and pictures are drawn, gameplay data and structure are not', () => {
-    const all: LayerType[] = ['tile', 'collision', 'terrain', 'objects', 'encounters', 'image', 'folder']
+    const all: LayerType[] = ['tile', 'collision', 'terrain', 'objects', 'encounters', 'image']
     expect(Object.keys(LAYER_SCENERY).sort()).toEqual([...all].sort())
     expect(all.filter((t) => LAYER_SCENERY[t] !== 'none').sort()).toEqual(['image', 'tile'])
   })
@@ -41,12 +50,12 @@ describe('LAYER_SCENERY', () => {
 
 describe('drawMapScenery', () => {
   const asset = {} as SpriteAssetInfo
-  const base = { width: 4, layers: [] as never[] }
+  const base = { width: 4, nodes: [] as SceneNode[] }
 
   it('paints pictures of image layers: a map made only of pictures is not blank (the warp and resize previews once missed them)', () => {
     drawn.length = 0
     const { ctx } = fakeCtx()
-    const unresolved = drawMapScenery(ctx, { ...base, layers: [{ type: 'image', visible: true, images: [{ id: 'a', graphicId: 'p.png', x: 100, y: 200 }] }] }, { tileImages: { get: () => undefined }, assets: { 'graphic:p.png': asset } })
+    const unresolved = drawMapScenery(ctx, { ...base, nodes: [image('l', [{ id: 'a', graphicId: 'p.png', x: 100, y: 200 }])] }, { tileImages: { get: () => undefined }, assets: { 'graphic:p.png': asset } })
     expect(drawn).toEqual([{ x: 100, y: 200 }])
     expect(unresolved).toEqual([])
   })
@@ -54,31 +63,42 @@ describe('drawMapScenery', () => {
   it('paints the layer list from the bottom up, tiles and pictures as listed, and skips hidden layers', () => {
     order.length = 0
     const { ctx } = fakeCtx()
-    // the list is top first: pictures on top, tiles under them, and a hidden tile layer at the very bottom
-    const layers = [
-      { type: 'image', visible: true, images: [{ id: 'a', graphicId: 'p.png', x: 1, y: 2 }] },
-      { type: 'tile', visible: true, data: { 0: { tilesetId: 'ts', x: 0, y: 0 } } },
-      { type: 'tile', visible: false, data: { 1: { tilesetId: 'ts', x: 0, y: 0 } } },
-    ] as never
-    drawMapScenery(ctx, { width: 4, layers }, { tileImages: { get: () => loaded }, assets: { 'graphic:p.png': asset } })
+    // the tree is in draw order: a hidden tile layer at the very back, tiles over it, pictures on top
+    const nodes = [
+      { id: 'h', name: 'h', type: 'tile', visible: false, data: { 1: { tilesetId: 'ts', x: 0, y: 0 } } },
+      { id: 't', name: 't', type: 'tile', data: { 0: { tilesetId: 'ts', x: 0, y: 0 } } },
+      image('i', [{ id: 'a', graphicId: 'p.png', x: 1, y: 2 }]),
+    ] as SceneNode[]
+    drawMapScenery(ctx, { width: 4, nodes }, { tileImages: { get: () => loaded }, assets: { 'graphic:p.png': asset } })
     expect(order).toEqual(['tile', 'picture'])
     order.length = 0
-    drawMapScenery(ctx, { width: 4, layers: [...(layers as never[])].reverse() as never }, { tileImages: { get: () => loaded }, assets: { 'graphic:p.png': asset } })
+    drawMapScenery(ctx, { width: 4, nodes: [...nodes].reverse() }, { tileImages: { get: () => loaded }, assets: { 'graphic:p.png': asset } })
     expect(order).toEqual(['picture', 'tile'])
+  })
+
+  it('leaves out what a hidden group hides, and hidden pictures', () => {
+    order.length = 0
+    const { ctx } = fakeCtx()
+    const nodes = [
+      { id: 'g', name: 'g', type: 'group', visible: false, children: [{ id: 't', name: 't', type: 'tile', data: { 0: { tilesetId: 'ts', x: 0, y: 0 } } }] },
+      image('i', [{ id: 'a', graphicId: 'p.png', x: 1, y: 2 }, { id: 'b', graphicId: 'p.png', x: 3, y: 4, visible: false }]),
+    ] as SceneNode[]
+    drawMapScenery(ctx, { width: 4, nodes }, { tileImages: { get: () => loaded }, assets: { 'graphic:p.png': asset } })
+    expect(order).toEqual(['picture'])
   })
 
   it('places a tile by its index and skips collision markers, missing and unfinished images', () => {
     const { ctx, calls } = fakeCtx()
-    const layers = [{ type: 'tile', visible: true, data: { 5: { tilesetId: 'ts', x: 1, y: 1 }, 6: { tilesetId: '__collision__', x: 0, y: 0 }, 7: { tilesetId: 'later', x: 0, y: 0 } } }] as never
-    drawMapScenery(ctx, { width: 4, layers }, { tileImages: { get: (id) => (id === 'ts' ? loaded : id === 'later' ? ({ complete: false, naturalWidth: 0 } as HTMLImageElement) : undefined) } })
+    const nodes = [{ id: 't', name: 't', type: 'tile', data: { 5: { tilesetId: 'ts', x: 1, y: 1 }, 6: { tilesetId: '__collision__', x: 0, y: 0 }, 7: { tilesetId: 'later', x: 0, y: 0 } } }] as SceneNode[]
+    drawMapScenery(ctx, { width: 4, nodes }, { tileImages: { get: (id) => (id === 'ts' ? loaded : id === 'later' ? ({ complete: false, naturalWidth: 0 } as HTMLImageElement) : undefined) } })
     expect(calls).toEqual(['tile@32,32']) // index 5 on a 4-wide map = column 1, row 1
   })
 
   it('reports pictures it could not draw (no asset yet) so the caller can mark them', () => {
     const { ctx } = fakeCtx()
-    const layers = [{ type: 'image', visible: true, images: [{ id: 'a', graphicId: 'missing.png', x: 7, y: 9 }] }] as never
-    expect(drawMapScenery(ctx, { width: 4, layers }, { tileImages: { get: () => undefined }, assets: {} })).toEqual([{ id: 'a', graphicId: 'missing.png', x: 7, y: 9 }])
-    expect(drawMapScenery(ctx, { width: 4, layers }, { tileImages: { get: () => undefined } })).toHaveLength(1)
+    const nodes = [image('l', [{ id: 'a', graphicId: 'missing.png', x: 7, y: 9 }])]
+    expect(drawMapScenery(ctx, { width: 4, nodes }, { tileImages: { get: () => undefined }, assets: {} })).toMatchObject([{ id: 'a', graphicId: 'missing.png', x: 7, y: 9 }])
+    expect(drawMapScenery(ctx, { width: 4, nodes }, { tileImages: { get: () => undefined } })).toHaveLength(1)
   })
 })
 

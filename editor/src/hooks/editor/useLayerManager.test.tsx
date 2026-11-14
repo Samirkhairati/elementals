@@ -1,36 +1,34 @@
-import { StrictMode, useState, type ReactNode } from 'react'
+import { StrictMode, type ReactNode } from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
-import type { Layer, MapData } from '@/types/editor'
+import type { SceneNode } from '../../../../shared/sceneTree'
+import { collisionShapeNodes } from '../../../../shared/sceneTree'
 import { createSaveQueue } from '@/lib/saveQueue'
 import { useMapAutosave } from '@/hooks/useMapAutosave'
-import { makeLayer, makeMap } from '@/test/helpers'
-import { useLayerManager } from './useLayerManager'
+import { lockedNode, shown } from '@/lib/sceneIndex'
+import { makeGroup, makeLayer, makeMap } from '@/test/helpers'
+import { useSceneHarness } from '@/test/sceneHarness'
 
 const wrapper = ({ children }: { children: ReactNode }) => <StrictMode>{children}</StrictMode>
 
-function setup(initialLayers: Layer[] = [makeLayer('L1', { name: 'Layer 1' })]) {
+function setup(initial: SceneNode[] = [makeLayer('L1', { name: 'Layer 1' })]) {
   const onCommitHistory = vi.fn()
   const save = vi.fn()
   const queue = createSaveQueue({ delayMs: 300 })
-  const initial: MapData = makeMap({ layers: initialLayers })
-
   const hook = renderHook(
     () => {
-      const [activeMap, setActiveMap] = useState<MapData | null>(initial)
-      const manager = useLayerManager({ setActiveMap, onCommitHistory })
-      useMapAutosave(activeMap, { queue, save })
-      return { activeMap, manager }
+      const scene = useSceneHarness(makeMap({ nodes: initial }), onCommitHistory)
+      useMapAutosave(scene.activeMap, { queue, save })
+      return scene
     },
     { wrapper }
   )
-  // load the initial layers like onMapSelected does
-  act(() => {
-    hook.result.current.manager.setLayers(initialLayers)
-    hook.result.current.manager.setActiveLayerId(initialLayers[0]?.id ?? null)
-  })
+  act(() => hook.result.current.layers.setActiveLayerId(initial.find((n) => n.type !== 'group')?.id ?? null))
   return { ...hook, onCommitHistory, save, queue }
 }
+
+/** The layers as the list shows them, top first. */
+const names = (r: { current: ReturnType<typeof useSceneHarness> }) => r.current.tree.index.layersTopFirst.map((l) => l.name)
 
 beforeEach(() => {
   vi.useFakeTimers()
@@ -39,150 +37,181 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-describe('useLayerManager (StrictMode)', () => {
-  it('creating a tile layer commits history once, mirrors into the map, selects it and saves once', () => {
+describe('useLayerManager on the scene tree (StrictMode)', () => {
+  it('creating a tile layer commits history once, writes into the map, selects it and saves once', () => {
     const { result, onCommitHistory, save } = setup()
-    act(() => result.current.manager.handleCreateLayer())
+    act(() => result.current.layers.handleCreateLayer())
 
     expect(onCommitHistory).toHaveBeenCalledTimes(1)
-    const layers = result.current.manager.layers
-    expect(layers).toHaveLength(2)
-    expect(layers[0]).toMatchObject({ name: 'Layer 2', type: 'tile' })
-    expect(result.current.manager.activeLayerId).toBe(layers[0].id)
-    expect(result.current.activeMap?.layers).toBe(layers)
+    const nodes = result.current.activeMap!.nodes
+    // the tree is in draw order: the new layer is the last one, on top
+    expect(nodes.map((n) => n.name)).toEqual(['Layer 1', 'Layer 2'])
+    expect(nodes[1]).toMatchObject({ type: 'tile' })
+    expect(result.current.layers.activeLayerId).toBe(nodes[1].id)
+    // the tree is the map itself: no copy is kept anywhere
+    expect(result.current.tree.nodes).toBe(nodes)
 
     act(() => vi.advanceTimersByTime(300))
     expect(save).toHaveBeenCalledTimes(1)
+    expect(save.mock.calls[0][0].nodes).toBe(nodes)
   })
 
-  it('exposes the latest layers synchronously via getLayers, and passes them to onCommitHistory', () => {
+  it('exposes the latest tree synchronously via getNodes, and passes it to onCommitHistory', () => {
     const { result, onCommitHistory } = setup()
     act(() => {
-      result.current.manager.handleCreateLayerOfType('objects')
-      expect(result.current.manager.getLayers().map(l => l.name)).toEqual(['Objects', 'Layer 1'])
-      result.current.manager.handleRenameLayer('L1', 'Ground')
-      expect(result.current.manager.getLayers().map(l => l.name)).toEqual(['Objects', 'Ground'])
+      result.current.layers.createNode('objects')
+      expect(result.current.tree.getNodes().map((n) => n.name)).toEqual(['Layer 1', 'Objects'])
+      result.current.layers.renameNode('L1', 'Ground')
+      expect(result.current.tree.getNodes().map((n) => n.name)).toEqual(['Ground', 'Objects'])
     })
     expect(onCommitHistory).toHaveBeenCalledTimes(2)
-    expect(onCommitHistory.mock.calls[1][0].map((l: Layer) => l.name)).toEqual(['Objects', 'Ground'])
+    expect(onCommitHistory.mock.calls[1][0].map((n: SceneNode) => n.name)).toEqual(['Ground', 'Objects'])
   })
 
   it('keeps special layers above new tile layers; one terrain layer per map, collision layers can be many', () => {
     const { result, onCommitHistory } = setup()
-    act(() => result.current.manager.handleCreateLayerOfType('terrain'))
-    act(() => result.current.manager.handleCreateLayerOfType('terrain')) // duplicate -> ignored
+    act(() => result.current.layers.createNode('terrain'))
+    act(() => result.current.layers.createNode('terrain')) // duplicate -> ignored
     expect(onCommitHistory).toHaveBeenCalledTimes(1)
-    act(() => result.current.manager.handleCreateLayerOfType('collision'))
-    act(() => result.current.manager.handleCreateLayerOfType('collision'))
+    act(() => result.current.layers.createNode('collision'))
+    act(() => result.current.layers.createNode('collision'))
     expect(onCommitHistory).toHaveBeenCalledTimes(3)
-    act(() => result.current.manager.handleCreateLayerOfType('tile'))
-    expect(result.current.manager.layers.map(l => l.type)).toEqual(['collision', 'collision', 'terrain', 'tile', 'tile'])
-    const cols = result.current.manager.layers.filter(l => l.type === 'collision')
-    expect(cols.map(l => l.name).sort()).toEqual(['Collision', 'Collision 2'])
-    expect(cols[0]).toMatchObject({ data: {}, shapes: [], tileGroups: [] })
+    act(() => result.current.layers.createNode('tile', null))
+    expect(result.current.tree.index.layersTopFirst.map((l) => l.type)).toEqual(['collision', 'collision', 'terrain', 'tile', 'tile'])
+    const cols = result.current.tree.index.layers.filter((l) => l.type === 'collision')
+    expect(cols.map((l) => l.name).sort()).toEqual(['Collision', 'Collision 2'])
+    expect(cols[0]).toMatchObject({ data: {}, children: [] })
   })
 
-  it('duplicates a layer with an independent copy of its data and selects it', () => {
+  it('duplicates a layer with an independent copy of its data, below it, and selects it', () => {
     const { result } = setup([makeLayer('L1', { data: { 0: { tilesetId: 't', x: 1, y: 1 } } })])
-    act(() => result.current.manager.handleDuplicateLayer('L1'))
-    const [orig, copy] = result.current.manager.layers
+    act(() => result.current.layers.duplicateNodes(['L1']))
+    const [orig, copy] = result.current.tree.index.layersTopFirst.slice().reverse().sort((a) => (a.id === 'L1' ? -1 : 1)) as never[] as { id: string; name: string; data: object }[]
     expect(copy.name).toBe('L1 Copy')
     expect(copy.data).toEqual(orig.data)
     expect(copy.data).not.toBe(orig.data)
-    expect(result.current.manager.activeLayerId).toBe(copy.id)
+    expect(result.current.layers.activeLayerId).toBe(copy.id)
+    // lower in the list = earlier in the draw order
+    expect(result.current.tree.nodes.map((n) => n.id)).toEqual([copy.id, 'L1'])
   })
 
-  it('deleting the active layer re-selects the first remaining; deleting another keeps selection', () => {
+  it('deleting the active layer re-selects the topmost remaining; deleting another keeps selection', () => {
     const { result, onCommitHistory } = setup([makeLayer('A'), makeLayer('B'), makeLayer('C')])
-    act(() => result.current.manager.setActiveLayerId('B'))
-    act(() => result.current.manager.handleDeleteLayer('C'))
-    expect(result.current.manager.activeLayerId).toBe('B')
-    act(() => result.current.manager.handleDeleteLayer('B'))
-    expect(result.current.manager.activeLayerId).toBe('A')
+    act(() => result.current.layers.setActiveLayerId('B'))
+    act(() => result.current.layers.deleteNodes(['C']))
+    expect(result.current.layers.activeLayerId).toBe('B')
+    act(() => result.current.layers.deleteNodes(['B']))
+    expect(result.current.layers.activeLayerId).toBe('A')
     expect(onCommitHistory).toHaveBeenCalledTimes(2)
   })
 
-  it('toggle visibility / lock and reorder each commit once', () => {
+  it('toggle visibility / lock and moving each commit once', () => {
     const { result, onCommitHistory } = setup([makeLayer('A'), makeLayer('B')])
-    act(() => result.current.manager.toggleLayerVisibility('A'))
-    act(() => result.current.manager.toggleLayerLock('A'))
-    act(() => result.current.manager.handleReorderLayers([...result.current.manager.layers].reverse()))
-    expect(result.current.manager.layers.map(l => l.id)).toEqual(['B', 'A'])
-    expect(result.current.manager.layers[1]).toMatchObject({ visible: false, locked: true })
+    act(() => result.current.layers.toggleNodeVisibility('A'))
+    act(() => result.current.layers.toggleNodeLock('A'))
+    act(() => result.current.layers.moveNodes(['A'], 'B', 'above'))
+    expect(result.current.tree.nodes.map((n) => n.id)).toEqual(['B', 'A'])
+    expect(result.current.tree.nodes[1]).toMatchObject({ visible: false, locked: true })
     expect(onCommitHistory).toHaveBeenCalledTimes(3)
+    // switching back removes the flag instead of storing the default
+    act(() => result.current.layers.toggleNodeVisibility('A'))
+    expect(result.current.tree.nodes[1]).not.toHaveProperty('visible')
   })
 
   it('blank rename is ignored', () => {
     const { result, onCommitHistory } = setup()
-    act(() => result.current.manager.handleRenameLayer('L1', '   '))
+    act(() => result.current.layers.renameNode('L1', '   '))
     expect(onCommitHistory).not.toHaveBeenCalled()
   })
 
   it('switches to a virtual collision tile selection on collision layers and restores the previous one', () => {
-    const { result } = setup([makeLayer('T'), makeLayer('C', { type: 'collision' })])
+    const { result } = setup([makeLayer('T'), makeLayer('C', { type: 'collision', children: [] })])
     const sel = { width: 1, height: 1, tiles: [{ tilesetId: 'ts', x: 2, y: 2 }] }
-    act(() => result.current.manager.setTileSelection(sel))
-    act(() => result.current.manager.setActiveLayerId('C'))
-    expect(result.current.manager.tileSelection?.tiles[0]?.tilesetId).toBe('__collision__')
-    act(() => result.current.manager.setActiveLayerId('T'))
-    expect(result.current.manager.tileSelection).toEqual(sel)
+    act(() => result.current.layers.setTileSelection(sel))
+    act(() => result.current.layers.setActiveLayerId('C'))
+    expect(result.current.layers.tileSelection?.tiles[0]?.tilesetId).toBe('__collision__')
+    act(() => result.current.layers.setActiveLayerId('T'))
+    expect(result.current.layers.tileSelection).toEqual(sel)
   })
 
-  describe('folders', () => {
+  it('replaces the shapes of a collision layer in one step and keeps the untouched ones the same objects', () => {
+    const shape = { id: 's1', type: 'collisionShape' as const, name: '', closed: true, points: [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 0, y: 10 }] }
+    const { result, onCommitHistory } = setup([makeLayer('C', { type: 'collision', children: [shape] })])
+    const before = collisionShapeNodes(result.current.tree.index.layers[0] as never)[0]
+    act(() => result.current.layers.setCollisionShapes('C', [before, { id: 's2', closed: false, points: [{ x: 1, y: 1 }, { x: 2, y: 2 }] }]))
+    const after = collisionShapeNodes(result.current.tree.index.layers[0] as never)
+    expect(after.map((s) => s.id)).toEqual(['s1', 's2'])
+    expect(after[0]).toBe(before)
+    expect(onCommitHistory).toHaveBeenCalledTimes(1)
+    act(() => result.current.layers.setCollisionShapes('C', after))
+    expect(onCommitHistory).toHaveBeenCalledTimes(1)
+  })
+
+  describe('groups', () => {
     const held = () => [
-      makeLayer('F', { type: 'folder', name: 'Scenery' }),
-      makeLayer('a', { name: 'Ground', folderId: 'F' }),
-      makeLayer('b', { name: 'Deco', folderId: 'F' }),
+      makeGroup('F', [makeLayer('a', { name: 'Ground' }), makeLayer('b', { name: 'Deco' })], { name: 'Scenery' }),
       makeLayer('c', { name: 'Loose' }),
     ]
 
-    it('creates a folder named Folder, Folder 2 on top of the list', () => {
+    it('creates groups named Group, Group 2', () => {
       const { result } = setup()
-      act(() => result.current.manager.handleCreateLayerOfType('folder'))
-      act(() => result.current.manager.handleCreateLayerOfType('folder'))
-      expect(result.current.manager.layers.filter(l => l.type === 'folder').map(l => l.name).sort()).toEqual(['Folder', 'Folder 2'])
+      act(() => result.current.layers.createNode('group', null))
+      act(() => result.current.layers.createNode('group', null))
+      expect(result.current.tree.nodes.filter((n) => n.type === 'group').map((n) => n.name).sort()).toEqual(['Group', 'Group 2'])
     })
 
-    it('the folder eye and lock set the layers it holds, in one undo step each', () => {
+    it('the group eye and lock reach the layers inside it, in one undo step each', () => {
       const { result, onCommitHistory } = setup(held())
-      act(() => result.current.manager.toggleLayerVisibility('F'))
-      expect(result.current.manager.layers.map(l => l.visible)).toEqual([false, false, false, true])
+      act(() => result.current.layers.toggleNodeVisibility('F'))
+      const index = result.current.tree.index
+      expect(['a', 'b', 'c'].map((id) => shown(index, id))).toEqual([false, false, true])
       expect(onCommitHistory).toHaveBeenCalledTimes(1)
-      act(() => result.current.manager.toggleLayerLock('F'))
-      expect(result.current.manager.layers.map(l => l.locked)).toEqual([true, true, true, false])
+      act(() => result.current.layers.toggleNodeLock('F'))
+      expect(['a', 'b', 'c'].map((id) => lockedNode(result.current.tree.index, id))).toEqual([true, true, false])
     })
 
-    it('a layer created from a folder goes in as its top layer, opens the folder and is selected', () => {
-      const layers = held().map(l => (l.id === 'F' ? { ...l, collapsed: true } : l))
-      const { result } = setup(layers)
-      act(() => result.current.manager.handleCreateLayerOfType('tile', 'F'))
-      const now = result.current.manager.layers
-      expect(now.map(l => l.id).slice(0, 2)).toEqual(['F', now[1].id])
-      expect(now[1]).toMatchObject({ type: 'tile', folderId: 'F' })
-      expect(now[0].collapsed).toBe(false)
-      expect(now).toHaveLength(5)
-      expect(result.current.manager.activeLayerId).toBe(now[1].id)
-      // other kinds cannot be held: they are created outside
-      act(() => result.current.manager.handleCreateLayerOfType('objects', 'F'))
-      expect(result.current.manager.layers.find(l => l.type === 'objects')?.folderId).toBeUndefined()
+    it('a layer created inside a group goes in as its top layer, opens the group and is selected', () => {
+      const nodes = held().map((n) => (n.id === 'F' ? ({ ...n, collapsed: true } as SceneNode) : n))
+      const { result } = setup(nodes)
+      act(() => result.current.layers.createNode('tile', 'F'))
+      const group = result.current.tree.nodes.find((n) => n.id === 'F') as { children: SceneNode[]; collapsed?: boolean }
+      expect(group.children).toHaveLength(3)
+      expect(group.children[2]).toMatchObject({ type: 'tile' })
+      expect(group.collapsed).toBeUndefined()
+      expect(result.current.layers.activeLayerId).toBe(group.children[2].id)
+      // other kinds go in too: a group holds every layer type (pictures only live in image layers)
+      act(() => result.current.layers.createNode('objects', 'F'))
+      expect((result.current.tree.nodes.find((n) => n.id === 'F') as { children: SceneNode[] }).children.some((c) => c.type === 'objects')).toBe(true)
     })
 
-    it('deleting a folder keeps its layers, now outside it', () => {
+    it('deleting a group deletes what is inside it; ungrouping keeps it', () => {
       const { result } = setup(held())
-      act(() => result.current.manager.handleDeleteLayer('F'))
-      expect(result.current.manager.layers.map(l => l.id)).toEqual(['a', 'b', 'c'])
-      expect(result.current.manager.layers.every(l => l.folderId === undefined)).toBe(true)
+      act(() => result.current.layers.ungroupNode('F'))
+      expect(result.current.tree.nodes.map((n) => n.id)).toEqual(['a', 'b', 'c'])
+      act(() => result.current.layers.groupNodes(['a', 'b']))
+      const group = result.current.tree.nodes.find((n) => n.type === 'group')!
+      expect(group.name).toBe('Group')
+      act(() => result.current.layers.deleteNodes([group.id]))
+      expect(result.current.tree.nodes.map((n) => n.id)).toEqual(['c'])
     })
 
-    it('opening or closing a folder is saved but is not an undo step', () => {
-      const { result, onCommitHistory, activeMap } = (() => {
-        const r = setup(held())
-        return { ...r, activeMap: () => r.result.current.activeMap }
-      })()
-      act(() => result.current.manager.toggleFolderCollapsed('F'))
-      expect(result.current.manager.layers[0].collapsed).toBe(true)
-      expect(activeMap()!.layers[0].collapsed).toBe(true)
+    it('opening or closing a group is saved but is not an undo step', () => {
+      const { result, onCommitHistory } = setup(held())
+      act(() => result.current.layers.toggleCollapsed('F'))
+      expect(result.current.tree.nodes[0]).toMatchObject({ collapsed: true })
+      expect(result.current.activeMap!.nodes[0]).toMatchObject({ collapsed: true })
       expect(onCommitHistory).not.toHaveBeenCalled()
+      act(() => result.current.layers.toggleCollapsed('F'))
+      expect(result.current.tree.nodes[0]).not.toHaveProperty('collapsed')
+    })
+
+    it('dragging a layer into a group moves it there; a layer dropped on a leaf lands beside it', () => {
+      const { result } = setup(held())
+      act(() => result.current.layers.moveNodes(['c'], 'F', 'inside'))
+      expect((result.current.tree.nodes[0] as { children: SceneNode[] }).children.map((n) => n.id)).toEqual(['a', 'b', 'c'])
+      act(() => result.current.layers.moveNodes(['c'], 'a', 'below'))
+      expect((result.current.tree.nodes[0] as { children: SceneNode[] }).children.map((n) => n.id)).toEqual(['c', 'a', 'b'])
+      expect(names(result)).toEqual(['Deco', 'Ground', 'Loose'])
     })
   })
 })
