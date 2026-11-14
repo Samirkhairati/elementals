@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { useEditorClipboard } from '@/store/editorClipboard'
 import { makeLayer } from '@/test/helpers'
 import { LayersPanel, type EntitiesSlot } from './LayersPanel'
@@ -387,6 +387,18 @@ describe('LayersPanel', () => {
       fireEvent.contextMenu(rowOf('Ground'))
       expect(screen.getByRole('menuitem', { name: /Enable Y-sort/ })).toHaveAttribute('data-disabled')
     })
+  })
+
+  it('a tile layer offers a drop shadow from its menu; one that has a shadow offers to edit it', () => {
+    const addDropShadow = vi.fn()
+    renderPanel({ addDropShadow })
+    fireEvent.contextMenu(rowOf('Ground'))
+    fireEvent.click(screen.getByRole('menuitem', { name: /Add drop shadow/ }))
+    expect(addDropShadow).toHaveBeenCalledWith(expect.any(String))
+    cleanup()
+    renderPanel({ addDropShadow, layers: [makeLayer('t', { type: 'tile', name: 'Ground', look: { default: { shadow: { x: 2, y: 3 } } } })] })
+    fireEvent.contextMenu(rowOf('Ground'))
+    expect(screen.getByRole('menuitem', { name: /Edit drop shadow/ })).toBeInTheDocument()
   })
 
   it('an indented layer is narrower by its indent, so its buttons stay inside the panel', () => {

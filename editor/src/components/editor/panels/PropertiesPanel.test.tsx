@@ -80,7 +80,7 @@ describe('PropertiesPanel entity inspector', () => {
     setup({ Tag: { tag: 'npc' } })
     const card = screen.getByTestId('component-card-Tag')
     expect(within(card).getByLabelText('Tag')).toBeInTheDocument()
-    fireEvent.click(within(card).getByRole('button', { name: 'Tag component' }))
+    fireEvent.click(within(card).getByRole('button', { name: /^Tag/ }))
     expect(within(card).queryByLabelText('Tag')).toBeNull()
   })
 
@@ -112,8 +112,8 @@ describe('PropertiesPanel entity inspector', () => {
   it('the Event card still opens its editor from the window event while collapsed', async () => {
     setup({ Event: createDefaultEventProps() })
     const card = screen.getByTestId('component-card-Event')
-    fireEvent.click(within(card).getByRole('button', { name: 'Event component' }))
-    expect(within(card).getByRole('button', { name: 'Event component' })).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(within(card).getByRole('button', { name: /^Event/ }))
+    expect(within(card).getByRole('button', { name: /^Event/ })).toHaveAttribute('aria-expanded', 'false')
     expect(screen.queryByRole('dialog')).toBeNull()
     window.dispatchEvent(new CustomEvent('editor:open-event-editor', { detail: 'e1' }))
     expect(await screen.findByRole('dialog')).toBeInTheDocument()

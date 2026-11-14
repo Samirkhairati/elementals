@@ -7,6 +7,7 @@ import type { MapData } from '@/types/editor';
 
 import { MapsPanel } from '@/components/editor/panels/MapsPanel';
 import { LayersPanel } from '@/components/editor/panels/LayersPanel';
+import { useDropShadow } from '@/components/editor/look/DropShadowMenuItem';
 import { EntityTree, entityCreators } from '@/components/editor/panels/EntityTree';
 import { CollisionPanel } from '@/components/editor/panels/CollisionPanel';
 import { PropertiesPanel } from '@/components/editor/panels/PropertiesPanel';
@@ -130,6 +131,7 @@ const selectLayers = (c: EditorContextValue) => ({
 export function LayersWrapper(_props: IDockviewPanelProps) {
   const ctx = useEditorSelector(selectLayers);
   const bindings = useBindings();
+  const dropShadow = useDropShadow();
   const { placeNew, placePrefab } = entityCreators({ startPlacement: ctx.startPlacement, createEntity: ctx.handleCreateEntity });
   const entitiesSlot = {
     count: ctx.entities.length,
@@ -191,6 +193,7 @@ export function LayersWrapper(_props: IDockviewPanelProps) {
         toggleLayerVisibility={ctx.toggleLayerVisibility}
         toggleLayerLock={ctx.toggleLayerLock}
         setLayerYSort={ctx.setLayerYSort}
+        addDropShadow={(layerId) => dropShadow({ kind: 'layer', layerId })}
         deleteLayer={ctx.handleDeleteLayer}
         reorderLayers={ctx.handleReorderLayers}
         createLayerOfType={ctx.handleCreateLayerOfType}

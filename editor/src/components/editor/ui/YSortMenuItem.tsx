@@ -19,7 +19,7 @@ export function YSortMenuItem({ own, inherited, from, disabled, title, onChange 
   const next = !on
   return (
     <ContextMenuItem disabled={disabled} title={title} onClick={() => onChange(from && next === inherited ? undefined : next)}>
-      <ArrowDownUp className="mr-2 h-3.5 w-3.5" />
+      <ArrowDownUp />
       {on ? 'Disable Y-sort' : 'Enable Y-sort'}
       {own === undefined && inherited && from && <ContextMenuShortcut>from {from}</ContextMenuShortcut>}
     </ContextMenuItem>

@@ -20,6 +20,8 @@ import type {
   MaskMode,
   OverlayMode,
   ShaderUse,
+  ShadowBlend,
+  LookShadow,
   Vignette,
 } from './types.ts'
 
@@ -249,6 +251,30 @@ function cleanGrain(v: unknown): Grain | undefined {
   return compact({ amount, size: num(v.size, 1, 8), animated: v.animated === true ? true : undefined }) as Grain
 }
 
+export const SHADOW_BLENDS: readonly ShadowBlend[] = ['normal', 'multiply', 'screen', 'add']
+export const MAX_SHADOW_SOFTNESS = 64
+export const MAX_SHADOW_OFFSET = 512
+/** A new shadow: down and to the right, soft, half dark. */
+export const DEFAULT_SHADOW: LookShadow = { x: 6, y: 8, softness: 4, opacity: 50 }
+
+export function cleanShadow(v: unknown): LookShadow | undefined {
+  if (!isRecord(v)) return undefined
+  const x = num(v.x, -MAX_SHADOW_OFFSET, MAX_SHADOW_OFFSET)
+  const y = num(v.y, -MAX_SHADOW_OFFSET, MAX_SHADOW_OFFSET)
+  const blend = SHADOW_BLENDS.includes(v.blend as ShadowBlend) && v.blend !== 'multiply' ? (v.blend as ShadowBlend) : undefined
+  return {
+    x: x ?? 0,
+    y: y ?? 0,
+    ...compact({
+      softness: num(v.softness, 0, MAX_SHADOW_SOFTNESS),
+      opacity: num(v.opacity, 0, 100),
+      color: hex(v.color),
+      blend,
+      off: v.off === true ? true : undefined,
+    }),
+  }
+}
+
 function cleanShaderUse(v: unknown): ShaderUse | undefined {
   if (!isRecord(v)) return undefined
   const id = str(v.id)
@@ -280,6 +306,8 @@ export function cleanLook(v: unknown): Look | undefined {
   if (vignette) look.vignette = vignette
   const grain = cleanGrain(v.grain)
   if (grain) look.grain = grain
+  const shadow = cleanShadow(v.shadow)
+  if (shadow) look.shadow = shadow
   if (shaders.length > 0) look.shaders = shaders
   const preset = str(v.preset)
   if (preset) look.preset = preset

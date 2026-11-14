@@ -22,6 +22,11 @@ code (`shared/look/`) and the same GLSL, so what the editor's canvas shows is wh
   components per look (one per channel of the brush texture). `compileLooks` drops what does not fit and warns.
 * **Mask space**: a picture's own look is in the picture's own pixels (unscaled, unflipped; `pictureSubject`); a layer's
   or the map's look is in map pixels.
+* **Drop shadow** (`Look.shadow`, `LookShadow`): offset `x/y` (map pixels), `softness` (blur radius, map pixels),
+  `opacity` (darkness 0..100, default 50), `color`, `blend` (`normal`, `multiply` (default), `screen`, `add`), `off`. It is
+  part of a profile's look, so it changes with the profile and crossfades in transitions, but it is not part of the grade
+  (`isNeutralLook` ignores it; presets never carry it). A picture uses its own look's shadow, else its layer's
+  (`shadowFor`, inner first); `off: true` on the picture removes the layer's. The map has none.
 * **Profiles** live in `project/looks.json` (`LooksFile`: `profiles`, `start`, the author's `presets`), copied to
   `game/public/data/looks.json` by the asset sync. Ids are stable; renaming changes only the name.
 
@@ -48,14 +53,27 @@ Pictures are graded once per look + placement and cached (`lookDraw.ts`); tile l
 pixel per map pixel; the map's look grades the canvas's content Konva layer right after it draws (`lookMapPass.ts`,
 `useMapLookPass.ts`). Grid, handles and overlays are on a second Konva layer and stay ungraded.
 
+**Drop shadows** (`shared/look/shadow.ts`): both renderers draw the subject's silhouette into a canvas and blur its
+alpha with the same three-pass box blur (≈ gaussian, `shadowMask`), coloured (`maskPixels`), then draw it just below the
+subject, offset, faded and blended. A picture's silhouette is its own frame (blurred by softness ÷ scale, so it is drawn
+scaled with it); a tile layer's is baked in chunks of 16 × 16 tiles (`shadowChunk`), each drawn with the tiles around it
+so the blur crosses chunk edges, and clipped to its own cells (`chunkShadowMask`), so the chunks tile into exactly the
+blur of the whole layer. Shadows fall on what is drawn below the subject; layers above cover them. **Game**:
+`LookShadows` (images at the subject's depth, moved just below it; canvas renderer too). **Editor**: `lib/look/shadowDraw.ts`
+(cached per picture and crop, and per chunk keyed by the tiles it is made of, so painting rebakes only the touched chunks).
+
 ## Editor UI
 
 * **Look panel** (Alt+G, View › Look; `components/editor/look/LookPanel.tsx`): edits the map, the active layer or the
-  picked picture (follows the selection; the pin keeps one). Profile tabs (Default + profiles; the dot = this subject has
-  its own look for that profile; double-click renames; ⋯ sets the start profile or deletes). Editing a profile without its
+  picked picture (follows the selection; the pin keeps one). Profile switch (Default + profiles; the dot = this subject has
+  its own look for that profile; + adds one, ⋯ renames, sets the start profile or deletes). Editing a profile without its
   own look copies the default first ("= Default" badge). Presets (built-in groups + project presets), copy / paste look,
-  save as preset. Tabs: **Edit** (the sections, vignette and grain under Effects), **Masks**, **Shaders**. Every slider
+  save as preset. Tabs: **Edit** (Shadow, the adjustment sections, Vignette, Grain), **Masks**, **Shaders**. Every slider
   commits one undo step on release (`setLook(ref, set, commit)` in `routes/editor.tsx`).
+* **Drop shadow**: right-click a tile or image layer, a picture in the Images panel or a picture on the canvas › **Add
+  drop shadow** (in every profile; then the Look panel opens on it, pinned). The Look panel's **Shadow** section sets
+  direction, distance, softness, darkness, colour and blend; a picture shows its layer's shadow and can take its own or
+  switch it off.
 * **Masks on the canvas** (`konva/KonvaMaskEditor.tsx`): the selected component shows handles (linear: start / middle /
   end; radial: centre, width + rotation, height; marquee: corners + move); a brush component paints with left-drag (the
   panel's size / feather / flow / erase). Overlay: off, red overlay, black and white. Colour range has an eyedropper

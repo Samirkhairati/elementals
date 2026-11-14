@@ -44,7 +44,7 @@ describe('LookPanel', () => {
   it('a profile tab edits that profile, copied from the default, not the default', () => {
     const withDefault = [{ ...layers[0], look: { default: { adjust: { exposure: 1, contrast: 7 } } } }, layers[1]]
     const setLook = setup({ layers: withDefault })
-    fireEvent.click(screen.getByRole('tab', { name: /Night/ }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Night' }))
     expect(getLookView().profile).toBe('night')
     expect(screen.getByText('= Default')).toBeInTheDocument()
     fireEvent.keyDown(exposure(), { key: 'ArrowRight' })
@@ -77,7 +77,7 @@ describe('LookPanel', () => {
 
   it('edits the selected picture of the active image layer', () => {
     const setLook = setup({ activeLayerId: 'i1', selectedImageId: 'pic' })
-    expect(screen.getByText('Cloud')).toBeInTheDocument()
+    expect(screen.getByText('Look · Cloud')).toBeInTheDocument()
     fireEvent.keyDown(exposure(), { key: 'ArrowRight' })
     expect(setLook.mock.calls[0][0]).toEqual({ kind: 'picture', layerId: 'i1', imageId: 'pic' })
   })

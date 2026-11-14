@@ -28,13 +28,13 @@ function RootContextMenuContent({
   onOpenCreateFolder: () => void
 }) {
   return (
-    <ContextMenuContent className="w-44">
+    <ContextMenuContent>
       <ContextMenuItem onClick={onOpenCreateMap}>
-        <Plus className="w-3.5 h-3.5 mr-2" />
+        <Plus />
         New Map
       </ContextMenuItem>
       <ContextMenuItem onClick={onOpenCreateFolder}>
-        <FolderPlus className="w-3.5 h-3.5 mr-2" />
+        <FolderPlus />
         New Folder
       </ContextMenuItem>
     </ContextMenuContent>
@@ -173,13 +173,13 @@ export function MapsPanel({
                     <span className="ed-row-label" title={folderName}>{folderName}</span>
                   </div>
                 </ContextMenuTrigger>
-                <ContextMenuContent className="w-48">
+                <ContextMenuContent>
                   <ContextMenuItem onClick={() => openCreateMap(folder)}>
-                    <Plus className="w-3.5 h-3.5 mr-2" />
+                    <Plus />
                     New Map
                   </ContextMenuItem>
                   <ContextMenuItem onClick={() => openCreateFolder(folder)}>
-                    <FolderPlus className="w-3.5 h-3.5 mr-2" />
+                    <FolderPlus />
                     New Subfolder
                   </ContextMenuItem>
                   <ContextMenuSeparator />
@@ -191,7 +191,7 @@ export function MapsPanel({
                       }, 0)
                     }}
                   >
-                    <Edit2 className="w-3.5 h-3.5 mr-2" />
+                    <Edit2 />
                     Rename
                   </ContextMenuItem>
                   <ContextMenuItem
@@ -200,9 +200,9 @@ export function MapsPanel({
                         handleDeleteMapFolder(folder)
                       }, 0)
                     }}
-                    className="text-red-400 focus:text-red-400 focus:bg-red-500/10"
+                    destructive
                   >
-                    <Trash2 className="w-3.5 h-3.5 mr-2" />
+                    <Trash2 />
                     Delete Folder
                   </ContextMenuItem>
                 </ContextMenuContent>
@@ -266,7 +266,7 @@ export function MapsPanel({
                   <span className="ed-row-label" title={m.name}>{m.name}</span>
                 </div>
               </ContextMenuTrigger>
-              <ContextMenuContent className="w-48">
+              <ContextMenuContent>
                 <ContextMenuItem
                   onClick={() => {
                     setTimeout(() => {
@@ -281,16 +281,16 @@ export function MapsPanel({
                     }, 0)
                   }}
                 >
-                  <Edit2 className="w-3.5 h-3.5 mr-2" />
+                  <Edit2 />
                   Rename
                 </ContextMenuItem>
                 <ContextMenuItem onClick={() => setTimeout(() => handleResizeMap(m), 0)}>
-                  <Scaling className="w-3.5 h-3.5 mr-2" />
+                  <Scaling />
                   Resize…
                 </ContextMenuItem>
                 {handleMapSettings && (
                   <ContextMenuItem onClick={() => setTimeout(() => handleMapSettings(m), 0)}>
-                    <Settings2 className="w-3.5 h-3.5 mr-2" />
+                    <Settings2 />
                     Settings…
                   </ContextMenuItem>
                 )}
@@ -299,11 +299,11 @@ export function MapsPanel({
                   onClick={() => handleExportMapToGame(m)}
                   title="Writes the map into the game's maps folder"
                 >
-                  <Gamepad2 className="w-3.5 h-3.5 mr-2" />
+                  <Gamepad2 />
                   Export to Game
                 </ContextMenuItem>
                 <ContextMenuItem onClick={() => handleExportMap(m)}>
-                  <Download className="w-3.5 h-3.5 mr-2" />
+                  <Download />
                   Export as File…
                 </ContextMenuItem>
                 <ContextMenuSeparator />
@@ -313,9 +313,9 @@ export function MapsPanel({
                       handleDeleteMap(m.folderPath, m.fileName)
                     }, 0)
                   }}
-                  className="text-red-400 focus:text-red-400 focus:bg-red-500/10"
+                  destructive
                 >
-                  <Trash2 className="w-3.5 h-3.5 mr-2" />
+                  <Trash2 />
                   Delete Map
                 </ContextMenuItem>
               </ContextMenuContent>

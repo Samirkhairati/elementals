@@ -2,7 +2,8 @@
 // `onChange(next, done)` fires continuously while dragging with done=false and once with done=true on release, a
 // keyboard step or a reset; the caller commits an undo step only on done=true.
 import React, { useRef, useState } from 'react'
-import { ChevronDown, ChevronRight, Eye, EyeOff, RotateCcw } from 'lucide-react'
+import { Slider } from '../ui/fields'
+import { Card, EyeButton, ResetButton } from '../ui/controls'
 import { cn } from '@/lib/utils'
 import { curveTable } from '../../../../../shared/look/bake'
 import { HSL_BANDS, HSL_BAND_COLORS, HSL_BAND_HUES } from '../../../../../shared/look/schema'
@@ -15,11 +16,6 @@ export type Change<T> = (next: T, done: boolean) => void
 const decimalsOf = (step: number) => (step < 0.1 ? 2 : step < 1 ? 1 : 0)
 const roundTo = (v: number, d: number) => Math.round(v * 10 ** d) / 10 ** d
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
-
-function snapTo(value: number, min: number, max: number, step: number): number {
-  const stepped = Math.round((value - min) / step) * step + min
-  return clamp(Math.round(stepped * 1e6) / 1e6, min, max)
-}
 
 export function formatLookValue(v: number, step: number, bipolar: boolean, unit = ''): string {
   const d = decimalsOf(step)
@@ -42,25 +38,9 @@ export interface LookSliderProps {
 }
 
 export function LookSlider({ label, value, defaultValue = 0, min, max, step, track, unit, disabled, onChange }: LookSliderProps) {
-  const bar = useRef<HTMLDivElement>(null)
-  const dragging = useRef(false)
-  const last = useRef(value)
-  const [draft, setDraft] = useState<number | null>(null)
   const [editing, setEditing] = useState<string | null>(null)
-  const shown = draft ?? value
-  const span = Math.max(1e-9, max - min)
-  const ratio = clamp((shown - min) / span, 0, 1)
   const bipolar = min < 0 && max > 0
-  const isDefault = shown === defaultValue
-
-  const fromPointer = (clientX: number) => {
-    const r = bar.current?.getBoundingClientRect()
-    if (!r || r.width === 0) return
-    const v = snapTo(min + ((clientX - r.left) / r.width) * span, min, max, step)
-    last.current = v
-    setDraft(v)
-    onChange(v, false)
-  }
+  const isDefault = value === defaultValue
   const reset = () => onChange(defaultValue, true)
   const commitText = () => {
     if (editing === null) return
@@ -68,28 +48,19 @@ export function LookSlider({ label, value, defaultValue = 0, min, max, step, tra
     setEditing(null)
     if (Number.isFinite(n)) onChange(roundTo(clamp(n, min, max), Math.max(decimalsOf(step), 2)), true)
   }
+  const tone = isDefault ? 'text-muted-foreground' : 'text-foreground'
 
-  const onKeyDown = (e: React.KeyboardEvent) => {
-    const big = step * (e.shiftKey ? 10 : 1)
-    const to = e.key === 'ArrowRight' || e.key === 'ArrowUp' ? shown + big : e.key === 'ArrowLeft' || e.key === 'ArrowDown' ? shown - big : e.key === 'Home' ? min : e.key === 'End' ? max : null
-    if (to === null) return
-    e.preventDefault()
-    const next = snapTo(to, min, max, step)
-    if (next !== shown) onChange(next, true)
-  }
-
-  const fillFrom = bipolar ? clamp((0 - min) / span, 0, 1) : 0
   return (
     <div className={cn('flex flex-col gap-0.5', disabled && 'pointer-events-none opacity-50')}>
-      <div className="flex items-baseline justify-between gap-2 text-xs">
-        <span className={cn('truncate select-none', isDefault ? 'text-muted-foreground' : 'text-foreground')} onDoubleClick={reset}>
+      <div className="flex h-4 items-center justify-between gap-2 text-ed-label">
+        <span className={cn('truncate select-none', tone)} onDoubleClick={reset} title="Double-click to reset">
           {label}
         </span>
         {editing !== null ? (
           <input
             aria-label={`${label} value input`}
             autoFocus
-            className="ed-input h-5 w-14 px-1 text-right text-xs"
+            className="ed-input h-4 w-14 px-1 text-right text-ed-label"
             value={editing}
             onChange={(e) => setEditing(e.target.value)}
             onBlur={commitText}
@@ -102,54 +73,23 @@ export function LookSlider({ label, value, defaultValue = 0, min, max, step, tra
             }}
           />
         ) : (
-          <button
-            type="button"
-            aria-label={`${label} value`}
-            className={cn('tabular-nums', isDefault ? 'text-muted-foreground' : 'text-foreground')}
-            onClick={() => setEditing(String(roundTo(shown, decimalsOf(step))))}
-          >
-            {formatLookValue(shown, step, bipolar, unit)}
+          <button type="button" aria-label={`${label} value`} className={cn('ed-mono tabular-nums', tone)} onClick={() => setEditing(String(roundTo(value, decimalsOf(step))))}>
+            {formatLookValue(value, step, bipolar, unit)}
           </button>
         )}
       </div>
-      <div
-        ref={bar}
-        role="slider"
-        aria-label={label}
-        aria-valuemin={min}
-        aria-valuemax={max}
-        aria-valuenow={shown}
-        aria-disabled={disabled || undefined}
-        tabIndex={disabled ? -1 : 0}
-        className="relative flex h-4 cursor-pointer touch-none items-center focus-visible:outline-none [&:focus-visible>span:last-child]:ring-2 [&:focus-visible>span:last-child]:ring-ring"
-        onPointerDown={(e) => {
-          dragging.current = true
-          e.currentTarget.setPointerCapture?.(e.pointerId)
-          fromPointer(e.clientX)
-        }}
-        onPointerMove={(e) => dragging.current && fromPointer(e.clientX)}
-        onPointerUp={(e) => {
-          if (!dragging.current) return
-          dragging.current = false
-          e.currentTarget.releasePointerCapture?.(e.pointerId)
-          setDraft(null)
-          onChange(last.current, true)
-        }}
-        onKeyDown={onKeyDown}
-      >
-        <span className="absolute inset-x-0 h-1 rounded-full bg-input" style={track ? { background: track } : undefined} />
-        {!track && bipolar && <span className="absolute h-2 w-px bg-muted-foreground/60" style={{ left: `${fillFrom * 100}%` }} />}
-        {!track && (
-          <span
-            className="absolute h-1 rounded-full bg-primary/80"
-            style={{ left: `${Math.min(fillFrom, ratio) * 100}%`, width: `${Math.abs(ratio - fillFrom) * 100}%` }}
-          />
-        )}
-        <span
-          aria-label={`${label} thumb`}
-          className="absolute h-3 w-3 -translate-x-1/2 rounded-full border border-black/40 bg-foreground shadow"
-          style={{ left: `${ratio * 100}%` }}
-          onDoubleClick={reset}
+      <div onDoubleClick={reset}>
+        <Slider
+          aria-label={label}
+          value={clamp(value, min, max)}
+          min={min}
+          max={max}
+          step={step}
+          track={track}
+          origin={bipolar ? 0 : undefined}
+          disabled={disabled}
+          onChange={(v) => onChange(v, false)}
+          onRelease={(v) => onChange(v, true)}
         />
       </div>
     </div>
@@ -269,19 +209,14 @@ export function CurveEditor({ curves, onChange }: CurveEditorProps) {
             />
           ))}
         </div>
-        <button
-          type="button"
-          aria-label="Reset curve"
-          title="Reset this channel"
+        <ResetButton
+          name="curve"
           disabled={isStraightCurve(stored)}
-          className="ed-btn h-5 px-1 disabled:opacity-40"
-          onClick={() => {
+          onReset={() => {
             setWork(null)
             onChange(setCurveChannel(curves, ch, undefined), true)
           }}
-        >
-          <RotateCcw className="h-3 w-3" />
-        </button>
+        />
       </div>
       <svg
         ref={svg}
@@ -583,30 +518,24 @@ export interface LookSectionProps {
   children: React.ReactNode
 }
 
+/** A section of the look editors: a collapsible card with its reset and its eye in the head. */
 export function LookSection({ title, icon, visible = true, onToggleVisible, onReset, defaultOpen = false, summary, children }: LookSectionProps) {
-  const [open, setOpen] = useState(defaultOpen)
-  const Chevron = open ? ChevronDown : ChevronRight
   return (
-    <section className="rounded border border-border bg-card/40">
-      <header className="flex items-center gap-1 px-1.5 py-1">
-        <button type="button" aria-expanded={open} aria-label={`${open ? 'Collapse' : 'Expand'} ${title}`} className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-xs font-medium" onClick={() => setOpen(!open)}>
-          <Chevron className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          {icon && <span className="shrink-0 text-muted-foreground">{icon}</span>}
-          <span className="truncate">{title}</span>
-          {!open && summary && <span className="ml-1 truncate text-[11px] font-normal text-muted-foreground">{summary}</span>}
-        </button>
-        {onReset && (
-          <button type="button" aria-label={`Reset ${title}`} title="Reset" className="rounded p-1 text-muted-foreground hover:text-foreground" onClick={onReset}>
-            <RotateCcw className="h-3.5 w-3.5" />
-          </button>
-        )}
-        {onToggleVisible && (
-          <button type="button" aria-label={`${visible ? 'Hide' : 'Show'} ${title}`} aria-pressed={visible} title={visible ? 'Switch off' : 'Switch on'} className={cn('rounded p-1 hover:text-foreground', visible ? 'text-foreground' : 'text-muted-foreground')} onClick={onToggleVisible}>
-            {visible ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
-          </button>
-        )}
-      </header>
-      {open && <div className={cn('flex flex-col gap-2 px-2 pb-2 pt-1', !visible && 'opacity-40')}>{children}</div>}
-    </section>
+    <Card
+      collapsible
+      defaultOpen={defaultOpen}
+      title={title}
+      icon={icon}
+      summary={summary}
+      dim={!visible}
+      actions={
+        <>
+          {onReset && <ResetButton name={title} onReset={onReset} />}
+          {onToggleVisible && <EyeButton name={title} visible={visible} onToggle={onToggleVisible} title={visible ? 'Switch off' : 'Switch on'} />}
+        </>
+      }
+    >
+      {children}
+    </Card>
   )
 }

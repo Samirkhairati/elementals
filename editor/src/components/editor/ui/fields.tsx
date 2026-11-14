@@ -324,6 +324,15 @@ interface SliderProps {
   disabled?: boolean
   className?: string
   'aria-label'?: string
+  /**
+   * The final value of a drag (after the `onChange` calls) or of a key step (instead of `onChange`): for callers that
+   * store one undo step per change, so this handler must apply the value too.
+   */
+  onRelease?: (value: number) => void
+  /** CSS background of the track (a gradient for hue / temperature sliders); the fill is then hidden. */
+  track?: string
+  /** Where the fill starts, as a value (0 for -100..100 sliders); default `min`. */
+  origin?: number
 }
 
 function snap(value: number, min: number, max: number, step: number): number {
@@ -332,22 +341,28 @@ function snap(value: number, min: number, max: number, step: number): number {
 }
 
 /** Drag the thumb or use the arrow keys (Shift = x10, Home / End = ends). */
-export function Slider({ value, onChange, min, max, step = 1, disabled, className, ...rest }: SliderProps) {
-  const track = useRef<HTMLDivElement>(null)
+export function Slider({ value, onChange, min, max, step = 1, disabled, className, onRelease, track, origin, ...rest }: SliderProps) {
+  const bar = useRef<HTMLDivElement>(null)
   const dragging = useRef(false)
+  const last = useRef(value)
   const span = Math.max(1e-9, max - min)
-  const ratio = Math.min(1, Math.max(0, (value - min) / span))
+  const at = (v: number) => Math.min(1, Math.max(0, (v - min) / span))
+  const ratio = at(value)
+  const from = at(origin ?? min)
 
-  const fromPointer = (clientX: number) => {
-    const r = track.current?.getBoundingClientRect()
-    if (!r || r.width === 0) return
-    const next = snap(min + ((clientX - r.left) / r.width) * span, min, max, step)
+  const set = (next: number) => {
+    last.current = next
     if (next !== value) onChange(next)
+  }
+  const fromPointer = (clientX: number) => {
+    const r = bar.current?.getBoundingClientRect()
+    if (!r || r.width === 0) return
+    set(snap(min + ((clientX - r.left) / r.width) * span, min, max, step))
   }
 
   return (
     <div
-      ref={track}
+      ref={bar}
       role="slider"
       tabIndex={disabled ? -1 : 0}
       aria-label={rest['aria-label']}
@@ -358,13 +373,16 @@ export function Slider({ value, onChange, min, max, step = 1, disabled, classNam
       className={cn('relative flex h-4 min-w-16 flex-1 cursor-pointer touch-none items-center focus-visible:outline-none [&:focus-visible>span:last-child]:ring-2 [&:focus-visible>span:last-child]:ring-ring', disabled && 'pointer-events-none opacity-50', className)}
       onPointerDown={(e) => {
         dragging.current = true
+        last.current = value
         e.currentTarget.setPointerCapture?.(e.pointerId)
         fromPointer(e.clientX)
       }}
       onPointerMove={(e) => dragging.current && fromPointer(e.clientX)}
       onPointerUp={(e) => {
+        if (!dragging.current) return
         dragging.current = false
         e.currentTarget.releasePointerCapture?.(e.pointerId)
+        onRelease?.(last.current)
       }}
       onKeyDown={(e) => {
         const big = step * (e.shiftKey ? 10 : 1)
@@ -372,12 +390,15 @@ export function Slider({ value, onChange, min, max, step = 1, disabled, classNam
         if (to === null) return
         e.preventDefault()
         const next = snap(to, min, max, step)
-        if (next !== value) onChange(next)
+        if (next === value) return
+        if (onRelease) onRelease(next)
+        else onChange(next)
       }}
     >
-      <span className="absolute inset-x-0 h-1 rounded-full bg-input" />
-      <span className="absolute h-1 rounded-full bg-primary" style={{ width: `${ratio * 100}%` }} />
-      <span className="absolute h-3 w-3 -translate-x-1/2 rounded-full bg-foreground shadow" style={{ left: `${ratio * 100}%` }} />
+      <span className="absolute inset-x-0 h-1 rounded-full bg-input" style={track ? { background: track } : undefined} />
+      {from > 0 && from < 1 && <span className="absolute h-2 w-px bg-muted-foreground/60" style={{ left: `${from * 100}%` }} />}
+      {!track && <span className="absolute h-1 rounded-full bg-primary" style={{ left: `${Math.min(from, ratio) * 100}%`, width: `${Math.abs(ratio - from) * 100}%` }} />}
+      <span className="absolute h-3 w-3 -translate-x-1/2 rounded-full bg-foreground shadow ring-1 ring-black/30" style={{ left: `${ratio * 100}%` }} />
     </div>
   )
 }

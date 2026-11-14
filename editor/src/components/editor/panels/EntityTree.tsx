@@ -31,23 +31,23 @@ export function EntitySubmenu({ onNew, onPrefab }: { onNew: () => void; onPrefab
   return (
     <ContextMenuSub>
       <ContextMenuSubTrigger>
-        <Users className="mr-2 h-3.5 w-3.5 text-sky-400" />
+        <Users className="text-sky-400" />
         Entity
       </ContextMenuSubTrigger>
-      <ContextMenuSubContent className="w-48">
+      <ContextMenuSubContent>
         <ContextMenuItem onClick={onNew} title="An empty entity, one tile in size: add the components you need">
-          <Plus className="mr-2 h-3.5 w-3.5 text-primary" />
+          <Plus className="text-primary" />
           New
         </ContextMenuItem>
         <ContextMenuSub>
           <ContextMenuSubTrigger>
-            <Sparkles className="mr-2 h-3.5 w-3.5 text-amber-400" />
+            <Sparkles className="text-amber-400" />
             Prefab
           </ContextMenuSubTrigger>
-          <ContextMenuSubContent className="w-56">
+          <ContextMenuSubContent>
             {PRESET_PREFABS.map((prefab) => (
               <ContextMenuItem key={prefab.id} onClick={() => onPrefab(prefab)} title={prefab.description}>
-                <NamedIcon name={prefab.icon} className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
+                <NamedIcon name={prefab.icon} className="text-muted-foreground" />
                 {prefab.name}
               </ContextMenuItem>
             ))}
@@ -288,7 +288,7 @@ export function EntityTree(props: EntityTreeProps) {
           </div>
         </ContextMenuTrigger>
 
-        <ContextMenuContent className="w-48 text-xs">
+        <ContextMenuContent>
           {entity.components.Event && (
             <ContextMenuItem
               onClick={() => {
@@ -297,29 +297,29 @@ export function EntityTree(props: EntityTreeProps) {
                 openEventEditor(entity.id, 60)
               }}
             >
-              <Zap className="ed-icon mr-2 text-blue-400" />
+              <Zap className="ed-icon text-blue-400" />
               Edit event…
             </ContextMenuItem>
           )}
           <ContextMenuItem onClick={() => setEditingEntityId(entity.id)}>
-            <Edit2 className="mr-2 h-3.5 w-3.5" />
+            <Edit2 />
             Rename
           </ContextMenuItem>
           <ContextMenuItem onClick={() => duplicateEntity(entity.id)}>
-            <Copy className="mr-2 h-3.5 w-3.5" />
+            <Copy />
             Duplicate
           </ContextMenuItem>
           <ContextMenuItem onClick={() => toggleEntityVisibility?.(entity.id)}>
-            {isVisible ? <EyeOff className="mr-2 h-3.5 w-3.5" /> : <Eye className="mr-2 h-3.5 w-3.5" />}
+            {isVisible ? <EyeOff /> : <Eye />}
             {isVisible ? 'Hide Entity' : 'Show Entity'}
           </ContextMenuItem>
           {entityFolders.length > 0 && (
             <ContextMenuSub>
               <ContextMenuSubTrigger>
-                <FolderInput className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
+                <FolderInput className="text-muted-foreground" />
                 Move to Folder
               </ContextMenuSubTrigger>
-              <ContextMenuSubContent className="w-44 text-xs">
+              <ContextMenuSubContent>
                 <ContextMenuItem disabled={!entity.folder} onClick={() => moveEntityToFolder?.(entity.id, null)}>
                   Root (No Folder)
                 </ContextMenuItem>
@@ -335,8 +335,8 @@ export function EntityTree(props: EntityTreeProps) {
           <ContextMenuSeparator />
           <EntitySubmenu onNew={() => placeNew(entity.folder ?? null)} onPrefab={(p) => placePrefab(p, entity.folder ?? null)} />
           <ContextMenuSeparator />
-          <ContextMenuItem onClick={() => confirmDeleteEntity(entity)} className="text-red-400 focus:bg-red-500/10 focus:text-red-400">
-            <Trash2 className="mr-2 h-3.5 w-3.5" />
+          <ContextMenuItem onClick={() => confirmDeleteEntity(entity)} destructive>
+            <Trash2 />
             Delete Entity
           </ContextMenuItem>
         </ContextMenuContent>
@@ -390,20 +390,20 @@ export function EntityTree(props: EntityTreeProps) {
                   </div>
                 </div>
               </ContextMenuTrigger>
-              <ContextMenuContent className="w-48 text-xs">
+              <ContextMenuContent>
                 <EntitySubmenu onNew={() => placeNew(folder.id)} onPrefab={(p) => placePrefab(p, folder.id)} />
                 <ContextMenuSeparator />
                 <ContextMenuItem onClick={() => setEditingFolderId(folder.id)}>
-                  <Edit2 className="mr-2 h-3.5 w-3.5" />
+                  <Edit2 />
                   Rename Folder
                 </ContextMenuItem>
                 <ContextMenuItem onClick={() => toggleEntityFolderVisibility?.(folder.id)}>
-                  {isFolderVisible ? <EyeOff className="mr-2 h-3.5 w-3.5" /> : <Eye className="mr-2 h-3.5 w-3.5" />}
+                  {isFolderVisible ? <EyeOff /> : <Eye />}
                   {isFolderVisible ? 'Hide All in Folder' : 'Show All in Folder'}
                 </ContextMenuItem>
                 <ContextMenuSeparator />
-                <ContextMenuItem onClick={() => confirmDeleteFolder(folder)} className="text-red-400 focus:bg-red-500/10 focus:text-red-400">
-                  <Trash2 className="mr-2 h-3.5 w-3.5" />
+                <ContextMenuItem onClick={() => confirmDeleteFolder(folder)} destructive>
+                  <Trash2 />
                   Delete Folder
                 </ContextMenuItem>
               </ContextMenuContent>
@@ -433,7 +433,7 @@ export function EntityTree(props: EntityTreeProps) {
 export function NewEntityFolderItem({ onCreate }: { onCreate: () => void }) {
   return (
     <ContextMenuItem onClick={onCreate}>
-      <FolderPlus className="mr-2 h-3.5 w-3.5 text-amber-400" />
+      <FolderPlus className="text-amber-400" />
       New Entity Folder
     </ContextMenuItem>
   )

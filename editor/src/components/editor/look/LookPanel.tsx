@@ -1,11 +1,11 @@
 // The Look panel (dock panel `look`): Lightroom-style colour grading of the map, the active layer or the picked
-// picture. The profile tabs pick which look is edited, and the canvas shows the same profile (the top toolbar's Look
-// menu is the same switch). See docs/looks.md.
+// picture, plus its drop shadow. The profile picked here is what the panel edits and what the canvas shows (the top
+// toolbar's Look menu is the same switch). See docs/looks.md.
 
-import { Check, Clipboard, Copy, Eye, EyeOff, Image as ImageIcon, Layers, Map as MapIcon, MoreHorizontal, Pencil, Pin, PinOff, Plus, RotateCcw, Save, Sparkles, SlidersHorizontal, Trash2, Wand2 } from 'lucide-react'
+import { Aperture, Check, Clipboard, Copy, Image as ImageIcon, Layers, Map as MapIcon, MoreHorizontal, Pencil, Pin, PinOff, Plus, RotateCcw, Save, Sparkles, SlidersHorizontal, Trash2, Wand2 } from 'lucide-react'
 import React, { useState } from 'react'
 import { applyPreset, LOOK_PRESETS, PRESET_GROUPS } from '../../../../../shared/look/presets'
-import { lookId } from '../../../../../shared/look/schema'
+import { lookId, resolveLook } from '../../../../../shared/look/schema'
 import type { Grain, Look, Vignette } from '../../../../../shared/look/types'
 import { editLookSet, findPicture, lookInView, selectedSubject, withAdjust } from '@/lib/look/lookEdit'
 import { updateLooksFile, useLookLibrary } from '@/lib/look/lookLibrary'
@@ -13,16 +13,16 @@ import { getLookSet, ownLook, subjectExists, withProfileLook } from '@/lib/look/
 import { getCanvasViewRect, setLookView, subjectKey, useLookView, type LookSubjectRef } from '@/lib/look/lookView'
 import { resolveImageItem } from '@/lib/imageItems'
 import { mapPixelSize } from '../../../../../shared/mapSize'
-import { cn } from '@/lib/utils'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useEditorSelector, type EditorContextValue } from '../layout/EditorContext'
-import { EdButton, IconButton, InfoTip, Segmented, Toggle } from '../ui/controls'
+import { Badge, Card, EdButton, EyeButton, Field, IconButton, InfoTip, Segmented, Toggle } from '../ui/controls'
 import { ColorField } from '../ui/fields'
 import { RenameInput } from '../ui/RenameInput'
 import { LookAdjustEditor } from './LookAdjustEditor'
 import { LookMasksEditor } from './LookMasksEditor'
 import { LookShadersEditor } from './LookShadersEditor'
-import { LookSlider, type Change } from './lookControls'
+import { LookShadowEditor } from './LookShadowEditor'
+import { LookSection, LookSlider, type Change } from './lookControls'
 
 const selectLook = (c: EditorContextValue) => ({
   activeMap: c.activeMap,
@@ -34,113 +34,131 @@ const selectLook = (c: EditorContextValue) => ({
 })
 
 type Tab = 'adjust' | 'masks' | 'shaders'
+const DEFAULT_TAB = '__default'
 
 /** The look copied with "Copy look" (pasted onto any subject / profile). */
 let copiedLook: Look | null = null
 
-function VignetteGrain({ look, onChange }: { look: Look; onChange: Change<Look> }) {
+/** Without a field: the rest of the look. */
+function without<K extends keyof Look>(look: Look, key: K): Omit<Look, K> {
+  const { [key]: _drop, ...rest } = look
+  return rest
+}
+
+function VignetteSection({ look, onChange }: { look: Look; onChange: Change<Look> }) {
   const v = look.vignette
-  const g = look.grain
-  const setV = (patch: Partial<Vignette>, done: boolean) => {
+  const set = (patch: Partial<Vignette>, done: boolean) => {
     const next: Vignette = { amount: v?.amount ?? 0, ...v, ...patch }
-    const { vignette: _old, ...rest } = look
-    onChange(next.amount !== 0 || next.color ? { ...rest, vignette: next } : rest, done)
-  }
-  const setG = (patch: Partial<Grain>, done: boolean) => {
-    const next: Grain = { amount: g?.amount ?? 0, ...g, ...patch }
-    const { grain: _old, ...rest } = look
-    onChange(next.amount > 0 ? { ...rest, grain: next } : rest, done)
+    onChange(next.amount !== 0 || next.color ? { ...without(look, 'vignette'), vignette: next } : without(look, 'vignette'), done)
   }
   return (
-    <>
-      <div className="mt-2 text-ed-label font-medium text-muted-foreground">Vignette</div>
-      <LookSlider label="Amount" value={v?.amount ?? 0} min={-100} max={100} step={1} track="linear-gradient(90deg, #000, #888, #fff)" onChange={(amount, done) => setV({ amount }, done)} />
-      <LookSlider label="Midpoint" value={v?.midpoint ?? 50} defaultValue={50} min={0} max={100} step={1} onChange={(midpoint, done) => setV({ midpoint }, done)} />
-      <LookSlider label="Roundness" value={v?.roundness ?? 0} min={-100} max={100} step={1} onChange={(roundness, done) => setV({ roundness }, done)} />
-      <LookSlider label="Feather" value={v?.feather ?? 50} defaultValue={50} min={0} max={100} step={1} onChange={(feather, done) => setV({ feather }, done)} />
-      <div className="flex items-center justify-between">
-        <span className="text-ed-label text-muted-foreground">Colour</span>
-        <ColorField aria-label="Vignette colour" allowEmpty value={v?.color ?? ''} onChange={(color) => setV({ color: color || undefined }, true)} />
-      </div>
-      <div className="mt-2 text-ed-label font-medium text-muted-foreground">Grain</div>
-      <LookSlider label="Grain" value={g?.amount ?? 0} min={0} max={100} step={1} onChange={(amount, done) => setG({ amount }, done)} />
-      <LookSlider label="Size" value={g?.size ?? 1} defaultValue={1} min={1} max={8} step={0.5} unit="px" onChange={(size, done) => setG({ size }, done)} />
-      <div className="flex items-center justify-between">
-        <span className="text-ed-label text-muted-foreground">Animated (game)</span>
-        <Toggle aria-label="Animated grain" checked={!!g?.animated} onChange={(animated) => setG({ animated: animated || undefined }, true)} />
-      </div>
-    </>
+    <LookSection title="Vignette" icon={<Aperture />} summary={v?.amount ? `${v.amount > 0 ? '+' : ''}${v.amount}` : undefined} onReset={v ? () => onChange(without(look, 'vignette'), true) : undefined}>
+      <LookSlider label="Amount" value={v?.amount ?? 0} min={-100} max={100} step={1} track="linear-gradient(90deg, #000, #888, #fff)" onChange={(amount, done) => set({ amount }, done)} />
+      <LookSlider label="Midpoint" value={v?.midpoint ?? 50} defaultValue={50} min={0} max={100} step={1} onChange={(midpoint, done) => set({ midpoint }, done)} />
+      <LookSlider label="Roundness" value={v?.roundness ?? 0} min={-100} max={100} step={1} onChange={(roundness, done) => set({ roundness }, done)} />
+      <LookSlider label="Feather" value={v?.feather ?? 50} defaultValue={50} min={0} max={100} step={1} onChange={(feather, done) => set({ feather }, done)} />
+      <Field label="Colour">
+        <ColorField aria-label="Vignette colour" allowEmpty value={v?.color ?? ''} onChange={(color) => set({ color: color || undefined }, true)} />
+      </Field>
+    </LookSection>
   )
 }
 
-/** Default + one tab per profile; the selected one is what the canvas shows and what the panel edits. */
-function ProfileTabs({ profile, hasOwn }: { profile: string | null; hasOwn: (p: string) => boolean }) {
+function GrainSection({ look, onChange }: { look: Look; onChange: Change<Look> }) {
+  const g = look.grain
+  const set = (patch: Partial<Grain>, done: boolean) => {
+    const next: Grain = { amount: g?.amount ?? 0, ...g, ...patch }
+    onChange(next.amount > 0 ? { ...without(look, 'grain'), grain: next } : without(look, 'grain'), done)
+  }
+  return (
+    <LookSection title="Grain" icon={<Sparkles />} summary={g?.amount ? `${g.amount}` : undefined} onReset={g ? () => onChange(without(look, 'grain'), true) : undefined}>
+      <LookSlider label="Amount" value={g?.amount ?? 0} min={0} max={100} step={1} onChange={(amount, done) => set({ amount }, done)} />
+      <LookSlider label="Size" value={g?.size ?? 1} defaultValue={1} min={1} max={8} step={0.5} unit="px" onChange={(size, done) => set({ size }, done)} />
+      <Field label="Animated (game)">
+        <Toggle aria-label="Animated grain" checked={!!g?.animated} onChange={(animated) => set({ animated: animated || undefined }, true)} />
+      </Field>
+    </LookSection>
+  )
+}
+
+/** Default + one option per profile; the picked one is what the canvas shows and what the panel edits. */
+function ProfilePicker({ profile, hasOwn }: { profile: string | null; hasOwn: (p: string) => boolean }) {
   const lib = useLookLibrary()
   const [renaming, setRenaming] = useState<string | null>(null)
   const profiles = lib.file.profiles
+  const start = lib.file.start ?? profiles[0]?.id
+  const current = profiles.find((p) => p.id === profile)
   const addProfile = () => {
     const id = lookId('p')
     updateLooksFile((f) => ({ ...f, profiles: [...f.profiles, { id, name: `Profile ${f.profiles.length + 1}` }] }))
     setLookView({ profile: id })
     setRenaming(id)
   }
+  const renamingProfile = profiles.find((p) => p.id === renaming)
+
   return (
-    <div className="flex flex-wrap items-center gap-1" role="tablist" aria-label="Look profiles">
-      <button type="button" role="tab" aria-selected={profile === null} className={cn('rounded-md px-2 py-0.5 text-ed-label', profile === null ? 'bg-primary text-primary-foreground' : 'bg-muted/50 text-muted-foreground hover:text-foreground')} onClick={() => setLookView({ profile: null })}>
-        Default
-      </button>
-      {profiles.map((p) =>
-        renaming === p.id ? (
-          <RenameInput key={p.id} className="h-6 w-24" initial={p.name} label="Profile name" onRename={(name) => updateLooksFile((f) => ({ ...f, profiles: f.profiles.map((x) => (x.id === p.id ? { ...x, name } : x)) }))} onClose={() => setRenaming(null)} />
-        ) : (
-          <DropdownMenu key={p.id}>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={profile === p.id}
-              className={cn('group relative flex items-center gap-1 rounded-md px-2 py-0.5 text-ed-label', profile === p.id ? 'bg-primary text-primary-foreground' : 'bg-muted/50 text-muted-foreground hover:text-foreground')}
-              onClick={() => setLookView({ profile: p.id })}
-              onDoubleClick={() => setRenaming(p.id)}
-              title={hasOwn(p.id) ? `${p.name}: this subject has its own look` : `${p.name}: same as Default here`}
-            >
-              {p.name}
-              {hasOwn(p.id) ? <span className="h-1.5 w-1.5 rounded-full bg-current" /> : null}
-              {lib.file.start === p.id || (!lib.file.start && profiles[0]?.id === p.id) ? <span className="text-[9px] opacity-70">▶</span> : null}
-              {profile === p.id ? (
-                <DropdownMenuTrigger asChild>
-                  <span role="button" aria-label={`${p.name} profile menu`} className="-mr-1 rounded px-0.5 hover:bg-black/20" onClick={(e) => e.stopPropagation()}>
-                    <MoreHorizontal className="h-3 w-3" />
-                  </span>
-                </DropdownMenuTrigger>
-              ) : null}
-            </button>
-            <DropdownMenuContent align="start">
-              <DropdownMenuItem onSelect={() => setRenaming(p.id)}>
-                <Pencil className="mr-2 h-3.5 w-3.5" /> Rename
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-1">
+        <span className="ed-section-title flex-1">Profile</span>
+        <IconButton aria-label="New profile" title="New profile" onClick={addProfile}>
+          <Plus />
+        </IconButton>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <IconButton aria-label="Profile menu" disabled={!current}>
+              <MoreHorizontal />
+            </IconButton>
+          </DropdownMenuTrigger>
+          {current ? (
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => setRenaming(current.id)}>
+                <Pencil /> Rename {current.name}
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => updateLooksFile((f) => ({ ...f, start: p.id }))}>
-                <Check className="mr-2 h-3.5 w-3.5" /> Game starts in this profile
+              <DropdownMenuItem disabled={start === current.id} onSelect={() => updateLooksFile((f) => ({ ...f, start: current.id }))}>
+                <Check /> The game starts in {current.name}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                className="text-destructive"
+                destructive
                 onSelect={() => {
-                  updateLooksFile((f) => ({ ...f, profiles: f.profiles.filter((x) => x.id !== p.id), ...(f.start === p.id ? { start: undefined } : {}) }))
+                  updateLooksFile((f) => ({ ...f, profiles: f.profiles.filter((x) => x.id !== current.id), ...(f.start === current.id ? { start: undefined } : {}) }))
                   setLookView({ profile: null })
                 }}
               >
-                <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete profile
+                <Trash2 /> Delete {current.name}
               </DropdownMenuItem>
             </DropdownMenuContent>
-          </DropdownMenu>
-        )
+          ) : null}
+        </DropdownMenu>
+        <InfoTip>
+          Profiles are the project&apos;s lighting states (time of day, weather...). Every map, layer and picture can have a look per profile; without one it uses its Default look (a dot marks the profiles this one has its own look in). The game switches profile with the Set Look Profile event command and starts in the one marked ▶.
+        </InfoTip>
+      </div>
+      {renamingProfile ? (
+        <RenameInput key={renamingProfile.id} initial={renamingProfile.name} label="Profile name" onRename={(name) => updateLooksFile((f) => ({ ...f, profiles: f.profiles.map((x) => (x.id === renamingProfile.id ? { ...x, name } : x)) }))} onClose={() => setRenaming(null)} />
+      ) : (
+        <Segmented<string>
+          aria-label="Look profile"
+          className="flex w-full flex-wrap"
+          value={profile ?? DEFAULT_TAB}
+          options={[
+            { value: DEFAULT_TAB, label: 'Default' },
+            ...profiles.map((p) => ({
+              value: p.id,
+              title: hasOwn(p.id) ? `${p.name}: its own look here` : `${p.name}: the same as Default here`,
+              label: (
+                <>
+                  {start === p.id ? <span aria-hidden className="text-[9px] opacity-70">▶</span> : null}
+                  {p.name}
+                  {hasOwn(p.id) ? <span aria-hidden className="size-1.5 rounded-full bg-current" /> : null}
+                </>
+              ),
+              ariaLabel: p.name,
+            })),
+          ]}
+          onChange={(v) => setLookView({ profile: v === DEFAULT_TAB ? null : v })}
+        />
       )}
-      <IconButton aria-label="New profile" title="New profile" onClick={addProfile}>
-        <Plus className="h-3.5 w-3.5" />
-      </IconButton>
-      <InfoTip>
-        Profiles are the project&apos;s lighting states (time of day, weather...). Every map, layer and picture can have a look per profile; without one it uses its Default look. The game switches profile with the Set Look Profile event command (▶ = the profile it starts in). Double-click a tab to rename it.
-      </InfoTip>
     </div>
   )
 }
@@ -156,13 +174,13 @@ function PresetMenu({ look, onApply }: { look: Look | undefined; onApply: (l: Lo
           <Wand2 /> <span className="truncate">{current ?? 'Presets'}</span>
         </EdButton>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-48">
+      <DropdownMenuContent align="start">
         {PRESET_GROUPS.map((g) => (
           <DropdownMenuSub key={g}>
-            <DropdownMenuSubTrigger className="text-ed-body">{g}</DropdownMenuSubTrigger>
+            <DropdownMenuSubTrigger>{g}</DropdownMenuSubTrigger>
             <DropdownMenuSubContent>
               {LOOK_PRESETS.filter((p) => p.group === g).map((p) => (
-                <DropdownMenuItem key={p.id} className="text-ed-body" onSelect={() => onApply(applyPreset(look, p))}>
+                <DropdownMenuItem key={p.id} onSelect={() => onApply(applyPreset(look, p))}>
                   {p.name}
                 </DropdownMenuItem>
               ))}
@@ -172,9 +190,9 @@ function PresetMenu({ look, onApply }: { look: Look | undefined; onApply: (l: Lo
         {presets.length ? (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuLabel className="text-ed-label">Project presets</DropdownMenuLabel>
+            <DropdownMenuLabel>Project presets</DropdownMenuLabel>
             {presets.map((p) => (
-              <DropdownMenuItem key={p.id} className="text-ed-body" onSelect={() => onApply(applyPreset(look, p))}>
+              <DropdownMenuItem key={p.id} onSelect={() => onApply(applyPreset(look, p))}>
                 {p.name}
               </DropdownMenuItem>
             ))}
@@ -192,7 +210,7 @@ export function LookPanel() {
   const [tab, setTab] = useState<Tab>('adjust')
   const [savingPreset, setSavingPreset] = useState(false)
   const map = ctx.activeMap
-  if (!map) return <div className="p-3 text-center text-ed-label text-muted-foreground">No map open</div>
+  if (!map) return <div className="ed-empty">No map open</div>
 
   const followed = selectedSubject(ctx.layers, ctx.activeLayerId, ctx.selectedImageId)
   const ref: LookSubjectRef = view.pinned && subjectExists(ctx.layers, view.pinned) ? view.pinned : followed
@@ -206,6 +224,7 @@ export function LookPanel() {
   const profileName = profile ? lib.file.profiles.find((p) => p.id === profile)?.name : 'Default'
 
   const edit = (change: (l: Look) => Look | undefined, done: boolean) => ctx.setLook(ref, editLookSet(set, profile, change), done)
+  const editPart = <K extends 'masks' | 'shaders'>(key: K) => (value: Look[K] & unknown[], done: boolean) => edit((l) => (value.length ? { ...without(l, key), [key]: value } : without(l, key)), done)
 
   // the mask space: a picture's own pixels, else the part of the map in view
   const px = mapPixelSize(map)
@@ -213,21 +232,40 @@ export function LookPanel() {
   const box = resolved ? { x: 0, y: 0, w: resolved.src.w, h: resolved.src.h } : (getCanvasViewRect() ?? { x: 0, y: 0, w: px.width, h: px.height })
 
   const subjects: { value: LookSubjectRef['kind']; label: string; icon: React.ReactNode; ref: LookSubjectRef | null }[] = [
-    { value: 'map', label: 'Map', icon: <MapIcon className="h-3.5 w-3.5" />, ref: { kind: 'map' } },
-    { value: 'layer', label: 'Layer', icon: <Layers className="h-3.5 w-3.5" />, ref: followed.kind !== 'map' ? { kind: 'layer', layerId: followed.layerId } : ref.kind !== 'map' ? { kind: 'layer', layerId: ref.layerId } : null },
-    { value: 'picture', label: 'Picture', icon: <ImageIcon className="h-3.5 w-3.5" />, ref: followed.kind === 'picture' ? followed : ref.kind === 'picture' ? ref : null },
+    { value: 'map', label: 'Map', icon: <MapIcon />, ref: { kind: 'map' } },
+    { value: 'layer', label: 'Layer', icon: <Layers />, ref: followed.kind !== 'map' ? { kind: 'layer', layerId: followed.layerId } : ref.kind !== 'map' ? { kind: 'layer', layerId: ref.layerId } : null },
+    { value: 'picture', label: 'Picture', icon: <ImageIcon />, ref: followed.kind === 'picture' ? followed : ref.kind === 'picture' ? ref : null },
   ]
   const subjectName = ref.kind === 'map' ? map.name || map.fileName : ref.kind === 'layer' ? (layer?.name ?? 'Layer') : picture?.name || picture?.graphicId?.split('/').pop() || picture?.assetId || 'Picture'
   const hasOwn = (p: string) => !!ownLook(set, p)
   const counts = { masks: shown.masks?.length ?? 0, shaders: shown.shaders?.length ?? 0 }
   const enabled = shown.enabled !== false
+  // a picture without its own shadow gets its layer's
+  const layerShadow = ref.kind === 'picture' ? (resolveLook(layer?.look, profile)?.shadow ?? undefined) : undefined
 
   return (
-    <div className="flex flex-col gap-2 text-ed-body" data-testid="look-panel">
-      {/* whose look */}
-      <div className="flex items-center gap-1">
+    <div className="flex w-full flex-col gap-3 text-left" data-testid="look-panel">
+      <Card
+        caps
+        title={<span title={subjectName}>Look · {subjectName}</span>}
+        actions={
+          <>
+            {inherited ? <Badge title={`No ${profileName} look yet: showing Default. Any change makes one.`}>= Default</Badge> : null}
+            <EyeButton name="this look" visible={enabled} disabled={!look} onToggle={() => edit((l) => ({ ...l, enabled: enabled ? false : undefined }), true)} />
+            <IconButton
+              aria-label={view.pinned ? 'Unpin: follow the selection' : 'Pin this subject'}
+              title={view.pinned ? 'Pinned: click to follow the selection again' : 'Keep editing this one when the selection changes'}
+              active={!!view.pinned}
+              onClick={() => setLookView({ pinned: view.pinned ? null : ref })}
+            >
+              {view.pinned ? <Pin /> : <PinOff />}
+            </IconButton>
+          </>
+        }
+      >
         <Segmented<LookSubjectRef['kind']>
           aria-label="Look of"
+          className="w-full"
           value={ref.kind}
           options={subjects.map((s) => ({ value: s.value, label: s.label, icon: s.icon, title: s.ref ? undefined : s.value === 'picture' ? 'Pick a picture on an image layer' : 'Select a tile or image layer' }))}
           onChange={(k) => {
@@ -235,76 +273,59 @@ export function LookPanel() {
             if (target) setLookView({ pinned: k === followed.kind && !view.pinned ? null : target })
           }}
         />
-        <span className="flex-1" />
-        <IconButton aria-label={view.pinned ? 'Unpin: follow the selection' : 'Pin this subject'} title={view.pinned ? 'Pinned: click to follow the selection again' : 'Keep editing this one when the selection changes'} active={!!view.pinned} onClick={() => setLookView({ pinned: view.pinned ? null : ref })}>
-          {view.pinned ? <Pin className="h-3.5 w-3.5" /> : <PinOff className="h-3.5 w-3.5" />}
-        </IconButton>
-      </div>
-      <div className="flex items-center gap-1.5">
-        <IconButton aria-label={enabled ? 'Turn this look off' : 'Turn this look on'} title={enabled ? 'Look on' : 'Look off'} onClick={() => edit((l) => ({ ...l, enabled: enabled ? false : undefined }), true)} disabled={!look}>
-          {enabled ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
-        </IconButton>
-        <span className="min-w-0 flex-1 truncate font-medium" title={subjectName}>
-          {subjectName}
-        </span>
-        {inherited ? (
-          <span className="ed-badge px-1.5 py-0.5 text-[10px]" title={`No ${profileName} look yet: showing Default. Any change makes one.`}>
-            = Default
-          </span>
-        ) : null}
-      </div>
-
-      <ProfileTabs profile={profile} hasOwn={hasOwn} />
-
-      <div className="flex items-center gap-1">
-        <PresetMenu look={look} onApply={(l) => edit(() => l, true)} />
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <IconButton aria-label="Look menu">
-              <MoreHorizontal className="h-3.5 w-3.5" />
-            </IconButton>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem disabled={!look} onSelect={() => (copiedLook = structuredClone(shown))}>
-              <Copy className="mr-2 h-3.5 w-3.5" /> Copy look
-            </DropdownMenuItem>
-            <DropdownMenuItem disabled={!copiedLook} onSelect={() => copiedLook && edit(() => structuredClone(copiedLook!), true)}>
-              <Clipboard className="mr-2 h-3.5 w-3.5" /> Paste look
-            </DropdownMenuItem>
-            <DropdownMenuItem disabled={!look} onSelect={() => setSavingPreset(true)}>
-              <Save className="mr-2 h-3.5 w-3.5" /> Save as project preset…
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            {profile !== null ? (
-              <DropdownMenuItem disabled={!ownLook(set, profile)} onSelect={() => ctx.setLook(ref, withProfileLook(set, profile, undefined), true)}>
-                <RotateCcw className="mr-2 h-3.5 w-3.5" /> Use Default for {profileName}
+        <ProfilePicker profile={profile} hasOwn={hasOwn} />
+        <div className="flex items-center gap-1">
+          <PresetMenu look={look} onApply={(l) => edit(() => l, true)} />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <IconButton aria-label="Look menu">
+                <MoreHorizontal />
+              </IconButton>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem disabled={!look} onSelect={() => (copiedLook = structuredClone(shown))}>
+                <Copy /> Copy look
               </DropdownMenuItem>
-            ) : null}
-            <DropdownMenuItem disabled={!look} className="text-destructive" onSelect={() => ctx.setLook(ref, withProfileLook(set, profile, profile === null ? undefined : {}), true)}>
-              <Trash2 className="mr-2 h-3.5 w-3.5" /> Reset {profileName} look
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-      {savingPreset ? (
-        <RenameInput
-          initial={look?.preset ? 'My preset' : `${subjectName} ${profileName}`}
-          label="Preset name"
-          onRename={(name) => {
-            const { masks: _m, shaders: _s, preset: _p, ...rest } = shown
-            updateLooksFile((f) => ({ ...f, presets: [...(f.presets ?? []), { id: lookId('preset'), name, look: rest }] }))
-          }}
-          onClose={() => setSavingPreset(false)}
-        />
-      ) : null}
+              <DropdownMenuItem disabled={!copiedLook} onSelect={() => copiedLook && edit(() => structuredClone(copiedLook!), true)}>
+                <Clipboard /> Paste look
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled={!look} onSelect={() => setSavingPreset(true)}>
+                <Save /> Save as project preset…
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              {profile !== null ? (
+                <DropdownMenuItem disabled={!ownLook(set, profile)} onSelect={() => ctx.setLook(ref, withProfileLook(set, profile, undefined), true)}>
+                  <RotateCcw /> Use Default for {profileName}
+                </DropdownMenuItem>
+              ) : null}
+              <DropdownMenuItem destructive disabled={!look} onSelect={() => ctx.setLook(ref, withProfileLook(set, profile, profile === null ? undefined : {}), true)}>
+                <Trash2 /> Reset {profileName} look
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+        {savingPreset ? (
+          <RenameInput
+            initial={look?.preset ? 'My preset' : `${subjectName} ${profileName}`}
+            label="Preset name"
+            onRename={(name) => {
+              // a preset is a grade: masks, shaders and the shadow belong to the subject
+              const { masks: _m, shaders: _s, shadow: _sh, preset: _p, ...rest } = shown
+              updateLooksFile((f) => ({ ...f, presets: [...(f.presets ?? []), { id: lookId('preset'), name, look: rest }] }))
+            }}
+            onClose={() => setSavingPreset(false)}
+          />
+        ) : null}
+      </Card>
 
       <Segmented<Tab>
         aria-label="Look section"
+        className="w-full"
         value={tab}
         options={[
-          { value: 'adjust', label: 'Edit', icon: <SlidersHorizontal className="h-3.5 w-3.5" /> },
-          { value: 'masks', label: counts.masks ? `Masks ${counts.masks}` : 'Masks', icon: <Pencil className="h-3.5 w-3.5" /> },
-          { value: 'shaders', label: counts.shaders ? `Shaders ${counts.shaders}` : 'Shaders', icon: <Sparkles className="h-3.5 w-3.5" /> },
+          { value: 'adjust', label: 'Edit', icon: <SlidersHorizontal /> },
+          { value: 'masks', label: counts.masks ? `Masks ${counts.masks}` : 'Masks', icon: <Pencil /> },
+          { value: 'shaders', label: counts.shaders ? `Shaders ${counts.shaders}` : 'Shaders', icon: <Sparkles /> },
         ]}
         onChange={(t) => {
           setTab(t)
@@ -312,37 +333,31 @@ export function LookPanel() {
         }}
       />
 
-      <div className={cn(!enabled && 'opacity-60')}>
+      <div className={enabled ? 'flex flex-col gap-2' : 'flex flex-col gap-2 opacity-60'}>
         {tab === 'adjust' ? (
-          <LookAdjustEditor
-            adjust={shown.adjust}
-            onChange={(adjust, done) => edit((l) => withAdjust(l, adjust), done)}
-            effectsExtra={<VignetteGrain look={shown} onChange={(l, done) => edit(() => l, done)} />}
-            onResetEffectsExtra={() => edit(({ vignette: _v, grain: _g, ...rest }) => rest, true)}
-          />
+          <>
+            {ref.kind !== 'map' ? (
+              <LookShadowEditor
+                shadow={shown.shadow}
+                inherited={layerShadow}
+                defaultOpen={!!shown.shadow}
+                onChange={(shadow, done) => edit((l) => (shadow ? { ...without(l, 'shadow'), shadow } : without(l, 'shadow')), done)}
+              />
+            ) : null}
+            <LookAdjustEditor adjust={shown.adjust} onChange={(adjust, done) => edit((l) => withAdjust(l, adjust), done)} />
+            <VignetteSection look={shown} onChange={(l, done) => edit(() => l, done)} />
+            <GrainSection look={shown} onChange={(l, done) => edit(() => l, done)} />
+          </>
         ) : tab === 'masks' ? (
           <LookMasksEditor
             masks={shown.masks ?? []}
             subject={subject}
             box={box}
             spaceLabel={ref.kind === 'picture' ? "the picture's own pixels (before scaling and flipping)" : 'map pixels'}
-            onChange={(masks, done) =>
-              edit((l) => {
-                const { masks: _old, ...rest } = l
-                return masks.length ? { ...rest, masks } : rest
-              }, done)
-            }
+            onChange={editPart('masks')}
           />
         ) : (
-          <LookShadersEditor
-            shaders={shown.shaders ?? []}
-            onChange={(shaders, done) =>
-              edit((l) => {
-                const { shaders: _old, ...rest } = l
-                return shaders.length ? { ...rest, shaders } : rest
-              }, done)
-            }
-          />
+          <LookShadersEditor shaders={shown.shaders ?? []} onChange={editPart('shaders')} />
         )}
       </div>
     </div>

@@ -8,6 +8,8 @@ import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, ClipboardPaste, Copy, Co
 import { useEditorClipboard } from '@/store/editorClipboard'
 import { groupYSort, inheritedItemYSort, itemYSort, layerYSort } from '../../../../../shared/ySort'
 import { YSortBadge, YSortMenuItem } from '../ui/YSortMenuItem'
+import { DropShadowMenuItem, useDropShadow } from '../look/DropShadowMenuItem'
+import { hasShadow } from '@/lib/look/lookEdit'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuShortcut, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from '@/components/ui/context-menu'
 import type { ImageItem } from '@/types/editor'
 import { imagePickLabel, imagePickName } from '@/lib/graphicAssets'
@@ -18,7 +20,7 @@ import { useBindings } from '@/store/shortcutStore'
 import { sortedImages } from '@/lib/layerOrder'
 import { imageRows } from '@/lib/imageGroups'
 import type { ImageGroup } from '@/types/editor'
-import { Badge, EdButton, Field, IconButton, InfoTip, NumberField, TextField, Toggle } from '../ui/controls'
+import { Badge, Card, EdButton, Field, IconButton, NumberField, TextField, Toggle } from '../ui/controls'
 import { ZoomPane } from '../ui/ZoomPane'
 import { ImageItemView } from '../sprites/ImageItemView'
 import { ScaleField } from './ScaleField'
@@ -79,6 +81,7 @@ const nameOf = (img: ImageItem) => img.name || imagePickName(img)
 
 export function ImagesPanel() {
   const ctx = useEditorSelector(selectImages)
+  const dropShadow = useDropShadow()
   const layer = ctx.layers.find((l) => l.id === ctx.activeLayerId && l.type === 'image') ?? null
   const [pickerOpen, setPickerOpen] = useState(false)
   const [cropOpen, setCropOpen] = useState(false)
@@ -255,42 +258,42 @@ export function ImagesPanel() {
                   </div>
                 </ContextMenuTrigger>
                 {/* Focus stays where the menu put it (Rename opens a name field that must keep it). */}
-                <ContextMenuContent className="w-56" onCloseAutoFocus={(e) => e.preventDefault()}>
+                <ContextMenuContent onCloseAutoFocus={(e) => e.preventDefault()}>
                   <ContextMenuItem disabled={locked} onClick={() => { ctx.setSelectedImageId(img.id); setRenaming(img.id) }}>
-                    <Edit2 className="mr-2 h-3.5 w-3.5" />
+                    <Edit2 />
                     Rename
                   </ContextMenuItem>
                   <ContextMenuItem disabled={locked} onClick={() => ctx.placeMultiple(layer.id, img.id)} title="Click the map to add more copies: same picture, crop, scale and flips">
-                    <Stamp className="mr-2 h-3.5 w-3.5" />
+                    <Stamp />
                     Place more copies
                     {placeKeys && <ContextMenuShortcut>{placeKeys}</ContextMenuShortcut>}
                   </ContextMenuItem>
                   <ContextMenuSeparator />
                   <ContextMenuItem disabled={locked || i === 0} onClick={() => ctx.reorderImage(layer.id, img.id, 1)}>
-                    <ArrowUp className="mr-2 h-3.5 w-3.5" />
+                    <ArrowUp />
                     Bring forward
                   </ContextMenuItem>
                   <ContextMenuItem disabled={locked || i === rows.length - 1} onClick={() => ctx.reorderImage(layer.id, img.id, -1)}>
-                    <ArrowDown className="mr-2 h-3.5 w-3.5" />
+                    <ArrowDown />
                     Send backward
                   </ContextMenuItem>
                   <ContextMenuSeparator />
                   <ContextMenuItem disabled={locked} onClick={() => newGroup(targets)}>
-                    <GroupIcon className="mr-2 h-3.5 w-3.5" />
+                    <GroupIcon />
                     {targets.length > 1 ? `Group ${targets.length} pictures` : 'Group this picture'}
                     {groupKeys && <ContextMenuShortcut>{groupKeys}</ContextMenuShortcut>}
                   </ContextMenuItem>
                   <ContextMenuItem disabled={locked} onClick={() => newGroup()}>
-                    <FolderPlus className="mr-2 h-3.5 w-3.5" />
+                    <FolderPlus />
                     New empty group
                   </ContextMenuItem>
                   {groups.length > 0 && (
                     <ContextMenuSub>
                       <ContextMenuSubTrigger disabled={locked}>
-                        <FolderInput className="mr-2 h-3.5 w-3.5" />
+                        <FolderInput />
                         Move to group
                       </ContextMenuSubTrigger>
-                      <ContextMenuSubContent className="w-44">
+                      <ContextMenuSubContent>
                         {groups.map((g) => (
                           <ContextMenuItem key={g.id} disabled={targets.every((id) => images.find((m) => m.id === id)?.groupId === g.id)} onClick={() => ctx.setImagesGroup(layer.id, targets, g.id)}>
                             <span className="truncate">{g.name}</span>
@@ -301,7 +304,7 @@ export function ImagesPanel() {
                   )}
                   {targets.some((id) => images.find((m) => m.id === id)?.groupId) && (
                     <ContextMenuItem disabled={locked} onClick={() => ctx.setImagesGroup(layer.id, targets, null)}>
-                      <FolderMinus className="mr-2 h-3.5 w-3.5" />
+                      <FolderMinus />
                       Take out of group
                     </ContextMenuItem>
                   )}
@@ -314,20 +317,21 @@ export function ImagesPanel() {
                     title="Draw among the characters by how far down the picture stands"
                     onChange={(v) => ctx.setImagesYSort(layer.id, targets, v)}
                   />
+                  <DropShadowMenuItem has={hasShadow(img.look)} disabled={locked} onClick={() => dropShadow({ kind: 'picture', layerId: layer.id, imageId: img.id })} />
                   <ContextMenuSeparator />
                   <ContextMenuItem onClick={() => ctx.copyImages(layer.id, targets)}>
-                    <Copy className="mr-2 h-3.5 w-3.5" />
+                    <Copy />
                     Copy
                     {editKeys.copy && <ContextMenuShortcut>{editKeys.copy}</ContextMenuShortcut>}
                   </ContextMenuItem>
                   <ContextMenuItem disabled={locked} onClick={() => ctx.duplicateImages(layer.id, targets)}>
-                    <CopyPlus className="mr-2 h-3.5 w-3.5" />
+                    <CopyPlus />
                     Duplicate
                     {editKeys.duplicate && <ContextMenuShortcut>{editKeys.duplicate}</ContextMenuShortcut>}
                   </ContextMenuItem>
                   <ContextMenuSeparator />
-                  <ContextMenuItem disabled={locked} className="text-red-400 focus:bg-red-500/10 focus:text-red-400" onClick={() => ctx.deleteImages(layer.id, targets)}>
-                    <Trash2 className="mr-2 h-3.5 w-3.5" />
+                  <ContextMenuItem disabled={locked} destructive onClick={() => ctx.deleteImages(layer.id, targets)}>
+                    <Trash2 />
                     {targets.length > 1 ? `Delete ${targets.length} pictures` : 'Delete'}
                   </ContextMenuItem>
                 </ContextMenuContent>
@@ -350,16 +354,24 @@ export function ImagesPanel() {
 
   return (
     <div className="flex w-full flex-col gap-3 text-left" data-testid="images-panel">
-      <section className="ed-card" data-testid="image-layer-section">
-        <div className="ed-card-head">
-          <span className="ed-section-title min-w-0 flex-1 truncate" title={`Images · ${layer.name}`}>Images · {layer.name}</span>
-          <InfoTip>Images snap to the grid while the magnet in the top toolbar is on, and move freely when it is off. Ctrl/Cmd+click adds or removes an image from the selection and Shift+click picks a range; Delete, Duplicate, Ctrl/Cmd+C and Ctrl/Cmd+V work on all of them.</InfoTip>
+      <Card
+        caps
+        title={<span title={`Images · ${layer.name}`}>Images · {layer.name}</span>}
+        info={
+          <>Images snap to the grid while the magnet in the top toolbar is on, and move freely when it is off. Ctrl/Cmd+click adds or removes an image from the selection and Shift+click picks a range; Delete, Duplicate, Ctrl/Cmd+C and Ctrl/Cmd+V work on all of them.</>
+        }
+        actions={
+          <>
           {picked.length > 1 && <Badge>{picked.length} selected</Badge>}
           <Badge>{images.length}</Badge>
           <button type="button" className="ed-btn" data-size="sm" data-variant="primary" aria-label="Add image" title={openGroup ? `Add a picture to the group ${openGroup.name}` : 'Add a picture to this layer'} disabled={locked} onClick={() => openPicker()}>
             <Plus />
             Add
           </button>
+          </>
+        }
+        data-testid="image-layer-section"
+      >
           <PicturePicker
             open={pickerOpen}
             onOpenChange={setPickerOpen}
@@ -372,10 +384,9 @@ export function ImagesPanel() {
             onImport={importPictures}
             importTo={importTo}
           />
-        </div>
         <ContextMenu>
         <ContextMenuTrigger asChild>
-        <div className="ed-card-body" data-testid="image-list-area">
+        <div className="flex flex-col gap-2" data-testid="image-list-area">
           {ctx.pendingImage && (
             <div className="flex items-center gap-2 rounded-md border border-primary/40 bg-primary/10 px-2 py-1.5 text-ed-label" data-testid="placing-banner">
               <span className="min-w-0 flex-1 truncate">Placing {pendingLabel}: click the map (Esc to stop)</span>
@@ -428,26 +439,28 @@ export function ImagesPanel() {
           )}
         </div>
         </ContextMenuTrigger>
-        <ContextMenuContent className="w-48">
+        <ContextMenuContent>
           <ContextMenuItem disabled={locked} onClick={() => newGroup()}>
-            <FolderPlus className="mr-2 h-3.5 w-3.5" />
+            <FolderPlus />
             New group
           </ContextMenuItem>
           {picked.length > 0 && (
             <ContextMenuItem disabled={locked} onClick={() => newGroup(picked)}>
-              <GroupIcon className="mr-2 h-3.5 w-3.5" />
+              <GroupIcon />
               {picked.length > 1 ? `Group ${picked.length} pictures` : 'Group the picked picture'}
               {groupKeys && <ContextMenuShortcut>{groupKeys}</ContextMenuShortcut>}
             </ContextMenuItem>
           )}
         </ContextMenuContent>
         </ContextMenu>
-      </section>
+      </Card>
 
       {selected && (
-        <section className="ed-card" data-testid="image-props">
-          <div className="ed-card-head">
-            <span className="ed-section-title min-w-0 flex-1 truncate" title={imagePickLabel(selected)}>{nameOf(selected)}</span>
+        <Card
+          caps
+          title={<span title={imagePickLabel(selected)}>{nameOf(selected)}</span>}
+          actions={
+            <>
             <EdButton
               size="sm"
               aria-label="Crop image"
@@ -480,8 +493,10 @@ export function ImagesPanel() {
             >
               <Stamp />
             </IconButton>
-          </div>
-          <div className="ed-card-body">
+            </>
+          }
+          data-testid="image-props"
+        >
             {previewSize && (
               <div className="flex h-60 min-h-0 flex-col" data-testid="image-preview">
                 <ZoomPane key={`${selected.id}`} width={previewSize.w} height={previewSize.h} maxFit={8} hint={false} compact focus={cropFocus}>
@@ -550,7 +565,6 @@ export function ImagesPanel() {
             <Field label="Flip vertically">
               <Toggle checked={!!selected.flipY} onChange={(flipY) => ctx.updateImage(layer.id, selected.id, { flipY })} disabled={locked} aria-label="Flip image vertically" />
             </Field>
-          </div>
           {graphic && (
             <CropImageDialog
               open={cropOpen}
@@ -562,7 +576,7 @@ export function ImagesPanel() {
               onClose={() => setCropOpen(false)}
             />
           )}
-        </section>
+        </Card>
       )}
     </div>
   )
@@ -682,32 +696,32 @@ function ImageGroupBlock({
             )}
           </div>
         </ContextMenuTrigger>
-        <ContextMenuContent className="w-52" onCloseAutoFocus={(e) => e.preventDefault()}>
+        <ContextMenuContent onCloseAutoFocus={(e) => e.preventDefault()}>
           <ContextMenuItem disabled={locked} onClick={() => setRenaming(true)}>
-            <Edit2 className="mr-2 h-3.5 w-3.5" />
+            <Edit2 />
             Rename
           </ContextMenuItem>
           <ContextMenuItem disabled={locked} onClick={onAddInside}>
-            <ImagePlus className="mr-2 h-3.5 w-3.5" />
+            <ImagePlus />
             Add picture inside…
           </ContextMenuItem>
           <ContextMenuItem disabled={locked} onClick={onNewGroup}>
-            <FolderPlus className="mr-2 h-3.5 w-3.5" />
+            <FolderPlus />
             New group
           </ContextMenuItem>
           <ContextMenuSeparator />
           <ContextMenuItem disabled={members.length === 0} onClick={() => ctx.copyImages(layerId, ids)}>
-            <Copy className="mr-2 h-3.5 w-3.5" />
+            <Copy />
             Copy
             {keys.copy && <ContextMenuShortcut>{keys.copy}</ContextMenuShortcut>}
           </ContextMenuItem>
           <ContextMenuItem disabled={locked || members.length === 0} onClick={() => ctx.duplicateImages(layerId, ids)} title="A copy of the group with all its pictures">
-            <CopyPlus className="mr-2 h-3.5 w-3.5" />
+            <CopyPlus />
             Duplicate
             {keys.duplicate && <ContextMenuShortcut>{keys.duplicate}</ContextMenuShortcut>}
           </ContextMenuItem>
           <ContextMenuItem disabled={locked || !canPaste} onClick={() => ctx.pasteImages(layerId, null, group.id)} title="Pastes the copied pictures into this group">
-            <ClipboardPaste className="mr-2 h-3.5 w-3.5" />
+            <ClipboardPaste />
             Paste inside
             {keys.paste && <ContextMenuShortcut>{keys.paste}</ContextMenuShortcut>}
           </ContextMenuItem>
@@ -717,7 +731,7 @@ function ImageGroupBlock({
             onClick={() => ctx.setImageGroupLocked(layerId, group.id, !group.locked)}
             title={group.locked ? 'Clicking a picture on the map picks just that picture again' : 'Clicking any picture of the group on the map picks the whole group'}
           >
-            {group.locked ? <Unlock className="mr-2 h-3.5 w-3.5" /> : <Lock className="mr-2 h-3.5 w-3.5" />}
+            {group.locked ? <Unlock /> : <Lock />}
             {group.locked ? 'Unlock Group' : 'Lock Group'}
           </ContextMenuItem>
           <YSortMenuItem
@@ -729,13 +743,13 @@ function ImageGroupBlock({
             onChange={(v) => ctx.setImageGroupYSort(layerId, group.id, v)}
           />
           <ContextMenuItem disabled={locked} onClick={() => ctx.ungroupImageGroup(layerId, group.id)} title="The pictures stay where they are, as loose pictures">
-            <Ungroup className="mr-2 h-3.5 w-3.5" />
+            <Ungroup />
             Ungroup
             {keys.ungroup && <ContextMenuShortcut>{keys.ungroup}</ContextMenuShortcut>}
           </ContextMenuItem>
           <ContextMenuSeparator />
-          <ContextMenuItem disabled={locked} className="text-red-400 focus:bg-red-500/10 focus:text-red-400" onClick={() => ctx.deleteImageGroup(layerId, group.id)}>
-            <Trash2 className="mr-2 h-3.5 w-3.5" />
+          <ContextMenuItem disabled={locked} destructive onClick={() => ctx.deleteImageGroup(layerId, group.id)}>
+            <Trash2 />
             {members.length > 0 ? 'Delete Group and Pictures' : 'Delete Group'}
           </ContextMenuItem>
         </ContextMenuContent>

@@ -159,6 +159,29 @@ export interface Grain {
   animated?: boolean
 }
 
+/** How a shadow is laid over what is under it (the modes Phaser's WebGL renderer and the canvas share). */
+export type ShadowBlend = 'normal' | 'multiply' | 'screen' | 'add'
+
+/**
+ * A drop shadow under a picture or a tile layer: its silhouette, blurred, tinted and offset (docs/looks.md). On an
+ * image layer's look it is every picture's shadow (a picture's own look can replace it, or switch it off).
+ */
+export interface LookShadow {
+  /** Offset in map pixels (the direction the light comes from is the opposite). */
+  x: number
+  y: number
+  /** Blur radius in map pixels (0 = a hard edge), 0..64. */
+  softness?: number
+  /** 0..100, default 50. */
+  opacity?: number
+  /** Default black. */
+  color?: string
+  /** Default multiply. */
+  blend?: ShadowBlend
+  /** Switched off: no shadow, and a picture's own off shadow hides its layer's. */
+  off?: boolean
+}
+
 /** A user shader (project/shaders/<id>.frag) with its parameter values. */
 export interface ShaderUse {
   id: string
@@ -175,6 +198,8 @@ export interface Look {
   masks?: LookMask[]
   vignette?: Vignette
   grain?: Grain
+  /** A drop shadow (layers and pictures; not part of the colour grade). */
+  shadow?: LookShadow
   shaders?: ShaderUse[]
   /** The preset it was started from (shown, nothing else). */
   preset?: string

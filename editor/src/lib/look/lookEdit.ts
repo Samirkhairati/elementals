@@ -2,7 +2,7 @@
 // without its own look starts from a copy of the default), and fresh masks / components with sensible geometry.
 
 import { lookId, MAX_COMPONENTS, MAX_MASKS } from '../../../../shared/look/schema'
-import type { Look, LookAdjust, LookMask, LookSet, MaskComponent, MaskComponentType, MaskMode } from '../../../../shared/look/types'
+import type { Look, LookAdjust, LookMask, LookSet, LookShadow, MaskComponent, MaskComponentType, MaskMode } from '../../../../shared/look/types'
 import type { ImageItem, Layer } from '@/types/editor'
 import { layerHasLook, ownLook, withProfileLook } from './lookSubjects'
 import type { LookSubjectRef } from './lookView'
@@ -36,7 +36,7 @@ export function lookInView(set: LookSet | undefined, profile: string | null): { 
 
 /** True when a look holds nothing at all (removed rather than stored, for the default look). */
 export function isEmptyLook(l: Look): boolean {
-  return l.enabled !== false && !l.adjust && !l.masks?.length && !l.vignette && !l.grain && !l.shaders?.length && !l.preset
+  return l.enabled !== false && !l.adjust && !l.masks?.length && !l.vignette && !l.grain && !l.shaders?.length && !l.preset && !l.shadow
 }
 
 /**
@@ -48,6 +48,19 @@ export function editLookSet(set: LookSet | undefined, profile: string | null, ch
   const next = change(look ?? {})
   const keep = next && (profile !== null || !isEmptyLook(next)) ? next : undefined
   return withProfileLook(set, profile, keep)
+}
+
+/** The look set casts a drop shadow in some profile. */
+export const hasShadow = (set: LookSet | undefined): boolean => !!set?.default?.shadow || Object.values(set?.profiles ?? {}).some((l) => !!l.shadow)
+
+/**
+ * A look set with a drop shadow in every profile: the default look and each profile's own look that has none yet (a
+ * profile with its own look does not see the default's, so it gets the shadow too).
+ */
+export function withShadowEverywhere(set: LookSet | undefined, shadow: LookShadow): LookSet {
+  const add = (l: Look | undefined): Look => (l?.shadow ? l : { ...(l ?? {}), shadow: { ...shadow } })
+  const profiles = set?.profiles ? Object.fromEntries(Object.entries(set.profiles).map(([id, l]) => [id, add(l)])) : undefined
+  return { ...(set ?? {}), default: add(set?.default), ...(profiles ? { profiles } : {}) }
 }
 
 // ── adjustments ────────────────────────────────────────────────────────────────────────────────────

@@ -8,6 +8,7 @@ import { resolveLook, LUT_SIZE } from "@shared/look/schema.ts";
 import { pictureSubject, WORLD_SUBJECT, type LookPlacement } from "@shared/look/shader.ts";
 import type { ShaderInfo } from "@shared/look/userShaders.ts";
 import type { LookSet, ShaderUse } from "@shared/look/types.ts";
+import { LookShadows } from "./LookShadows";
 import { lookState, type LookBlend } from "./lookState";
 import {
   LOOK_GRADE_PIPELINE,
@@ -55,6 +56,7 @@ export class LookRuntime {
   private mapSize = { w: 1, h: 1 };
   private unsubscribe: () => void;
   private warned = new Set<string>();
+  private readonly shadows: LookShadows;
 
   private warnOnce(w: string): void {
     if (this.warned.has(w)) return;
@@ -64,6 +66,7 @@ export class LookRuntime {
 
   constructor(scene: Phaser.Scene, shaders: ShaderInfo[]) {
     this.scene = scene;
+    this.shadows = new LookShadows(scene);
     this.shaders = new Map(shaders.map((s) => [s.id, s]));
     const r = scene.game.renderer;
     this.renderer = r instanceof Phaser.Renderer.WebGL.WebGLRenderer ? r : null;
@@ -81,13 +84,16 @@ export class LookRuntime {
   destroy(): void {
     this.unsubscribe();
     this.clear();
+    this.shadows.clear();
     for (const t of this.textures.values()) this.dropTextures(t);
     this.textures.clear();
   }
 
-  /** Shows a map's looks: its own (camera), its tile layers' and its pictures'. */
+  /** Shows a map's looks: its own (camera), its tile layers' and its pictures', and their drop shadows. */
   showMap(map: { look?: LookSet; size: { w: number; h: number }; tileLayers: { layer: Phaser.Tilemaps.TilemapLayer; look: LookSet }[]; pictures: PictureItem[] }): void {
     this.clear();
+    // shadows need no shader: they show with the canvas renderer too
+    this.shadows.show(map, lookState.blend);
     if (!this.renderer) return;
     this.mapSize = map.size;
     const camera = this.scene.cameras.main;
@@ -143,6 +149,7 @@ export class LookRuntime {
   }
 
   private applyBlend(b: LookBlend): void {
+    this.shadows.apply(b);
     for (const s of this.subjects) {
       const to = this.compiledFor(s, b.to);
       const compiled = b.t >= 1 || b.from === b.to ? to : mixCompiled(this.compiledFor(s, b.from), to, b.t);

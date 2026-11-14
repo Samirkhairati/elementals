@@ -2,14 +2,14 @@
 // intersect what the ones before them select, and its own adjustments. The mask being edited shows its handles on the
 // canvas (konva/KonvaMaskEditor) and, when the overlay is on, what it selects.
 
-import { Brush, Circle, Droplet, Eye, EyeOff, FlipHorizontal2, Layers, Minus, MoreHorizontal, Pipette, Plus, Square, SquareDashed, SunDim, Trash2, X } from 'lucide-react'
+import { Brush, Circle, Copy, Droplet, FlipHorizontal2, Layers, Minus, MoreHorizontal, Pipette, Plus, Square, SquareDashed, SunDim, Trash2, X } from 'lucide-react'
 import React from 'react'
 import type { LookMask, MaskComponent, MaskComponentType, MaskMode } from '../../../../../shared/look/types'
 import { canAddComponent, canAddMask, COMPONENT_LABELS, COMPONENT_ORDER, MODE_LABELS, newComponent, newMask, updateComponent } from '@/lib/look/lookEdit'
 import { getLookView, setLookView, useLookView, type LookViewState } from '@/lib/look/lookView'
 import { cn } from '@/lib/utils'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { EdButton, IconButton, InfoTip, NumberField, Segmented, TextField } from '../ui/controls'
+import { Card, EdButton, EyeButton, Field, IconButton, InfoTip, NumberField, Segmented, TextField } from '../ui/controls'
 import { ColorField } from '../ui/fields'
 import { LookAdjustEditor } from './LookAdjustEditor'
 import { LookSlider, type Change } from './lookControls'
@@ -17,19 +17,19 @@ import { LookSlider, type Change } from './lookControls'
 type Box = { x: number; y: number; w: number; h: number }
 
 export const COMPONENT_ICONS: Record<MaskComponentType, React.ReactNode> = {
-  all: <Layers className="h-3.5 w-3.5" />,
-  linear: <SquareDashed className="h-3.5 w-3.5" />,
-  radial: <Circle className="h-3.5 w-3.5" />,
-  rect: <Square className="h-3.5 w-3.5" />,
-  brush: <Brush className="h-3.5 w-3.5" />,
-  color: <Droplet className="h-3.5 w-3.5" />,
-  luminance: <SunDim className="h-3.5 w-3.5" />,
+  all: <Layers />,
+  linear: <SquareDashed />,
+  radial: <Circle />,
+  rect: <Square />,
+  brush: <Brush />,
+  color: <Droplet />,
+  luminance: <SunDim />,
 }
 
 const MODE_ICONS: Record<MaskMode, React.ReactNode> = {
-  add: <Plus className="h-3 w-3" />,
-  subtract: <Minus className="h-3 w-3" />,
-  intersect: <X className="h-3 w-3" />,
+  add: <Plus />,
+  subtract: <Minus />,
+  intersect: <X />,
 }
 
 /** Samples a colour from the screen with looks switched off (the colour range compares against the original). */
@@ -55,11 +55,11 @@ function AddMenu({ label, mode, disabled, onAdd, children }: { label: string; mo
       <DropdownMenuTrigger asChild disabled={disabled}>
         {children}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-44">
-        <DropdownMenuLabel className="text-ed-label">{label}</DropdownMenuLabel>
+      <DropdownMenuContent align="start">
+        <DropdownMenuLabel>{label}</DropdownMenuLabel>
         <DropdownMenuSeparator />
         {COMPONENT_ORDER.filter((t) => mode === 'new' || t !== 'all').map((t) => (
-          <DropdownMenuItem key={t} onSelect={() => onAdd(t)} className="gap-2 text-ed-body">
+          <DropdownMenuItem key={t} onSelect={() => onAdd(t)}>
             {COMPONENT_ICONS[t]}
             {COMPONENT_LABELS[t]}
           </DropdownMenuItem>
@@ -132,15 +132,15 @@ function ComponentSettings({ c, onChange, view }: { c: MaskComponent; onChange: 
             aria-label="Brush or eraser"
             value={b.erase ? 'erase' : 'paint'}
             options={[
-              { value: 'paint', label: 'Paint', icon: <Brush className="h-3.5 w-3.5" /> },
-              { value: 'erase', label: 'Erase', icon: <X className="h-3.5 w-3.5" /> },
+              { value: 'paint', label: 'Paint', icon: <Brush /> },
+              { value: 'erase', label: 'Erase', icon: <X /> },
             ]}
             onChange={(v) => setBrush({ erase: v === 'erase' })}
           />
           <LookSlider label="Size" value={b.size} defaultValue={24} min={1} max={400} step={1} unit="px" onChange={(size) => setBrush({ size })} />
           <LookSlider label="Feather" value={Math.round(b.feather * 100)} defaultValue={60} min={0} max={100} step={1} onChange={(v) => setBrush({ feather: v / 100 })} />
           <LookSlider label="Flow" value={Math.round(b.flow * 100)} defaultValue={80} min={1} max={100} step={1} onChange={(v) => setBrush({ flow: v / 100 })} />
-          <div className="flex items-center justify-between text-ed-label text-muted-foreground">
+          <div className="flex items-center justify-between ed-hint">
             <span>{c.strokes.length} stroke{c.strokes.length === 1 ? '' : 's'}</span>
             <EdButton size="sm" disabled={c.strokes.length === 0} onClick={() => set({ strokes: [] })}>
               Clear
@@ -153,8 +153,7 @@ function ComponentSettings({ c, onChange, view }: { c: MaskComponent; onChange: 
     case 'color':
       return (
         <>
-          <div className="flex items-center gap-2">
-            <span className="w-14 text-ed-label text-muted-foreground">Colour</span>
+          <Field label="Color">
             <ColorField aria-label="Colour to select" value={c.color} onChange={(color) => set({ color })} />
             <IconButton
               aria-label="Pick a colour on screen"
@@ -164,9 +163,9 @@ function ComponentSettings({ c, onChange, view }: { c: MaskComponent; onChange: 
                 if (color) set({ color })
               }}
             >
-              <Pipette className="h-3.5 w-3.5" />
+              <Pipette />
             </IconButton>
-          </div>
+          </Field>
           <LookSlider label="Range" value={c.range ?? 30} defaultValue={30} min={0} max={100} step={1} onChange={(range, done) => set({ range }, done)} />
           <LookSlider label="Softness" value={c.softness ?? 50} defaultValue={50} min={0} max={100} step={1} onChange={(softness, done) => set({ softness }, done)} />
           {strength}
@@ -238,43 +237,46 @@ export function LookMasksEditor({ masks, subject, box, spaceLabel, onChange }: L
           A mask applies its own adjustments to part of the picture. Components combine top to bottom: Add (+) extends the selection, Subtract (−) removes from it, Intersect (×) keeps only what both select. Geometry is in {spaceLabel}. Drag the handles on the canvas; brush masks paint while the brush component is selected. Up to 4 masks and 16 components per look.
         </InfoTip>
       </div>
-      {masks.length === 0 ? <div className="py-3 text-center text-ed-label text-muted-foreground">No masks yet</div> : null}
+      {masks.length === 0 ? <div className="ed-hint py-2 text-center">No masks yet</div> : null}
       {masks.map((m) => {
         const open = m.id === current?.id
         const hidden = m.visible === false
         return (
-          <div key={m.id} className={cn('ed-card', open && 'ring-1 ring-primary/60')}>
-            <div className="flex items-center gap-1 px-1.5 py-1">
-              <IconButton aria-label={hidden ? `Show ${m.name}` : `Hide ${m.name}`} onClick={() => setMask(m.id, { ...m, visible: hidden ? undefined : false })}>
-                {hidden ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-              </IconButton>
-              <button type="button" className={cn('min-w-0 flex-1 truncate text-left text-ed-body', hidden && 'opacity-50')} onClick={() => select(open ? null : m.id)} aria-expanded={open}>
-                {m.name}
-                <span className="ml-1 text-ed-label text-muted-foreground">
-                  {m.components.length} part{m.components.length === 1 ? '' : 's'}
-                </span>
-              </button>
-              <IconButton aria-label={`Invert ${m.name}`} title="Invert" active={m.invert} onClick={() => setMask(m.id, { ...m, invert: m.invert ? undefined : true })}>
-                <FlipHorizontal2 className="h-3.5 w-3.5" />
-              </IconButton>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <IconButton aria-label={`${m.name} menu`}>
-                    <MoreHorizontal className="h-3.5 w-3.5" />
-                  </IconButton>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onSelect={() => onChange([...masks, { ...structuredClone(m), id: `${m.id}_${Date.now().toString(36)}`, name: `${m.name} copy` }], true)} disabled={!canAddMask(look)}>
-                    Duplicate
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setMask(m.id, null)} className="text-destructive">
-                    <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete mask
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-            {open ? (
-              <div className="flex flex-col gap-2 border-t border-border/60 p-2">
+          <Card
+            key={m.id}
+            collapsible
+            open={open}
+            onOpenChange={(o) => select(o ? m.id : null)}
+            className={cn(open && 'ring-1 ring-primary/60')}
+            title={m.name}
+            summary={`${m.components.length} part${m.components.length === 1 ? '' : 's'}`}
+            dim={hidden}
+            actions={
+              <>
+                <EyeButton visible={!hidden} name={m.name} onToggle={() => setMask(m.id, { ...m, visible: hidden ? undefined : false })} />
+                <IconButton aria-label={`Invert ${m.name}`} title="Invert" active={m.invert} onClick={() => setMask(m.id, { ...m, invert: m.invert ? undefined : true })}>
+                  <FlipHorizontal2 />
+                </IconButton>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <IconButton aria-label={`${m.name} menu`} title="More">
+                      <MoreHorizontal />
+                    </IconButton>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onSelect={() => onChange([...masks, { ...structuredClone(m), id: `${m.id}_${Date.now().toString(36)}`, name: `${m.name} copy` }], true)} disabled={!canAddMask(look)}>
+                      <Copy /> Duplicate
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem destructive onSelect={() => setMask(m.id, null)}>
+                      <Trash2 /> Delete mask
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            }
+          >
+            <>
                 <TextField aria-label="Mask name" value={m.name} onCommit={(name) => setMask(m.id, { ...m, name: name.trim() || m.name })} />
                 <LookSlider label="Amount" value={Math.round((m.amount ?? 1) * 100)} defaultValue={100} min={0} max={100} step={1} onChange={(v, done) => setMask(m.id, { ...m, amount: v >= 100 ? undefined : v / 100 }, done)} />
                 <div className="flex flex-col gap-0.5">
@@ -284,7 +286,7 @@ export function LookMasksEditor({ masks, subject, box, spaceLabel, onChange }: L
                     return (
                       <div key={c.id}>
                         <div className="ed-row h-7" data-selected={sel ? 'true' : undefined}>
-                          <span className={cn('inline-flex h-4 w-4 items-center justify-center rounded-sm', c.mode === 'subtract' ? 'bg-destructive/30' : c.mode === 'intersect' ? 'bg-amber-500/30' : 'bg-primary/30')} title={MODE_LABELS[c.mode]}>
+                          <span className={cn('inline-flex size-4 shrink-0 items-center justify-center rounded-sm [&>svg]:size-3', c.mode === 'subtract' ? 'bg-red-500/30' : c.mode === 'intersect' ? 'bg-amber-500/30' : 'bg-primary/30')} title={MODE_LABELS[c.mode]}>
                             {MODE_ICONS[c.mode]}
                           </span>
                           {COMPONENT_ICONS[c.type]}
@@ -293,13 +295,11 @@ export function LookMasksEditor({ masks, subject, box, spaceLabel, onChange }: L
                             {c.invert ? <span className="ml-1 text-muted-foreground">(inverted)</span> : null}
                           </button>
                           <IconButton aria-label={`Invert ${COMPONENT_LABELS[c.type]}`} title="Invert" active={c.invert} onClick={() => setMask(m.id, updateComponent(m, c.id, (x) => ({ ...x, invert: x.invert ? undefined : true })))}>
-                            <FlipHorizontal2 className="h-3 w-3" />
+                            <FlipHorizontal2 />
                           </IconButton>
-                          <IconButton aria-label={off ? 'Show component' : 'Hide component'} onClick={() => setMask(m.id, updateComponent(m, c.id, (x) => ({ ...x, visible: off ? undefined : false })))}>
-                            {off ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-                          </IconButton>
+                          <EyeButton visible={!off} name={COMPONENT_LABELS[c.type].toLowerCase()} onToggle={() => setMask(m.id, updateComponent(m, c.id, (x) => ({ ...x, visible: off ? undefined : false })))} />
                           <IconButton aria-label="Delete component" tone="danger" onClick={() => setMask(m.id, m.components.length > 1 ? updateComponent(m, c.id, () => null) : null)}>
-                            <Trash2 className="h-3 w-3" />
+                            <Trash2 />
                           </IconButton>
                         </div>
                         {sel ? (
@@ -326,11 +326,10 @@ export function LookMasksEditor({ masks, subject, box, spaceLabel, onChange }: L
                     </AddMenu>
                   ))}
                 </div>
-                <div className="mt-1 text-ed-label font-medium text-muted-foreground">Mask adjustments</div>
+                <div className="ed-section-title mt-1">Mask adjustments</div>
                 <LookAdjustEditor adjust={m.adjust} onChange={(adjust, done) => setMask(m.id, { ...m, adjust: adjust ?? {} }, done)} />
-              </div>
-            ) : null}
-          </div>
+            </>
+          </Card>
         )
       })}
     </div>

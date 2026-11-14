@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { MAX_COMPONENTS, MAX_MASKS } from '../../../../shared/look/schema'
 import type { Look, LookMask, LookSet } from '../../../../shared/look/types'
 import type { Layer } from '@/types/editor'
-import { canAddComponent, canAddMask, editLookSet, lookInView, moveBy, newComponent, newMask, patchAdjust, selectedSubject, updateComponent, updateMask } from './lookEdit'
+import { canAddComponent, canAddMask, editLookSet, hasShadow, withShadowEverywhere, lookInView, moveBy, newComponent, newMask, patchAdjust, selectedSubject, updateComponent, updateMask } from './lookEdit'
 
 const layers = [
   { id: 't', type: 'tile', name: 'T' },
@@ -35,10 +35,26 @@ describe('lookInView', () => {
   })
 })
 
+describe('withShadowEverywhere', () => {
+  it('adds the shadow to the default look and to every profile look without one', () => {
+    const set: LookSet = { default: { adjust: { exposure: 1 } }, profiles: { night: { adjust: { exposure: -1 } }, dusk: { shadow: { x: 1, y: 1 } } } }
+    const next = withShadowEverywhere(set, { x: 6, y: 8 })
+    expect(next.default).toEqual({ adjust: { exposure: 1 }, shadow: { x: 6, y: 8 } })
+    expect(next.profiles?.night.shadow).toEqual({ x: 6, y: 8 })
+    expect(next.profiles?.dusk.shadow).toEqual({ x: 1, y: 1 })
+    expect(hasShadow(set)).toBe(true)
+    expect(hasShadow(undefined)).toBe(false)
+    expect(withShadowEverywhere(undefined, { x: 2, y: 3 })).toEqual({ default: { shadow: { x: 2, y: 3 } } })
+  })
+})
+
 describe('editLookSet', () => {
   it('removes an emptied default look', () => {
     const set: LookSet = { default: { adjust: { exposure: 1 } } }
     expect(editLookSet(set, null, ({ adjust: _a, ...rest }) => rest)).toBeUndefined()
+  })
+  it('keeps a default look that only casts a shadow', () => {
+    expect(editLookSet(undefined, null, (l) => ({ ...l, shadow: { x: 4, y: 6 } }))).toEqual({ default: { shadow: { x: 4, y: 6 } } })
   })
   it('keeps an emptied profile look as {}', () => {
     const set: LookSet = { default: { adjust: { exposure: 1 } }, profiles: { night: { adjust: { exposure: 2 } } } }

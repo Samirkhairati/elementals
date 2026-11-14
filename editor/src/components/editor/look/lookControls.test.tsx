@@ -151,7 +151,7 @@ describe('LookSection', () => {
       </LookSection>,
     )
     expect(screen.queryByText('body')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Expand Light' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Light', expanded: false }))
     expect(screen.getByText('body')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Show Light' }))
     fireEvent.click(screen.getByRole('button', { name: 'Reset Light' }))

@@ -25,6 +25,7 @@ import { Copy, CopyPlus, Frame, LayoutGrid, Plus, Scissors, Trash2, Unplug } fro
 import type { EventGraph, GraphIssue, SummaryContext } from '../../../../../shared/engine/types'
 import { GRAPH_START, connect, disconnect, edgesOf, extractFragment, getNode, layoutGraph, moveNode, pasteFragment, reachableFromStart } from '../../../../../shared/engine/graph'
 import { cn } from '@/lib/utils'
+import { menuClass } from '@/components/ui/menuStyles'
 import { useThemeStore } from '@/store/themeStore'
 import {
   CommandNodeView,
@@ -548,13 +549,13 @@ function Canvas({ graph, onChange, selectedId, onSelect, issues, summaryContext,
         <div
           role="menu"
           aria-label="Node actions"
-          className="absolute z-20 min-w-44 rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-lg"
+          className={cn(menuClass.content, 'absolute z-20')}
           style={{ left: menu.x, top: menu.y }}
           onContextMenu={(e) => e.preventDefault()}
         >
           {menu.edge ? (
             <MenuItem
-              icon={<Trash2 className="h-3.5 w-3.5" />}
+              icon={<Trash2 />}
               label="Delete wire"
               destructive
               onClick={() => {
@@ -567,7 +568,7 @@ function Canvas({ graph, onChange, selectedId, onSelect, issues, summaryContext,
           ) : (
             <>
               <MenuItem
-                icon={<Trash2 className="h-3.5 w-3.5" />}
+                icon={<Trash2 />}
                 label={selectedNodeIds.length + selectedFrameIds.length > 1 ? 'Delete selection' : selectedFrameIds.length > 0 ? 'Delete frame' : 'Delete node'}
                 hint="Del"
                 destructive
@@ -578,7 +579,7 @@ function Canvas({ graph, onChange, selectedId, onSelect, issues, summaryContext,
                 }}
               />
               <MenuItem
-                icon={<Scissors className="h-3.5 w-3.5" />}
+                icon={<Scissors />}
                 label="Delete and reconnect"
                 disabled={!hasNodeSelection}
                 onClick={() => {
@@ -588,7 +589,7 @@ function Canvas({ graph, onChange, selectedId, onSelect, issues, summaryContext,
               />
               <MenuSeparator />
               <MenuItem
-                icon={<CopyPlus className="h-3.5 w-3.5" />}
+                icon={<CopyPlus />}
                 label="Duplicate"
                 hint="Ctrl+D"
                 disabled={!hasNodeSelection && selectedFrameIds.length === 0}
@@ -598,7 +599,7 @@ function Canvas({ graph, onChange, selectedId, onSelect, issues, summaryContext,
                 }}
               />
               <MenuItem
-                icon={<Copy className="h-3.5 w-3.5" />}
+                icon={<Copy />}
                 label="Copy"
                 hint="Ctrl+C"
                 disabled={!hasNodeSelection && selectedFrameIds.length === 0}
@@ -608,7 +609,7 @@ function Canvas({ graph, onChange, selectedId, onSelect, issues, summaryContext,
                 }}
               />
               <MenuItem
-                icon={<Unplug className="h-3.5 w-3.5" />}
+                icon={<Unplug />}
                 label="Disconnect wires"
                 disabled={!hasNodeSelection}
                 onClick={() => {
@@ -627,7 +628,7 @@ function Canvas({ graph, onChange, selectedId, onSelect, issues, summaryContext,
 }
 
 function MenuSeparator() {
-  return <div role="separator" className="-mx-1 my-1 h-px bg-border" />
+  return <div role="separator" className={menuClass.separator} />
 }
 
 function MenuItem({ icon, label, hint, onClick, disabled, destructive }: { icon: React.ReactNode; label: string; hint?: string; onClick: () => void; disabled?: boolean; destructive?: boolean }) {
@@ -637,14 +638,11 @@ function MenuItem({ icon, label, hint, onClick, disabled, destructive }: { icon:
       role="menuitem"
       disabled={disabled}
       onClick={onClick}
-      className={cn(
-        'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none disabled:pointer-events-none disabled:opacity-40',
-        destructive && 'text-destructive',
-      )}
+      className={cn(menuClass.item, 'w-full text-left hover:bg-accent disabled:pointer-events-none disabled:opacity-50', destructive && menuClass.destructive, destructive && 'hover:bg-red-500/10')}
     >
       {icon}
       <span className="flex-1">{label}</span>
-      {hint && <span className="text-[10px] text-muted-foreground">{hint}</span>}
+      {hint && <span className={menuClass.shortcut}>{hint}</span>}
     </button>
   )
 }

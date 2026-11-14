@@ -79,3 +79,7 @@ Left for later:
   drag (or a 16³ draft LUT) would make slow machines smoother.
 - **Picture looks are cached per placement**: dragging a picture with its own look re-grades it every frame of the drag.
 - **Look panel width**: the mask component rows and shader headers crowd below ~280px.
+- **Game tile-layer shadows bake every chunk at map load** (a canvas blur per 16 × 16-tile chunk and profile shadow). Fine
+  for town-sized maps; a very large map with soft layer shadows would want to bake chunks as the camera reaches them.
+- **Shadow silhouettes are read with `getImageData`**: one small `drawnPixels` helper exists in both the editor
+  (`lib/look/shadowDraw.ts`) and the game (`look/LookShadows.ts`) because `shared/` stays DOM-free.

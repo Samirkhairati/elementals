@@ -13,7 +13,7 @@ import { COMPONENT_REGISTRY } from '@/lib/componentRegistry'
 import { COMPONENT_TYPES } from '../../../../../shared/engine/components'
 import { entityIconName, pxToTile, summarizeEntity, tileToPxClamped } from '@/lib/entityVisuals'
 import { ComponentCard } from './entity/ComponentCard'
-import { Badge, EdButton, Field, NumberField, TextField } from '../ui/controls'
+import { Badge, Card, EdButton, Field, NumberField, TextField } from '../ui/controls'
 import { accentVar, NamedIcon } from '../ui/icons'
 import { SpriteThumb } from '../sprites/SpriteThumb'
 import { useEditorSelector, type EditorContextValue } from '../layout/EditorContext'
@@ -63,8 +63,8 @@ function AddComponentMenu({ entity, addComponent }: { entity: EntityData; addCom
           Add component
         </EdButton>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-72 p-1">
-        <DropdownMenuLabel className="px-2 py-1 text-ed-label font-normal text-muted-foreground">Components give an entity abilities</DropdownMenuLabel>
+      <DropdownMenuContent align="end" className="w-72">
+        <DropdownMenuLabel className="font-normal normal-case tracking-normal">Components give an entity abilities</DropdownMenuLabel>
         <DropdownMenuSeparator />
         {available.map((type) => {
           const schema = COMPONENT_REGISTRY[type]
@@ -203,11 +203,7 @@ export function PropertiesPanel({
     if (layer) {
       return (
         <div className="flex w-full flex-col gap-3 text-left">
-          <section className="ed-card">
-            <div className="ed-card-head">
-              <span className="ed-section-title flex-1">Layer</span>
-            </div>
-            <div className="ed-card-body">
+          <Card caps title="Layer">
               <Field label="Name">
                 <TextField value={layer.name} onCommit={(name) => updateLayers(layers.map((l) => (l.id === activeLayerId ? { ...l, name } : l)))} aria-label="Layer name" />
               </Field>
@@ -221,8 +217,7 @@ export function PropertiesPanel({
                   />
                 </Field>
               )}
-            </div>
-          </section>
+          </Card>
         </div>
       )
     }

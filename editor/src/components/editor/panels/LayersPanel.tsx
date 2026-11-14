@@ -30,6 +30,8 @@ import { canHoldInFolder, isFolder, moveInList, setLayerFolder, visibleStack } f
 import { useEditorClipboard } from '@/store/editorClipboard'
 import { inheritedLayerYSort, layerYSort } from '../../../../../shared/ySort'
 import { YSortBadge, YSortMenuItem } from '../ui/YSortMenuItem'
+import { DropShadowMenuItem } from '../look/DropShadowMenuItem'
+import { hasShadow } from '@/lib/look/lookEdit'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -70,7 +72,7 @@ function LayerKindItems({ createLayerOfType, layers, only }: { createLayerOfType
         const taken = SINGLETON_TYPES.includes(type) && layers.some((l) => l.type === type)
         return (
           <ContextMenuItem key={type} disabled={taken} title={taken ? 'A map has one of these' : title} onClick={() => createLayerOfType(type)}>
-            <Icon className={`mr-2 h-3.5 w-3.5 ${color}`} />
+            <Icon className={color} />
             {label}
           </ContextMenuItem>
         )
@@ -92,15 +94,15 @@ function NewLayerSubmenu({
   return (
     <ContextMenuSub>
       <ContextMenuSubTrigger>
-        <Plus className="w-3.5 h-3.5 mr-2" />
+        <Plus />
         New Layer
-        {keys && <span className="ml-auto pl-3 text-muted-foreground">{keys}</span>}
+        {keys && <ContextMenuShortcut>{keys}</ContextMenuShortcut>}
       </ContextMenuSubTrigger>
-      <ContextMenuSubContent className="w-48">
+      <ContextMenuSubContent>
         <LayerKindItems createLayerOfType={createLayerOfType} layers={layers} />
         <ContextMenuSeparator />
         <ContextMenuItem onClick={() => createLayerOfType('folder')}>
-          <FolderIcon className="mr-2 h-3.5 w-3.5 text-yellow-400" />
+          <FolderIcon className="text-yellow-400" />
           Folder
         </ContextMenuItem>
       </ContextMenuSubContent>
@@ -186,12 +188,12 @@ function EntitiesRow({ visible, onToggle, drag, dropPosition, slot, open, setOpe
           </div>
         </ContextMenuTrigger>
         {slot && (
-          <ContextMenuContent className="w-48">
+          <ContextMenuContent>
             <EntitySubmenu onNew={slot.onNew} onPrefab={slot.onPrefab} />
             <NewEntityFolderItem onCreate={slot.onNewFolder} />
             <ContextMenuSeparator />
             <ContextMenuItem onClick={onToggle}>
-              {visible ? <EyeOff className="w-3.5 h-3.5 mr-2" /> : <Eye className="w-3.5 h-3.5 mr-2" />}
+              {visible ? <EyeOff /> : <Eye />}
               {visible ? 'Hide Entities' : 'Show Entities'}
             </ContextMenuItem>
           </ContextMenuContent>
@@ -226,6 +228,8 @@ interface LayersPanelProps {
   toggleLayerLock: (id: string) => void
   /** Y-sort on / off for an image layer or a folder; undefined = follow the folder. */
   setLayerYSort?: (id: string, value: boolean | undefined) => void
+  /** Gives a tile or image layer a drop shadow (or opens the one it has) in the Look panel. */
+  addDropShadow?: (id: string) => void
   deleteLayer: (id: string) => void
   reorderLayers: (newLayers: Layer[]) => void
   /** With a folder id, a tile or image layer is created inside that folder. */
@@ -269,6 +273,7 @@ export function LayersPanel({
   toggleLayerVisibility,
   toggleLayerLock,
   setLayerYSort,
+  addDropShadow,
   deleteLayer,
   reorderLayers,
   createLayerOfType,
@@ -376,7 +381,7 @@ export function LayersPanel({
     <>
       <NewLayerSubmenu createLayerOfType={createType} layers={layers} keys={newLayerKeys} />
       <ContextMenuItem onClick={() => createLayerOfType('folder')}>
-        <FolderPlus className="w-3.5 h-3.5 mr-2 text-yellow-400" />
+        <FolderPlus className="text-yellow-400" />
         New Folder
         {newFolderKeys && <ContextMenuShortcut>{newFolderKeys}</ContextMenuShortcut>}
       </ContextMenuItem>
@@ -406,7 +411,7 @@ export function LayersPanel({
           </div>
         </ContextMenuTrigger>
 
-        <ContextMenuContent className="w-48">{createMenu(createLayerOfType)}</ContextMenuContent>
+        <ContextMenuContent>{createMenu(createLayerOfType)}</ContextMenuContent>
       </ContextMenu>
     )
   }
@@ -549,18 +554,18 @@ export function LayersPanel({
                   </div>
                 </ContextMenuTrigger>
 
-                <ContextMenuContent className="w-48">
+                <ContextMenuContent>
                   <ContextMenuItem onClick={() => startEditing(layer)}>
-                    <Edit2 className="w-3.5 h-3.5 mr-2" />
+                    <Edit2 />
                     Rename
                   </ContextMenuItem>
                   {isFolderRow && (
                     <ContextMenuSub>
                       <ContextMenuSubTrigger>
-                        <Plus className="w-3.5 h-3.5 mr-2" />
+                        <Plus />
                         New Layer inside
                       </ContextMenuSubTrigger>
-                      <ContextMenuSubContent className="w-48">
+                      <ContextMenuSubContent>
                         <LayerKindItems createLayerOfType={(type) => createLayerOfType(type, layer.id)} layers={layers} only={['tile', 'image', 'collision']} />
                       </ContextMenuSubContent>
                     </ContextMenuSub>
@@ -568,7 +573,7 @@ export function LayersPanel({
                   {isFolderRow ? (
                     <>
                       <ContextMenuItem onClick={() => createLayerOfType('folder')}>
-                        <FolderPlus className="w-3.5 h-3.5 mr-2 text-yellow-400" />
+                        <FolderPlus className="text-yellow-400" />
                         New Folder
                         {newFolderKeys && <ContextMenuShortcut>{newFolderKeys}</ContextMenuShortcut>}
                       </ContextMenuItem>
@@ -582,13 +587,13 @@ export function LayersPanel({
                       <ContextMenuSeparator />
                       {copyLayers && (
                         <ContextMenuItem onClick={() => copyFromRow(layer)}>
-                          <Copy className="w-3.5 h-3.5 mr-2" />
+                          <Copy />
                           Copy
                           {editKeys.copy && <ContextMenuShortcut>{editKeys.copy}</ContextMenuShortcut>}
                         </ContextMenuItem>
                       )}
                       <ContextMenuItem onClick={() => duplicateLayer(layer.id)}>
-                        <CopyPlus className="w-3.5 h-3.5 mr-2" />
+                        <CopyPlus />
                         Duplicate
                         {editKeys.duplicate && <ContextMenuShortcut>{editKeys.duplicate}</ContextMenuShortcut>}
                       </ContextMenuItem>
@@ -596,7 +601,7 @@ export function LayersPanel({
                   )}
                   {pasteLayers && (
                     <ContextMenuItem disabled={!canPasteLayers} onClick={() => pasteLayers(layer.id)} title={isFolderRow ? 'Pastes into this folder (a copied folder goes below it)' : 'Pastes below this layer, in the same folder'}>
-                      <ClipboardPaste className="w-3.5 h-3.5 mr-2" />
+                      <ClipboardPaste />
                       {isFolderRow ? 'Paste inside' : 'Paste'}
                       {editKeys.paste && <ContextMenuShortcut>{editKeys.paste}</ContextMenuShortcut>}
                     </ContextMenuItem>
@@ -604,10 +609,10 @@ export function LayersPanel({
                   {canHoldInFolder(layer) && (folders.length > 0 || held) && (
                     <ContextMenuSub>
                       <ContextMenuSubTrigger>
-                        <FolderIcon className="w-3.5 h-3.5 mr-2" />
+                        <FolderIcon />
                         Move to folder
                       </ContextMenuSubTrigger>
-                      <ContextMenuSubContent className="w-44">
+                      <ContextMenuSubContent>
                         {folders.map((f) => (
                           <ContextMenuItem key={f.id} disabled={layer.folderId === f.id} onClick={() => putInFolder(layer.id, f.id)}>
                             {f.name}
@@ -626,12 +631,12 @@ export function LayersPanel({
                   <ContextMenuItem onClick={() => toggleLayerVisibility(layer.id)}>
                     {layer.visible ? (
                       <>
-                        <EyeOff className="w-3.5 h-3.5 mr-2" />
+                        <EyeOff />
                         Hide Layer
                       </>
                     ) : (
                       <>
-                        <Eye className="w-3.5 h-3.5 mr-2" />
+                        <Eye />
                         Show Layer
                       </>
                     )}
@@ -639,12 +644,12 @@ export function LayersPanel({
                   <ContextMenuItem onClick={() => toggleLayerLock(layer.id)}>
                     {layer.locked ? (
                       <>
-                        <Unlock className="w-3.5 h-3.5 mr-2" />
+                        <Unlock />
                         Unlock Layer
                       </>
                     ) : (
                       <>
-                        <Lock className="w-3.5 h-3.5 mr-2" />
+                        <Lock />
                         Lock Layer
                       </>
                     )}
@@ -661,12 +666,13 @@ export function LayersPanel({
                   {setLayerYSort && layer.type === 'tile' && (
                     <YSortMenuItem own={false} inherited={false} disabled title="Tile layers draw as one piece; put pictures on an image layer to y-sort them" onChange={() => {}} />
                   )}
+                  {addDropShadow && (layer.type === 'tile' || layer.type === 'image') && <DropShadowMenuItem has={hasShadow(layer.look)} onClick={() => addDropShadow(layer.id)} />}
                   <ContextMenuSeparator />
                   <ContextMenuItem
                     onClick={() => confirmDeleteLayer(layer)}
-                    className="text-red-400 focus:text-red-400 focus:bg-red-500/10"
+                    destructive
                   >
-                    <Trash2 className="w-3.5 h-3.5 mr-2" />
+                    <Trash2 />
                     {isFolderRow ? 'Delete Folder' : 'Delete Layer'}
                   </ContextMenuItem>
                 </ContextMenuContent>
@@ -676,7 +682,7 @@ export function LayersPanel({
         </div>
       </ContextMenuTrigger>
 
-      <ContextMenuContent className="w-48">{createMenu(createLayerOfType)}</ContextMenuContent>
+      <ContextMenuContent>{createMenu(createLayerOfType)}</ContextMenuContent>
     </ContextMenu>
   )
 }

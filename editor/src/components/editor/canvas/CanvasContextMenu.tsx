@@ -4,12 +4,14 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuShortcut,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu'
+import { DropShadowDropdownItem } from '../look/DropShadowMenuItem'
 import { Plus, Sparkles, Copy, CopyPlus, Trash2, Pipette, Palette, Users } from 'lucide-react'
 import { NamedIcon } from '../ui/icons'
 import { OVERLAY_COLORS } from '@/hooks/editor/canvas/canvasView'
@@ -53,6 +55,8 @@ interface CanvasContextMenuProps {
   onSampleTile?: (tileX: number, tileY: number) => void
   /** "Place multiple" on the picture that was right-clicked. */
   onPlaceMultiple?: (imageId: string) => void
+  /** The drop shadow of the picture that was right-clicked: whether it has one, and adding it (null: not a picture). */
+  pictureShadow?: (imageId: string) => { has: boolean; add: () => void } | null
   /** Shown next to the entry (the shortcut, if any). */
   placeMultipleKeys?: string
 }
@@ -66,6 +70,7 @@ export function CanvasContextMenu({
   onSetAreaColor,
   onSampleTile,
   onPlaceMultiple,
+  pictureShadow,
   placeMultipleKeys,
   snapToGrid = true,
 }: CanvasContextMenuProps) {
@@ -97,7 +102,6 @@ export function CanvasContextMenu({
       <DropdownMenuContent
         align="start"
         side="bottom"
-        className="w-52 text-xs z-50 bg-popover/95 backdrop-blur-sm border-border/80 shadow-2xl"
         onCloseAutoFocus={(e) => {
           e.preventDefault()
           document.body.style.pointerEvents = ''
@@ -105,7 +109,7 @@ export function CanvasContextMenu({
       >
         {target?.type === 'entity' && target.entity ? (
           <>
-            <DropdownMenuLabel className="truncate text-foreground font-semibold">
+            <DropdownMenuLabel className="truncate text-foreground">
               {target.entity.name}
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
@@ -140,7 +144,7 @@ export function CanvasContextMenu({
                 onClose()
               }}
             >
-              <Copy className="w-3.5 h-3.5 mr-2" />
+              <Copy />
               Duplicate
             </DropdownMenuItem>
             <DropdownMenuSeparator />
@@ -149,15 +153,15 @@ export function CanvasContextMenu({
                 onDeleteEntity?.(target.entity!.id)
                 onClose()
               }}
-              className="text-red-400 focus:text-red-400 focus:bg-red-500/10"
+              destructive
             >
-              <Trash2 className="w-3.5 h-3.5 mr-2" />
+              <Trash2 />
               Delete Entity
             </DropdownMenuItem>
           </>
         ) : (
           <>
-            <DropdownMenuLabel className="text-muted-foreground font-normal text-[10px]">
+            <DropdownMenuLabel className="font-normal">
               Tile ({tileX}, {tileY})
             </DropdownMenuLabel>
             {target?.pictureId && onPlaceMultiple && (
@@ -168,10 +172,19 @@ export function CanvasContextMenu({
                     onClose()
                   }}
                 >
-                  <CopyPlus className="w-3.5 h-3.5 mr-2 text-primary" />
+                  <CopyPlus className="text-primary" />
                   Place multiple
-                  {placeMultipleKeys && <span className="ml-auto pl-3 text-muted-foreground">{placeMultipleKeys}</span>}
+                  {placeMultipleKeys && <DropdownMenuShortcut>{placeMultipleKeys}</DropdownMenuShortcut>}
                 </DropdownMenuItem>
+                {pictureShadow?.(target.pictureId) && (
+                  <DropShadowDropdownItem
+                    has={pictureShadow(target.pictureId!)!.has}
+                    onClick={() => {
+                      pictureShadow(target.pictureId!)!.add()
+                      onClose()
+                    }}
+                  />
+                )}
                 <DropdownMenuSeparator />
               </>
             )}
@@ -184,25 +197,25 @@ export function CanvasContextMenu({
               return (
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger>
-                    <Users className="w-3.5 h-3.5 mr-2 text-sky-400" />
+                    <Users className="text-sky-400" />
                     Entity
                   </DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent className="w-44 text-xs z-50 bg-popover/95 backdrop-blur-sm">
+                  <DropdownMenuSubContent>
                     <DropdownMenuItem
                       onClick={() => {
                         onCreateEntity('New Entity', at.x, at.y, undefined)
                         onClose()
                       }}
                     >
-                      <Plus className="w-3.5 h-3.5 mr-2 text-primary" />
+                      <Plus className="text-primary" />
                       New
                     </DropdownMenuItem>
                     <DropdownMenuSub>
                       <DropdownMenuSubTrigger>
-                        <Sparkles className="w-3.5 h-3.5 mr-2 text-amber-400" />
+                        <Sparkles className="text-amber-400" />
                         Prefab
                       </DropdownMenuSubTrigger>
-                      <DropdownMenuSubContent className="w-52 text-xs z-50 bg-popover/95 backdrop-blur-sm">
+                      <DropdownMenuSubContent>
                         {PRESET_PREFABS.map((prefab) => (
                           <DropdownMenuItem
                             key={prefab.name}
@@ -212,7 +225,7 @@ export function CanvasContextMenu({
                               onClose()
                             }}
                           >
-                            <NamedIcon name={prefab.icon} className="w-3.5 h-3.5 mr-2 text-muted-foreground" />
+                            <NamedIcon name={prefab.icon} className="text-muted-foreground" />
                             {prefab.name}
                           </DropdownMenuItem>
                         ))}
@@ -230,7 +243,7 @@ export function CanvasContextMenu({
                 onClose()
               }}
             >
-              <Pipette className="w-3.5 h-3.5 mr-2 text-muted-foreground" />
+              <Pipette className="text-muted-foreground" />
               Sample Tile Here
             </DropdownMenuItem>
           </>

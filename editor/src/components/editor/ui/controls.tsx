@@ -4,7 +4,7 @@
 import { Slider } from './fields'
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Info, Magnet, Maximize, Minus, Plus } from 'lucide-react'
+import { ChevronDown, ChevronRight, Eye, EyeOff, Info, Magnet, Maximize, Minus, Plus, RotateCcw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useDismiss } from '@/hooks/useDismiss'
 import { MAX_ZOOM, MIN_ZOOM, sliderToZoom, zoomLabel, zoomToSlider } from '@/lib/zoom'
@@ -442,6 +442,42 @@ export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(f
   )
 })
 
+/** The eye of a row or card: shows / hides what it belongs to (`name` goes into its label: "Hide trees"). */
+export function EyeButton({ visible, onToggle, name, title, disabled }: { visible: boolean; onToggle: () => void; name: string; title?: string; disabled?: boolean }) {
+  return (
+    <IconButton
+      aria-label={`${visible ? 'Hide' : 'Show'} ${name}`}
+      aria-pressed={visible}
+      title={title ?? (visible ? `Hide ${name}` : `Show ${name}`)}
+      disabled={disabled}
+      onClick={(e) => {
+        e.stopPropagation()
+        onToggle()
+      }}
+      onDoubleClick={(e) => e.stopPropagation()}
+    >
+      {visible ? <Eye /> : <EyeOff />}
+    </IconButton>
+  )
+}
+
+/** Puts something back to its defaults. */
+export function ResetButton({ name, onReset, disabled }: { name: string; onReset: () => void; disabled?: boolean }) {
+  return (
+    <IconButton
+      aria-label={`Reset ${name}`}
+      title={`Reset ${name}`}
+      disabled={disabled}
+      onClick={(e) => {
+        e.stopPropagation()
+        onReset()
+      }}
+    >
+      <RotateCcw />
+    </IconButton>
+  )
+}
+
 /** The magnet: when on, sizes and offsets snap to whole tiles (hold Shift while dragging to place freely). */
 export function SnapToggle({ on, onChange, step }: { on: boolean; onChange: (on: boolean) => void; step: number }) {
   return (
@@ -515,19 +551,86 @@ export function SliderNumber({ value, onCommit, min, max, step = 1, unit, label 
   )
 }
 
-/** Collapsible section that shows a one-line summary while closed. */
-export function Section({ title, summary, info, defaultOpen = true, children }: { title: React.ReactNode; summary?: React.ReactNode; info?: React.ReactNode; defaultOpen?: boolean; children: React.ReactNode }) {
-  const [open, setOpen] = useState(defaultOpen)
+// ── Card ────────────────────────────────────────────────────────────────────────────────────────
+
+interface CardProps {
+  title: React.ReactNode
+  /** Small uppercase heading (a panel's own card: "LAYER", "IMAGES · trees") instead of a normal title (an item). */
+  caps?: boolean
+  icon?: React.ReactNode
+  /** CSS colour of the head's left stripe (default slate). */
+  accent?: string
+  /** Muted one-line text after the title. */
+  summary?: React.ReactNode
+  info?: React.ReactNode
+  /** Accessible name of the info button. */
+  infoLabel?: string
+  /** Buttons and badges at the right of the head (clicks on them never toggle the card). */
+  actions?: React.ReactNode
+  /** Collapsible when given: controlled by `open` + `onOpenChange`, or uncontrolled from `defaultOpen`. */
+  collapsible?: boolean
+  open?: boolean
+  defaultOpen?: boolean
+  onOpenChange?: (open: boolean) => void
+  /** Hide the body while closed instead of unmounting it (it holds state or listeners that must live on). */
+  keepMounted?: boolean
+  /** Dims the body (a switched-off section). */
+  dim?: boolean
+  className?: string
+  bodyClassName?: string
+  'data-testid'?: string
+  children?: React.ReactNode
+}
+
+/** The one card of the editor: accent-striped head (title, icon, summary, actions), then a padded body. */
+export function Card({ title, caps, icon, accent, summary, info, infoLabel, actions, collapsible, open: openProp, defaultOpen = true, onOpenChange, keepMounted, dim, className, bodyClassName, children, ...rest }: CardProps) {
+  const [own, setOwn] = useState(defaultOpen)
+  const open = !collapsible || (openProp ?? own)
+  const toggle = () => {
+    setOwn(!open)
+    onOpenChange?.(!open)
+  }
+  const Chevron = open ? ChevronDown : ChevronRight
   return (
-    <section className="rounded border border-border">
-      <div className="flex items-center gap-2 px-2 py-1">
-        <button type="button" aria-expanded={open} className="flex flex-1 items-center gap-2 text-left text-ed-label" onClick={() => setOpen(!open)}>
-          <span className="font-medium">{title}</span>
-          {!open && summary ? <span className="ed-hint truncate">{summary}</span> : null}
-        </button>
-        {info ? <InfoTip>{info}</InfoTip> : null}
+    <section className={cn('ed-card', className)} style={accent ? { ['--card-accent' as string]: accent } : undefined} data-testid={rest['data-testid']}>
+      <div className="ed-card-head">
+        {collapsible ? (
+          <button type="button" aria-expanded={open} className="flex h-full min-w-0 flex-1 items-center gap-1.5 text-left" onClick={toggle}>
+            <Chevron className="ed-icon text-muted-foreground" />
+            <CardTitle title={title} caps={caps} icon={icon} summary={summary} />
+          </button>
+        ) : (
+          <div className="flex min-w-0 flex-1 items-center gap-1.5">
+            <CardTitle title={title} caps={caps} icon={icon} summary={summary} />
+          </div>
+        )}
+        {info ? <InfoTip label={infoLabel}>{info}</InfoTip> : null}
+        {actions ? <div className="flex shrink-0 items-center gap-0.5">{actions}</div> : null}
       </div>
-      {open ? <div className="flex flex-col gap-2 border-t border-border p-2">{children}</div> : null}
+      {(open || keepMounted) && children !== undefined && children !== null && children !== false ? (
+        <div className={cn('ed-card-body', dim && 'opacity-40', bodyClassName)} hidden={!open}>
+          {children}
+        </div>
+      ) : null}
     </section>
+  )
+}
+
+function CardTitle({ title, caps, icon, summary }: { title: React.ReactNode; caps?: boolean; icon?: React.ReactNode; summary?: React.ReactNode }) {
+  return (
+    <>
+      {icon ? <span className="flex shrink-0 text-muted-foreground [&>svg]:size-3.5">{icon}</span> : null}
+      <span className={cn('min-w-0 truncate', caps ? 'ed-section-title' : 'text-ed-body font-medium text-foreground')}>{title}</span>
+      {summary ? <span className="min-w-0 flex-1 truncate text-ed-label text-muted-foreground">{summary}</span> : null}
+    </>
+  )
+}
+
+/** Collapsible card that shows a one-line summary while closed. */
+export function Section({ title, summary, info, defaultOpen = true, children }: { title: React.ReactNode; summary?: React.ReactNode; info?: React.ReactNode; defaultOpen?: boolean; children: React.ReactNode }) {
+  return (
+    <Card collapsible defaultOpen={defaultOpen} title={title} summary={summary} info={info}>
+      {children}
+    </Card>
   )
 }

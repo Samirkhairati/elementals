@@ -5,16 +5,17 @@ import { Aperture, Blend, Droplets, Palette, Spline, Sun } from 'lucide-react'
 import { ADJUST_SLIDERS, OVERLAY_MODES } from '../../../../../shared/look/schema'
 import type { AdjustSection, LookAdjust, OverlayMode } from '../../../../../shared/look/types'
 import { patchAdjust } from '@/lib/look/lookEdit'
+import { Field } from '../ui/controls'
 import { ColorField, Select, optionsOf } from '../ui/fields'
 import { CurveEditor, GradingEditor, HslMixer, LookSection, LookSlider, type Change } from './lookControls'
 
 const SECTION_ICONS: Record<AdjustSection, React.ReactNode> = {
-  light: <Sun className="h-3.5 w-3.5" />,
-  color: <Palette className="h-3.5 w-3.5" />,
-  mixer: <Droplets className="h-3.5 w-3.5" />,
-  grading: <Aperture className="h-3.5 w-3.5" />,
-  curves: <Spline className="h-3.5 w-3.5" />,
-  effects: <Blend className="h-3.5 w-3.5" />,
+  light: <Sun />,
+  color: <Palette />,
+  mixer: <Droplets />,
+  grading: <Aperture />,
+  curves: <Spline />,
+  effects: <Blend />,
 }
 
 const sliderKeys = (section: AdjustSection) => ADJUST_SLIDERS.filter((s) => s.section === section)
@@ -43,13 +44,9 @@ export interface LookAdjustEditorProps {
   onChange: Change<LookAdjust | undefined>
   /** Sections open at first. */
   open?: AdjustSection[]
-  /** Extra Effects rows (vignette, grain: the whole look's only). */
-  effectsExtra?: React.ReactNode
-  /** Nothing in Effects but `effectsExtra` counts as set (for the summary / reset). */
-  onResetEffectsExtra?: () => void
 }
 
-export function LookAdjustEditor({ adjust, onChange, open = ['light'], effectsExtra, onResetEffectsExtra }: LookAdjustEditorProps) {
+export function LookAdjustEditor({ adjust, onChange, open = ['light'] }: LookAdjustEditorProps) {
   const set = (patch: Partial<LookAdjust>, done: boolean) => onChange(patchAdjust(adjust, patch), done)
   const off = adjust?.off ?? {}
   const toggle = (s: AdjustSection) => {
@@ -61,7 +58,6 @@ export function LookAdjustEditor({ adjust, onChange, open = ['light'], effectsEx
     const patch: Partial<LookAdjust> = {}
     for (const k of SECTION_KEYS[s]) (patch as Record<string, undefined>)[k] = undefined
     set(patch, true)
-    if (s === 'effects') onResetEffectsExtra?.()
   }
   const section = (s: AdjustSection, title: string, body: React.ReactNode, sum?: string) => (
     <LookSection
@@ -108,19 +104,13 @@ export function LookAdjustEditor({ adjust, onChange, open = ['light'], effectsEx
         'Effects',
         <>
           {sliders('effects')}
-          <div className="mt-1 flex items-center gap-2">
-            <span className="w-14 shrink-0 text-ed-label text-muted-foreground">Light color</span>
+          <Field label="Light color">
             <ColorField aria-label="Overlay colour" value={overlay?.color ?? '#ff9a3c'} onChange={(color) => setOverlay({ color }, true)} />
-            <Select<OverlayMode>
-              aria-label="Overlay blend mode"
-              className="min-w-0 flex-1"
-              value={overlay?.mode ?? 'softlight'}
-              options={optionsOf(OVERLAY_MODES)}
-              onChange={(mode) => setOverlay({ mode }, true)}
-            />
-          </div>
+          </Field>
+          <Field label="Light blend">
+            <Select<OverlayMode> aria-label="Overlay blend mode" value={overlay?.mode ?? 'softlight'} options={optionsOf(OVERLAY_MODES)} onChange={(mode) => setOverlay({ mode }, true)} />
+          </Field>
           <LookSlider label="Light amount" value={overlay?.amount ?? 0} min={0} max={100} step={1} track={`linear-gradient(90deg, transparent, ${overlay?.color ?? '#ff9a3c'})`} onChange={(amount, done) => setOverlay({ amount }, done)} />
-          {effectsExtra}
         </>,
         summary(adjust, 'effects')
       )}

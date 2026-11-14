@@ -40,6 +40,8 @@ import { useCanvasView } from '@/hooks/editor/canvas/canvasView'
 import { clampEntitiesIndex } from '@/lib/layerOrder'
 import { mapPixelSize } from '../../../../../shared/mapSize'
 import { useEditorSelector, type EditorContextValue } from '@/components/editor/layout/EditorContext'
+import { useDropShadow } from '@/components/editor/look/DropShadowMenuItem'
+import { hasShadow } from '@/lib/look/lookEdit'
 import { openEventEditor } from '@/lib/openEventEditor'
 
 const selectCanvasContext = (c: EditorContextValue) => ({
@@ -163,6 +165,7 @@ export function MapCanvas({
   // Preload and cache tileset image textures
   const images = useTilesetImages(tilesets)
   const { spriteAssets, setLook } = useEditorSelector(selectCanvasContext)
+  const dropShadow = useDropShadow()
   const view = useCanvasView()
 
   // Viewport, zoom, pan, and stage coordinate translation
@@ -515,6 +518,11 @@ export function MapCanvas({
         }}
         onSampleTile={sampleSingleTile}
         onPlaceMultiple={onPlaceMultiple}
+        pictureShadow={(imageId) => {
+          const layer = layers.find((l) => l.images?.some((i) => i.id === imageId))
+          if (!layer) return null
+          return { has: hasShadow(layer.images!.find((i) => i.id === imageId)!.look), add: () => dropShadow({ kind: 'picture', layerId: layer.id, imageId }) }
+        }}
         placeMultipleKeys={placeMultipleKeys}
         snapToGrid={snapToGrid}
       />

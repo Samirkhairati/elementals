@@ -197,9 +197,9 @@ export function LibraryBrowser({ items, folders, query, mode, selected, onSelect
       <ContextMenu key={item.key}>
         <ContextMenuTrigger asChild onContextMenu={() => { if (!(many && isPicked(row))) { clearPicked(); onSelect(item.key) } }}>{child}</ContextMenuTrigger>
         {/* Delete… opens its dialog once the menu has closed: opened earlier, the menu's focus trap pulls focus back from the dialog. */}
-        <ContextMenuContent className="w-52" onCloseAutoFocus={(e) => { const run = chosen.current; if (run) { e.preventDefault(); chosen.current = null; run() } }}>
-          <ContextMenuItem className="text-red-400 focus:text-red-400 focus:bg-red-500/10" onClick={() => { chosen.current = all ? () => onDeleteMany?.(multi) : () => onDeleteItem(item.key) }}>
-            <Trash2 className="mr-2 h-3.5 w-3.5" />
+        <ContextMenuContent onCloseAutoFocus={(e) => { const run = chosen.current; if (run) { e.preventDefault(); chosen.current = null; run() } }}>
+          <ContextMenuItem destructive onClick={() => { chosen.current = all ? () => onDeleteMany?.(multi) : () => onDeleteItem(item.key) }}>
+            <Trash2 />
             {all ? `Delete ${describeSelection(multi, noun)}…` : 'Delete…'}
           </ContextMenuItem>
         </ContextMenuContent>

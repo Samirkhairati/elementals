@@ -14,6 +14,8 @@ import { useLookLibrary } from '@/lib/look/lookLibrary'
 import { pictureStack, worldStack } from '@/lib/look/lookSubjects'
 import { drawGradedArea, drawGradedPicture } from '@/lib/look/lookDraw'
 import { pictureBox } from '@/lib/look/pictureBox'
+import { drawLayerShadow, drawPictureShadow } from '@/lib/look/shadowDraw'
+import { shadowFor } from '../../../../../../shared/look/shadow'
 
 const NO_ASSETS: Record<string, SpriteAssetInfo> = {}
 
@@ -39,10 +41,12 @@ export function drawImageItem(ctx: CanvasRenderingContext2D, item: ImageItem, sp
   if (!resolved) return
   const at = drag && drag.id === item.id ? drag : drag?.along?.ids.includes(item.id) ? { x: item.x + drag.along.dx, y: item.y + drag.along.dy } : item
   if (looks && looks.view.enabled) {
+    const shadow = shadowFor([item.look, looks.layer.look], looks.view.profile)
+    const { src } = resolved
+    const { box, mirrorX, mirrorY } = pictureBox(item, resolved, at)
+    if (shadow) drawPictureShadow(ctx, shadow, { img: resolved.img, src, box, mirrorX, mirrorY, opacity: item.opacity })
     const stack = pictureStack(item, looks.layer, looks.view.profile)
     if (stack.length > 0) {
-      const { src } = resolved
-      const { box, mirrorX, mirrorY } = pictureBox(item, resolved, at)
       const key = `${imagePickKey(item)}@${src.x},${src.y},${src.w},${src.h}`
       const subject = subjectKey({ kind: 'picture', layerId: looks.layer.id, imageId: item.id })
       if (drawGradedPicture(ctx, { img: resolved.img, src, box, mirrorX, mirrorY, opacity: item.opacity, key }, stack, subject, looks.mapSize)) return
@@ -166,6 +170,10 @@ export const KonvaTilemapLayer = React.memo(function KonvaTilemapLayer({
               maxTileY = Math.min(mapHeight - 1, Math.ceil((rect.y + rect.h) / 32) + 1)
             }
             if (maxTileX < minTileX || maxTileY < minTileY) return
+
+            // Its drop shadow first, under the tiles.
+            const shadow = view.enabled && layer.type === 'tile' ? shadowFor([layer.look], view.profile) : null
+            if (shadow) drawLayerShadow(ctx, shadow, { layerId: layer.id, data, tilesets: images, mapW: mapWidth, mapH: mapHeight, view: rect ?? { x: 0, y: 0, w: mapSize.w, h: mapSize.h } })
 
             // A layer with a look: the visible tiles are drawn offscreen, graded with the game's shader, drawn back.
             if (view.enabled && layer.type === 'tile' && layer.look) {

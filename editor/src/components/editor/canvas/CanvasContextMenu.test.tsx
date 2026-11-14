@@ -45,6 +45,15 @@ describe('CanvasContextMenu over a picture', () => {
     expect(screen.getByText('Sample Tile Here')).toBeTruthy()
   })
 
+  it('offers the drop shadow of that picture and closes', () => {
+    const add = vi.fn()
+    const onClose = vi.fn()
+    render(menu({ pictureId: 'pic-1' }, { onPlaceMultiple: vi.fn(), onClose, pictureShadow: (id: string) => (id === 'pic-1' ? { has: false, add } : null) }))
+    fireEvent.click(screen.getByText('Add drop shadow'))
+    expect(add).toHaveBeenCalled()
+    expect(onClose).toHaveBeenCalled()
+  })
+
   it('has no such entry when the click was not on a picture', () => {
     render(menu({}, { onPlaceMultiple: vi.fn() }))
     expect(screen.queryByText('Place multiple')).toBeNull()
