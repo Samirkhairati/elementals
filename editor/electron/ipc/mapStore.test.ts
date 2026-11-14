@@ -479,3 +479,23 @@ describe('listMaps keeps what it does not know', () => {
     expect(maps[0]).toMatchObject({ pixelWidth: 90, pixelHeight: 50, settings: { playerZ: 7 }, entitiesIndex: 2, entityFolders: [{ id: 'f' }] })
   })
 })
+
+describe('listMaps and schema 6 maps', () => {
+  it('passes a map made of nodes through without inventing layers or entities', async () => {
+    const fs = await import('node:fs')
+    const os = await import('node:os')
+    const path = await import('node:path')
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'maps-tree-'))
+    const nodes = [{ id: 'a', type: 'tile', name: 'ground' }]
+    fs.writeFileSync(path.join(dir, 'tree.json'), JSON.stringify({ name: 'Tree', width: 3, height: 2, schemaVersion: 6, nodes }))
+    fs.writeFileSync(path.join(dir, 'old.json'), JSON.stringify({ name: 'Old', width: 3, height: 2, schemaVersion: 5 }))
+    const { maps } = listMaps(dir)
+    const tree = maps.find((m) => m.fileName === 'tree.json')!
+    expect(tree.nodes).toEqual(nodes)
+    expect(tree).not.toHaveProperty('layers')
+    expect(tree).not.toHaveProperty('entities')
+    expect(tree.schemaVersion).toBe(6)
+    // an older map still gets both lists
+    expect(maps.find((m) => m.fileName === 'old.json')).toMatchObject({ layers: [], entities: [] })
+  })
+})

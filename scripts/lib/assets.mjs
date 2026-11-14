@@ -26,6 +26,7 @@ import { fileURLToPath } from 'node:url'
 import { deflateSync } from 'node:zlib'
 import { readPngSize } from '../../shared/png.ts'
 import { gifSheetFile } from '../../shared/gifSheet.ts'
+import { picturesOfMap } from '../../shared/sceneTreeMigrate.ts'
 import { normalizeGameSettings } from '../../shared/gameSettings.ts'
 import { cleanLooksFile } from '../../shared/look/schema.ts'
 import {
@@ -112,25 +113,23 @@ export function loadMapPictures(projectDir) {
     } catch {
       continue // maps:check reports unreadable maps
     }
-    for (const layer of Array.isArray(map?.layers) ? map.layers : []) {
-      if (layer?.type !== 'image') continue
-      for (const item of Array.isArray(layer.images) ? layer.images : []) {
-        const id = item?.graphicId
-        if (typeof id !== 'string' || pictures[id] !== undefined) continue
-        if (!isValidGraphicId(id)) {
-          warnings.push(`${rel}: image "${id}" is not a valid graphic id`)
-          continue
-        }
-        if (isGifGraphicId(id)) {
-          warnings.push(`${rel}: picture "${id}" is a GIF animation; image layers place still pictures (an entity can play it through a sprite)`)
-          continue
-        }
-        try {
-          pictures[id] = fs.readFileSync(path.join(graphicsDir, id))
-        } catch (e) {
-          if (e.code === 'ENOENT') warnings.push(`${rel}: picture "${id}" is not in the graphics library`)
-          else warnings.push(`${rel}: picture "${id}": ${e.message}`)
-        }
+    // Pictures are nodes of the map's tree (schema 6); a schema 5 map's `images` are read through the same migration.
+    for (const item of picturesOfMap(map)) {
+      const id = item.graphicId
+      if (typeof id !== 'string' || pictures[id] !== undefined) continue
+      if (!isValidGraphicId(id)) {
+        warnings.push(`${rel}: image "${id}" is not a valid graphic id`)
+        continue
+      }
+      if (isGifGraphicId(id)) {
+        warnings.push(`${rel}: picture "${id}" is a GIF animation; image layers place still pictures (an entity can play it through a sprite)`)
+        continue
+      }
+      try {
+        pictures[id] = fs.readFileSync(path.join(graphicsDir, id))
+      } catch (e) {
+        if (e.code === 'ENOENT') warnings.push(`${rel}: picture "${id}" is not in the graphics library`)
+        else warnings.push(`${rel}: picture "${id}": ${e.message}`)
       }
     }
   }

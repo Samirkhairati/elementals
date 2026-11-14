@@ -195,6 +195,33 @@ describe('pictures on image layers', () => {
     assert.deepEqual(fs.readFileSync(path.join(sb.publicDir, 'graphics/images/sky.png')), makePng(64, 32))
   })
 
+  test('pictures of a schema 6 map are nodes of its tree, inside groups too', () => {
+    const sb = sandbox()
+    sb.graphic('images/sky.png', 64, 32)
+    sb.graphic('props/ball.png', 16, 16)
+    writeJson(path.join(sb.projectDir, 'maps/town.json'), {
+      name: 'town',
+      width: 2,
+      height: 2,
+      schemaVersion: 6,
+      nodes: [
+        { id: 'g', type: 'group', name: 'Scenery', children: [{ id: 'i', type: 'image', name: 'Sky', children: [
+          { id: 'a', type: 'picture', name: '', graphicId: 'images/sky.png', x: 0, y: 0 },
+          { id: 'pg', type: 'group', name: 'Props', children: [{ id: 'b', type: 'picture', name: '', graphicId: 'props/ball.png', x: 0, y: 0 }, { id: 'c', type: 'picture', name: '', assetId: 'objects/ball', x: 0, y: 0 }] },
+        ] }] },
+      ],
+    })
+    assert.deepEqual(Object.keys(loadMapPictures(sb.projectDir).pictures).sort(), ['images/sky.png', 'props/ball.png'])
+  })
+
+  test('a map that is not a map of layers or nodes holds no pictures', () => {
+    const sb = sandbox()
+    writeJson(path.join(sb.projectDir, 'maps/null.json'), null)
+    writeJson(path.join(sb.projectDir, 'maps/list.json'), [1, 2])
+    writeJson(path.join(sb.projectDir, 'maps/odd.json'), { layers: 'x', nodes: 7 })
+    assert.deepEqual(loadMapPictures(sb.projectDir), { pictures: {}, warnings: [] })
+  })
+
   test('a missing or invalid picture is a warning, and nothing escapes the library', () => {
     const sb = sandbox()
     writeJson(path.join(sb.projectDir, 'maps/town.json'), mapWith([

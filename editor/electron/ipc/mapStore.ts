@@ -30,8 +30,11 @@ export interface MapFile {
   height: number;
   pixelWidth?: number;
   pixelHeight?: number;
-  layers: unknown[];
-  entities: unknown[];
+  /** Schema 5 and older: the layers and entities (always there, `[]` when the file has none). Absent in a schema 6 map. */
+  layers?: unknown[];
+  entities?: unknown[];
+  /** Schema 6: the map's tree of nodes (shared/sceneTree.ts), passed through untouched. */
+  nodes?: unknown[];
 }
 
 export interface MapListing {
@@ -74,8 +77,8 @@ export function listMaps(mapsDir: string): MapListing {
         name: typeof data.name === 'string' && data.name ? data.name : path.parse(name).name,
         width: typeof data.width === 'number' && data.width ? data.width : 50,
         height: typeof data.height === 'number' && data.height ? data.height : 50,
-        layers: Array.isArray(data.layers) ? data.layers : [],
-        entities: Array.isArray(data.entities) ? data.entities : [],
+        // A schema 6 map is a tree (`nodes`); only older ones get the `layers` / `entities` lists.
+        ...(Array.isArray(data.nodes) ? {} : { layers: Array.isArray(data.layers) ? data.layers : [], entities: Array.isArray(data.entities) ? data.entities : [] }),
       });
     },
     warnings
@@ -128,7 +131,7 @@ export function createMap(
   folderPath: string | null = null,
   /** A map made by resolution: its size in pixels (the tile grid `width` x `height` covers it). */
   pixelSize: { width: number; height: number } | null = null
-): { map: MapFile } {
+): { map: MapFile & { layers: unknown[]; entities: unknown[] } } {
   if (typeof name !== 'string' || name.trim() === '') throw new Error('Map name must not be empty');
   assertDimension(width, 'width');
   assertDimension(height, 'height');
