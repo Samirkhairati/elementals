@@ -22,8 +22,14 @@
 //   schemaVersion 3: the Event component's `pages` list is called `states` (renamed on load).
 //   schemaVersion 5: the trigger names action / playerTouch / eventTouch / autorun / parallel become a start kind
 //   plus `blocks` (autorun and parallel also `repeat`); see triggers.ts.
+//   schemaVersion 6: a map is one tree of nodes (`nodes`) instead of `layers` + `entities` + `entityFolders` + `entitiesIndex`;
+//   see sceneTreeMigrate.ts. `migrateMap` produces it; `migrateMapToLegacy` stops at the schema 5 shape (the editor works on
+//   that until it moves to nodes).
 
 import { migrateCollisionLayers } from '../collisionLayers.ts';
+import { LEGACY_SCHEMA_VERSION, hasNodeTree, migrateToNodeTree } from '../sceneTreeMigrate.ts';
+import { mapTree } from '../sceneTree.ts';
+import type { SceneNode } from '../sceneTree.ts';
 import type { Command, EngineEntity, EventState, LegacyComponentType } from './types.ts';
 import { SCHEMA_VERSION } from './types.ts';
 import { createCommand } from './commands.ts';
@@ -259,10 +265,11 @@ export function migrateEntity(entity: EntityLike): MigrateResult<EngineEntity> {
 }
 
 /**
- * Migrates every entity and stamps the current `schemaVersion` (maps already at a newer version keep theirs).
+ * Migrates every entity of a map made of `layers` and `entities` (schema 5 and older) and stamps schemaVersion 5 (maps at
+ * a newer version keep theirs). This is the shape the editor still works on; `migrateMap` goes on to the node tree.
  * Returns the same object when nothing changed.
  */
-export function migrateMap<T extends object>(map: T): MigrateResult<T> {
+export function migrateMapToLegacy<T extends object>(map: T): MigrateResult<T> {
   if (!isRecord(map)) return { value: map, changed: false };
   const out: Record<string, unknown> = { ...map };
   let changed = false;
@@ -290,10 +297,38 @@ export function migrateMap<T extends object>(map: T): MigrateResult<T> {
     }
   }
 
+  if (typeof map.schemaVersion !== 'number' || map.schemaVersion < LEGACY_SCHEMA_VERSION) {
+    out.schemaVersion = LEGACY_SCHEMA_VERSION;
+    changed = true;
+  }
+
+  return changed ? { value: out as T, changed: true } : { value: map, changed: false };
+}
+
+/**
+ * Migrates a map to the current schema (6): every entity becomes canonical, old `polygons` layers become collision layers,
+ * and `layers`, `entities`, `entityFolders` and `entitiesIndex` become the node tree `nodes` (`migrateToNodeTree`).
+ * A map that already is a tree only has the entities in it migrated and its `schemaVersion` stamped (maps at a newer
+ * version keep theirs). Idempotent; returns the same object when nothing changed.
+ */
+export function migrateMap<T extends object>(map: T): MigrateResult<T> {
+  if (!isRecord(map)) return { value: map, changed: false };
+  if (!hasNodeTree(map)) return migrateToNodeTree(migrateMapToLegacy(map).value);
+
+  const out: Record<string, unknown> = { ...map };
+  let changed = false;
+  const nodes = mapTree(map.nodes as SceneNode[], (node) => {
+    if (node.type !== 'entity') return node;
+    const r = migrateEntity(node as unknown as EntityLike);
+    return r.changed ? (r.value as unknown as SceneNode) : node;
+  });
+  if (nodes !== map.nodes) {
+    out.nodes = nodes;
+    changed = true;
+  }
   if (typeof map.schemaVersion !== 'number' || map.schemaVersion < SCHEMA_VERSION) {
     out.schemaVersion = SCHEMA_VERSION;
     changed = true;
   }
-
   return changed ? { value: out as T, changed: true } : { value: map, changed: false };
 }

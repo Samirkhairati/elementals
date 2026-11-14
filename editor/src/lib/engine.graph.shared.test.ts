@@ -35,6 +35,7 @@ import {
   validateGraph,
 } from '../../../shared/engine/index'
 import type { Command, EventGraph, GraphNode } from '../../../shared/engine/index'
+import { allEntities } from '../../../shared/sceneTree'
 
 const seq = () => createSequentialIdGenerator('n')
 const node = (id: string, type: string, out: Record<string, string> = {}, params: Record<string, unknown> = {}): GraphNode => ({
@@ -599,7 +600,7 @@ describe('real project maps', () => {
     let states = 0
     for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.json'))) {
       const map = migrateMap(JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'))).value as any
-      for (const entity of map.entities ?? []) {
+      for (const entity of allEntities(map.nodes) as any[]) {
         for (const state of entity.components?.Event?.states ?? []) {
           states++
           const graph = state.graph

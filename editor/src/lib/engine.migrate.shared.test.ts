@@ -7,7 +7,7 @@ import {
   LEGACY_COMPONENT_TYPES,
   listLegacyComponents,
   migrateEntity,
-  migrateMap,
+  migrateMapToLegacy,
   normalizeEventProps,
   normalizeProps,
   validateEntity,
@@ -44,7 +44,7 @@ describe('legacy project maps (fixtures from git history)', () => {
   it('map2: the plain collider entity is untouched, the player-like entity becomes Sprite+Movement+Event', () => {
     const map = readMap('map2.json')
     const before = structuredClone(map)
-    const { value, changed } = migrateMap(map)
+    const { value, changed } = migrateMapToLegacy(map)
     expect(map).toEqual(before) // input never mutated
     expect(changed).toBe(true)
     expect(value.schemaVersion).toBe(5)
@@ -70,7 +70,7 @@ describe('legacy project maps (fixtures from git history)', () => {
 
   it('market: the sign becomes an interact Event with one showText', () => {
     const map = readMap('market.json')
-    const { value } = migrateMap(map)
+    const { value } = migrateMapToLegacy(map)
     const sign = value.entities[0]
     expect(Object.keys(sign.components)).toEqual(['Transform', 'Collider', 'Event', 'Tag'])
     expect(sign.components.Transform).toEqual({ x: 336, y: 128, depth: 0 })
@@ -84,10 +84,10 @@ describe('legacy project maps (fixtures from git history)', () => {
 
   it('every legacy map is stable under a second migration and migrates deterministically', () => {
     for (const name of fs.readdirSync(FIXTURES).filter((f) => f.endsWith('.legacy.json')).map((f) => f.replace('.legacy', ''))) {
-      const once = migrateMap(readMap(name))
-      const again = migrateMap(readMap(name))
+      const once = migrateMapToLegacy(readMap(name))
+      const again = migrateMapToLegacy(readMap(name))
       expect(JSON.stringify(again.value)).toBe(JSON.stringify(once.value)) // same ids on every run
-      const twice = migrateMap(once.value)
+      const twice = migrateMapToLegacy(once.value)
       expect(twice.changed).toBe(false)
       expect(twice.value).toBe(once.value)
     }
@@ -303,20 +303,22 @@ describe('Transform, extras and bookkeeping', () => {
   })
 })
 
-describe('migrateMap', () => {
+// migrateMapToLegacy is migrateMap up to the schema 5 shape (layers + entities): it carries the entity migrations. The step to
+// the node tree (schema 6) is tested in sceneTreeMigrate.shared.test.ts.
+describe('migrateMapToLegacy', () => {
   it('stamps the current schemaVersion even without entities, once', () => {
     const map = { name: 'm', width: 1, height: 1, layers: [] }
-    const r = migrateMap(map)
+    const r = migrateMapToLegacy(map)
     expect(r.changed).toBe(true)
     expect(r.value).toEqual({ ...map, schemaVersion: 5 })
     expect(map).not.toHaveProperty('schemaVersion')
-    const again = migrateMap(r.value)
+    const again = migrateMapToLegacy(r.value)
     expect(again.changed).toBe(false)
     expect(again.value).toBe(r.value)
   })
 
   it('leaves newer schema versions alone but still migrates entities', () => {
-    const r = migrateMap({ schemaVersion: 99, entities: [ent({ Interactable: { message: 'x' } })] })
+    const r = migrateMapToLegacy({ schemaVersion: 99, entities: [ent({ Interactable: { message: 'x' } })] })
     expect(r.value.schemaVersion).toBe(99)
     expect(Object.keys(r.value.entities[0].components)).toContain('Event')
   })
@@ -338,7 +340,7 @@ describe('migrateMap', () => {
     })
 
     it('turns the tree into a graph that keeps the command ids and drops `commands`', () => {
-      const r = migrateMap(withTree())
+      const r = migrateMapToLegacy(withTree())
       const state = (r.value.entities[0].components as any).Event.states[0]
       expect(state).not.toHaveProperty('commands')
       expect(state.graph.frames).toEqual([])
@@ -352,36 +354,36 @@ describe('migrateMap', () => {
     })
 
     it('is deterministic (same start id) and idempotent', () => {
-      const a = migrateMap(withTree()).value
-      const b = migrateMap(withTree()).value
+      const a = migrateMapToLegacy(withTree()).value
+      const b = migrateMapToLegacy(withTree()).value
       expect(JSON.stringify(a)).toBe(JSON.stringify(b))
-      const again = migrateMap(a)
+      const again = migrateMapToLegacy(a)
       expect(again.changed).toBe(false)
       expect(again.value).toBe(a)
     })
 
     it('every migrated graph validates without errors', () => {
-      const e = migrateMap(withTree()).value.entities[0]
+      const e = migrateMapToLegacy(withTree()).value.entities[0]
       expect(validateEntity(e).filter((i) => i.severity === 'error')).toEqual([])
     })
 
     it('leaves states that already have a graph, and still removes nothing else', () => {
       const graph = { nodes: [{ id: 's', type: 'start', params: {}, out: {}, x: 0, y: 0 }], frames: [] }
-      const r = migrateMap({ schemaVersion: 3, entities: [ent({ Event: { states: [{ id: 'g', name: 'G', conditions: [], trigger: 'action', graph, faceOnInteract: true, solid: null, appearance: {} }] } })] })
+      const r = migrateMapToLegacy({ schemaVersion: 3, entities: [ent({ Event: { states: [{ id: 'g', name: 'G', conditions: [], trigger: 'action', graph, faceOnInteract: true, solid: null, appearance: {} }] } })] })
       expect((r.value.entities[0].components as any).Event.states[0].graph).toEqual(graph)
     })
 
     it('skips junk entries of the tree instead of failing', () => {
       const messy = withTree()
       ;(messy.entities[0].components as any).Event.states[0].commands = [null, 5, { type: 'wait' }, { id: 'ok', type: 'wait', params: { ms: 1 } }]
-      const state = (migrateMap(messy).value.entities[0].components as any).Event.states[0]
+      const state = (migrateMapToLegacy(messy).value.entities[0].components as any).Event.states[0]
       expect(state.graph.nodes.filter((n: any) => n.type === 'wait').map((n: any) => n.id)).toEqual(['ok'])
     })
 
     it('does not mutate its input', () => {
       const input = withTree()
       const before = structuredClone(input)
-      migrateMap(input)
+      migrateMapToLegacy(input)
       expect(input).toEqual(before)
     })
   })
@@ -400,27 +402,27 @@ describe('migrateMap', () => {
       ['autorun', { trigger: 'onActive', blocks: true, repeat: true }],
       ['parallel', { trigger: 'onActive', blocks: false, repeat: true }],
     ])('%s keeps its behaviour under the new names', (old, expected) => {
-      const r = migrateMap(withTrigger(old))
+      const r = migrateMapToLegacy(withTrigger(old))
       expect(r.changed).toBe(true)
       expect(stateOf(r)).toMatchObject(expected)
       expect(r.value.schemaVersion).toBe(5)
     })
 
     it('only autorun and parallel get `repeat`', () => {
-      expect(stateOf(migrateMap(withTrigger('action')))).not.toHaveProperty('repeat')
-      expect(stateOf(migrateMap(withTrigger('playerTouch')))).not.toHaveProperty('repeat')
+      expect(stateOf(migrateMapToLegacy(withTrigger('action')))).not.toHaveProperty('repeat')
+      expect(stateOf(migrateMapToLegacy(withTrigger('playerTouch')))).not.toHaveProperty('repeat')
     })
 
     it('is idempotent and returns already migrated maps by reference', () => {
-      const first = migrateMap(withTrigger('autorun'))
-      const again = migrateMap(first.value)
+      const first = migrateMapToLegacy(withTrigger('autorun'))
+      const again = migrateMapToLegacy(first.value)
       expect(again.changed).toBe(false)
       expect(again.value).toBe(first.value)
     })
 
     it('keeps a `blocks` the state already carries and leaves the new start kinds alone', () => {
-      expect(stateOf(migrateMap(withTrigger('action', { blocks: false })))).toMatchObject({ trigger: 'interact', blocks: false })
-      const current = migrateMap({ ...withTrigger('timer', { blocks: false, interval: 2 }), schemaVersion: 5 })
+      expect(stateOf(migrateMapToLegacy(withTrigger('action', { blocks: false })))).toMatchObject({ trigger: 'interact', blocks: false })
+      const current = migrateMapToLegacy({ ...withTrigger('timer', { blocks: false, interval: 2 }), schemaVersion: 5 })
       expect(current.changed).toBe(false)
     })
 
@@ -443,7 +445,7 @@ describe('migrateMap', () => {
     const page = { id: 'p1', name: 'Page 1', conditions: [], trigger: 'interact', blocks: true, graph: { nodes: [{ id: 's', type: 'start', params: {}, out: {}, x: 0, y: 0 }], frames: [] }, faceOnInteract: true, solid: null, appearance: {} }
 
     it('renames the Event component list and leaves everything else alone', () => {
-      const r = migrateMap({ schemaVersion: 2, entities: [ent({ Event: { pages: [page] }, Tag: { tag: 'npc' } })] })
+      const r = migrateMapToLegacy({ schemaVersion: 2, entities: [ent({ Event: { pages: [page] }, Tag: { tag: 'npc' } })] })
       expect(r.changed).toBe(true)
       expect(r.value.schemaVersion).toBe(5)
       const components = r.value.entities[0].components as Record<string, any>
@@ -452,14 +454,14 @@ describe('migrateMap', () => {
     })
 
     it('is idempotent and keeps already migrated maps by reference', () => {
-      const first = migrateMap({ schemaVersion: 2, entities: [ent({ Event: { pages: [page] } })] })
-      const again = migrateMap(first.value)
+      const first = migrateMapToLegacy({ schemaVersion: 2, entities: [ent({ Event: { pages: [page] } })] })
+      const again = migrateMapToLegacy(first.value)
       expect(again.changed).toBe(false)
       expect(again.value).toBe(first.value)
     })
 
     it('prefers an existing states list and drops the stale pages key', () => {
-      const r = migrateMap({ schemaVersion: 2, entities: [ent({ Event: { pages: [{ ...page, id: 'old' }], states: [page] } })] })
+      const r = migrateMapToLegacy({ schemaVersion: 2, entities: [ent({ Event: { pages: [{ ...page, id: 'old' }], states: [page] } })] })
       expect((r.value.entities[0].components as Record<string, any>).Event).toEqual({ states: [page] })
     })
 
@@ -470,17 +472,17 @@ describe('migrateMap', () => {
 
   it('keeps unchanged entities by reference, ignores non-object entries and non-object maps', () => {
     const keep = ent({ Tag: { tag: 'k' } })
-    const r = migrateMap({ schemaVersion: 2, entities: [keep, 7, null, ent({ GridMovement: {} })] })
+    const r = migrateMapToLegacy({ schemaVersion: 2, entities: [keep, 7, null, ent({ GridMovement: {} })] })
     expect(r.value.entities[0]).toBe(keep)
     expect(r.value.entities[1]).toBe(7)
     expect(r.value.entities[2]).toBeNull()
     expect(r.changed).toBe(true)
-    expect(migrateMap(null as any)).toEqual({ value: null, changed: false })
-    expect(migrateMap([] as any).changed).toBe(false)
+    expect(migrateMapToLegacy(null as any)).toEqual({ value: null, changed: false })
+    expect(migrateMapToLegacy([] as any).changed).toBe(false)
   })
 
   it('works on frozen maps', () => {
     const map = frozen({ name: 'm', width: 1, height: 1, layers: [], entities: [ent({ SpriteView: { texture: 'a-walk' } })] })
-    expect(() => migrateMap(map)).not.toThrow()
+    expect(() => migrateMapToLegacy(map)).not.toThrow()
   })
 })

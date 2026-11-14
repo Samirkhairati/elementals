@@ -5,6 +5,7 @@ import { commandNodes } from '../../../../shared/engine/graph'
 import { mapSaveQueue } from '@/lib/saveQueue'
 import { installElectronAPI, makeEntity, makeLayer, makeMap, uninstallElectronAPI } from '@/test/helpers'
 import { useMapManager } from './useMapManager'
+import { ENTITIES_GROUP_ID } from '../../../../shared/sceneTreeMigrate'
 
 const wrapper = ({ children }: { children: ReactNode }) => <StrictMode>{children}</StrictMode>
 
@@ -77,6 +78,31 @@ describe('useMapManager', () => {
     expect(loaded.schemaVersion).toBe(5)
     expect(loaded.entities![0].components.Movement).toMatchObject({ controller: 'player' })
     expect(loaded.entities![0].components.Sprite).toMatchObject({ asset: 'characters/player' })
+  })
+
+  it('loads a schema 6 map (nodes) as the layers and entities the editor still works on', async () => {
+    const v6 = {
+      name: 'Tree',
+      fileName: 'tree.json',
+      folderPath: null,
+      width: 4,
+      height: 4,
+      schemaVersion: 6,
+      nodes: [
+        { id: 'a', type: 'tile', name: 'ground', data: {} },
+        { id: ENTITIES_GROUP_ID, type: 'group', name: 'Entities', children: [] },
+      ],
+    }
+    installElectronAPI({ getMaps: () => Promise.resolve({ success: true, folders: [], maps: [v6] }) })
+    const { result } = renderHook(() => useMapManager(), { wrapper })
+    await act(async () => {
+      await result.current.loadMaps()
+    })
+    const loaded = result.current.maps[0]
+    expect(loaded).not.toHaveProperty('nodes')
+    expect(loaded.schemaVersion).toBe(5)
+    expect(loaded.layers.map(l => [l.id, l.type, l.visible])).toEqual([['a', 'tile', true]])
+    expect(loaded.entities).toEqual([])
   })
 
   it('already canonical maps are used as they are (same object, no churn)', async () => {

@@ -23,8 +23,8 @@ export type LegacyComponentType =
   | 'AIWander'
   | 'Interactable';
 
-/** Version written to `map.schemaVersion`. Maps without it are legacy (1). */
-export const SCHEMA_VERSION = 5;
+/** Version written to `map.schemaVersion`. Maps without it are legacy (1). 6 = one tree of nodes (`map.nodes`, shared/sceneTree.ts). */
+export const SCHEMA_VERSION = 6;
 
 // ── Component props ─────────────────────────────────────────────────────────────────────────────
 // Positions are pixels in map space. A tile is 32px. The Transform position is the entity's

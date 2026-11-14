@@ -10,7 +10,7 @@ import {
   renameCollisionItem,
   tileGroupCells,
 } from '../../../shared/collisionLayers'
-import { migrateMap } from '../../../shared/engine/migrate'
+import { migrateMap, migrateMapToLegacy } from '../../../shared/engine/migrate'
 import { convertEditorMapToTiled } from '../../../shared/mapExport'
 import type { EditorLayer, EditorMap } from '../../../shared/mapTypes'
 
@@ -99,7 +99,8 @@ describe('migrateCollisionLayers', () => {
 
   it('runs as part of migrateMap', () => {
     const map = { name: 'm', width: 1, height: 1, schemaVersion: 5, layers: [{ id: 'p', name: 'P', type: 'polygons', visible: true }] }
-    expect(migrateMap(map).value.layers[0]).toMatchObject({ type: 'collision', shapes: [] })
+    expect(migrateMapToLegacy(map).value.layers[0]).toMatchObject({ type: 'collision', shapes: [] })
+    expect((migrateMap(map).value as EditorMap).nodes![0]).toMatchObject({ type: 'collision', children: [] })
   })
 })
 

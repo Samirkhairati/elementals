@@ -2,11 +2,15 @@ import { useState, useCallback } from 'react'
 import { MapData, Layer, EntityData } from '@/types/editor'
 import { mapSaveQueue } from '@/lib/saveQueue'
 import { useSyncedState } from '@/hooks/useSyncedState'
-import { migrateMap } from '../../../../shared/engine/migrate'
+import { migrateMap, migrateMapToLegacy } from '../../../../shared/engine/migrate'
+import { hasNodeTree, nodeTreeToLegacy } from '../../../../shared/sceneTreeMigrate'
 
 /** Legacy maps (SpriteView, Interactable ...) become canonical (schemaVersion 2) the moment the editor loads them. */
 export function migrateLoadedMap(map: MapData): MapData {
-  return migrateMap(map).value
+  // TEMPORARY bridge until the editor works on nodes (phase 2): the editor still edits `layers` and `entities` (schema 5),
+  // so a schema 6 file (`nodes`) is turned back into that shape; older files are migrated as they always were.
+  if (hasNodeTree(map)) return nodeTreeToLegacy(migrateMap(map).value) as unknown as MapData
+  return migrateMapToLegacy(map).value
 }
 
 interface UseMapManagerOptions {
