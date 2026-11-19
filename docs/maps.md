@@ -19,14 +19,31 @@ Editing a map in the editor does **not** update the game by itself.
 
 - `shared/mapExport.ts` - `convertEditorMapToTiled(map, tilesets)` and `serializeTiledMap` (2-space JSON, no trailing newline).
   The map is migrated first (`migrateMap`, so a schema 5 map and a schema 6 map export the same file) and the output carries the
-  current `schemaVersion` (6). It walks the node tree (see "Map format, schema 6").
+  current `schemaVersion` (7). It walks the node tree (see "Map format, schema 7").
 - `shared/mapSchema.ts` - `validateEditorMap` (schema 6 `nodes`, or the older `layers`; also validates entities/events via `shared/engine`) and `validateTiledMap` (hand-written, no dependencies).
-- `shared/sceneTree.ts` - the node types and the pure tree operations; `shared/sceneTreeMigrate.ts` - schema 5 <-> 6.
+- `shared/sceneTree.ts` - the node types and the pure tree operations; `shared/sceneTreeMigrate.ts` - schema 5 <-> 6 and 6 -> 7 (`typedNodes`); `shared/sceneEntity.ts` - entity node <-> component bag; `shared/sceneLayers.ts` - the layers a tree draws as.
 - `shared/png.ts` - `readPngSize`. `shared/mapTypes.ts` - types only.
 
 The editor imports it from `src/hooks/useExportMap.ts` (relative path, no extension); Node imports it with explicit `.ts`
 paths (type stripping). Keep the files free of enums, namespaces, parameter properties and DOM/Node imports.
 **Export to Game** (Maps panel context menu) validates the editor map and the converted map, then writes `game/public/data/maps/<id>.json` atomically with no dialog (`export-map-to-game` channel, `mapStore.exportMapToGame`; the id is the editor file name slugified, see below). It refuses to write (notice with the first errors) when either is invalid. **Export as File…** is the old save dialog. Run against a project copy (`ELEMENTALS_PROJECT_DIR`), the game folder is the one *beside that copy*, so the real game is never touched. Export to Game also runs the asset sync (what `npm run assets:sync` does: pictures, tilesets, sprites and manifests are copied into `game/public`, `electron/ipc/gameAssets.ts`), so the pictures and tilesets a map uses reach the game with it, and the notice says how many files were copied. It needs the repo's `scripts/lib/assets.mjs` next to the project; for a project copy (the harness) or a packaged editor it is skipped, the notice says so, and you run `npm run assets:sync` yourself. A failed sync never fails the export. `npm run dev` also syncs at start.
+
+## Map format, schema 7: Godot-style nodes
+
+Schema 7 keeps the schema 6 tree (below) and makes everything in it a node (full table in docs/node-tree-plan.md, "Schema 7"):
+
+* **No image layers.** Sprite2Ds (`picture`) sit in a **Node2D** (`group`) or a **YSort** (`ySort`, everything below it is
+  y-sorted), never at the root and never inside another sprite. A run of neighbouring sprites of one host exports as one
+  `kind=image` objectgroup named after that host (`shared/sceneLayers.ts`), so the game reads them as it read image layers. A
+  Node2D without a z or Look of its own inside a Node2D that holds sprites stays in that run (as a picture group did).
+* **Looks are nodes**: a `look` child of a TileMap, Sprite2D, Node2D or YSort (one per node) holds what the `look` field held.
+* **Entities hold their components as nodes**: AnimatedSprite2D (Sprite), StaticBody2D with a CollisionShape2D (solid Collider),
+  Area2D with a CollisionShape2D (where events trigger: the `Area` component, or a non-solid Collider without a body), one
+  movement node (Wander / PlayerController / Mover = Movement) and Event. `Transform` and `Tag` stay in the entity's `components`.
+* **Lock** always freezes; a Node2D picked and dragged as one has `pickAsOne`.
+* Migration from schema 6 is `typedNodes` (pure, idempotent): image layer -> Node2D, sorted branch -> YSort (a Node2D when
+  something below opts out, its sorting children YSorts), sorted lone picture -> wrapped in a YSort, `look` -> Look child, locked
+  picture group -> `pickAsOne`, component bag -> component nodes. The export does not change.
 
 ## Map format, schema 6: one tree of nodes
 
@@ -85,7 +102,7 @@ property `look` (JSON); see docs/looks.md.
 
 ## Image layers
 
-An editor layer of type `image` holds freely placed pictures (`picture` children, in schema 5 `images[]`: `assetId` for a sprite or `graphicId` for a picture from the graphics library, never both; pixel `x`/`y` = the sprite anchor, optional `z`, `scale`, `flipX`, `opacity`)
+*(In schema 7 an image layer is a Node2D or YSort holding Sprite2Ds, see "Map format, schema 7"; what follows about pictures, crops, the Images panel and the game still holds, with "image layer" read as the sprites' Node2D.)* An editor layer of type `image` holds freely placed pictures (`picture` children, in schema 5 `images[]`: `assetId` for a sprite or `graphicId` for a picture from the graphics library, never both; pixel `x`/`y` = the sprite anchor, optional `z`, `scale`, `flipX`, `opacity`)
 instead of tile cells. In the editor they are drawn in layer `z` order (equal `z` keeps the list order) and placed with or without grid snapping. Snapping puts the picture's edges on the grid: on each axis the edge nearest to a line (left or right, top or bottom) moves onto it, using the size the game draws (`round(w * scale)`), so a picture two tiles wide is not half a tile off. The grid is the 32 px tile grid unless changed with a right-click on the grid snapping button (size X/Y and offset X/Y, an editor preference shared by every map; drawn as dashed yellow lines when it differs from the tile grid). Holding Shift while placing or dragging a picture locks it to one axis (guide lines along its edges): a drag stays in the row or column it started from, and while placing, once a picture has been placed the next Shift-locked one lines up with it (before that, the lock starts where Shift went down); **Place multiple** (menu of a right-clicked picture, the Images panel, or Ctrl/Cmd+Shift+D) keeps placing copies of a picture with the same crop, scale, flips and opacity; pictures (and entities) can be placed and dragged past the map's edge (they are never clamped to it); a one-tile picture lands exactly where an entity does (`snapImageAnchor`).
 The converter writes them as a Tiled `objectgroup` with the layer property `kind = image` (and `z` when set); each image is an object with type `image`,
 `x`/`y` and the property `sprite` (asset id) or `graphic` (graphic id) plus `cropX`/`cropY`/`cropW`/`cropH`, `z`, `scale`, `flipX`, `opacity` when set, sorted by draw order. The object's `name` is the item's `name` (its picture id when it has none).

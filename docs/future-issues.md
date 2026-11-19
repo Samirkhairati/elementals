@@ -90,13 +90,26 @@ Left for later:
   `folder: null` (`city` drifted before the tree; its export is unchanged apart from `schemaVersion`). Re-export with `node scripts/export-maps.mjs --write --only market --force` (the game ignores both).
 - **Two exports can change when a schema 5 map migrates.** Pictures of equal `z` that a picture group pulls apart, and entities that interleave
   with entity folders, end up grouped together (draw order of equal-`z` pictures, `entities` array order). Nothing in `project/maps` does either.
-- **A locked group inside an image layer does not freeze its pictures**: it keeps the old picture-group meaning (a click on the map picks
-  the whole group; `pictureLocked` / `expandPictureClick`), while a locked group anywhere else locks what it holds. If authors find the two
-  meanings confusing, split it into a `selectAsGroup` field.
 - **A hidden folder with one shown layer** migrates to a shown group (the canvas honoured the layer's own eye); with inherited visibility the
   author hides the layer too, or the group. Maps made before the tree never relied on the difference.
 - **Tree operations walk the whole tree**: `sceneIndex` (cached per tree) answers the lookups the canvas makes per frame or mouse move,
   but every edit in `lib/sceneOps.ts` (`locate`, `canHold`'s singleton check, `insertNode`'s duplicate-id check) is O(tree). Fine at
   map sizes today (hundreds of nodes).
 
+## Node tree (schema 7)
 
+- **Equal-`z` layers draw in the opposite order in the game.** The exporter writes layers top first (`sceneLayers(...).reverse()` in
+  `shared/mapExport.ts`) and the game creates them in file order, so of two tile or image layers with the same `z` the game draws the
+  upper one *under* the lower one, the reverse of the editor (in `city`, `pit` and `right` are both z 26). Sprites inside one object group
+  are in draw order, so this only shows between groups; that is why a Node2D without a z of its own stays in its parent's run
+  (`hostIndex` in `shared/sceneLayers.ts`). Fixing it (the game creating layers last-first, or the exporter writing bottom first as
+  Tiled does) changes how existing maps look in the game where equal-`z` layers overlap, so it waits for a decision.
+- **`maps:check` drift on the committed maps is older than schema 7**: `game/public/data/maps/city.json` was re-exported in 1b89482
+  from a city map with y-sorted layers that was never committed (the committed `project/maps/city.json` has no y-sort), and
+  `market.json` still has the entity field `folder` dropped in schema 6. Export to Game from the editor (or
+  `node scripts/export-maps.mjs --write --only <map> --force`) once the project maps are the ones wanted.
+- **An empty image layer exports nothing now**: it became an empty Node2D, which cannot be told from an empty folder. The game drew
+  nothing for it either.
+- **The y-sort migration can wrap single sprites**: a y-sorted picture in an image layer that was not sorted becomes a YSort holding only
+  that sprite (`<id>:ysort`). It exports and draws the same, but the tree shows one extra row per such sprite; a "Merge into YSort" action
+  could gather neighbouring ones.

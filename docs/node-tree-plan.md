@@ -1,6 +1,6 @@
 # One node tree for maps: migration plan
 
-Status: **phases 1–4 implemented on `feat/node-tree`** (the editor works on the tree and saves schema 6; see "Implementation decisions" at the end, which win where they differ from the text above). Phase 5 (generalised properties) and phase 6 (game node paths) are not started. Goal: replace the map's mix of layers, folders, picture groups, the
+Status: **phases 1–4 implemented on `feat/node-tree`, and the tree is fully node based (schema 7)**: see "Implementation decisions" and "Schema 7: Godot-style nodes" at the end, which win where they differ from the text above (the later section wins over the earlier). Phase 5 (generalised properties) and phase 6 (game node paths) are not started. Goal: replace the map's mix of layers, folders, picture groups, the
 Entities row, entity folders and collision items with **one tree of nodes**, the way Godot's scene tree works. Every
 node type gets the same treatment: one row, one menu, one inspector, one selection, and the same inherited properties.
 
@@ -232,3 +232,47 @@ above, this section wins.
 * One Scene panel (`SceneTree.tsx`) replaces the Layers list, the Entities rows and the picture/collision item lists;
   the Images and Collision panels keep their tools as the inspectors of the selected picture / collision node.
 * Old saved dock layouts: `images` / `collision` list panels that no longer exist close on load, like `entities` today.
+
+## Schema 7: Godot-style nodes
+
+Schema 6 kept image layers and entity component bags. Schema 7 (`SCHEMA_VERSION = 7`) makes everything a node, named
+after Godot's types (the `type` keys stay short; the labels and lucide icons are `NODE_TYPES` in `shared/sceneTree.ts`):
+
+| type | label | holds | notes |
+|---|---|---|---|
+| `group` | Node2D | scene nodes, `picture`, one `look` | `z`, `opacity`, `pickAsOne` (picked and dragged as one) pass down |
+| `ySort` | YSort | as Node2D | everything below it draws sorted by its feet among the characters |
+| `tile` | TileMap | one `look` | `data`, `z` |
+| `terrain`, `encounters`, `objects` | unchanged | — | terrain and encounters one per map |
+| `picture` | Sprite2D | one `look` | a sprite inside a sprite is refused; only inside a Node2D / YSort, never at the root |
+| `look` | Look | — | the colour grading and drop shadow of its parent (`look` field) |
+| `collision` | StaticBody2D (map) | `collisionTiles`, `collisionShape` | the map's collision, as before |
+| `entity` | Entity | its component nodes | keeps `x`, `y` and its `Transform` / `Tag` (and unknown components) in `components` |
+| `animatedSprite` | AnimatedSprite2D | — | the `Sprite` component (`props`; the eye is `Sprite.visible`) |
+| `body` | StaticBody2D (entity) | one `collisionShape` | the solid `Collider` (no shape = one tile) |
+| `area` | Area2D | one `collisionShape` | where events trigger: the `Area` component next to a body, else a non-solid `Collider` |
+| `wander`, `playerController`, `mover` | movement | — | the `Movement` component (`controller` wander / player / none); one per entity |
+| `event` | Event | — | the `Event` component (states and graphs) |
+
+* **Placement** is `childTypesOf` + slots (`canHold`, `canPlace`): one Look per node, one of each component and one
+  movement node per entity, one shape per body or area. The Add Node menu, paste, drag and drop and the importers all
+  go through it, so a tree that breaks the rules cannot be built.
+* **Entities**: `shared/sceneEntity.ts` maps an entity node to its bag of components (`componentsOfEntity`, cached per
+  node) and writes a bag back (`entityWithComponents`, which keeps unchanged child nodes and returns the same node when
+  nothing changed). The game, the exporter and the database read `engineEntityOf(node)`; the editor's entity code reads
+  `entityView(node)` (`editor/src/lib/sceneIndex.ts`). New ECS component **Area** (`game/src/ecs/components/AreaComponent.ts`):
+  `triggerArea` (`game/src/events/footprint.ts`) uses it before the Collider.
+* **Sprites draw in runs**: `shared/sceneLayers.ts` lists the layers in draw order: layer nodes, plus each run of
+  neighbouring Sprite2Ds of one host. A run exports as one Tiled `kind=image` objectgroup named after its host (what an
+  image layer was). A Node2D / YSort with no z or Look of its own inside a branch that holds sprites itself stays in that
+  branch's run (as a picture group stayed in its image layer's object group); a branch holding only other nodes is like
+  a folder, each branch in it its own run; a YSort around one sprite counts as that sprite. So migrated maps export byte
+  for byte as before (but for empty image layers, which became empty Node2Ds and export nothing). The canvas draws the
+  same runs.
+* **Migration** (`typedNodes` in `shared/sceneTreeMigrate.ts`, pure, idempotent, cached per array; run on load for
+  schema 6 trees and after `migrateToNodeTree` for older maps): an image layer becomes a Node2D; a `look` field on a
+  TileMap, Sprite2D or branch becomes a Look child (`<id>:look`); a locked picture group becomes `pickAsOne` (lock now
+  always freezes); y-sort: a sorted branch becomes a YSort unless something below it opts out (`ySort: false`), in
+  which case it stays a Node2D and its sorting children become YSorts; a sorted picture outside a YSort is wrapped in
+  one (`<id>:ysort`); an entity's component bag is split into child nodes. The export is unchanged: the golden test
+  compares every fixture byte for byte with the schema 5 output.

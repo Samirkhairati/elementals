@@ -9,7 +9,7 @@ disagree, fix the types first, then this document.
 
 ## 1. Entities and components
 
-An entity is a bag of components. A map holds a list of entities. There are **six** components; each one
+An entity is a bag of components. A map holds a list of entities. There are **seven** components; each one
 answers one question about the entity:
 
 | Component | Question it answers | Replaces (schemaVersion 1) |
@@ -17,9 +17,18 @@ answers one question about the entity:
 | **Transform** | Where is it, and what draws on top of what? | Transform |
 | **Sprite** | What does it look like (and how does it animate)? | SpriteView + CharacterAnimation |
 | **Collider** | What space does it occupy / what area does it cover? | Collider |
+| **Area** | Where do its events trigger, when that is not its Collider? (a box like the Collider's) | — (new in schema 7) |
 | **Movement** | Does it move, and who drives it? | GridMovement + FreeMovement + PlayerControl + AIWander |
 | **Event** | What happens when the player interacts with it? | Interactable |
 | **Tag** | Free-form label for lookups (`npc`, `chest`) | Tag |
+
+**In a map (schema 7) the components are nodes** of the entity, as in Godot (`shared/sceneEntity.ts`, docs/node-tree-plan.md):
+the entity node keeps `Transform`, `Tag` and unknown components in its `components`; **AnimatedSprite2D** is the Sprite,
+**StaticBody2D** + CollisionShape2D the solid Collider, **Area2D** + CollisionShape2D the Area (or, without a body, a non-solid
+Collider), **Wander** / **PlayerController** / **Mover** the Movement (`controller` wander / player / none) and **Event** the Event.
+An entity holds one of each (one movement node). Code that wants the bag reads `componentsOfEntity` / `engineEntityOf` (the game,
+the exporter, the database) or `entityView` (the editor's entity code); writes go through `entityWithComponents`. In the game
+`triggerArea` (`game/src/events/footprint.ts`) is the Area when there is one, else the Collider.
 
 ### Why the old set was confusing
 * *SpriteView vs CharacterAnimation*: one drew a single frame, the other picked animations by name.
