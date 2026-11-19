@@ -61,8 +61,15 @@ export interface LookAdjust {
     balance?: number
   }
   curves?: { rgb?: CurvePoints; r?: CurvePoints; g?: CurvePoints; b?: CurvePoints }
-  // Effects that are still colour functions
+  // Detail: local contrast, worked out from the pixels around (a pass of its own after the grade; the look's global
+  // adjustments only, a mask ignores them). -100..100.
+  /** Medium-sized detail (surfaces, foliage): + crisper, - smoother. */
+  texture?: number
+  /** Local contrast of the midtones over a larger area: + punchier, - softer. */
+  clarity?: number
+  /** Lightroom's Dehaze: + takes haze away (the darkest channel around each pixel estimates it), - adds a haze. */
   dehaze?: number
+  // Effects that are colour functions
   /** 0..100: lifts the blacks (matte). */
   fade?: number
   /** A colour laid over the picture (light colour, fog, ...). */

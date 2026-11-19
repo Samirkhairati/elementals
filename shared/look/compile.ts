@@ -4,6 +4,7 @@
 
 import type { BrushStroke, Look, LookMask, MaskComponent, ShaderUse } from './types.ts'
 import { LUT_SIZE, MAX_BRUSHES, MAX_COMPONENTS, MAX_MASKS, isNeutralAdjust } from './schema.ts'
+import type { LookAdjust } from './types.ts'
 import { IDENTITY, bakeStrip, chainColor, colorFunction, hexToRgb, rgbToLab, type ColorFn } from './bake.ts'
 
 /** Where a look's mask shapes live: the picture's own box (`subject`) or map pixels (`world`). */
@@ -51,8 +52,38 @@ export interface CompiledLook {
   maskIndex: Record<string, number>
   shaders: ShaderUse[]
   warnings: string[]
-  /** True when nothing would change a pixel (no grade at all: skip the pass). */
+  /** Texture, clarity, dehaze (-1..1 each), unused: the detail pass (LOOK_DETAIL_FRAG); all 0 = no detail pass. */
+  detail: [number, number, number, number]
+  /** The grade pass would change nothing (no colour adjustment, mask, vignette or grain); the detail pass may still run. */
+  gradeNeutral: boolean
+  /** True when nothing would change a pixel (no grade and no detail: skip the passes). */
   neutral: boolean
+}
+
+/** Whether a compiled look has a detail pass. */
+export const hasDetail = (c: Pick<CompiledLook, 'detail'>): boolean => c.detail[0] !== 0 || c.detail[1] !== 0 || c.detail[2] !== 0
+
+const clampUnit = (v: number) => Math.max(-1, Math.min(1, v))
+
+/** An adjustment without its detail fields: what the LUT depends on (a texture drag does not bake it again). */
+function colourPart(a: LookAdjust | undefined): LookAdjust | null {
+  if (!a) return null
+  const { texture: _t, clarity: _c, dehaze: _d, ...rest } = a
+  return rest
+}
+
+/** The detail of a stack of looks: their global texture, clarity and dehaze added up (a mask's are not applied). */
+function detailOf(adjusts: readonly (LookAdjust | undefined)[]): CompiledLook['detail'] {
+  let texture = 0
+  let clarity = 0
+  let dehaze = 0
+  for (const a of adjusts) {
+    if (!a || a.off?.effects) continue
+    texture += (a.texture ?? 0) / 100
+    clarity += (a.clarity ?? 0) / 100
+    dehaze += (a.dehaze ?? 0) / 100
+  }
+  return [clampUnit(texture), clampUnit(clarity), clampUnit(dehaze), 0]
 }
 
 export const COMP_TYPE = { all: 0, linear: 1, radial: 2, rect: 3, brush: 4, color: 5, luminance: 6 } as const
@@ -233,7 +264,7 @@ export function compileLooks(stack: readonly LookLayer[], options: CompileOption
 
   // The LUT atlas: baked once per distinct set of adjustments (most subjects share a preset).
   const adjustKey = hashString(
-    JSON.stringify([n, active.map((l) => l.look.adjust ?? null), active.map((l) => (l.look.masks ?? []).filter(usableMask).map((m) => m.adjust))])
+    JSON.stringify([n, active.map((l) => colourPart(l.look.adjust)), active.map((l) => (l.look.masks ?? []).filter(usableMask).map((m) => colourPart(m.adjust)))])
   )
   let lut = lutCache.get(adjustKey)
   if (!lut) {
@@ -256,7 +287,9 @@ export function compileLooks(stack: readonly LookLayer[], options: CompileOption
   const grain = active.find((l) => l.look.grain && l.look.grain.amount > 0)?.look.grain
   const vColor = vig?.color ? hexToRgb(vig.color) : vig && vig.amount > 0 ? ([1, 1, 1] as [number, number, number]) : ([0, 0, 0] as [number, number, number])
   const shaders = active.flatMap((l) => (l.look.shaders ?? []).filter((s) => s.visible !== false))
-  const neutral = !hasGlobal && maskCount === 0 && !vig && !grain
+  const gradeNeutral = !hasGlobal && maskCount === 0 && !vig && !grain
+  const detail = detailOf(active.map((l) => l.look.adjust))
+  const neutral = gradeNeutral && !hasDetail({ detail })
 
   return {
     key: hashString(JSON.stringify([n, stack, options.subjectSize, options.mapSize])),
@@ -277,6 +310,8 @@ export function compileLooks(stack: readonly LookLayer[], options: CompileOption
     maskIndex,
     shaders,
     warnings,
+    detail,
+    gradeNeutral,
     neutral,
   }
 }
@@ -302,6 +337,8 @@ export function mixCompiled(a: CompiledLook, b: CompiledLook, t: number): Compil
     vignette: lerp4(a.vignette, b.vignette) as CompiledLook['vignette'],
     vignetteColor: (a.vignette[0] === 0 ? b.vignetteColor : b.vignette[0] === 0 ? a.vignetteColor : lerp4(a.vignetteColor, b.vignetteColor)) as CompiledLook['vignetteColor'],
     grain: lerp4(a.grain, b.grain) as CompiledLook['grain'],
+    detail: lerp4(a.detail, b.detail) as CompiledLook['detail'],
+    gradeNeutral: a.gradeNeutral && b.gradeNeutral,
     neutral: a.neutral && b.neutral,
   }
   const near = t < 0.5 ? a : b

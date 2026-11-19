@@ -183,6 +183,93 @@ void main() {
 }
 `
 
+/**
+ * The detail pass (texture, clarity, dehaze), run over what the grade drew. It needs the pixels around each one, so it
+ * is a pass of its own over a whole subject (the editor's layer / picture canvas; in the game a post pipeline of the
+ * object or the camera). `uLookUvToWorld` is the same mapping as the grade pass's (its size gives the uv of one map
+ * pixel, so the radii are in map pixels whatever the zoom); `uLookDetail` = texture, clarity, dehaze (-1..1), unused.
+ *
+ *  - Texture: the luminance minus a blur of radius ~2 px, added back (+) or taken away (-): medium detail.
+ *  - Clarity: the luminance minus a blur of radius ~10 px, weighted to the midtones: local contrast.
+ *  - Dehaze (as Lightroom's, the dark channel prior): the darkest channel over a neighbourhood estimates the haze in
+ *    front of each pixel (the light is taken as white); + divides it out (contrast and colour come back where it was
+ *    hazy), - lays a light haze over the picture, thicker where it is already light.
+ *
+ * Transparent pixels around are left out of the blurs (alpha-weighted), so a sprite's edge does not darken.
+ */
+export const LOOK_DETAIL_FRAG = `${LOOK_PRECISION}
+uniform sampler2D uMainSampler;
+varying vec2 outTexCoord;
+uniform vec4 uLookUvToWorld;
+uniform vec4 uLookDetail;
+
+float detailLum(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
+
+// Alpha-weighted mean luminance of 8 taps on a ring of radius r (uv), plus the centre.
+float detailBlur(vec2 uv, vec2 r, float centre, float centreA) {
+  float sum = centre * centreA;
+  float wsum = centreA;
+  for (int i = 0; i < 8; i++) {
+    float a = float(i) * 0.785398;
+    vec4 s = texture2D(uMainSampler, uv + vec2(cos(a), sin(a)) * r);
+    sum += detailLum(s.rgb);
+    wsum += s.a;
+    vec4 h = texture2D(uMainSampler, uv + vec2(cos(a + 0.3927), sin(a + 0.3927)) * r * 0.5);
+    sum += detailLum(h.rgb);
+    wsum += h.a;
+  }
+  return sum / max(wsum, 1e-4);
+}
+
+void main() {
+  vec4 s = texture2D(uMainSampler, outTexCoord);
+  if (s.a <= 0.0) {
+    gl_FragColor = s;
+    return;
+  }
+  vec3 c = s.rgb / s.a;
+  vec2 px = 1.0 / max(abs(uLookUvToWorld.zw), vec2(1e-6));
+  float L = detailLum(c);
+
+  if (uLookDetail.x != 0.0) {
+    float fine = detailBlur(outTexCoord, px * 2.0, L, s.a);
+    c += (L - fine) * uLookDetail.x * (uLookDetail.x > 0.0 ? 2.2 : 1.0);
+  }
+  if (uLookDetail.y != 0.0) {
+    float wide = detailBlur(outTexCoord, px * 10.0, L, s.a);
+    float mid = 1.0 - pow(abs(2.0 * L - 1.0), 2.0);
+    c += (L - wide) * uLookDetail.y * (uLookDetail.y > 0.0 ? 1.6 : 0.9) * (0.35 + 0.65 * mid);
+  }
+  if (uLookDetail.z != 0.0) {
+    // the dark channel: the darkest channel over a 13 x 13 px neighbourhood (sparse taps), opaque pixels only
+    float dark = min(c.r, min(c.g, c.b));
+    for (int y = -2; y <= 2; y++) {
+      for (int x = -2; x <= 2; x++) {
+        vec4 t = texture2D(uMainSampler, outTexCoord + vec2(float(x), float(y)) * px * 3.0);
+        if (t.a > 0.5) dark = min(dark, min(t.r, min(t.g, t.b)) / t.a);
+      }
+    }
+    float k = uLookDetail.z;
+    if (k > 0.0) {
+      float t = max(1.0 - 0.95 * k * dark, 0.3);
+      c = (c - vec3(1.0)) / t + vec3(1.0);
+      // the haze also lifted the blacks: pull them back down a little as Lightroom does
+      c = mix(c, c * c, 0.15 * k);
+    } else {
+      float haze = -k * (0.45 + 0.4 * dark);
+      c = mix(c, vec3(0.62 + 0.3 * L), haze * 0.75);
+    }
+  }
+  c = clamp(c, 0.0, 1.0);
+  gl_FragColor = vec4(c * s.a, s.a);
+}
+`
+
+/** The uniform values of the detail pass for a compiled look (besides `uLookUvToWorld`, set by the host). */
+export function lookDetailUniforms(look: Pick<CompiledLook, 'detail'>): UniformValue[] {
+  return [{ name: 'uLookDetail', type: '4f', value: look.detail }]
+}
+
 export interface UniformValue {
   name: string
   type: '1f' | '4f' | '3f' | '4fv'

@@ -73,6 +73,8 @@ export const ADJUST_SLIDERS: readonly SliderDef[] = [
   { key: 'tint', label: 'Tint', min: -100, max: 100, step: 1, section: 'color', track: 'linear-gradient(90deg, #3fb950, #c9c9c9, #d04fd0)' },
   { key: 'vibrance', label: 'Vibrance', min: -100, max: 100, step: 1, section: 'color', track: 'linear-gradient(90deg, #8a8a8a, #d9534f, #f0ad4e, #5cb85c, #5bc0de)' },
   { key: 'saturation', label: 'Saturation', min: -100, max: 100, step: 1, section: 'color', track: 'linear-gradient(90deg, #8a8a8a, #e5484d, #ffd60a, #46a758, #0090ff, #d6409f)' },
+  { key: 'texture', label: 'Texture', min: -100, max: 100, step: 1, section: 'effects' },
+  { key: 'clarity', label: 'Clarity', min: -100, max: 100, step: 1, section: 'effects' },
   { key: 'dehaze', label: 'Dehaze', min: -100, max: 100, step: 1, section: 'effects' },
   { key: 'fade', label: 'Fade', min: 0, max: 100, step: 1, section: 'effects' },
 ]
@@ -400,11 +402,15 @@ export function isNeutralLook(look: Look | null | undefined): boolean {
   return true
 }
 
+/** The detail adjustments: worked out from the pixels around, in a pass of their own (not the LUT), global looks only. */
+export const DETAIL_KEYS: readonly (keyof LookAdjust)[] = ['texture', 'clarity', 'dehaze']
+
+/** Whether the colour adjustments (what the LUT bakes) change nothing; the detail adjustments are not looked at. */
 export function isNeutralAdjust(a: LookAdjust | undefined): boolean {
   if (!a) return true
   const off = a.off ?? {}
   for (const s of ADJUST_SLIDERS) {
-    if (off[s.section]) continue
+    if (off[s.section] || DETAIL_KEYS.includes(s.key)) continue
     const v = a[s.key]
     if (typeof v === 'number' && v !== 0) return false
   }

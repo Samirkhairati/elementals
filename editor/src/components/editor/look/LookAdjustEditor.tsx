@@ -2,7 +2,7 @@
 // Curve and Effects. Every change goes out as (next, done): done = the end of a drag, the moment to record an undo step.
 
 import { Aperture, Blend, Droplets, Palette, Spline, Sun } from 'lucide-react'
-import { ADJUST_SLIDERS, OVERLAY_MODES } from '../../../../../shared/look/schema'
+import { ADJUST_SLIDERS, DETAIL_KEYS, OVERLAY_MODES } from '../../../../../shared/look/schema'
 import type { AdjustSection, LookAdjust, OverlayMode } from '../../../../../shared/look/types'
 import { patchAdjust } from '@/lib/look/lookEdit'
 import { Field } from '../ui/controls'
@@ -44,9 +44,11 @@ export interface LookAdjustEditorProps {
   onChange: Change<LookAdjust | undefined>
   /** Sections open at first. */
   open?: AdjustSection[]
+  /** Offer texture, clarity and dehaze (a look's own adjustments; a mask cannot have them). Default true. */
+  detail?: boolean
 }
 
-export function LookAdjustEditor({ adjust, onChange, open = ['light'] }: LookAdjustEditorProps) {
+export function LookAdjustEditor({ adjust, onChange, open = ['light'], detail = true }: LookAdjustEditorProps) {
   const set = (patch: Partial<LookAdjust>, done: boolean) => onChange(patchAdjust(adjust, patch), done)
   const off = adjust?.off ?? {}
   const toggle = (s: AdjustSection) => {
@@ -74,7 +76,7 @@ export function LookAdjustEditor({ adjust, onChange, open = ['light'] }: LookAdj
     </LookSection>
   )
   const sliders = (s: AdjustSection) =>
-    sliderKeys(s).map((d) => (
+    sliderKeys(s).filter((d) => detail || !DETAIL_KEYS.includes(d.key)).map((d) => (
       <LookSlider
         key={d.key}
         label={d.label}

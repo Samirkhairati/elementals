@@ -195,7 +195,6 @@ export function colorFunction(a: LookAdjust): ColorFn {
   const tint = color ? (a.tint ?? 0) / 100 : 0
   const vibrance = color ? (a.vibrance ?? 0) / 100 : 0
   const saturation = color ? (a.saturation ?? 0) / 100 : 0
-  const dehaze = fx ? (a.dehaze ?? 0) / 100 : 0
   const fade = fx ? (a.fade ?? 0) / 100 : 0
   // White balance gains in linear light, normalised so mid grey keeps its brightness.
   const gains: RGB = [1 + 0.32 * temp + 0.12 * tint, 1 - 0.25 * tint, 1 - 0.32 * temp + 0.12 * tint]
@@ -252,12 +251,6 @@ export function colorFunction(a: LookAdjust): ColorFn {
       const wBl = 1 - smoothstep(0, 0.35, L)
       const delta = shadows * 0.35 * wSh + highlights * 0.35 * wHi + whites * 0.25 * wWh + blacks * 0.2 * wBl
       c = [c[0] + delta, c[1] + delta, c[2] + delta]
-    }
-    if (dehaze !== 0) {
-      const k = dehaze * 0.12
-      c = c.map((v) => (v - k) / (1 - Math.max(-0.5, k))) as RGB
-      const L = luma(c)
-      c = c.map((v) => L + (v - L) * (1 + dehaze * 0.3)) as RGB
     }
     c = [clamp01(c[0]), clamp01(c[1]), clamp01(c[2])]
 

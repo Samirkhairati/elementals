@@ -4,8 +4,8 @@
 // Texture convention: v = 0 is the image's top everywhere. Passes into an intermediate texture keep that order; the
 // last pass, into the canvas, flips (GL's canvas origin is bottom-left).
 
-import { LOOK_PASS_FRAG, lookUniforms, type LookPlacement } from '../../../../shared/look/shader'
-import type { CompiledLook } from '../../../../shared/look/compile'
+import { LOOK_DETAIL_FRAG, LOOK_PASS_FRAG, lookDetailUniforms, lookUniforms, type LookPlacement } from '../../../../shared/look/shader'
+import { hasDetail, type CompiledLook } from '../../../../shared/look/compile'
 import { SHADER_HEADER_LINES, shaderParamValues, shaderSource, type ShaderInfo } from '../../../../shared/look/userShaders'
 
 const VERT = `
@@ -172,8 +172,10 @@ export class LookGL {
   render(source: TexImageSource, w: number, h: number, grade: GradePass | null, shaders: readonly ShaderPass[] = []): boolean {
     const gl = this.gl
     if (gl.isContextLost() || w < 1 || h < 1) return false
-    const passes: ({ kind: 'grade'; p: GradePass } | { kind: 'shader'; p: ShaderPass })[] = []
-    if (grade && !grade.compiled.neutral) passes.push({ kind: 'grade', p: grade })
+    const passes: ({ kind: 'grade'; p: GradePass } | { kind: 'detail'; p: GradePass } | { kind: 'shader'; p: ShaderPass })[] = []
+    if (grade && !grade.compiled.gradeNeutral) passes.push({ kind: 'grade', p: grade })
+    // Texture, clarity and dehaze look at the pixels around: a pass of their own over what the grade drew.
+    if (grade && hasDetail(grade.compiled)) passes.push({ kind: 'detail', p: grade })
     for (const s of shaders) passes.push({ kind: 'shader', p: s })
     if (passes.length === 0) return false
     if (this.canvas.width !== w) this.canvas.width = w
@@ -194,9 +196,9 @@ export class LookGL {
     let drawn = 0
     passes.forEach((pass, i) => {
       const last = i === passes.length - 1
-      const prog = pass.kind === 'grade' ? this.program('grade', LOOK_PASS_FRAG) : this.program(userKey(pass.p.info), shaderSource(pass.p.info.source))
+      const prog = pass.kind === 'grade' ? this.program('grade', LOOK_PASS_FRAG) : pass.kind === 'detail' ? this.program('detail', LOOK_DETAIL_FRAG) : this.program(userKey(pass.p.info), shaderSource(pass.p.info.source))
       if ('error' in prog) {
-        if (pass.kind === 'grade') console.error('[looks] grading shader failed:', prog.error)
+        if (pass.kind !== 'shader') console.error(`[looks] ${pass.kind} shader failed:`, prog.error)
         if (!last) return
         // A broken last shader: still show what came before it.
       }
@@ -213,6 +215,7 @@ export class LookGL {
       gl.uniform1i(this.loc(p, 'uMainSampler'), 0)
       if (!('error' in prog)) {
         if (pass.kind === 'grade') this.setGrade(p, pass.p)
+        else if (pass.kind === 'detail') this.setDetail(p, pass.p)
         else this.setShader(p, pass.p, w, h)
       }
       gl.drawArrays(gl.TRIANGLES, 0, 6)
@@ -241,6 +244,15 @@ export class LookGL {
       else if (u.type === '3f') gl.uniform3f(l, v[0], v[1], v[2])
       else if (u.type === '4f') gl.uniform4f(l, v[0], v[1], v[2], v[3])
       else gl.uniform4fv(l, u.value as Float32Array)
+    }
+  }
+
+  private setDetail(p: Program, g: GradePass): void {
+    const gl = this.gl
+    gl.uniform4f(this.loc(p, 'uLookUvToWorld'), ...g.uvToWorld)
+    for (const u of lookDetailUniforms(g.compiled)) {
+      const v = u.value as number[]
+      gl.uniform4f(this.loc(p, u.name), v[0], v[1], v[2], v[3])
     }
   }
 

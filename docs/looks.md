@@ -13,8 +13,9 @@ code (`shared/look/`) and the same GLSL, so what the editor's canvas shows is wh
   user **shaders**. Every number is optional (absent = neutral).
 * **Adjustments** (`LookAdjust`): Light (exposure, contrast, highlights, shadows, whites, blacks), Color (temperature, tint,
   vibrance, saturation), the 8-band **colour mixer** (`hsl`), **colour grading** wheels (shadows / midtones / highlights /
-  global, blending, balance), **curves** (RGB, R, G, B), Effects (dehaze, fade, a coloured light `overlay`). Each section
-  has an eye (`off`).
+  global, blending, balance), **curves** (RGB, R, G, B), Effects (texture, clarity, dehaze, fade, a coloured light `overlay`). Each section
+  has an eye (`off`). Texture, clarity and dehaze (`DETAIL_KEYS`) look at the neighbouring pixels, so they are a separate
+  pass (below) and global only: masks do not offer them.
 * **Masks**: components combine top to bottom: `add` (max), `subtract` (m·(1−v)), `intersect` (m·v); each has invert,
   visibility and strength; the mask has amount, invert and visibility. Types: `all`, `linear`, `radial`, `rect`
   (marquee, corner radius + soft edge), `brush` (strokes with size / feather / flow / erase), `color` (Lab ΔE of the
@@ -33,13 +34,21 @@ code (`shared/look/`) and the same GLSL, so what the editor's canvas shows is wh
 ## How a look is drawn
 
 `shared/look/bake.ts` turns adjustments into a colour function (white balance → exposure → contrast → tone zones →
-dehaze → curves → mixer → vibrance / saturation → grading → overlay → fade). `compile.ts` bakes it into a **32³ LUT**
+curves → mixer → vibrance / saturation → grading → overlay → fade). `compile.ts` bakes it into a **32³ LUT**
 (a 1024 × 32·(1+masks) atlas: strip 0 global, one strip per mask), packs the mask components into uniforms and
 rasterises brush strokes into an RGBA texture. A picture's stack is [its own look (subject space), its layer's look
 (world space)]: global adjustments chain, then every mask applies in order; vignette and grain come from the first look
 that sets them (frame: the picture's box, or the camera view for layer and map looks). `shader.ts` holds the GLSL
 (`lookGrade`) and `lookUniforms`. Any amount of adjustment costs one LUT lookup per pixel (two-strip trilinear) plus the
 masks.
+
+**Detail pass** (`LOOK_DETAIL_FRAG`, `lookDetailUniforms`): Lightroom-style texture, clarity and dehaze run after the
+grade on the graded image, only when one of them is set (`CompiledLook.detail`, `hasDetail()`; the LUT hash leaves them
+out). Texture boosts the difference to a small blur (2 px radius: fine detail), clarity to a wide one (10 px) weighted
+to the midtones; dehaze estimates the haze with the dark channel prior (darkest channel over a 5×5 neighbourhood, taps
+3 px apart) and removes it (`(c − 1) / t + 1`, transmission `t = max(1 − 0.95·k·dark, 0.3)`), or adds haze when
+negative. The editor runs it as its own WebGL pass (`lookGL.ts`); the game as the `LookDetail` post pipeline on the
+camera (`game/src/look/pipelines.ts`).
 
 **Game** (`game/src/look/`): `LookRuntime` builds the subjects from the map's `look` properties
 (`readLooks.ts`). Pictures and tile layers are graded inline by `LookGradePipeline` (a SinglePipeline: no extra

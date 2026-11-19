@@ -3,14 +3,16 @@
 // transition runs. See docs/looks.md.
 
 import Phaser from "phaser";
-import { compileLooks, mixCompiled, type CompiledLook, type LookLayer } from "@shared/look/compile.ts";
+import { compileLooks, hasDetail, mixCompiled, type CompiledLook, type LookLayer } from "@shared/look/compile.ts";
 import { resolveLook, LUT_SIZE } from "@shared/look/schema.ts";
 import { pictureSubject, WORLD_SUBJECT, type LookPlacement } from "@shared/look/shader.ts";
 import type { ShaderInfo } from "@shared/look/userShaders.ts";
-import type { LookSet, ShaderUse } from "@shared/look/types.ts";
+import type { LookSet } from "@shared/look/types.ts";
 import { LookShadows } from "./LookShadows";
 import { lookState, type LookBlend } from "./lookState";
 import {
+  LOOK_DETAIL_PIPELINE,
+  LookDetailPipeline,
   LOOK_GRADE_PIPELINE,
   LOOK_PASS_PIPELINE,
   LookGradePipeline,
@@ -74,6 +76,7 @@ export class LookRuntime {
       const pipes = this.renderer.pipelines;
       if (!pipes.has(LOOK_GRADE_PIPELINE)) pipes.add(LOOK_GRADE_PIPELINE, new LookGradePipeline(scene.game));
       if (!pipes.getPostPipeline(LOOK_PASS_PIPELINE)) pipes.addPostPipeline(LOOK_PASS_PIPELINE, LookPassPipeline);
+      if (!pipes.getPostPipeline(LOOK_DETAIL_PIPELINE)) pipes.addPostPipeline(LOOK_DETAIL_PIPELINE, LookDetailPipeline);
       for (const info of shaders) pipes.addPostPipeline(userShaderKey(info.id), userShaderPipeline(info));
     } else {
       console.warn("[Looks] the canvas renderer cannot grade; looks are off (use WebGL)");
@@ -154,7 +157,7 @@ export class LookRuntime {
       const to = this.compiledFor(s, b.to);
       const compiled = b.t >= 1 || b.from === b.to ? to : mixCompiled(this.compiledFor(s, b.from), to, b.t);
       this.bind(s, compiled, b.t < 1 && b.from !== b.to);
-      this.setShaders(s, compiled.shaders);
+      this.setShaders(s, compiled);
     }
   }
 
@@ -188,19 +191,25 @@ export class LookRuntime {
     }
   }
 
-  private setShaders(s: Subject, uses: ShaderUse[]): void {
+  /** The post pipelines of a subject: the detail pass first (when its look has texture, clarity or dehaze), then its user shaders. */
+  private setShaders(s: Subject, compiled: CompiledLook): void {
     const target = s.target as unknown as Phaser.GameObjects.Components.PostPipeline;
-    const wanted = uses.filter((u) => {
+    const detail = hasDetail(compiled);
+    const wanted = compiled.shaders.filter((u) => {
       if (this.shaders.has(u.shader)) return true;
       const w = `shader "${u.shader}" is not loaded (run \`npm run assets:sync\`)`;
       this.warnOnce(w);
       return false;
     });
-    const keys = wanted.map((u) => userShaderKey(u.shader));
+    const keys = [...(detail ? [LOOK_DETAIL_PIPELINE] : []), ...wanted.map((u) => userShaderKey(u.shader))];
     if (keys.join("|") !== s.shaderKeys.join("|")) {
       for (const k of s.shaderKeys) target.removePostPipeline(k);
       for (const k of keys) target.setPostPipeline(k);
       s.shaderKeys = keys;
+    }
+    if (detail) {
+      const found = target.getPostPipeline(LOOK_DETAIL_PIPELINE) as unknown as LookDetailPipeline | LookDetailPipeline[] | undefined;
+      for (const p of Array.isArray(found) ? found : found ? [found] : []) p.detail = compiled.detail;
     }
     // Parameters: the n-th instance of a shader on the target gets the n-th use's values.
     const seen = new Map<string, number>();

@@ -327,7 +327,7 @@ export function LookMasksEditor({ masks, subject, box, spaceLabel, onChange }: L
                   ))}
                 </div>
                 <div className="ed-section-title mt-1">Mask adjustments</div>
-                <LookAdjustEditor adjust={m.adjust} onChange={(adjust, done) => setMask(m.id, { ...m, adjust: adjust ?? {} }, done)} />
+                <LookAdjustEditor detail={false} adjust={m.adjust} onChange={(adjust, done) => setMask(m.id, { ...m, adjust: adjust ?? {} }, done)} />
             </>
           </Card>
         )

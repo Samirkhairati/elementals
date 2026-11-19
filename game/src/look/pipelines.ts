@@ -2,11 +2,13 @@
 // - LookGradePipeline: Phaser's Single pipeline with the grade inline, for pictures and tile layers. No extra render
 //   pass: each object's pixels are graded while they are drawn, and objects with different looks only split the batch.
 // - LookPassPipeline: a camera post pass with the same grade, for the whole map's look (characters included).
+// - LookDetailPipeline: a post pass for texture, clarity and dehaze (they look at the pixels around), on the camera, a
+//   tile layer or a picture whose look has them, after its grade.
 // - user shaders: one post pipeline class per shader file, on the camera, a tile layer or a picture.
 // Every grade calls `lookGrade` of shared/look/shader.ts, the code the editor draws its preview with.
 
 import Phaser from "phaser";
-import { LOOK_GLSL, LOOK_PASS_FRAG, LOOK_PRECISION, lookUniforms, type LookPlacement, type UniformValue } from "@shared/look/shader.ts";
+import { LOOK_DETAIL_FRAG, LOOK_GLSL, LOOK_PASS_FRAG, LOOK_PRECISION, lookDetailUniforms, lookUniforms, type LookPlacement, type UniformValue } from "@shared/look/shader.ts";
 import type { CompiledLook } from "@shared/look/compile.ts";
 import { shaderParamValues, shaderSource, type ShaderInfo } from "@shared/look/userShaders.ts";
 
@@ -192,6 +194,27 @@ export class LookPassPipeline extends Phaser.Renderer.WebGL.Pipelines.PostFXPipe
     this.bindTexture(binding.lut, 1);
     this.bindTexture(binding.brush ?? binding.lut, 2);
     this.gl.activeTexture(this.gl.TEXTURE0);
+    this.bindAndDraw(renderTarget);
+  }
+}
+
+export const LOOK_DETAIL_PIPELINE = "LookDetail";
+
+/** Texture, clarity and dehaze over what an object or the camera drew (its `detail` is set by the LookRuntime). */
+export class LookDetailPipeline extends Phaser.Renderer.WebGL.Pipelines.PostFXPipeline {
+  detail: CompiledLook["detail"] = [0, 0, 0, 0];
+
+  constructor(game: Phaser.Game) {
+    super({ game, name: LOOK_DETAIL_PIPELINE, fragShader: LOOK_DETAIL_FRAG });
+  }
+
+  override onDraw(renderTarget: Phaser.Renderer.WebGL.RenderTarget): void {
+    // The render target holds the camera's whole screen, upside down in uv (as the look pass).
+    const s = lookView.screenToWorld;
+    const w = renderTarget.width;
+    const h = renderTarget.height;
+    this.set4f("uLookUvToWorld", s[0], s[1] + h * s[3], w * s[2], -h * s[3]);
+    applyUniforms(this, lookDetailUniforms({ detail: this.detail }));
     this.bindAndDraw(renderTarget);
   }
 }

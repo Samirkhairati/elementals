@@ -8,6 +8,8 @@ import {
   cleanLooksFile,
   colorFunction,
   compileLooks,
+  hasDetail,
+  lookDetailUniforms,
   curveTable,
   isNeutralLook,
   lookUniforms,
@@ -63,6 +65,33 @@ describe('look colour function', () => {
 })
 
 describe('compileLooks', () => {
+  it('texture, clarity and dehaze are a detail pass: they add up over the stack, clamp, skip masks and an Effects eye that is off', () => {
+    const only = compileLooks([{ look: { adjust: { dehaze: 40, texture: -20 } }, space: 'world' }], SIZE)
+    expect(only.detail).toEqual([-0.2, 0, 0.4, 0])
+    expect(hasDetail(only)).toBe(true)
+    expect(only.gradeNeutral).toBe(true) // no colour change: the grade pass is skipped
+    expect(only.neutral).toBe(false)
+    expect(only.hasGlobal).toBe(false)
+    expect(lookDetailUniforms(only)).toEqual([{ name: 'uLookDetail', type: '4f', value: [-0.2, 0, 0.4, 0] }])
+    const stacked = compileLooks(
+      [
+        { look: { adjust: { clarity: 80 } }, space: 'subject' },
+        { look: { adjust: { clarity: 70, dehaze: 10, off: { effects: true } }, masks: [{ id: 'm', name: 'M', components: [{ id: 'c', type: 'all' }], adjust: { dehaze: 100 } }] }, space: 'world' },
+      ] as Parameters<typeof compileLooks>[0],
+      SIZE
+    )
+    expect(stacked.detail).toEqual([0, 0.8, 0, 0])
+    const sum = compileLooks([{ look: { adjust: { clarity: 80 } }, space: 'subject' }, { look: { adjust: { clarity: 70 } }, space: 'world' }], SIZE)
+    expect(sum.detail[1]).toBe(1)
+  })
+
+  it('a detail change does not bake the LUT again', () => {
+    const a = compileLooks([{ look: { adjust: { exposure: 0.3, dehaze: 10 } }, space: 'world' }], SIZE)
+    const b = compileLooks([{ look: { adjust: { exposure: 0.3, dehaze: 60 } }, space: 'world' }], SIZE)
+    expect(b.lut).toBe(a.lut)
+    expect(b.key).not.toBe(a.key)
+  })
+
   it('bakes the LUT so a lookup matches the colour function', () => {
     const adjust = { exposure: 0.5, contrast: 20, saturation: 30, temperature: -20 }
     const compiled = compileLooks([{ look: { adjust }, space: 'world' }], SIZE)
