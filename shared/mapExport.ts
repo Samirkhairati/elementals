@@ -70,7 +70,7 @@ function shapeObjects(layer: CollisionLayerNode, nextId: () => number): TiledObj
  * are left out. What the tree passes down (opacity, y-sort) is resolved here, one value per sprite.
  */
 function imageObjects(run: SpriteRun, nextId: () => number): TiledObject[] {
-  // A hidden host hides the whole group (its `visible`); a sprite hidden itself, or by a Node2D below the host, is left out.
+  // A hidden host hides the whole group (its `visible`); a sprite hidden itself, or by a Node below the host, is left out.
   const below = run.hostAncestors.length + (run.host ? 1 : 0)
   return runDrawOrder(run).filter(({ node, ancestors }) => isVisible(node, ancestors.slice(below))).map(({ node: item, ancestors }) => {
     const properties: TiledProperty[] = [item.graphicId ? { name: 'graphic', type: 'string', value: item.graphicId } : { name: 'sprite', type: 'string', value: item.assetId ?? '' }]
@@ -105,7 +105,7 @@ function imageObjects(run: SpriteRun, nextId: () => number): TiledObject[] {
 /**
  * Converts an editor map (schema 6, or any older one: it is migrated first) to a Tiled-format map object.
  * The tree's layers (`sceneLayers`: layer nodes and runs of sprites, each run one image object group) are written top
- * first, each with what its ancestors pass down: a hidden node hides what is below it, the z and look of a Node2D or
+ * first, each with what its ancestors pass down: a hidden node hides what is below it, the z and look of a Node or
  * YSort go to the sprites below it, y-sort and opacity are resolved per sprite. Entities are flattened into the game's
  * entities (their child nodes become their components, shared/sceneEntity.ts).
  * `tilesets` must contain size info for every tileset the map uses; tilesets that are unknown or
@@ -117,7 +117,7 @@ export function convertEditorMapToTiled(map: EditorMap, tilesets: TilesetInfo[])
   // canonical components; the exported map is always stamped with the schema version.
   const migrated = migrateMap(map).value
   const nodes = migrated.nodes ?? []
-  // Node2Ds only organise the tree; the game gets the layers themselves, top first.
+  // Nodes only organise the tree; the game gets the layers themselves, top first.
   const sceneTop = sceneLayers(nodes).reverse()
   const layers = sceneTop.filter((l): l is Extract<typeof l, { kind: 'layer' }> => l.kind === 'layer')
   const collisionLayers = layers.filter((e): e is typeof e & { node: CollisionLayerNode } => e.node.type === 'collision')

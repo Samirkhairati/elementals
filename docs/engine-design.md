@@ -23,8 +23,8 @@ answers one question about the entity:
 | **Tag** | Free-form label for lookups (`npc`, `chest`) | Tag |
 
 **In a map (schema 7) the components are nodes** of the entity, as in Godot (`shared/sceneEntity.ts`, docs/node-tree-plan.md):
-the entity node keeps `Transform`, `Tag` and unknown components in its `components`; **AnimatedSprite2D** is the Sprite,
-**StaticBody2D** + CollisionShape2D the solid Collider, **Area2D** + CollisionShape2D the Area (or, without a body, a non-solid
+the entity node keeps `Transform`, `Tag` and unknown components in its `components`; **AnimatedSprite** is the Sprite,
+**StaticBody** + CollisionShape the solid Collider, **Area** + CollisionShape the Area (or, without a body, a non-solid
 Collider), **Wander** / **PlayerController** / **Mover** the Movement (`controller` wander / player / none) and **Event** the Event.
 An entity holds one of each (one movement node). Code that wants the bag reads `componentsOfEntity` / `engineEntityOf` (the game,
 the exporter, the database) or `entityView` (the editor's entity code); writes go through `entityWithComponents`. In the game

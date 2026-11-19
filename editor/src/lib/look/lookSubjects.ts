@@ -10,7 +10,7 @@ import { childrenOf, isContainer, lookNodeOf, updateNode, type LookNode, type Sc
 import { sceneIndex } from '../sceneIndex'
 import type { LookSubjectRef } from './lookView'
 
-/** Nodes graded as a layer by their Look child: TileMaps, and Node2Ds / YSorts (their Look grades the sprites below them). */
+/** Nodes graded as a layer by their Look child: TileMaps, and Nodes (their Look grades the sprites below them). */
 export const layerHasLook = (l: Pick<SceneNode, 'type'>): boolean => l.type === 'tile' || l.type === 'group' || l.type === 'ySort'
 
 const subjectNode = (nodes: readonly SceneNode[], ref: Exclude<LookSubjectRef, { kind: 'map' }>): SceneNode | undefined =>
@@ -112,7 +112,7 @@ export function compileCached(stack: readonly LookLayer[], options: { subjectSiz
   return c
 }
 
-/** The looks a picture is drawn with (its own Look, then the one its Node2D passes down) in a profile; empty = none. */
+/** The looks a picture is drawn with (its own Look, then the one its Node passes down) in a profile; empty = none. */
 export function pictureStack(item: { look?: LookSet }, layer: { look?: LookSet }, profile: string | null): LookLayer[] {
   const own = resolveLook(item.look, profile)
   const outer = resolveLook(layer.look, profile)

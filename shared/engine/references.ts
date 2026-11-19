@@ -54,7 +54,7 @@ function refLayers(map: RefMap): RefLayer[] {
     type: n.type,
     ...('data' in n && n.data ? { data: n.data as RefLayer['data'] } : {}),
   }));
-  // Sprites sit in any Node2D or YSort: one entry per node that holds some, named after it ("" = the map root).
+  // Sprites sit in any Node: one entry per node that holds some, named after it ("" = the map root).
   const holders = new Map<string, RefLayer>();
   for (const e of walk(nodes)) {
     if (e.node.type !== 'picture') continue;

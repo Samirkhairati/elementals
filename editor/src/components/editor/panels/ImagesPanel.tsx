@@ -1,11 +1,11 @@
-// The right-hand panel while a Node2D or YSort is active (it takes the place of the tileset panels). The pictures themselves
-// (and the groups of them) are rows of the Scene panel; this panel is where they are added (the picture browser, the
-// picture waiting to be placed) and where the picked one is looked at: a zoomable preview with the Crop button, and its
-// properties. The layer's own name and z stay in the Properties panel on the left.
+// The right-hand panel while a Node is active (it takes the place of the tileset panels). The sprites themselves (and
+// the Nodes holding them) are rows of the Scene panel, added there with Add Child Node › Sprite (which opens the picture
+// browser kept here); this panel shows the sprite waiting to be placed and the picked one: a zoomable preview with the
+// Crop button, and its properties. The Node's own name, z and opacity are in the Properties panel on the left.
 
 import { stillGraphics } from '@/lib/characterEdit'
 import React, { useEffect, useRef, useState } from 'react'
-import { Crop, Plus, Scaling, Stamp, X } from 'lucide-react'
+import { Crop, Scaling, Stamp, X } from 'lucide-react'
 import { imagePickLabel, imagePickName } from '@/lib/graphicAssets'
 import { flippedItemBounds, itemSourceSize } from '@/lib/imageItems'
 import { snapPicture } from '@/lib/imageSnap'
@@ -15,7 +15,7 @@ import type { ImageItem } from '@/types/editor'
 import { drawOrderPictures, isBranch, type BranchNode } from '../../../../../shared/sceneTree'
 import { lockedNode, pictureLocked, sceneIndex } from '@/lib/sceneIndex'
 import { OPEN_PICTURE_PICKER_EVENT } from '@/lib/picturePickerEvent'
-import { Badge, Card, EdButton, Field, IconButton, NumberField, TextField, Toggle } from '../ui/controls'
+import { Card, EdButton, Field, IconButton, NumberField, TextField, Toggle } from '../ui/controls'
 import { ZoomPane } from '../ui/ZoomPane'
 import { ImageItemView } from '../sprites/ImageItemView'
 import { ScaleField } from './ScaleField'
@@ -58,7 +58,7 @@ export function ImagesPanel() {
   const ctx = useEditorSelector(selectImages)
   const index = sceneIndex(ctx.nodes ?? NO_NODES)
   const found = index.byId.get(ctx.activeLayerId ?? '')?.node
-  // The Node2D / YSort the sprites are added to: the active one (a sprite's own host when a sprite is picked).
+  // The Node the sprites are added to: the active one (a sprite's own host when a sprite is picked).
   const layer = found && isBranch(found) ? found : null
   const [pickerOpen, setPickerOpen] = useState(false)
   const [cropOpen, setCropOpen] = useState(false)
@@ -102,7 +102,7 @@ export function ImagesPanel() {
   const cropKeys = describeBindings('image.crop', bindings)
   const resizeKeys = describeBindings('image.resize', bindings)
 
-  if (!layer) return <div className="ed-empty select-none">Select a Node2D or YSort to place sprites.</div>
+  if (!layer) return <div className="ed-empty select-none">Select a Node to place sprites.</div>
 
   // The layer (or a group above it) is locked; a locked picture is frozen too.
   const locked = lockedNode(index, layer.id) || (selected ? pictureLocked(index, selected.id) : false)
@@ -142,48 +142,31 @@ export function ImagesPanel() {
 
   return (
     <div className="flex w-full flex-col gap-3 text-left" data-testid="images-panel">
-      <Card
-        caps
-        title={<span title={`Images · ${layer.name}`}>Images · {layer.name}</span>}
-        info={
-          <>The pictures of this layer are listed in the Scene panel. Images snap to the grid while the magnet in the top toolbar is on, and move freely when it is off. Ctrl/Cmd+click adds or removes an image from the selection and Shift+click picks a range; Delete, Duplicate, Ctrl/Cmd+C and Ctrl/Cmd+V work on all of them.</>
-        }
-        actions={
-          <>
-            {picked.length > 1 && <Badge>{picked.length} selected</Badge>}
-            <Badge>{images.length}</Badge>
-            <button type="button" className="ed-btn" data-size="sm" data-variant="primary" aria-label="Add image" title={openGroup ? `Add a picture to the group ${openGroup.name}` : 'Add a picture to this layer'} disabled={layerLocked} onClick={() => setPickerOpen(true)}>
-              <Plus />
-              Add
-            </button>
-          </>
-        }
-        data-testid="image-layer-section"
-      >
-        <PicturePicker
-          open={pickerOpen}
-          onOpenChange={setPickerOpen}
-          title={openGroup ? `Add a picture to ${openGroup.name}` : 'Add a picture'}
-          sprites={ctx.spriteList}
-          graphics={stillGraphics(ctx.graphics)}
-          gifsLeftOut={ctx.graphics.length - stillGraphics(ctx.graphics).length}
-          images={ctx.graphicImages}
-          onPick={ctx.startImagePlacement}
-          onImport={importPictures}
-          importTo={importTo}
-        />
-        <div className="flex flex-col gap-2" data-testid="image-list-area">
-          {ctx.pendingImage && (
-            <div className="flex items-center gap-2 rounded-md border border-primary/40 bg-primary/10 px-2 py-1.5 text-ed-label" data-testid="placing-banner">
-              <span className="min-w-0 flex-1 truncate">Placing {pendingLabel}: click the map (Esc to stop)</span>
-              <IconButton title="Stop placing" aria-label="Stop placing" onClick={ctx.cancelImagePlacement}>
-                <X />
-              </IconButton>
-            </div>
-          )}
-          {images.length === 0 && <p className="ed-hint">No images yet. Use Add to place one.</p>}
+      <PicturePicker
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        title={openGroup ? `Add a picture to ${openGroup.name}` : `Add a picture to ${layer.name}`}
+        sprites={ctx.spriteList}
+        graphics={stillGraphics(ctx.graphics)}
+        gifsLeftOut={ctx.graphics.length - stillGraphics(ctx.graphics).length}
+        images={ctx.graphicImages}
+        onPick={ctx.startImagePlacement}
+        onImport={importPictures}
+        importTo={importTo}
+      />
+      {ctx.pendingImage && (
+        <div className="flex items-center gap-2 rounded-md border border-primary/40 bg-primary/10 px-2 py-1.5 text-ed-label" data-testid="placing-banner">
+          <span className="min-w-0 flex-1 truncate">Placing {pendingLabel}: click the map (Esc to stop)</span>
+          <IconButton title="Stop placing" aria-label="Stop placing" onClick={ctx.cancelImagePlacement}>
+            <X />
+          </IconButton>
         </div>
-      </Card>
+      )}
+      {!selected && !ctx.pendingImage && (
+        <div className="ed-empty select-none" data-testid="images-empty">
+          {picked.length > 1 ? `${picked.length} sprites picked` : `No sprite picked in ${layer.name}`}
+        </div>
+      )}
 
       {selected && (
         <Card

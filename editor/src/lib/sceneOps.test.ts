@@ -62,17 +62,17 @@ describe('names', () => {
   })
 
   it('newNodeName numbers tile layers and entities, and keeps the rest free among every name in the tree', () => {
-    const nodes = [makeLayer('a', { name: 'Layer 1' }), makeGroup('g', [makeEntity('e', { name: 'Entity 1' }), makeImageLayer('i', [], { ySort: true, name: 'YSort' })], { name: 'Node2D' })]
+    const nodes = [makeLayer('a', { name: 'Layer 1' }), makeGroup('g', [makeEntity('e', { name: 'Entity 1' }), makeImageLayer('i', [], { ySort: true, name: 'YSort' })], { name: 'Node' })]
     expect(newNodeName(nodes, 'tile')).toBe('Layer 2')
     expect(newNodeName(nodes, 'entity')).toBe('Entity 2')
     expect(newNodeName(nodes, 'ySort')).toBe('YSort 2')
-    expect(newNodeName(nodes, 'group')).toBe('Node2D 2')
+    expect(newNodeName(nodes, 'group')).toBe('Node 2')
     expect(newNodeName(nodes, 'picture')).toBe('Sprite')
   })
 
   it('newNodeName gives component nodes their type name: an entity holds one of each', () => {
-    expect(newNodeName([], 'animatedSprite')).toBe('AnimatedSprite2D')
-    expect(newNodeName([], 'area')).toBe('Area2D')
+    expect(newNodeName([], 'animatedSprite')).toBe('AnimatedSprite')
+    expect(newNodeName([], 'area')).toBe('Area')
   })
 })
 
@@ -85,7 +85,7 @@ describe('making nodes', () => {
   })
 
   it('makeNode gives a body or an area a one-tile box shape, and a shape a box only inside them', () => {
-    const body = makeNode('body', 'b', 'StaticBody2D') as { children: SceneNode[] }
+    const body = makeNode('body', 'b', 'StaticBody') as { children: SceneNode[] }
     expect(body.children).toEqual([{ id: 'b:shape', type: 'collisionShape', name: '', points: [], closed: true, box: { width: 32, height: 32, offsetX: 0, offsetY: 0 } }])
     expect(makeNode('collisionShape', 's', '', 'area')).toMatchObject({ box: { width: 32, height: 32 } })
     expect(makeNode('collisionShape', 's', '', 'collision')).not.toHaveProperty('box')
@@ -93,10 +93,10 @@ describe('making nodes', () => {
     expect((makeNode('wander', 'w', 'Wander') as { props: Record<string, unknown> }).props).not.toHaveProperty('controller')
   })
 
-  it('defaultIndex puts TileMaps, Node2Ds and YSorts below the special layers on top, the rest on top', () => {
+  it('defaultIndex puts TileMaps, Nodes below the special layers on top, the rest on top', () => {
     const children = [makeLayer('a'), makeLayer('c', { type: 'collision', children: [] }), makeLayer('t', { type: 'terrain' })]
     expect(defaultIndex(children, 'tile')).toBe(1)
-    expect(defaultIndex(children, 'ySort')).toBe(1)
+    expect(defaultIndex(children, 'ySort')).toBe(3)
     expect(defaultIndex(children, 'group')).toBe(1)
     expect(defaultIndex(children, 'collision')).toBe(3)
   })
@@ -105,7 +105,7 @@ describe('making nodes', () => {
     const nodes = town()
     expect(ids(parentPathFor(nodes, 'tile', 'town'))).toEqual(['town'])
     expect(ids(parentPathFor(nodes, 'tile', 'roofs'))).toEqual(['town'])
-    expect(ids(parentPathFor(nodes, 'tile', 'oak'))).toEqual(['trees']) // a sprite holds no TileMap: its Node2D does
+    expect(ids(parentPathFor(nodes, 'tile', 'oak'))).toEqual(['trees']) // a sprite holds no TileMap: its Node does
     expect(ids(parentPathFor(nodes, 'group', 'oak'))).toEqual(['trees'])
     expect(ids(parentPathFor(nodes, 'look', 'oak'))).toEqual(['trees', 'oak']) // a sprite takes a Look itself
     expect(ids(parentPathFor(nodes, 'picture', 'ground'))).toEqual([]) // nowhere above a root TileMap takes a sprite
@@ -142,11 +142,15 @@ describe('flags and fields', () => {
     expect(findNode(setLocked(locked, 'town', false), 'town')).not.toHaveProperty('locked')
   })
 
-  it('y-sort on makes a Node2D a YSort (its default name too), off makes it a Node2D again; other nodes are left alone', () => {
+  it('y-sort on gives a Node a YSort child (or shows its hidden one), off takes it away; other nodes are left alone', () => {
     const nodes = town()
-    expect(findNode(setYSort(nodes, 'trees', true), 'trees')).toMatchObject({ type: 'ySort', name: 'Trees' })
-    expect(findNode(setYSort(setYSort(nodes, 'trees', true), 'trees', undefined), 'trees')).toMatchObject({ type: 'group' })
-    expect(findNode(setYSort([makeGroup('g', [], { name: 'Node2D' })], 'g', true), 'g')).toMatchObject({ type: 'ySort', name: 'YSort' })
+    const on = setYSort(nodes, 'trees', true)
+    expect(findNode(on, 'trees')).toMatchObject({ type: 'group', name: 'Trees' })
+    expect(findNode(on, 'trees:ysort')).toEqual({ id: 'trees:ysort', type: 'ySort', name: 'YSort' })
+    expect(setYSort(on, 'trees', true)).toBe(on)
+    expect(findNode(setYSort(on, 'trees', undefined), 'trees:ysort')).toBeUndefined()
+    const hidden = setVisible(on, 'trees:ysort', false)
+    expect(findNode(setYSort(hidden, 'trees', true), 'trees:ysort')).toEqual({ id: 'trees:ysort', type: 'ySort', name: 'YSort' })
     expect(setYSort(nodes, 'oak', true)).toBe(nodes)
     expect(setYSort(nodes, 'ground', true)).toBe(nodes)
     expect(setYSort(nodes, 'trees', false)).toBe(nodes)
@@ -268,7 +272,7 @@ describe('dropping in the list', () => {
     expect(canDrop(nodes, ['ground'], 'town', 'inside')).toBe(true)
     expect(canDrop(nodes, ['town'], 'roofs', 'above')).toBe(false) // into itself
     expect(canDrop(nodes, ['oak'], 'ground', 'above')).toBe(false) // a sprite at the map root
-    expect(canDrop(nodes, ['ground'], 'trees', 'inside')).toBe(true) // a TileMap into a Node2D
+    expect(canDrop(nodes, ['ground'], 'trees', 'inside')).toBe(true) // a TileMap into a Node
     expect(canDrop(nodes, ['pine'], 'oak', 'inside')).toBe(false) // no sprite inside a sprite
     expect(canDrop(nodes, ['oak'], 'ground', 'inside')).toBe(false) // nor inside a TileMap
     expect(canDrop(setLocked(nodes, 'town', true), ['ground'], 'town', 'inside')).toBe(false)

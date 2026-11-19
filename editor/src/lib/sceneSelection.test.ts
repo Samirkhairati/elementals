@@ -4,7 +4,7 @@ import { makeEntity, makeGroup, makeImageLayer, makeLayer, makePicture } from '@
 import { sceneIndex } from './sceneIndex'
 import { NO_SELECTION, activeLayerFor, clearSelection, expandPictureClick, isPictureGroup, pruneSelection, sameView, selectMany, selectNode, viewOf } from './sceneSelection'
 
-// draw order: ground, town [npc, roofs], trees [oak, wall (a Node2D that picks as one) [left, right]]
+// draw order: ground, town [npc, roofs], trees [oak, wall (a Node that picks as one) [left, right]]
 const tree = (): SceneNode[] => [
   makeLayer('ground'),
   makeGroup('town', [makeEntity('npc'), makeLayer('roofs')]),
@@ -15,12 +15,12 @@ const index = () => sceneIndex(tree())
 const ROWS = ['trees', 'wall', 'right', 'left', 'oak', 'town', 'roofs', 'npc', 'ground']
 
 describe('what a node stands for', () => {
-  it('a Node2D that picks as one is a picture group; a plain one is not', () => {
+  it('a Node that picks as one is a picture group; a plain one is not', () => {
     expect(isPictureGroup(index(), 'wall')).toBe(true)
     expect(isPictureGroup(index(), 'town')).toBe(false)
   })
 
-  it('the active layer of a node: a layer itself, a sprite the Node2D it sits in, a Node2D itself, an entity none', () => {
+  it('the active layer of a node: a layer itself, a sprite the Node it sits in, a Node itself, an entity none', () => {
     const idx = index()
     expect(activeLayerFor(idx, 'roofs')).toBe('roofs')
     expect(activeLayerFor(idx, 'left')).toBe('wall')
@@ -31,7 +31,7 @@ describe('what a node stands for', () => {
     expect(activeLayerFor(idx, 'gone')).toBeUndefined()
   })
 
-  it('a click on a sprite of a pick-as-one Node2D picks the whole group, unless that group is the open one', () => {
+  it('a click on a sprite of a pick-as-one Node picks the whole group, unless that group is the open one', () => {
     const idx = index()
     expect(expandPictureClick(idx, 'left', null)).toEqual(['left', 'right'])
     expect(expandPictureClick(idx, 'left', 'wall')).toEqual(['left'])

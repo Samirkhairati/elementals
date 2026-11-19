@@ -254,7 +254,7 @@ export function MapCanvas({
   const imageDrag = useRef<ImageDrag | null>(null)
 
   const activeLayer = useMemo(() => index.byId.get(activeLayerId ?? '')?.node ?? null, [index, activeLayerId])
-  // A Node2D or YSort is the "image layer" of the sprites inside it: while it is active they can be picked and placed.
+  // A Node is the "image layer" of the sprites inside it: while it is active they can be picked and placed.
   const activeImageLayer = activeLayer && isBranch(activeLayer) ? activeLayer : null
   const isImageLayerActive = activeImageLayer !== null
   const { brush: collisionBrush } = usePolygonEdit()

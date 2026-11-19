@@ -47,13 +47,13 @@ export function MapSettingsDialog({ map, onClose, onSave, onResize }: Props) {
               <span className="ed-label flex items-center gap-1">
                 Player z-index
                 <InfoTip>
-                  The depth the player draws at in the game. TileMaps and the Node2Ds holding sprites with a higher z draw over the player, lower ones under it.
+                  The depth the player draws at in the game. TileMaps and the Nodes holding sprites with a higher z draw over the player, lower ones under it.
                   Sprites under a YSort sort among the characters at this depth. Default {DEFAULT_PLAYER_Z}.
                 </InfoTip>
               </span>
               <NumberField aria-label="Player z-index" integer min={-999} max={999} value={playerZ} onCommit={setPlayerZ} />
               <span className="ed-hint" data-testid="player-z-layers">
-                {above} of {drawn.length} TileMaps and sprite Node2Ds draw over the player
+                {above} of {drawn.length} TileMaps and sprite Nodes draw over the player
               </span>
             </div>
             <div className="flex items-center gap-2">

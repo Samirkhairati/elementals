@@ -49,6 +49,8 @@ const TILE_PANELS = ['tilesets', 'preview', 'activeSelection'];
 const FOCUS_PANELS = ['inspector', 'images', 'collision'];
 /** Panels of older layouts that no longer exist (the entity list is part of the Layers panel now). */
 const RETIRED_PANELS = ['entities'];
+/** Panels whose title changed: a saved layout keeps the old one. */
+const RENAMED_PANELS: Record<string, string> = { layers: 'SCENE' };
 
 export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
   const { maps = [], activeMap = null, onSelectMap, onClearActiveMap, entityFocus = false, imageFocus = false, collisionFocus = false } = options;
@@ -147,7 +149,7 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
     const layersPanel = api.addPanel({
       id: 'layers',
       component: 'layers',
-      title: 'LAYERS',
+      title: 'SCENE',
       position: { referencePanel: mapsPanel, direction: 'below' },
     });
 
@@ -389,6 +391,8 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
     if (restored) {
       if (!api.panels.some((p) => isMapPanelId(p.id) || p.id === 'empty_canvas')) ensureEmptyCanvasRef.current?.(api);
       for (const id of RETIRED_PANELS) api.getPanel(id)?.api.close();
+      // Panels renamed since the layout was saved show their current title.
+      for (const [id, title] of Object.entries(RENAMED_PANELS)) api.getPanel(id)?.api.setTitle(title);
       // A layout saved before the collision panel existed gets it in the right column, like the images panel.
       const besideRight = api.getPanel('images') ?? api.getPanel('inspector') ?? api.getPanel('tilesets');
       if (!api.getPanel('collision') && besideRight) {

@@ -2,7 +2,7 @@ import { StrictMode, type ReactNode } from 'react'
 import { describe, it, expect, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import type { BranchNode, PictureNode, SceneNode } from '../../../../shared/sceneTree'
-import { drawOrderPictures, picturesOf } from '../../../../shared/sceneTree'
+import { drawOrderPictures, picturesOf, sortsBelow } from '../../../../shared/sceneTree'
 import { makeGroup, makeImageLayer, makeLayer, makeMap, makePicture } from '@/test/helpers'
 import { useSceneHarness } from '@/test/sceneHarness'
 
@@ -20,18 +20,18 @@ const imageLayer = (r: R, id = 'I1') => r.current.tree.index.byId.get(id)!.node 
 const order = (r: R, id = 'I1') => drawOrderPictures(imageLayer(r, id)).map((p) => p.id)
 const withImageLayer = () => setup([makeImageLayer('I1', [], { name: 'Images' }), makeLayer('L1')])
 
-describe('useLayerManager: sprites in Node2Ds', () => {
-  it('creates a Node2D named Node2D, below the special layers, then Node2D 2', () => {
+describe('useLayerManager: sprites in Nodes', () => {
+  it('creates a Node named Node, below the special layers, then Node 2', () => {
     const { result } = setup([makeLayer('L1'), makeLayer('C', { type: 'collision', children: [] })])
     act(() => result.current.layers.createNode('group', null))
     let nodes = result.current.tree.nodes
     expect(nodes.map((l) => l.type)).toEqual(['tile', 'group', 'collision'])
-    expect(nodes[1]).toMatchObject({ name: 'Node2D', children: [] })
+    expect(nodes[1]).toMatchObject({ name: 'Node', children: [] })
     expect(result.current.layers.activeLayerId).toBe(nodes[1].id)
 
     act(() => result.current.layers.createNode('group', null))
     nodes = result.current.tree.nodes
-    expect(nodes.some((l) => l.name === 'Node2D 2')).toBe(true)
+    expect(nodes.some((l) => l.name === 'Node 2')).toBe(true)
   })
 
   it('adds a picture, selects it and commits history once', () => {
@@ -48,7 +48,7 @@ describe('useLayerManager: sprites in Node2Ds', () => {
     expect(result.current.activeMap?.nodes).toBe(result.current.tree.nodes)
   })
 
-  it('refuses to add a sprite to a node that is not a Node2D or YSort', () => {
+  it('refuses to add a sprite to a node that is not a Node', () => {
     const { result, onCommitHistory } = withImageLayer()
     act(() => {
       expect(result.current.layers.addImage('L1', { assetId: 'tree', x: 0, y: 0 })).toBeNull()
@@ -271,7 +271,7 @@ describe('useLayerManager: groups of pictures and y-sort', () => {
       ]),
     ])
 
-  it('selecting a Node2D that picks as one picks it and its sprites, opens it and makes it the active node', () => {
+  it('selecting a Node that picks as one picks it and its sprites, opens it and makes it the active node', () => {
     const { result } = grouped()
     act(() => result.current.layers.select('g'))
     expect(result.current.layers.openImageGroupId).toBe('g')
@@ -279,7 +279,7 @@ describe('useLayerManager: groups of pictures and y-sort', () => {
     expect(result.current.layers.activeLayerId).toBe('g')
   })
 
-  it('an empty Node2D can be selected: it is the active node, and sprites added to it go inside', () => {
+  it('an empty Node can be selected: it is the active node, and sprites added to it go inside', () => {
     const { result } = grouped()
     act(() => result.current.layers.select('e'))
     expect(result.current.layers.activeLayerId).toBe('e')
@@ -300,7 +300,7 @@ describe('useLayerManager: groups of pictures and y-sort', () => {
     expect(result.current.tree.index.byId.get(id!)?.ancestors.map((a) => a.id)).toEqual(['I1'])
   })
 
-  it('a click on a sprite of a pick-as-one Node2D picks the whole group, unless the group is the selected one', () => {
+  it('a click on a sprite of a pick-as-one Node picks the whole group, unless the group is the selected one', () => {
     const { result } = setup([
       makeImageLayer('I1', [makeGroup('g', [makePicture('a'), makePicture('b')], { pickAsOne: true }) as never, makePicture('c')]),
     ])
@@ -341,15 +341,20 @@ describe('useLayerManager: groups of pictures and y-sort', () => {
     expect(result.current.tree.index.byId.get('b')!.ancestors.map((a) => a.id)).toEqual(['I1'])
   })
 
-  it('y-sort on turns a Node2D into a YSort and off turns it back; sprites have no y-sort of their own', () => {
+  it('y-sort on gives a Node a YSort child and off takes it away; sprites have no y-sort of their own', () => {
     const { result } = grouped()
     act(() => result.current.layers.setNodeYSort('I1', true))
-    expect(imageLayer(result).type).toBe('ySort')
+    expect(imageLayer(result).type).toBe('group')
+    expect(sortsBelow(imageLayer(result))).toBe(true)
+    expect(imageLayer(result).children.filter((n) => n.type === 'ySort')).toHaveLength(1)
     act(() => result.current.layers.setNodesYSort(['b', 'g'], true))
-    expect(imageLayer(result).children.find((n) => n.id === 'g')?.type).toBe('ySort')
+    const g = imageLayer(result).children.find((n) => n.id === 'g')!
+    expect(g.type).toBe('group')
+    expect(sortsBelow(g)).toBe(true)
     expect(picturesOf(imageLayer(result)).find((i: PictureNode) => i.id === 'b')).not.toHaveProperty('ySort')
     act(() => result.current.layers.setNodeYSort('I1', undefined))
-    expect(imageLayer(result).type).toBe('group')
+    expect(sortsBelow(imageLayer(result))).toBe(false)
+    expect(imageLayer(result).children.some((n) => n.type === 'ySort')).toBe(false)
   })
 
 })

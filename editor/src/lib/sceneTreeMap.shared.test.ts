@@ -120,7 +120,7 @@ describe('validateEditorMap: nodes', () => {
     expect(warnings).toEqual(
       expect.arrayContaining([
         expect.stringContaining('too few points'),
-        expect.stringContaining('only a TileMap, Sprite2D, Node2D or YSort takes a look'),
+        expect.stringContaining('only a TileMap, Sprite, Node takes a look'),
         '2 terrain layers; a map has one',
         '2 layers will be exported with the same name "same"',
       ])
@@ -164,7 +164,7 @@ describe('convertEditorMapToTiled: trees', () => {
   })
 
   it('writes each run of sprites as an object group (named after its host), its sprites in z order, ties in tree order', () => {
-    // A Node2D that only organises sprites stays in its parent's run (one object group, as a picture group in an image layer).
+    // A Node that only organises sprites stays in its parent's run (one object group, as a picture group in an image layer).
     const m = tree([image('i', [pic('a', { z: 2 }), pic('b', { z: 1 }), group('g', [pic('c', { z: 2 }), pic('d', { z: 1 })]), pic('e')])])
     const names = (map: any) => convertEditorMapToTiled(map, tilesets).layers.map((l) => [l.name, l.objects!.map((o) => o.name)]) // top first
     expect(names(m)).toEqual([['i', ['e.png', 'b.png', 'd.png', 'a.png', 'c.png']]])
@@ -175,7 +175,7 @@ describe('convertEditorMapToTiled: trees', () => {
       ['g', ['d.png', 'c.png']],
       ['i', ['b.png', 'a.png']],
     ])
-    // A Node2D holding no sprites itself is like a folder: each branch in it is its own object group.
+    // A Node holding no sprites itself is like a folder: each branch in it is its own object group.
     const folder = tree([group('f', [image('one', [pic('a')]), image('two', [pic('b')])])])
     expect(names(folder)).toEqual([['two', ['b.png']], ['one', ['a.png']]])
   })
@@ -189,7 +189,7 @@ describe('convertEditorMapToTiled: trees', () => {
     expect((out.entities[1] as any).visible).toBe(false)
     expect(out.schemaVersion).toBe(SCHEMA_VERSION)
     expect(out.entities[0]).not.toHaveProperty('children')
-    expect(Object.keys(out.entities[0].components)).toEqual(['Transform', 'Sprite']) // the AnimatedSprite2D child is its Sprite
+    expect(Object.keys(out.entities[0].components)).toEqual(['Transform', 'Sprite']) // the AnimatedSprite child is its Sprite
   })
 
   it('migrates legacy entities inside a tree on export', () => {

@@ -1,11 +1,11 @@
 // The layers a scene tree draws as, in draw order (bottom first): its layer nodes (TileMap, Terrain, Encounters,
-// Objects, the map's StaticBody2D) and its sprites, a run of neighbouring Sprite2D nodes of one parent being one layer
-// (the game's image object group; the editor draws them the same way; a Node2D that only organises sprites stays in its
+// Objects, the map's StaticBody) and its sprites, a run of neighbouring Sprite nodes of one parent being one layer
+// (the game's image object group; the editor draws them the same way; a Node that only organises sprites stays in its
 // parent's run, see `hostIndex`). Entities are not layers. Shared by the exporter and the editor canvas so both see the
 // same layers. Pure; type-strippable.
 
 import type { LayerNode, PictureNode, SceneNode } from './sceneTree.ts'
-import { childrenOf, isBranch, isLayerNode, isVisible, lookNodeOf, walk } from './sceneTree.ts'
+import { childrenOf, isBranch, isLayerNode, isModifier, isVisible, lookNodeOf, walk } from './sceneTree.ts'
 
 export interface PlacedNode<T extends SceneNode = SceneNode> {
   node: T
@@ -47,15 +47,15 @@ export function sceneLayers(nodes: readonly SceneNode[], options: { shownOnly?: 
     } else if (isLayerNode(node)) {
       run = null
       out.push({ kind: 'layer', key: `l:${node.id}`, node, ancestors })
-    } else if (node.type !== 'look' && node.type !== 'collisionTiles' && node.type !== 'collisionShape') {
-      // A Node2D or YSort between two sprites of the same parent ends the run only when it draws something itself.
-      if (node.type !== 'group' && node.type !== 'ySort') run = null
+    } else if (!isModifier(node) && node.type !== 'collisionTiles' && node.type !== 'collisionShape') {
+      // A Node between two sprites of the same parent ends the run only when it draws something itself.
+      if (node.type !== 'group') run = null
     }
   }
   return out
 }
 
-// A Node2D / YSort that only organises sprites (no z or Look of its own: what else it passes down is resolved per sprite)
+// A Node that only organises sprites (no z or Look of its own: what else it passes down is resolved per sprite)
 // shares the run of a parent branch that holds sprites itself, as a picture group shared its image layer's object group.
 // A parent holding only other nodes is like a folder: each branch in it is its own run. Returns the index in `ancestors`
 // of the run's host (-1 = the map root).
@@ -66,10 +66,11 @@ function hostIndex(ancestors: readonly SceneNode[]): number {
 }
 
 const passesThrough = (branch: SceneNode): boolean => (branch as { z?: number }).z === undefined && !lookNodeOf(branch)
-// A YSort around one sprite (what a y-sorted picture became) counts as that sprite.
+// A y-sorted Node around one sprite (what a y-sorted picture became) counts as that sprite.
 function isSprite(node: SceneNode): boolean {
   if (node.type === 'picture') return true
-  const inside = node.type === 'ySort' && passesThrough(node) ? childrenOf(node) : []
+  if (!isBranch(node) || !passesThrough(node) || !childrenOf(node).some((c) => c.type === 'ySort')) return false
+  const inside = childrenOf(node).filter((c) => !isModifier(c))
   return inside.length === 1 && inside[0].type === 'picture'
 }
 const holdsSprites = (node: SceneNode): boolean => isBranch(node) && childrenOf(node).some(isSprite)

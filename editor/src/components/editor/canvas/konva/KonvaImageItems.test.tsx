@@ -55,7 +55,7 @@ describe('KonvaImageItems', () => {
     expect(handles().map((h) => h.props.x)).toEqual([4, 1])
   })
 
-  it('a locked sprite does not listen, and a Node2D that picks as one only holds its sprites together', () => {
+  it('a locked sprite does not listen, and a Node that picks as one only holds its sprites together', () => {
     const pic = (id: string, over: Record<string, any> = {}) => makePicture(id, { assetId: undefined, x: 32, y: 32, ...over })
     const group = { id: 'g', type: 'group', name: 'g', pickAsOne: true, children: [pic('m1')] }
     const layer = makeImageLayer('A', [pic('own', { locked: true }), group as any, pic('free')])

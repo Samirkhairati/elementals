@@ -1,6 +1,6 @@
 # One node tree for maps: migration plan
 
-Status: **phases 1–4 implemented on `feat/node-tree`, and the tree is fully node based (schema 7)**: see "Implementation decisions" and "Schema 7: Godot-style nodes" at the end, which win where they differ from the text above (the later section wins over the earlier). Phase 5 (generalised properties) and phase 6 (game node paths) are not started. Goal: replace the map's mix of layers, folders, picture groups, the
+Status: **phases 1–4 implemented on `feat/node-tree`, and the tree is fully node based (schema 7, YSort a child node since schema 8)**: see "Implementation decisions", "Schema 7: Godot-style nodes" and "Schema 8" at the end, which win where they differ from the text above (the later section wins over the earlier). Phase 5 (generalised properties) and phase 6 (game node paths) are not started. Goal: replace the map's mix of layers, folders, picture groups, the
 Entities row, entity folders and collision items with **one tree of nodes**, the way Godot's scene tree works. Every
 node type gets the same treatment: one row, one menu, one inspector, one selection, and the same inherited properties.
 
@@ -240,17 +240,17 @@ after Godot's types (the `type` keys stay short; the labels and lucide icons are
 
 | type | label | holds | notes |
 |---|---|---|---|
-| `group` | Node2D | scene nodes, `picture`, one `look` | `z`, `opacity`, `pickAsOne` (picked and dragged as one) pass down |
-| `ySort` | YSort | as Node2D | everything below it draws sorted by its feet among the characters |
+| `group` | Node | scene nodes, `picture`, one `look` | `z`, `opacity`, `pickAsOne` (picked and dragged as one) pass down |
+| `ySort` | YSort | as Node | everything below it draws sorted by its feet among the characters |
 | `tile` | TileMap | one `look` | `data`, `z` |
 | `terrain`, `encounters`, `objects` | unchanged | — | terrain and encounters one per map |
-| `picture` | Sprite2D | one `look` | a sprite inside a sprite is refused; only inside a Node2D / YSort, never at the root |
+| `picture` | Sprite | one `look` | a sprite inside a sprite is refused; only inside a Node, never at the root |
 | `look` | Look | — | the colour grading and drop shadow of its parent (`look` field) |
-| `collision` | StaticBody2D (map) | `collisionTiles`, `collisionShape` | the map's collision, as before |
+| `collision` | StaticBody (map) | `collisionTiles`, `collisionShape` | the map's collision, as before |
 | `entity` | Entity | its component nodes | keeps `x`, `y` and its `Transform` / `Tag` (and unknown components) in `components` |
-| `animatedSprite` | AnimatedSprite2D | — | the `Sprite` component (`props`; the eye is `Sprite.visible`) |
-| `body` | StaticBody2D (entity) | one `collisionShape` | the solid `Collider` (no shape = one tile) |
-| `area` | Area2D | one `collisionShape` | where events trigger: the `Area` component next to a body, else a non-solid `Collider` |
+| `animatedSprite` | AnimatedSprite | — | the `Sprite` component (`props`; the eye is `Sprite.visible`) |
+| `body` | StaticBody (entity) | one `collisionShape` | the solid `Collider` (no shape = one tile) |
+| `area` | Area | one `collisionShape` | where events trigger: the `Area` component next to a body, else a non-solid `Collider` |
 | `wander`, `playerController`, `mover` | movement | — | the `Movement` component (`controller` wander / player / none); one per entity |
 | `event` | Event | — | the `Event` component (states and graphs) |
 
@@ -263,16 +263,36 @@ after Godot's types (the `type` keys stay short; the labels and lucide icons are
   `entityView(node)` (`editor/src/lib/sceneIndex.ts`). New ECS component **Area** (`game/src/ecs/components/AreaComponent.ts`):
   `triggerArea` (`game/src/events/footprint.ts`) uses it before the Collider.
 * **Sprites draw in runs**: `shared/sceneLayers.ts` lists the layers in draw order: layer nodes, plus each run of
-  neighbouring Sprite2Ds of one host. A run exports as one Tiled `kind=image` objectgroup named after its host (what an
-  image layer was). A Node2D / YSort with no z or Look of its own inside a branch that holds sprites itself stays in that
+  neighbouring Sprites of one host. A run exports as one Tiled `kind=image` objectgroup named after its host (what an
+  image layer was). A Node with no z or Look of its own inside a branch that holds sprites itself stays in that
   branch's run (as a picture group stayed in its image layer's object group); a branch holding only other nodes is like
   a folder, each branch in it its own run; a YSort around one sprite counts as that sprite. So migrated maps export byte
-  for byte as before (but for empty image layers, which became empty Node2Ds and export nothing). The canvas draws the
+  for byte as before (but for empty image layers, which became empty Nodes and export nothing). The canvas draws the
   same runs.
 * **Migration** (`typedNodes` in `shared/sceneTreeMigrate.ts`, pure, idempotent, cached per array; run on load for
-  schema 6 trees and after `migrateToNodeTree` for older maps): an image layer becomes a Node2D; a `look` field on a
-  TileMap, Sprite2D or branch becomes a Look child (`<id>:look`); a locked picture group becomes `pickAsOne` (lock now
+  schema 6 trees and after `migrateToNodeTree` for older maps): an image layer becomes a Node; a `look` field on a
+  TileMap, Sprite or branch becomes a Look child (`<id>:look`); a locked picture group becomes `pickAsOne` (lock now
   always freezes); y-sort: a sorted branch becomes a YSort unless something below it opts out (`ySort: false`), in
-  which case it stays a Node2D and its sorting children become YSorts; a sorted picture outside a YSort is wrapped in
+  which case it stays a Node and its sorting children become YSorts; a sorted picture outside a YSort is wrapped in
   one (`<id>:ysort`); an entity's component bag is split into child nodes. The export is unchanged: the golden test
   compares every fixture byte for byte with the schema 5 output.
+
+## Schema 8: YSort is a child node
+
+Schema 8 (`SCHEMA_VERSION = 8`) turns YSort from a container into a **modifier child**, like Look: a Node (`group`)
+holds at most one `ySort` node (no children of its own), and while it is shown everything in that Node draws sorted by
+its feet among the characters; hiding it turns y-sort off. Read it with `sortsBelow(node)` / `ySortNodeOf(node)`;
+`effectiveYSort` / `inheritedYSort` look up the ancestors; `isModifier` (Look, YSort) is what the layer walk skips.
+`isBranch` now means `group` only.
+
+* **Migration** (`typedNodes`): a schema 7 YSort container becomes a Node with its children and a YSort child
+  `<id>:ysort` appended; a y-sorted branch of an older map does the same; a y-sorted lone picture is wrapped in a Node
+  `<id>:ysort` holding the picture and its YSort. The export is unchanged (the golden test still matches).
+* **Labels** drop the "2D": Node, Sprite, StaticBody, Area, CollisionShape, AnimatedSprite.
+* **Editor**: the Scene panel has the map as its top row (selected while nothing else is; the Look panel then edits the
+  map's look; drops on it go to the top level), Godot-style connector lines, chevrons only on nodes with children, an eye
+  and lock on every row (a hidden collision item is only hidden in the editor: the game still collides). The row menu
+  is Edit event, Add Child Node (Sprite, YSort, Look and Entity from prefab included; old `objects` layers are not
+  offered), Place more copies (Sprite), Rename / Copy / Paste / Duplicate, Group / Ungroup, Delete. Pick as one, z and
+  opacity of a Node are in the Properties panel.
+

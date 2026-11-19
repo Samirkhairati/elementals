@@ -68,14 +68,14 @@ export function newNodeName(nodes: readonly SceneNode[], type: SceneNodeType): s
     terrain: 'Terrain',
     encounters: 'Encounters',
     objects: 'Objects',
-    group: 'Node2D',
+    group: 'Node',
     ySort: 'YSort',
     collisionTiles: 'Tiles',
     collisionShape: 'Shape',
     picture: 'Sprite',
     look: 'Look',
   }
-  // Component nodes keep their type's name (an entity has one of each): AnimatedSprite2D, Area2D, Wander...
+  // Component nodes keep their type's name (an entity has one of each): AnimatedSprite, Area, Wander...
   if (isComponentType(type)) return NODE_TYPES[type].label
   return uniqueName(base[type] ?? NODE_TYPES[type]?.label ?? 'Node', taken)
 }
@@ -103,14 +103,15 @@ function movementProps(): Record<string, unknown> {
 
 /**
  * An empty node of a type (no id clash is checked here). `parentType` is the type of the node it goes into: a
- * CollisionShape2D of an entity's body or area is a one-tile box, one of the map's StaticBody2D a polygon to draw.
+ * CollisionShape of an entity's body or area is a one-tile box, one of the map's StaticBody a polygon to draw.
  */
 export function makeNode(type: NewNodeType, id: string, name: string, parentType?: SceneNodeType): SceneNode {
   switch (type) {
     case 'group':
-    case 'ySort':
     case 'tile':
       return { id, type, name, children: [] }
+    case 'ySort':
+      return { id, type, name }
     case 'picture':
       return { id, type, name, x: 0, y: 0, children: [] }
     case 'look':
@@ -145,11 +146,11 @@ export function makeNode(type: NewNodeType, id: string, name: string, parentType
 const SPECIAL_LAYERS: readonly SceneNodeType[] = ['collision', 'terrain', 'encounters']
 
 /**
- * Where a new node goes among the children of `parent`: the top (last), except that a TileMap, Node2D or YSort goes below
+ * Where a new node goes among the children of `parent`: the top (last), except that a TileMap, Node goes below
  * the special layers (collision, terrain, encounters) that sit at the top, which stay on top by default.
  */
 export function defaultIndex(children: readonly SceneNode[], type: SceneNodeType): number {
-  if (type !== 'tile' && type !== 'group' && type !== 'ySort') return children.length
+  if (type !== 'tile' && type !== 'group') return children.length
   let at = children.length
   while (at > 0 && SPECIAL_LAYERS.includes(children[at - 1].type)) at--
   return at
@@ -237,12 +238,20 @@ export function carryView(current: readonly SceneNode[], restored: SceneNode[]):
   })
 }
 
-/** Y-sort on (the Node2D becomes a YSort) or off (the YSort becomes a Node2D); anything else is left alone. */
+/**
+ * Y-sort of a Node on (it gets a YSort child, or its hidden one is shown) or off (its YSort child goes); anything that is
+ * not a Node is left alone.
+ */
 export const setYSort = (nodes: SceneNode[], id: string, value: boolean | undefined): SceneNode[] =>
   updateNode(nodes, id, (n) => {
-    if (n.type === 'group' && value === true) return { ...n, type: 'ySort', name: n.name === NODE_TYPES.group.label ? NODE_TYPES.ySort.label : n.name }
-    if (n.type === 'ySort' && value !== true) return { ...n, type: 'group', name: n.name === NODE_TYPES.ySort.label ? NODE_TYPES.group.label : n.name }
-    return n
+    if (n.type !== 'group') return n
+    const current = n.children.find((c) => c.type === 'ySort')
+    if (value === true) {
+      if (current && current.visible !== false) return n
+      if (current) return { ...n, children: n.children.map((c) => (c === current ? withField(c, 'visible', undefined) : c)) }
+      return { ...n, children: [...n.children, { id: `${n.id}:ysort`, type: 'ySort', name: NODE_TYPES.ySort.label }] }
+    }
+    return current ? { ...n, children: n.children.filter((c) => c !== current) } : n
   })
 
 /** Renames a node (a blank name is ignored). */
@@ -257,7 +266,10 @@ export function patchNode(nodes: SceneNode[], id: string, patch: Record<string, 
   return updateNode(nodes, id, (n) => {
     const cur = n as unknown as Record<string, unknown>
     if (!Object.keys(patch).some((k) => cur[k] !== patch[k])) return n
-    return { ...n, ...patch } as SceneNode
+    // An undefined value removes the field.
+    const out: Record<string, unknown> = { ...n, ...patch }
+    for (const k of Object.keys(patch)) if (patch[k] === undefined) delete out[k]
+    return out as unknown as SceneNode
   })
 }
 
@@ -454,8 +466,12 @@ export function duplicateNodes(nodes: SceneNode[], ids: readonly string[], newId
 /** Where dropped nodes land relative to the row they were dropped on: above it in the list, below it, or inside it (a container). */
 export type DropWhere = 'above' | 'below' | 'inside'
 
+/** The id the Scene panel's root row (the map itself) stands for in drops: dropped inside it = onto the map root. */
+export const SCENE_ROOT_ID = '__scene_root__'
+
 /** The place a node dropped `where` on `targetId` would take: its parent path, and (for a drop beside) the index among the parent's children. */
 export function dropPlace(nodes: readonly SceneNode[], targetId: string, where: DropWhere): { parentPath: readonly SceneNode[]; index?: number } | null {
+  if (targetId === SCENE_ROOT_ID) return where === 'inside' ? { parentPath: [] } : null
   const at = locate(nodes as SceneNode[], targetId)
   if (!at) return null
   if (where === 'inside') return isContainer(at.node) ? { parentPath: [...at.ancestors, at.node] } : null
@@ -490,13 +506,15 @@ export function moveNodesTo(nodes: SceneNode[], ids: readonly string[], targetId
   let next = nodes
   let previous: string | null = null
   for (const id of tops) {
-    const target = locate(next, targetId)
-    if (!target) break
+    const target = targetId === SCENE_ROOT_ID ? null : locate(next, targetId)
+    if (!target && targetId !== SCENE_ROOT_ID) break
     let parentId: string | null
     let index: number | undefined
     if (where === 'inside') {
-      parentId = target.node.id
+      parentId = target ? target.node.id : null
       index = undefined
+    } else if (!target) {
+      break
     } else {
       const anchor = previous ? locate(next, previous) : target
       if (!anchor) break

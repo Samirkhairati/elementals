@@ -54,9 +54,16 @@ describe('usePaintTools (StrictMode)', () => {
     act(() => result.current.tools.handlePaint(1, 2))
     expect(result.current.layer.data).toEqual({ 9: { tilesetId: 'ts', x: 1, y: 0 } })
     expect(result.current.activeMap?.nodes[0]).toBe(result.current.layer)
-    expect(setDebugInfo).toHaveBeenCalledTimes(1)
-    expect(setDebugInfo.mock.calls[0][0]).toMatchObject({ action: 'brush', error: 'Success', x: 1, y: 2 })
+    // success is not reported (a stroke would re-render the editor on every cell)
+    expect(setDebugInfo).not.toHaveBeenCalled()
     expect(commitHistory).not.toHaveBeenCalled() // history is committed at stroke end
+  })
+
+  it('paints every cell between the last one and this one in one change (a fast stroke leaves no gaps)', () => {
+    const { result } = setup()
+    act(() => result.current.tools.handlePaint(0, 0))
+    act(() => result.current.tools.handlePaint(3, 0, { x: 0, y: 0 }))
+    expect(Object.keys(result.current.layer.data ?? {}).map(Number).sort((a, b) => a - b)).toEqual([0, 1, 2, 3])
   })
 
   it('painting an empty sampled area on a collision layer erases there instead of drawing a block', () => {
@@ -107,7 +114,7 @@ describe('usePaintTools (StrictMode)', () => {
       [{ activeLayerId: 'missing' }, 'Layer not found', [0, 0]],
       [{ layer: { locked: true } }, 'Layer locked/hidden', [0, 0]],
       [{ layer: { visible: false } }, 'Layer locked/hidden', [0, 0]],
-      [{ layer: { type: 'group', children: [] } }, 'Node2D and YSort hold nodes, not tiles', [0, 0]],
+      [{ layer: { type: 'group', children: [] } }, 'Node hold nodes, not tiles', [0, 0]],
     ]
     for (const [opts, message, [x, y]] of cases) {
       const { result, setDebugInfo } = setup(opts)
@@ -121,7 +128,7 @@ describe('usePaintTools (StrictMode)', () => {
     const { result, setDebugInfo } = setup({ layer: { data: { 5: { tilesetId: 'ts', x: 0, y: 0 } } }, tool: 'eraser' })
     act(() => result.current.tools.handlePaint(1, 1))
     expect(result.current.layer.data).toEqual({})
-    expect(setDebugInfo.mock.calls[0][0]).toMatchObject({ action: 'eraser', error: 'Success' })
+    expect(setDebugInfo).not.toHaveBeenCalled()
   })
 
   it('eraser on an empty cell leaves the layers untouched', () => {
@@ -129,7 +136,7 @@ describe('usePaintTools (StrictMode)', () => {
     const before = result.current.activeMap?.nodes
     act(() => result.current.tools.handlePaint(1, 1))
     expect(result.current.activeMap?.nodes).toBe(before)
-    expect(setDebugInfo.mock.calls[0][0]).toMatchObject({ action: 'erase', error: 'Already empty' })
+    expect(setDebugInfo).not.toHaveBeenCalled()
   })
 
   it('bucket and rectangle fills commit history exactly once each', () => {

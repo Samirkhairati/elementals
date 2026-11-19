@@ -18,7 +18,7 @@ import {
   picturesOfMap,
   typedNodes,
 } from '../../../shared/sceneTreeMigrate'
-import { allEntities, allPictures, canHold, findNode, walk, type CollisionLayerNode, type GroupNode, type BranchNode, type SceneNode } from '../../../shared/sceneTree'
+import { allEntities, allPictures, canHold, findNode, sortsBelow, walk, type CollisionLayerNode, type GroupNode, type BranchNode, type SceneNode } from '../../../shared/sceneTree'
 import { validateEditorMap } from '../../../shared/mapSchema'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -103,13 +103,14 @@ describe('migrateToNodeTree: folders', () => {
     ],
   })
 
-  it('becomes a Node2D holding its layers (a YSort when it y-sorted), in draw order, placed where the folder row was', () => {
+  it('becomes a Node holding its layers (a YSort when it y-sorted), in draw order, placed where the folder row was', () => {
     expect(rootIds(m)).toEqual(['bottom', 'F', 'top', ENTITIES_GROUP_ID])
     const group = findNode(nodesOf(m), 'F') as BranchNode
-    expect(group).toMatchObject({ type: 'ySort', name: 'F', collapsed: true, locked: true })
+    expect(group).toMatchObject({ type: 'group', name: 'F', collapsed: true, locked: true })
+    expect(sortsBelow(group)).toBe(true)
     expect(group).not.toHaveProperty('ySort')
     expect(findNode(nodesOf(m), 'b')).toMatchObject({ type: 'group' }) // the image layer inside: sorted by the YSort already
-    expect(childIds(group)).toEqual(['c', 'b', 'a'])
+    expect(childIds(group)).toEqual(['c', 'b', 'a', 'F:ysort'])
     expect((group as any).visible).toBeUndefined()
   })
 
@@ -216,15 +217,17 @@ describe('migrateToNodeTree: image layers', () => {
       pic('q', { crop: { x: 0, y: 0, w: 8, h: 8 } }),
     ])
     const [q, sorted] = node.children as any[] // q has no z (0), p has z 2
-    // a y-sorted sprite is wrapped in a YSort of its own; its look becomes its Look child
-    expect(sorted).toMatchObject({ id: 'p:ysort', type: 'ySort', name: 'Chest (y-sort)' })
+    // a y-sorted sprite is wrapped in a Node of its own holding a YSort; its look becomes its Look child
+    expect(sorted).toMatchObject({ id: 'p:ysort', type: 'group', name: 'Chest (y-sort)' })
+    expect(sortsBelow(sorted)).toBe(true)
     expect(sorted.children).toEqual([
       { id: 'p', type: 'picture', name: 'Chest', assetId: 'objects/chest', x: 3, y: 4, z: 2, scale: 2, flipX: true, flipY: false, opacity: 0.5, children: [{ id: 'p:look', type: 'look', name: 'Look', look }] },
+      { id: 'p:ysort:ysort', type: 'ySort', name: 'YSort' },
     ])
     expect(q).toEqual({ id: 'q', type: 'picture', name: '', graphicId: 'q.png', crop: { x: 0, y: 0, w: 8, h: 8 }, x: 1, y: 2, children: [] })
   })
 
-  it('turns picture groups into Node2Ds placed where their first picture is; empty groups go to the front; a locked one picks as one', () => {
+  it('turns picture groups into Nodes placed where their first picture is; empty groups go to the front; a locked one picks as one', () => {
     const node = imageNode(
       [pic('a', { z: 1 }), pic('b', { z: 2, groupId: 'G1' }), pic('c', { z: 3 }), pic('d', { z: 4, groupId: 'G1' }), pic('e', { z: 5, groupId: 'G2' })],
       [{ id: 'G1', name: 'One', locked: true, ySort: false }, { id: 'G2', name: 'Two' }, { id: 'G3', name: 'Three' }, { id: 'G4', name: 'Four', ySort: true }]
@@ -235,7 +238,7 @@ describe('migrateToNodeTree: image layers', () => {
     expect(g1).not.toHaveProperty('locked')
     expect(g1).not.toHaveProperty('ySort')
     expect(childIds(g1)).toEqual(['b', 'd'])
-    expect(findNode(node.children, 'G4')).toMatchObject({ type: 'ySort', children: [] })
+    expect(findNode(node.children, 'G4')).toMatchObject({ type: 'group', children: [{ id: 'G4:ysort', type: 'ySort', name: 'YSort' }] })
     expect((findNode(node.children, 'G2') as any).locked).toBeUndefined()
     expect(childIds(findNode(node.children, 'G2'))).toEqual(['e'])
   })
@@ -250,7 +253,7 @@ describe('migrateToNodeTree: image layers', () => {
     const node = imageNode([], undefined, { z: 9, ySort: false, look, visible: false })
     expect(node).toMatchObject({ id: 'L', type: 'group', name: 'L', z: 9, visible: false, children: [{ id: 'L:look', type: 'look', name: 'Look', look }] })
     expect(node).not.toHaveProperty('look')
-    expect(imageNode([], undefined, { ySort: true }).type).toBe('ySort')
+    expect(sortsBelow(imageNode([], undefined, { ySort: true }))).toBe(true)
   })
 
   it('gives picture ids that clash across layers a new, deterministic id', () => {
@@ -340,7 +343,7 @@ describe('migrateMap (schema 6)', () => {
     expect(r.changed).toBe(true)
     const v: any = r.value
     expect(v.schemaVersion).toBe(SCHEMA_VERSION)
-    expect(SCHEMA_VERSION).toBe(7)
+    expect(SCHEMA_VERSION).toBe(8)
     const [sign] = allEntities(v.nodes)
     expect(Object.keys(componentsOfEntity(sign))).toEqual(['Transform', 'Event'])
     expect(sign.children.map((c) => c.type)).toEqual(['event'])
@@ -389,7 +392,7 @@ describe('typedNodes (schema 6 -> 7)', () => {
   const pic = (id: string, extra: Record<string, unknown> = {}) => ({ id, type: 'picture', name: id, assetId: 'a', x: 0, y: 0, ...extra })
   const look = { exposure: 1 }
 
-  it('turns image layers into Node2Ds, sorted branches into YSorts, and looks into Look children', () => {
+  it('turns image layers into Nodes, sorted branches into YSorts, and looks into Look children', () => {
     const v6 = [
       { id: 'img', type: 'image', name: 'Props', ySort: true, look, children: [pic('a'), pic('b', { look })] },
       { id: 'ground', type: 'tile', name: 'Ground', look },
@@ -397,16 +400,16 @@ describe('typedNodes (schema 6 -> 7)', () => {
     ]
     const v7 = typedNodes(v6)
     const [props, ground, lone] = v7 as any[]
-    expect(props).toMatchObject({ type: 'ySort', id: 'img' })
+    expect(props).toMatchObject({ type: 'group', id: 'img' })
     expect(props).not.toHaveProperty('look')
-    expect(props.children.map((c: SceneNode) => c.type)).toEqual(['picture', 'picture', 'look'])
+    expect(props.children.map((c: SceneNode) => c.type)).toEqual(['picture', 'picture', 'look', 'ySort'])
     expect(props.children[1].children).toEqual([{ id: 'b:look', type: 'look', name: 'Look', look }])
     expect(ground.children).toEqual([{ id: 'ground:look', type: 'look', name: 'Look', look }])
-    expect(lone).toMatchObject({ id: 'lone:ysort', type: 'ySort', children: [{ id: 'lone', type: 'picture' }] })
+    expect(lone).toMatchObject({ id: 'lone:ysort', type: 'group', children: [{ id: 'lone', type: 'picture' }, { id: 'lone:ysort:ysort', type: 'ySort' }] })
     for (const { node } of walk(v7)) expect(node).not.toHaveProperty('ySort')
   })
 
-  it('keeps a sorted branch with an opt-out below as a Node2D and sorts its sorting children', () => {
+  it('keeps a sorted branch with an opt-out below as a Node and sorts its sorting children', () => {
     const v6 = [{ id: 'top', type: 'group', name: 'Top', ySort: true, children: [
       { id: 'flat', type: 'group', name: 'Flat', ySort: false, children: [pic('rug')] },
       { id: 'trees', type: 'group', name: 'Trees', children: [pic('oak')] },
@@ -414,7 +417,7 @@ describe('typedNodes (schema 6 -> 7)', () => {
     ] }]
     const [top] = typedNodes(v6) as any[]
     expect(top.type).toBe('group')
-    expect(top.children.map((c: SceneNode) => `${c.id}:${c.type}`)).toEqual(['flat:group', 'trees:ySort', 'rock:ysort:ySort'])
+    expect(top.children.map((c: SceneNode) => `${c.id}:${c.type}:${sortsBelow(c)}`)).toEqual(['flat:group:false', 'trees:group:true', 'rock:ysort:group:true'])
     expect(top.children[0].children[0].type).toBe('picture')
   })
 
@@ -466,7 +469,7 @@ describe.each([...real, ...synthetic])('%s', (_name, source) => {
   })
 
   it('keeps every layer, picture and entity', () => {
-    // An old map lists its layers; a tree (an autosaved map) holds them as nodes. Image layers become Node2Ds / YSorts.
+    // An old map lists its layers; a tree (an autosaved map) holds them as nodes. Image layers become Nodes.
     const LAYERS = ['tile', 'collision', 'terrain', 'encounters', 'objects']
     const raw = (list: any[]): any[] => list.flatMap((n) => [n, ...raw(Array.isArray(n?.children) ? n.children : [])])
     const before: any[] = source.nodes ? raw(source.nodes) : (source.layers ?? []).map((l: any) => (l.type === 'polygons' ? { ...l, type: 'collision' } : l))
@@ -542,7 +545,7 @@ describe('random legacy maps', () => {
       const v6: any = migrateMap(source).value
       const ids = walk(v6.nodes).map((e) => e.node.id)
       expect(new Set(ids).size).toBe(ids.length)
-      for (const { node, ancestors } of walk(v6.nodes)) expect(canHold(ancestors, node.type)).toBe(true)
+      for (const { node, ancestors } of walk(v6.nodes)) expect(canHold(ancestors, node.type, undefined, node.id) ? 'ok' : `${node.type} in ${ancestors.map((a) => a.type).join('/')}`).toBe('ok')
       expect(migrateMap(structuredClone(source)).value).toEqual(v6)
       expect(migrateMap(v6).value).toBe(v6)
     })

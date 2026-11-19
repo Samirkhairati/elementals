@@ -1,9 +1,9 @@
-// The Look panel (dock panel `look`): Lightroom-style colour grading of the map, the active layer or the picked
-// picture, plus its drop shadow. The profile picked here is what the panel edits and what the canvas shows (the top
+// The Look panel (dock panel `look`): Lightroom-style colour grading of the selected node (a Node, a TileMap or a Sprite:
+// its Look child; the map's own look while the Scene panel's root row is selected), plus its drop shadow. The profile picked here is what the panel edits and what the canvas shows (the top
 // toolbar's Look menu is the same switch). See docs/looks.md.
 
-import { Aperture, Check, Clipboard, Copy, Image as ImageIcon, Layers, Map as MapIcon, MoreHorizontal, Pencil, Pin, PinOff, Plus, RotateCcw, Save, Sparkles, SlidersHorizontal, Trash2, Wand2 } from 'lucide-react'
-import React, { useState } from 'react'
+import { Aperture, Check, Clipboard, Copy, Map as MapIcon, MoreHorizontal, Pencil, Pin, PinOff, Plus, RotateCcw, Save, Sparkles, SlidersHorizontal, Trash2, Wand2 } from 'lucide-react'
+import React, { useEffect, useState } from 'react'
 import { applyPreset, LOOK_PRESETS, PRESET_GROUPS } from '../../../../../shared/look/presets'
 import { lookId, resolveLook } from '../../../../../shared/look/schema'
 import type { Grain, Look, Vignette } from '../../../../../shared/look/types'
@@ -19,7 +19,8 @@ import { Badge, Card, EdButton, EyeButton, Field, IconButton, InfoTip, Segmented
 import { ColorField } from '../ui/fields'
 import { RenameInput } from '../ui/RenameInput'
 import { sceneIndex } from '@/lib/sceneIndex'
-import { ownLook as ownLookOf } from '../../../../../shared/sceneTree'
+import { NODE_TYPES, ownLook as ownLookOf } from '../../../../../shared/sceneTree'
+import { NodeTypeIcon } from '../panels/SceneTree'
 import { LookAdjustEditor } from './LookAdjustEditor'
 import { LookMasksEditor } from './LookMasksEditor'
 import { LookShadersEditor } from './LookShadersEditor'
@@ -205,6 +206,15 @@ function PresetMenu({ look, onApply }: { look: Look | undefined; onApply: (l: Lo
   )
 }
 
+/** The canvas edits a mask only while the panel shows that mask's subject: picking another node puts its handles away. */
+function MaskFollowsSubject({ subject }: { subject: string | null }) {
+  const mask = useLookView().mask
+  useEffect(() => {
+    if (mask && mask.subject !== subject) setLookView({ mask: null })
+  }, [mask, subject])
+  return null
+}
+
 export function LookPanel() {
   const ctx = useEditorSelector(selectLook)
   const view = useLookView()
@@ -216,6 +226,14 @@ export function LookPanel() {
 
   const nodes = ctx.nodes ?? []
   const followed = selectedSubject(nodes, ctx.activeLayerId, ctx.selectedImageId)
+  const active = ctx.activeLayerId ? sceneIndex(nodes).byId.get(ctx.activeLayerId)?.node : undefined
+  if (!view.pinned && active && followed.kind === 'map') {
+    return (
+      <div className="ed-empty">
+        <MaskFollowsSubject subject={null} />A {NODE_TYPES[active.type].label} has no look. Select a Node, TileMap or Sprite, or the map (the Scene panel&apos;s top row).
+      </div>
+    )
+  }
   const ref: LookSubjectRef = view.pinned && subjectExists(nodes, view.pinned) ? view.pinned : followed
   const subject = subjectKey(ref)
   const layer = ref.kind !== 'map' ? sceneIndex(nodes).byId.get(ref.layerId)?.node : undefined
@@ -234,11 +252,8 @@ export function LookPanel() {
   const resolved = picture ? resolveImageItem(picture, ctx.spriteAssets) : null
   const box = resolved ? { x: 0, y: 0, w: resolved.src.w, h: resolved.src.h } : (getCanvasViewRect() ?? { x: 0, y: 0, w: px.width, h: px.height })
 
-  const subjects: { value: LookSubjectRef['kind']; label: string; icon: React.ReactNode; ref: LookSubjectRef | null }[] = [
-    { value: 'map', label: 'Map', icon: <MapIcon />, ref: { kind: 'map' } },
-    { value: 'layer', label: 'Layer', icon: <Layers />, ref: followed.kind !== 'map' ? { kind: 'layer', layerId: followed.layerId } : ref.kind !== 'map' ? { kind: 'layer', layerId: ref.layerId } : null },
-    { value: 'picture', label: 'Picture', icon: <ImageIcon />, ref: followed.kind === 'picture' ? followed : ref.kind === 'picture' ? ref : null },
-  ]
+  const subjectNode = ref.kind === 'picture' ? sceneIndex(nodes).byId.get(ref.imageId)?.node : layer
+  const subjectType = subjectNode ? NODE_TYPES[subjectNode.type].label : 'Map'
   const subjectName = ref.kind === 'map' ? map.name || map.fileName : ref.kind === 'layer' ? (layer?.name ?? 'Layer') : picture?.name || picture?.graphicId?.split('/').pop() || picture?.assetId || 'Picture'
   const hasOwn = (p: string) => !!ownLook(set, p)
   const counts = { masks: shown.masks?.length ?? 0, shaders: shown.shaders?.length ?? 0 }
@@ -248,9 +263,11 @@ export function LookPanel() {
 
   return (
     <div className="flex w-full flex-col gap-3 text-left" data-testid="look-panel">
+      <MaskFollowsSubject subject={subject} />
       <Card
         caps
-        title={<span title={subjectName}>Look · {subjectName}</span>}
+        icon={subjectNode ? <NodeTypeIcon type={subjectNode.type} /> : <MapIcon style={{ color: '#93c5fd' }} />}
+        title={<span title={`${subjectType}: ${subjectName}`}>Look · {subjectName}</span>}
         actions={
           <>
             {inherited ? <Badge title={`No ${profileName} look yet: showing Default. Any change makes one.`}>= Default</Badge> : null}
@@ -266,16 +283,6 @@ export function LookPanel() {
           </>
         }
       >
-        <Segmented<LookSubjectRef['kind']>
-          aria-label="Look of"
-          className="w-full"
-          value={ref.kind}
-          options={subjects.map((s) => ({ value: s.value, label: s.label, icon: s.icon, title: s.ref ? undefined : s.value === 'picture' ? 'Pick a picture on an image layer' : 'Select a tile or image layer' }))}
-          onChange={(k) => {
-            const target = subjects.find((s) => s.value === k)?.ref
-            if (target) setLookView({ pinned: k === followed.kind && !view.pinned ? null : target })
-          }}
-        />
         <ProfilePicker profile={profile} hasOwn={hasOwn} />
         <div className="flex items-center gap-1">
           <PresetMenu look={look} onApply={(l) => edit(() => l, true)} />

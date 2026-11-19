@@ -26,7 +26,7 @@ function expected(golden: any): any {
 const isEmptyImageGroup = (l: any) =>
   l.type === 'objectgroup' && (l.objects ?? []).length === 0 && (l.properties ?? []).some((p: any) => p.name === 'kind' && p.value === 'image')
 
-// The schema 5 export without its empty image layers: an image layer with no pictures became an empty Node2D, which draws
+// The schema 5 export without its empty image layers: an image layer with no pictures became an empty Node, which draws
 // nothing and exports nothing (like an empty folder); the layers after it are numbered one lower.
 function withoutEmptyImageLayers(tiled: any): any {
   const layers = tiled.layers.filter((l: any) => !isEmptyImageGroup(l)).map((l: any, i: number) => ({ ...l, id: i + 1 }))
@@ -34,7 +34,7 @@ function withoutEmptyImageLayers(tiled: any): any {
 }
 
 // Every fixture exports byte for byte as before (but for empty image layers): a group of pictures in an image layer became
-// a Node2D in a Node2D, which stays in its parent's run of sprites (shared/sceneLayers.ts), so it is still part of the one
+// a Node in a Node, which stays in its parent's run of sprites (shared/sceneLayers.ts), so it is still part of the one
 // object group.
 function expectSameExport(_name: string, out: any, golden: any) {
   expect(serializeTiledMap(out)).toBe(JSON.stringify(withoutEmptyImageLayers(expected(golden)), null, 2))

@@ -11,7 +11,7 @@ export function makeLayer(id: string, overrides: Record<string, unknown> = {}): 
 }
 
 /**
- * A Node2D holding sprites (what an image layer became): `pictures` are nodes, or ids that become sprites of an asset.
+ * A Node holding sprites (what an image layer became): `pictures` are nodes, or ids that become sprites of an asset.
  * `ySort: true` in `overrides` makes it a YSort.
  */
 export function makeImageLayer(id: string, pictures: (PictureNode | string)[] = [], overrides: Record<string, unknown> = {}): BranchNode {

@@ -24,12 +24,17 @@ describe('LookSlider', () => {
     return onChange
   }
   it('steps with the arrow keys (Shift x10), done each time', () => {
-    const onChange = setup()
+    const onChange = vi.fn()
+    function Held() {
+      const [value, setValue] = React.useState(0)
+      return <LookSlider label="Exposure" value={value} min={-5} max={5} step={0.01} onChange={(v, done) => (setValue(v), onChange(v, done))} />
+    }
+    render(<Held />)
     const s = screen.getByRole('slider', { name: 'Exposure' })
     fireEvent.keyDown(s, { key: 'ArrowRight' })
     expect(onChange).toHaveBeenLastCalledWith(0.01, true)
     fireEvent.keyDown(s, { key: 'ArrowLeft', shiftKey: true })
-    expect(onChange).toHaveBeenLastCalledWith(-0.1, true)
+    expect(onChange).toHaveBeenLastCalledWith(-0.09, true)
   })
   it('resets on double click of the label', () => {
     const onChange = setup(2)

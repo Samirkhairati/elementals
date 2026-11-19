@@ -3,7 +3,7 @@ import React from 'react'
 import { Shape, Group } from 'react-konva'
 import type Konva from 'konva'
 import type { MapData, ImageItem } from '@/types/editor'
-import { isDataLayer, ownLook, type DataLayerNode } from '../../../../../../shared/sceneTree'
+import { isDataLayer, ownLook, shownCollisionCells, type DataLayerNode } from '../../../../../../shared/sceneTree'
 import type { LookSet } from '../../../../../../shared/look/types'
 import type { SpriteAssetInfo } from '../../../../../../shared/engine/types'
 import { drawResolvedSprite, useSpriteImagesVersion } from '@/lib/spriteImages'
@@ -31,7 +31,7 @@ interface KonvaTilemapLayerProps {
   dragRef?: React.MutableRefObject<ImageDrag | null>
 }
 
-/** Looks to draw a picture with: the Node2D it sits in and the look it passes down, the map size and the profile in view (absent = drawn plainly). */
+/** Looks to draw a picture with: the Node it sits in and the look it passes down, the map size and the profile in view (absent = drawn plainly). */
 export interface PictureLookContext {
   layer: { id: string; look?: LookSet }
   mapSize: { w: number; h: number }
@@ -162,7 +162,7 @@ export const KonvaTilemapLayer = React.memo(function KonvaTilemapLayer({
             const look = entry.look
 
             if (!isDataLayer(layer)) return
-            const data = layer.data
+            const data = layer.type === 'collision' ? shownCollisionCells(layer) : layer.data
             if (!data) return
 
             const mapWidth = activeMap.width

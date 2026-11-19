@@ -391,9 +391,11 @@ export const KonvaShapes = React.memo(function KonvaShapes({
             }
             ctx.restore()
           }
-          for (const l of otherLayers) for (const shape of collisionShapeNodes(l)) drawShape(shape, active ? 0.45 : 1, !layerMode && shape.id === selectedShapeId)
+          for (const l of otherLayers) for (const shape of collisionShapeNodes(l)) if (shape.visible !== false) drawShape(shape, active ? 0.45 : 1, !layerMode && shape.id === selectedShapeId)
           for (const shape of layerMode && !activeShown ? [] : shownShapes) {
             const sel = shape.id === selectedShapeId
+            // A hidden shape is not drawn unless it is the one being edited.
+            if ((shape as { visible?: boolean }).visible === false && !sel) continue
             drawShape(shape, 1, sel)
             if (active) for (const p of shape.points) handle(p, sel ? 7 : 5, sel ? SELECTED : '#fff')
           }

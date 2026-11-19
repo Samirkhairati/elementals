@@ -153,11 +153,11 @@ describe('useLayerManager on the scene tree (StrictMode)', () => {
       makeLayer('c', { name: 'Loose' }),
     ]
 
-    it('creates Node2Ds named Node2D, Node2D 2', () => {
+    it('creates Nodes named Node, Node 2', () => {
       const { result } = setup()
       act(() => result.current.layers.createNode('group', null))
       act(() => result.current.layers.createNode('group', null))
-      expect(result.current.tree.nodes.filter((n) => n.type === 'group').map((n) => n.name).sort()).toEqual(['Node2D', 'Node2D 2'])
+      expect(result.current.tree.nodes.filter((n) => n.type === 'group').map((n) => n.name).sort()).toEqual(['Node', 'Node 2'])
     })
 
     it('the group eye and lock reach the layers inside it, in one undo step each', () => {
@@ -179,7 +179,7 @@ describe('useLayerManager on the scene tree (StrictMode)', () => {
       expect(group.children[2]).toMatchObject({ type: 'tile' })
       expect(group.collapsed).toBeUndefined()
       expect(result.current.layers.activeLayerId).toBe(group.children[2].id)
-      // other kinds go in too: a group holds every layer type (and Sprite2Ds)
+      // other kinds go in too: a group holds every layer type (and Sprites)
       act(() => result.current.layers.createNode('objects', 'F'))
       expect((result.current.tree.nodes.find((n) => n.id === 'F') as { children: SceneNode[] }).children.some((c) => c.type === 'objects')).toBe(true)
     })
@@ -190,7 +190,7 @@ describe('useLayerManager on the scene tree (StrictMode)', () => {
       expect(result.current.tree.nodes.map((n) => n.id)).toEqual(['a', 'b', 'c'])
       act(() => result.current.layers.groupNodes(['a', 'b']))
       const group = result.current.tree.nodes.find((n) => n.type === 'group')!
-      expect(group.name).toBe('Node2D')
+      expect(group.name).toBe('Node')
       act(() => result.current.layers.deleteNodes([group.id]))
       expect(result.current.tree.nodes.map((n) => n.id)).toEqual(['c'])
     })

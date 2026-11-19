@@ -15,7 +15,7 @@ import type { IDockviewPanelProps } from 'dockview-react'
 interface FakePanel {
   id: string
   component: string
-  api: { setSize: ReturnType<typeof vi.fn>; setActive: ReturnType<typeof vi.fn>; close: () => void; isActive: boolean }
+  api: { setSize: ReturnType<typeof vi.fn>; setActive: ReturnType<typeof vi.fn>; close: () => void; setTitle: ReturnType<typeof vi.fn>; isActive: boolean }
   group: { api: { setVisible: ReturnType<typeof vi.fn> } }
 }
 
@@ -25,7 +25,7 @@ function createFakeApi() {
     const panel: FakePanel = {
       id: opts.id,
       component: opts.component,
-      api: { setSize: vi.fn(), setActive: vi.fn(), close: () => void panels.delete(opts.id), isActive: false },
+      api: { setSize: vi.fn(), setActive: vi.fn(), close: () => void panels.delete(opts.id), setTitle: vi.fn(), isActive: false },
       group: { api: { setVisible: vi.fn() } },
     }
     panels.set(opts.id, panel)

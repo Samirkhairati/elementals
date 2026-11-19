@@ -165,7 +165,7 @@ describe('checkMaps statuses', () => {
     const { results } = checkMaps(sb)
     assert.deepEqual(results.map((r) => r.status), [STATUS.MISSING_IN_GAME, STATUS.MISSING_IN_GAME])
     const [fromNew, fromOld] = [results.find((r) => r.name === 'new').tiled, results.find((r) => r.name === 'old').tiled]
-    assert.equal(fromNew.schemaVersion, 7) // the export carries the current schema
+    assert.equal(fromNew.schemaVersion, 8) // the export carries the current schema
     assert.deepEqual(fromNew, fromOld)
     // a schema 6 map is checked against its game copy like any other
     writeMaps(results, { gameDir: sb.gameDir, only: ['new'] })

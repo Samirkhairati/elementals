@@ -380,7 +380,7 @@ function validateNodes(nodes: unknown[], cellCtx: CellContext, options: Validate
       }
 
       if (type === 'look' && !isRecord(node.look)) errors.push(`${label}: look must be an object`)
-      if (type !== 'look' && node.look !== undefined) warnings.push(`${label}: only a TileMap, Sprite2D, Node2D or YSort takes a look (a Look node inside it); it is dropped on export`)
+      if (type !== 'look' && node.look !== undefined) warnings.push(`${label}: only a TileMap, Sprite, Node takes a look (a Look node inside it); it is dropped on export`)
       if ((type === 'animatedSprite' || type === 'wander' || type === 'playerController' || type === 'mover' || type === 'event') && !isRecord(node.props)) errors.push(`${label}: props must be an object`)
       if (type === 'tile' || type === 'terrain' || type === 'encounters' || type === 'objects') {
         const name = typeof node.name === 'string' ? node.name : ''

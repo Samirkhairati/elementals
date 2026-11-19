@@ -9,13 +9,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { EntityData, ComponentType, type PropBag } from '@/types/editor'
-import type { SceneNode } from '../../../../../shared/sceneTree'
+import { NODE_TYPES, isBranch, isLayerNode, type SceneNode } from '../../../../../shared/sceneTree'
 import { sceneIndex } from '@/lib/sceneIndex'
 import { COMPONENT_REGISTRY } from '@/lib/componentRegistry'
 import { COMPONENT_TYPES } from '../../../../../shared/engine/components'
 import { entityIconName, pxToTile, summarizeEntity, tileToPxClamped } from '@/lib/entityVisuals'
 import { ComponentCard } from './entity/ComponentCard'
-import { Badge, Card, EdButton, Field, NumberField, TextField } from '../ui/controls'
+import { Badge, Card, EdButton, Field, NumberField, TextField, Toggle } from '../ui/controls'
 import { accentVar, NamedIcon } from '../ui/icons'
 import { SpriteThumb } from '../sprites/SpriteThumb'
 import { useEditorSelector, type EditorContextValue } from '../layout/EditorContext'
@@ -201,26 +201,36 @@ export function PropertiesPanel({
     )
   }
 
-  // ── Layer Properties View (Fallback) ──────────────────────────────────────
+  // ── Node Properties View (Fallback) ───────────────────────────────────────
   if (activeLayerId) {
     const layer = sceneIndex(nodes).byId.get(activeLayerId)?.node
     if (layer) {
+      const kind = NODE_TYPES[layer.type]
+      const hasZ = isLayerNode(layer) && layer.type !== 'collision'
       return (
         <div className="flex w-full flex-col gap-3 text-left">
-          <Card caps title={layer.type === 'group' ? 'Group' : 'Layer'}>
-              <Field label="Name">
-                <TextField value={layer.name} onCommit={(name) => name.trim() && editNode(layer.id, { name: name.trim() })} aria-label="Layer name" />
+          <Card caps title={kind.label}>
+            <Field label="Name">
+              <TextField value={layer.name} onCommit={(name) => name.trim() && editNode(layer.id, { name: name.trim() })} aria-label="Node name" />
+            </Field>
+            {hasZ && (
+              <Field label="Z-index" info="Draw order of the layer in the game: higher draws on top, equal keeps the list order">
+                <NumberField value={(layer as { z?: number }).z ?? 0} integer aria-label="Layer z-index" onCommit={(z) => editNode(layer.id, { z })} />
               </Field>
-              {layer.type !== 'collision' && layer.type !== 'group' && layer.type !== 'entity' && layer.type !== 'picture' && layer.type !== 'collisionTiles' && layer.type !== 'collisionShape' && (
-                <Field label="Z-index" hint="Draw order of the layer: higher draws on top, equal keeps the list order">
-                  <NumberField
-                    value={(layer as { z?: number }).z ?? 0}
-                    integer
-                    aria-label="Layer z-index"
-                    onCommit={(z) => editNode(layer.id, { z })}
-                  />
+            )}
+            {isBranch(layer) && (
+              <>
+                <Field label="Z-index" info="Game depth of the sprites inside that have no nearer z: higher draws on top. Empty = the one from above">
+                  <NumberField value={layer.z ?? 0} integer aria-label="Node z-index" onCommit={(z) => editNode(layer.id, { z })} />
                 </Field>
-              )}
+                <Field label="Opacity" info="Multiplies the opacity of the sprites inside (1 = opaque)">
+                  <NumberField value={layer.opacity ?? 1} min={0} max={1} step={0.05} aria-label="Node opacity" onCommit={(o) => editNode(layer.id, { opacity: o === 1 ? undefined : o })} />
+                </Field>
+                <Field label="Pick as one" info="A click on one of its sprites on the map picks all of them (select this node in the Scene panel to pick single ones)">
+                  <Toggle aria-label="Pick sprites as one" checked={layer.pickAsOne === true} onChange={(on) => editNode(layer.id, { pickAsOne: on ? true : undefined })} />
+                </Field>
+              </>
+            )}
           </Card>
         </div>
       )

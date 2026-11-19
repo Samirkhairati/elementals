@@ -1595,7 +1595,7 @@
   "type": "map",
   "version": "1.10",
   "width": 62,
-  "schemaVersion": 7,
+  "schemaVersion": 8,
   "entities": [
     {
       "id": "ef579837-d137-4616-8396-a93c3c2b0711",

@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- tests build partial editor contexts */
 import { describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, screen, within } from '@testing-library/react'
+import { OPEN_PICTURE_PICKER_EVENT } from '@/lib/picturePickerEvent'
 import { renderWithEditor } from '@/test/editorContext'
 import { makeGroup, makePicture } from '@/test/helpers'
 import { ImagesPanel } from './ImagesPanel'
@@ -46,15 +47,18 @@ function setup(images: any[], extra: Record<string, unknown> = {}, layerOver: Re
   return fns
 }
 
+/** What the Scene panel's Add Child Node › Sprite does: ask this panel for its picture browser. */
+const openPicker = () => act(() => void window.dispatchEvent(new CustomEvent(OPEN_PICTURE_PICKER_EVENT)))
+
 const items = [
   { id: 'a', graphicId: 'sky/sheet.png', x: 4, y: 5, name: 'Cloud' },
   { id: 'b', graphicId: 'sky/sheet.png', x: 40, y: 5, crop: { x: 32, y: 0, w: 16, h: 16 } },
 ]
 
 describe('ImagesPanel', () => {
-  it('Add opens the picture browser and starts placing the pick', () => {
+  it('Add Child Node › Sprite opens the picture browser, and a pick starts placing it', () => {
     const { startImagePlacement } = setup([])
-    fireEvent.click(screen.getByRole('button', { name: 'Add image' }))
+    openPicker()
     fireEvent.click(screen.getByRole('radio', { name: /Pictures/ }))
     fireEvent.click(screen.getByTitle('sky/sheet.png'))
     expect(startImagePlacement).toHaveBeenCalledWith({ graphicId: 'sky/sheet.png' })
@@ -157,9 +161,9 @@ describe('ImagesPanel', () => {
     expect(f.placeMultiple).toHaveBeenCalledWith('i1', 'b')
   })
 
-  it('asks for a Node2D or YSort when the active node is another kind', () => {
+  it('asks for a Node when the active node is another kind', () => {
     renderWithEditor(<ImagesPanel />, { layers: [{ id: 't', name: 'Ground', type: 'tile', visible: true, locked: false }], activeLayerId: 't' } as any)
-    expect(screen.getByText(/Select a Node2D or YSort/)).toBeInTheDocument()
+    expect(screen.getByText(/Select a Node/)).toBeInTheDocument()
   })
 
   describe('Resize and the Crop / Resize shortcuts', () => {
@@ -221,18 +225,22 @@ describe('ImagesPanel', () => {
   })
 
   it('says how many are picked, and edits the picked picture\'s fields', () => {
+    setup(items)
+    expect(screen.getByTestId('images-empty').textContent).toBe('No sprite picked in Sky')
+    cleanup()
+    setup(items, { pickedImageIds: ['a', 'b'] })
+    expect(screen.getByTestId('images-empty').textContent).toBe('2 sprites picked')
+    cleanup()
     const f = setup(items, { pickedImageIds: ['a', 'b'], selectedImageId: 'a' })
-    expect(screen.getByText('2 selected')).toBeTruthy()
     const name = screen.getByLabelText('Name')
     fireEvent.change(name, { target: { value: 'Big cloud' } })
     fireEvent.blur(name)
     expect(f.updateImage).toHaveBeenCalledWith('i1', 'a', { name: 'Big cloud' })
   })
 
-  it('a locked sprite freezes its fields, the Node2D still takes new sprites; a pick-as-one Node2D does not freeze them', () => {
+  it('a locked sprite freezes its fields; a pick-as-one Node does not freeze them', () => {
     setup([{ ...items[0], locked: true }], { selectedImageId: 'a' })
     expect(screen.getByLabelText('Image scale')).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Add image' })).not.toBeDisabled()
     cleanup()
     setup([makeGroup('g', pictures([items[0]]), { pickAsOne: true })], { selectedImageId: 'a' })
     expect(screen.getByLabelText('Image scale')).not.toBeDisabled()
@@ -241,9 +249,10 @@ describe('ImagesPanel', () => {
     expect(screen.getByLabelText('Image scale')).toBeDisabled() // a lock above a sprite freezes it
   })
 
-  it('a picture inside a group: Add says it goes into the open group', () => {
+  it('a picture inside a group: the picture browser says it goes into the open group', () => {
     setup([makeGroup('g1', pictures(items), { name: 'Dam wall' })], { openImageGroupId: 'g1' })
-    expect(screen.getByRole('button', { name: 'Add image' }).title).toMatch(/Dam wall/)
+    openPicker()
+    expect(screen.getByRole('dialog', { name: /Add a picture to Dam wall/ })).toBeTruthy()
   })
 
   describe('group shortcuts', () => {

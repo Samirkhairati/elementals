@@ -25,9 +25,10 @@ export type LegacyComponentType =
 
 /**
  * Version written to `map.schemaVersion`. Maps without it are legacy (1). 6 = one tree of nodes (`map.nodes`,
- * shared/sceneTree.ts); 7 = typed nodes (Node2D, YSort, Sprite2D, Look, StaticBody2D, Area2D; entity components as nodes).
+ * shared/sceneTree.ts); 7 = typed nodes (Node, YSort, Sprite, Look, StaticBody, Area; entity components as nodes); 8 = YSort is a modifier
+ * child of a Node instead of a container.
  */
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 // ── Component props ─────────────────────────────────────────────────────────────────────────────
 // Positions are pixels in map space. A tile is 32px. The Transform position is the entity's
@@ -93,7 +94,7 @@ export interface ColliderProps {
 
 /**
  * Where the entity's events trigger when that is not its Collider (an entity with a solid body and a trigger area of its
- * own, the Area2D of its node). A box bottom-centred on the anchor, then shifted, as the Collider box is.
+ * own, the Area of its node). A box bottom-centred on the anchor, then shifted, as the Collider box is.
  */
 export interface AreaProps {
   width: number;

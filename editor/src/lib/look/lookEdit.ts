@@ -12,7 +12,7 @@ import type { LookSubjectRef } from './lookView'
 type Box = { x: number; y: number; w: number; h: number }
 
 /**
- * The subject the selection points at: the picked sprite, else the active TileMap / Node2D / YSort, else the map. A
+ * The subject the selection points at: the picked sprite, else the active TileMap / Node, else the map. A
  * selected Look node stands for the node it grades.
  */
 export function selectedSubject(nodes: readonly SceneNode[], activeLayerId: string | null, selectedImageId: string | null): LookSubjectRef {

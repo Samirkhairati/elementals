@@ -38,7 +38,7 @@ interface UseCanvasInteractionProps {
   setIsPainting: (v: boolean) => void
   setPaintStartPos: (v: Pos | null) => void
   setTileSelection: (s: TileSelection | null) => void
-  handlePaint: (x: number, y: number) => void
+  handlePaint: (x: number, y: number, from?: { x: number; y: number }) => void
   handlePaintBucket: (x: number, y: number) => void
   handleRectangleFill: (start: Pos, end: Pos) => void
   handleCommit: () => void
@@ -214,6 +214,8 @@ export function useCanvasInteraction({
   // ── Sync Refs for Listeners ──────────────────────────────────────────────
   const isPaintingRef = useRef(isPainting)
   useEffect(() => { isPaintingRef.current = isPainting }, [isPainting])
+  /** The cell the brush stroke last painted (the next one fills the cells in between). */
+  const lastPaintCellRef = useRef<{ x: number; y: number } | null>(null)
 
   const rectStartRef = useRef(rectStart)
   useEffect(() => { rectStartRef.current = rectStart }, [rectStart])
@@ -407,7 +409,7 @@ export function useCanvasInteraction({
         return
       }
 
-      // A Node2D / YSort (the sprites' "image layer"): a click drops the pending image, otherwise it only deselects (tiles are never painted here).
+      // A Node (the sprites' "image layer"): a click drops the pending image, otherwise it only deselects (tiles are never painted here).
       const activeLayer = indexRef.current.byId.get(activeLayerIdRef.current ?? '')?.node
       if (activeLayer && isBranch(activeLayer)) {
         if (button === 0) {
@@ -453,9 +455,12 @@ export function useCanvasInteraction({
         // Brush / Eraser tool
         if (isInside) {
           setIsPainting(true)
+          // The ref too: the next mouse move may come before the effect that follows the state.
+          isPaintingRef.current = true
           if (paintMode === 'continuous' || paintMode === 'discontinuous') {
             setPaintStartPos({ x, y })
           }
+          lastPaintCellRef.current = { x, y }
           handlePaint(x, y)
         }
       }
@@ -555,9 +560,12 @@ export function useCanvasInteraction({
         return
       }
 
-      // Brush / Eraser painting drag
+      // Brush / Eraser painting drag: only when the pointer reaches another cell, filling the cells on the way.
       if (isPaintingRef.current && coords.isInside) {
-        handlePaint(coords.x, coords.y)
+        const last = lastPaintCellRef.current
+        if (last && last.x === coords.x && last.y === coords.y) return
+        handlePaint(coords.x, coords.y, last ?? undefined)
+        lastPaintCellRef.current = { x: coords.x, y: coords.y }
       }
     },
     [getTileCoordsFromPointer, isPanningRef, isZoomingRef, handlePaint, stageRef, pendingImage]

@@ -139,10 +139,17 @@ describe('Slider', () => {
     expect(changed).not.toHaveBeenCalled()
   })
 
-  it('follows the pointer along its track', () => {
-    const { changed, slider } = setup()
-    slider.getBoundingClientRect = () => ({ left: 100, width: 200, top: 0, right: 300, bottom: 10, height: 10, x: 100, y: 0, toJSON: () => ({}) })
-    fireEvent.pointerDown(slider, { clientX: 250, pointerId: 1 })
+  it('follows the pointer along its track and reports the value where it is let go', () => {
+    const { changed } = setup()
+    // jsdom has no pointer capture; the track is the slider's root
+    const proto = Element.prototype as unknown as Record<string, unknown>
+    proto.setPointerCapture ??= () => {}
+    proto.releasePointerCapture ??= () => {}
+    proto.hasPointerCapture ??= () => true
+    const root = document.querySelector<HTMLElement>('[data-orientation]')! // the outermost one: the slider's root
+    root.getBoundingClientRect = () => ({ left: 100, width: 200, top: 0, right: 300, bottom: 10, height: 10, x: 100, y: 0, toJSON: () => ({}) })
+    fireEvent.pointerDown(root, { clientX: 250, pointerId: 1 })
+    fireEvent.pointerUp(root, { clientX: 250, pointerId: 1 })
     expect(changed).toHaveBeenLastCalledWith(8) // 75 % of 0..10, rounded to the step
   })
 })

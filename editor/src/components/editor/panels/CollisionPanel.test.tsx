@@ -27,18 +27,15 @@ function setup(layer = collision(), selectedEntityId: string | null = null) {
 afterEach(() => act(() => polygonEditStore.set({ selectedShapeId: null, brush: 'tiles' })))
 
 describe('CollisionPanel', () => {
-  it('lists the tiles items (with their tile count) and the shapes', () => {
+  it('shows the picked item (the items themselves are rows of the Scene panel): its count, and for a shape its kind', () => {
     setup()
-    const rows = screen.getAllByTestId('collision-item').map((r) => r.textContent)
-    expect(rows).toEqual(['Tiles2 tiles', 'Polygon 13 pts'])
-  })
-
-  it('picking an item picks its brush: a tiles item paints, a shape is edited', () => {
-    setup()
-    fireEvent.click(screen.getAllByTestId('collision-item')[1])
-    expect(polygonEditStore.get()).toMatchObject({ selectedShapeId: 's', brush: 'shape' })
-    fireEvent.click(screen.getAllByTestId('collision-item')[0])
-    expect(polygonEditStore.get()).toMatchObject({ selectedShapeId: 'g', brush: 'tiles' })
+    expect(screen.queryByTestId('collision-picked')).toBeNull()
+    act(() => polygonEditStore.set({ selectedShapeId: 'g', brush: 'tiles' }))
+    expect(screen.getByTestId('collision-picked-count').textContent).toBe('2 tiles')
+    expect(screen.getByTestId('collision-status').textContent).toBe('Painting into Tiles')
+    act(() => polygonEditStore.set({ selectedShapeId: 's', brush: 'shape' }))
+    expect(screen.getByTestId('collision-picked-count').textContent).toBe('3 points')
+    expect(screen.getByRole('radio', { name: 'Closed' })).toHaveAttribute('aria-checked', 'true')
   })
 
   it('+ Tiles adds an empty tiles item and picks it; + Shape switches to drawing', () => {
@@ -51,12 +48,13 @@ describe('CollisionPanel', () => {
     expect(polygonEditStore.get()).toMatchObject({ selectedShapeId: null, brush: 'shape' })
   })
 
-  it('deleting a tiles item from its menu removes its tiles', () => {
+  it('deleting the picked tiles item removes its tiles', () => {
     const { current } = setup()
-    fireEvent.contextMenu(screen.getAllByTestId('collision-item')[0])
-    fireEvent.click(screen.getByRole('menuitem', { name: /Delete tiles item/ }))
+    act(() => polygonEditStore.set({ selectedShapeId: 'g', brush: 'tiles' }))
+    fireEvent.click(screen.getByRole('button', { name: /Delete tiles item/ }))
     expect(current().children.map((c) => c.type)).toEqual(['collisionShape'])
     expect(current().data).toEqual({})
+    expect(polygonEditStore.get().selectedShapeId).toBeNull()
   })
 
   it('says so while an entity is selected (the map edits the entity then)', () => {

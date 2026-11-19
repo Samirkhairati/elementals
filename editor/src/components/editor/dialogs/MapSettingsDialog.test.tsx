@@ -16,7 +16,7 @@ describe('MapSettingsDialog', () => {
   it('shows the player z-index (default 20), how many layers draw over the player, and the size', () => {
     render(<MapSettingsDialog map={map()} onClose={vi.fn()} onSave={vi.fn()} />)
     expect(screen.getByLabelText('Player z-index')).toHaveValue('20')
-    expect(screen.getByTestId('player-z-layers')).toHaveTextContent('1 of 2 TileMaps and sprite Node2Ds draw over the player')
+    expect(screen.getByTestId('player-z-layers')).toHaveTextContent('1 of 2 TileMaps and sprite Nodes draw over the player')
     expect(screen.getByTestId('map-size')).toHaveTextContent('1280 × 720 px · 40 × 23 tiles')
   })
 

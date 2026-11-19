@@ -6,7 +6,7 @@ import { resetLookLibrary } from '@/lib/look/lookLibrary'
 import { getLookView, resetLookView } from '@/lib/look/lookView'
 import { LookPanel } from './LookPanel'
 
-// Draw order: the Node2D of sprites draws over the TileMap.
+// Draw order: the Node of sprites draws over the TileMap.
 const nodes = [
   { id: 'i1', name: 'Sky', type: 'group', children: [{ id: 'pic', type: 'picture', graphicId: 'sky/a.png', x: 0, y: 0, name: 'Cloud', children: [] }] },
   { id: 't1', name: 'Ground', type: 'tile', children: [] },
@@ -70,15 +70,19 @@ describe('LookPanel', () => {
     expect(done).toBe(true)
   })
 
-  it('the Map subject edits the map look', () => {
-    const setLook = setup()
-    fireEvent.click(screen.getByRole('radio', { name: /Map/ }))
-    expect(getLookView().pinned).toEqual({ kind: 'map' })
+  it('with nothing selected (the Scene panel\'s map row) it edits the map look', () => {
+    const setLook = setup({ activeLayerId: null })
+    expect(screen.getByText('Look · Town')).toBeInTheDocument()
     fireEvent.keyDown(exposure(), { key: 'ArrowRight' })
     expect(setLook.mock.calls[0][0]).toEqual({ kind: 'map' })
   })
 
-  it('edits the selected sprite of the active Node2D', () => {
+  it('a node that has no look says which nodes do', () => {
+    setup({ activeMap: mapWith([...nodes, { id: 'c', name: 'Walls', type: 'collision', children: [] }]), activeLayerId: 'c' })
+    expect(screen.getByText(/A StaticBody has no look/)).toBeInTheDocument()
+  })
+
+  it('edits the selected sprite of the active Node', () => {
     const setLook = setup({ activeLayerId: 'i1', selectedImageId: 'pic' })
     expect(screen.getByText('Look · Cloud')).toBeInTheDocument()
     fireEvent.keyDown(exposure(), { key: 'ArrowRight' })

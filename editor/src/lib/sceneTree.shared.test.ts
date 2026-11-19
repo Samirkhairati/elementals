@@ -52,7 +52,7 @@ const tile = (id: string, extra: Partial<SceneNode> = {}): SceneNode => ({ id, t
 const terrain = (id: string): SceneNode => ({ id, type: 'terrain', name: id })
 const encounters = (id: string): SceneNode => ({ id, type: 'encounters', name: id })
 const group = (id: string, children: SceneNode[] = [], extra: Partial<GroupNode> = {}): GroupNode => ({ id, type: 'group', name: id, children, ...extra })
-// a Node2D holding sprites (an image layer before schema 7)
+// a Node holding sprites (an image layer before schema 7)
 const image = (id: string, children: SceneNode[] = [], extra: Partial<BranchNode> = {}): BranchNode => ({ id, type: 'group', name: id, children, ...extra }) as BranchNode
 const picture = (id: string, extra: Partial<PictureNode> = {}): PictureNode => ({ id, type: 'picture', name: id, graphicId: `${id}.png`, x: 0, y: 0, children: [], ...extra })
 const entity = (id: string, extra: Partial<EntityNode> = {}): EntityNode => ({ id, type: 'entity', name: id, x: 0, y: 0, components: { Transform: { x: 0, y: 0, depth: 10 } }, children: [], ...extra })
@@ -76,7 +76,7 @@ function deepFreeze<T>(value: T): T {
  *   │  ├─ trees (group)
  *   │  │  └─ oak (entity)
  *   │  └─ npc (entity)
- *   ├─ sky (Node2D of sprites)
+ *   ├─ sky (Node of sprites)
  *   │  ├─ cloud (picture)
  *   │  └─ birds (group)
  *   │     ├─ b1 (picture)
@@ -108,7 +108,7 @@ describe('NODE_TYPES', () => {
       expect(info.sections.node).toBe(true)
     }
     const containers = NODE_TYPE_LIST.filter((t) => NODE_TYPES[t].container).sort()
-    expect(containers).toEqual(['area', 'body', 'collision', 'entity', 'group', 'picture', 'tile', 'ySort'])
+    expect(containers).toEqual(['area', 'body', 'collision', 'entity', 'group', 'picture', 'tile'])
     expect(isContainer(group('g'))).toBe(true)
     expect(isContainer(tile('t'))).toBe(true) // it may hold a Look
     expect(isContainer(terrain('t'))).toBe(false)
@@ -122,8 +122,8 @@ describe('NODE_TYPES', () => {
   })
 
   it('names the nodes the Godot way, with an icon each and no two alike', () => {
-    expect([NODE_TYPES.group.label, NODE_TYPES.picture.label, NODE_TYPES.animatedSprite.label, NODE_TYPES.area.label]).toEqual(['Node2D', 'Sprite2D', 'AnimatedSprite2D', 'Area2D'])
-    const menu = NODE_TYPE_LIST.filter((t) => t !== 'body' && t !== 'collision') // both StaticBody2D: the map's and an entity's
+    expect([NODE_TYPES.group.label, NODE_TYPES.picture.label, NODE_TYPES.animatedSprite.label, NODE_TYPES.area.label]).toEqual(['Node', 'Sprite', 'AnimatedSprite', 'Area'])
+    const menu = NODE_TYPE_LIST.filter((t) => t !== 'body' && t !== 'collision') // both StaticBody: the map's and an entity's
     expect(new Set(menu.map((t) => NODE_TYPES[t].label)).size).toBe(menu.length)
   })
 })
@@ -176,31 +176,35 @@ describe('canHold', () => {
   const types: SceneNodeType[] = [...NODE_TYPE_LIST]
   const holds = (path: SceneNode[]) => types.filter((t) => canHold(path, t))
 
-  it('lets the root hold the scene nodes, but no Sprite2D (a sprite sits in a Node2D or YSort)', () => {
-    expect(holds([]).sort()).toEqual(['collision', 'encounters', 'entity', 'group', 'objects', 'terrain', 'tile', 'ySort'])
+  it('lets the root hold the scene nodes, but no Sprite (a sprite sits in a Node) and no YSort (it sorts a Node)', () => {
+    expect(holds([]).sort()).toEqual(['collision', 'encounters', 'entity', 'group', 'objects', 'terrain', 'tile'])
   })
 
-  it('lets a Node2D and a YSort hold the scene nodes, Sprite2Ds and a Look, at any depth', () => {
+  it('lets a Node hold the scene nodes, Sprites, a Look and a YSort, at any depth', () => {
     const branch = ['collision', 'encounters', 'entity', 'group', 'look', 'objects', 'picture', 'terrain', 'tile', 'ySort'].sort()
     expect(holds([group('g')]).sort()).toEqual(branch)
-    expect(holds([group('g'), { id: 'y', type: 'ySort', name: 'y', children: [] }]).sort()).toEqual(branch)
     expect(holds([group('outer'), image('i'), group('g'), group('h')]).sort()).toEqual(branch)
+    // a YSort is a modifier: it holds nothing, and a Node holds one
+    expect(holds([group('g'), { id: 'y', type: 'ySort', name: 'y' }])).toEqual([])
+    const sorted = group('s', [{ id: 'y', type: 'ySort', name: 'y' }])
+    expect(canHold([sorted], 'ySort')).toBe(false)
+    expect(canHold([sorted], 'ySort', undefined, 'y')).toBe(true)
   })
 
-  it('lets a TileMap and a Sprite2D hold only a Look: no sprite inside a sprite', () => {
+  it('lets a TileMap and a Sprite hold only a Look: no sprite inside a sprite', () => {
     expect(holds([tile('t')])).toEqual(['look'])
     expect(holds([group('g'), picture('p')])).toEqual(['look'])
     expect(canHold([group('g'), picture('p')], 'picture')).toBe(false)
   })
 
-  it('lets the map\'s StaticBody2D hold collision items only, and leaves hold nothing', () => {
+  it('lets the map\'s StaticBody hold collision items only, and leaves hold nothing', () => {
     expect(holds([collision('c')]).sort()).toEqual(['collisionShape', 'collisionTiles'])
     for (const leaf of [terrain('x'), tilesItem('w'), shape('s')]) expect(holds([leaf])).toEqual([])
   })
 
   it('lets an entity hold its components, one of each and one movement node; a body or area one shape', () => {
     expect(holds([entity('e')]).sort()).toEqual(['animatedSprite', 'area', 'body', 'event', 'mover', 'playerController', 'wander'])
-    const e = entity('e', { children: [{ id: 's', type: 'animatedSprite', name: 'AnimatedSprite2D', props: {} }, { id: 'w', type: 'wander', name: 'Wander', props: {} }] })
+    const e = entity('e', { children: [{ id: 's', type: 'animatedSprite', name: 'AnimatedSprite', props: {} }, { id: 'w', type: 'wander', name: 'Wander', props: {} }] })
     expect(canHold([e], 'animatedSprite')).toBe(false)
     expect(canHold([e], 'mover')).toBe(false) // one movement node
     expect(canHold([e], 'animatedSprite', undefined, 's')).toBe(true) // moving it within the entity
@@ -356,7 +360,7 @@ describe('moveNode', () => {
 
   it('refuses what the placement rules forbid', () => {
     const tree = sample()
-    expect(moveNode(tree, 'cloud', null)).toBe(tree) // a sprite lives in a Node2D or YSort
+    expect(moveNode(tree, 'cloud', null)).toBe(tree) // a sprite lives in a Node
     expect(moveNode(tree, 'cloud', 'b1')).toBe(tree) // not in another sprite
     expect(moveNode(tree, 'oak', 'npc')).toBe(tree) // an entity holds no entity
     expect(moveNode(tree, 'ground', 'walls')).toBe(tree)
@@ -492,17 +496,20 @@ describe('inherited properties', () => {
     expect(isVisible(findNode(own, 'npc')!, ancestorsOf(own, 'npc')!)).toBe(true)
   })
 
-  it('y-sort: a YSort and everything below it sorts by its feet, nothing else does', () => {
+  it('y-sort: a Node holding a shown YSort and everything below it sorts by its feet, nothing else does', () => {
     const at = (tree: SceneNode[], id: string) => {
       const found = locate(tree, id)!
       return { sorted: effectiveYSort(found.node, found.ancestors), inherited: inheritedYSort(found.ancestors) }
     }
     const p = picture('p')
     expect(at([group('outer', [image('layer', [group('inner', [p])])])], 'p')).toEqual({ sorted: false, inherited: false })
-    const sorted: SceneNode[] = [group('outer', [{ id: 'ys', type: 'ySort', name: 'ys', children: [group('inner', [p])] }])]
+    const sorted: SceneNode[] = [group('outer', [group('ys', [group('inner', [p]), { id: 'mod', type: 'ySort', name: 'YSort' }])])]
     expect(at(sorted, 'p')).toEqual({ sorted: true, inherited: true })
     expect(at(sorted, 'ys')).toEqual({ sorted: true, inherited: false })
     expect(at(sorted, 'outer')).toEqual({ sorted: false, inherited: false })
+    // a hidden YSort is off
+    const off: SceneNode[] = [group('ys', [p, { id: 'mod', type: 'ySort', name: 'YSort', visible: false }])]
+    expect(at(off, 'p')).toEqual({ sorted: false, inherited: false })
   })
 
   it('multiplies opacity down the tree', () => {
@@ -512,7 +519,7 @@ describe('inherited properties', () => {
     expect(effectiveOpacity(at.node, at.ancestors)).toBe(0.5)
     expect(effectiveOpacity(picture('q'), [])).toBe(1)
     const groupWithOpacity = { ...tree[0], opacity: 0.5 } as unknown as SceneNode
-    expect(effectiveOpacity(at.node, [groupWithOpacity, ...at.ancestors.slice(1)])).toBe(0.25) // a Node2D's opacity multiplies too
+    expect(effectiveOpacity(at.node, [groupWithOpacity, ...at.ancestors.slice(1)])).toBe(0.25) // a Node's opacity multiplies too
   })
 
   it('finds the nearest value of any property', () => {

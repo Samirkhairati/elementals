@@ -4,6 +4,7 @@
 
 import React, { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import * as SliderPrimitive from '@radix-ui/react-slider'
 import { Check, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useDismiss } from '@/hooks/useDismiss'
@@ -340,66 +341,69 @@ function snap(value: number, min: number, max: number, step: number): number {
   return Math.min(max, Math.max(min, Math.round(stepped * 1e6) / 1e6))
 }
 
-/** Drag the thumb or use the arrow keys (Shift = x10, Home / End = ends). */
+/**
+ * Radix's slider: drag anywhere on the track or use the arrow keys (Shift / Page Up / Page Down = x10, Home / End = ends).
+ * While dragging, the thumb follows the pointer at once (local state) and `onChange` runs at most once per frame, as a
+ * low-priority (transition) update, so heavy work the value causes (a look re-grading the map) never makes the thumb lag
+ * or skip; the release (or a key step) sends the final value.
+ */
 export function Slider({ value, onChange, min, max, step = 1, disabled, className, onRelease, track, origin, ...rest }: SliderProps) {
-  const bar = useRef<HTMLDivElement>(null)
-  const dragging = useRef(false)
-  const last = useRef(value)
+  const [dragValue, setDragValue] = useState<number | null>(null)
+  const pending = useRef<number | null>(null)
+  const frame = useRef(0)
+  const latest = useRef({ onChange, onRelease, value })
+  latest.current = { onChange, onRelease, value }
+  useEffect(() => () => cancelAnimationFrame(frame.current), [])
+
+  const shown = dragValue ?? value
   const span = Math.max(1e-9, max - min)
   const at = (v: number) => Math.min(1, Math.max(0, (v - min) / span))
-  const ratio = at(value)
+  const ratio = at(shown)
   const from = at(origin ?? min)
 
-  const set = (next: number) => {
-    last.current = next
-    if (next !== value) onChange(next)
-  }
-  const fromPointer = (clientX: number) => {
-    const r = bar.current?.getBoundingClientRect()
-    if (!r || r.width === 0) return
-    set(snap(min + ((clientX - r.left) / r.width) * span, min, max, step))
+  const flush = () => {
+    frame.current = 0
+    const next = pending.current
+    pending.current = null
+    if (next === null) return
+    React.startTransition(() => latest.current.onChange(next))
   }
 
   return (
-    <div
-      ref={bar}
-      role="slider"
-      tabIndex={disabled ? -1 : 0}
+    <SliderPrimitive.Root
       aria-label={rest['aria-label']}
-      aria-valuemin={min}
-      aria-valuemax={max}
-      aria-valuenow={value}
-      aria-disabled={disabled || undefined}
-      className={cn('relative flex h-4 min-w-16 flex-1 cursor-pointer touch-none items-center focus-visible:outline-none [&:focus-visible>span:last-child]:ring-2 [&:focus-visible>span:last-child]:ring-ring', disabled && 'pointer-events-none opacity-50', className)}
-      onPointerDown={(e) => {
-        dragging.current = true
-        last.current = value
-        e.currentTarget.setPointerCapture?.(e.pointerId)
-        fromPointer(e.clientX)
+      value={[Math.min(max, Math.max(min, shown))]}
+      min={min}
+      max={max}
+      step={step}
+      disabled={disabled}
+      className={cn('relative flex h-4 min-w-16 flex-1 cursor-pointer touch-none select-none items-center', disabled && 'pointer-events-none opacity-50', className)}
+      onValueChange={([raw]) => {
+        const next = snap(raw, min, max, step)
+        setDragValue(next)
+        pending.current = next
+        if (!frame.current) frame.current = requestAnimationFrame(flush)
       }}
-      onPointerMove={(e) => dragging.current && fromPointer(e.clientX)}
-      onPointerUp={(e) => {
-        if (!dragging.current) return
-        dragging.current = false
-        e.currentTarget.releasePointerCapture?.(e.pointerId)
-        onRelease?.(last.current)
-      }}
-      onKeyDown={(e) => {
-        const big = step * (e.shiftKey ? 10 : 1)
-        const to = e.key === 'ArrowRight' || e.key === 'ArrowUp' ? value + big : e.key === 'ArrowLeft' || e.key === 'ArrowDown' ? value - big : e.key === 'PageUp' ? value + step * 10 : e.key === 'PageDown' ? value - step * 10 : e.key === 'Home' ? min : e.key === 'End' ? max : null
-        if (to === null) return
-        e.preventDefault()
-        const next = snap(to, min, max, step)
-        if (next === value) return
-        if (onRelease) onRelease(next)
-        else onChange(next)
+      onValueCommit={([raw]) => {
+        const next = snap(raw, min, max, step)
+        cancelAnimationFrame(frame.current)
+        frame.current = 0
+        pending.current = null
+        setDragValue(null)
+        const { onChange: change, onRelease: release, value: current } = latest.current
+        if (release) release(next)
+        else if (next !== current) change(next)
       }}
     >
-      <span className="absolute inset-x-0 h-1 rounded-full bg-input" style={track ? { background: track } : undefined} />
-      {from > 0 && from < 1 && <span className="absolute h-2 w-px bg-muted-foreground/60" style={{ left: `${from * 100}%` }} />}
-      {!track && <span className="absolute h-1 rounded-full bg-primary" style={{ left: `${Math.min(from, ratio) * 100}%`, width: `${Math.abs(ratio - from) * 100}%` }} />}
-      <span className="absolute h-3 w-3 -translate-x-1/2 rounded-full bg-foreground shadow ring-1 ring-black/30" style={{ left: `${ratio * 100}%` }} />
-    </div>
+      <SliderPrimitive.Track className="relative h-1 grow overflow-visible rounded-full bg-input" style={track ? { background: track } : undefined}>
+        {from > 0 && from < 1 && <span className="absolute top-1/2 h-2 w-px -translate-y-1/2 bg-muted-foreground/60" style={{ left: `${from * 100}%` }} />}
+        {!track && <span className="absolute inset-y-0 rounded-full bg-primary" style={{ left: `${Math.min(from, ratio) * 100}%`, width: `${Math.abs(ratio - from) * 100}%` }} />}
+      </SliderPrimitive.Track>
+      <SliderPrimitive.Thumb
+        aria-label={rest['aria-label']}
+        className="block size-3 cursor-grab rounded-full bg-foreground shadow ring-1 ring-black/30 transition-[box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing"
+      />
+    </SliderPrimitive.Root>
   )
 }
 

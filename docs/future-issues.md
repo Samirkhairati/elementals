@@ -102,7 +102,7 @@ Left for later:
   from a city map with y-sorted layers that was never committed (the committed `project/maps/city.json` has no y-sort), and
   `market.json` still has the entity field `folder` dropped in schema 6. Export to Game from the editor (or
   `node scripts/export-maps.mjs --write --only <map> --force`) once the project maps are the ones wanted.
-- **An empty image layer exports nothing now**: it became an empty Node2D, which cannot be told from an empty folder. The game drew
+- **An empty image layer exports nothing now**: it became an empty Node, which cannot be told from an empty folder. The game drew
   nothing for it either.
 - **The y-sort migration can wrap single sprites**: a y-sorted picture in an image layer that was not sorted becomes a YSort holding only
   that sprite (`<id>:ysort`). It exports and draws the same, but the tree shows one extra row per such sprite; a "Merge into YSort" action

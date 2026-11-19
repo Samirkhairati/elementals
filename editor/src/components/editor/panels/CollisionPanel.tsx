@@ -1,21 +1,17 @@
-import { useState } from 'react'
-import { Edit2, Grid3x3, Pentagon, Plus, Spline, Trash2 } from 'lucide-react'
+import { Grid3x3, Pentagon, Plus, Spline, Trash2 } from 'lucide-react'
 import { minPoints } from '../../../../../shared/collisionShapes'
 import type { CollisionItem } from '../../../../../shared/collisionLayers'
 import { collisionItemsOf, collisionShapeNodes } from '../../../../../shared/sceneTree'
 import { lockedNode, sceneIndex } from '@/lib/sceneIndex'
 import { polygonEditStore, usePolygonEdit, type CollisionBrush } from '@/lib/polygonEditStore'
 import { useEditorSelector, type EditorContextValue } from '../layout/EditorContext'
-import { Badge, Card, EdButton, Field, Segmented } from '../ui/controls'
-import { RenameInput } from '../ui/RenameInput'
+import { Card, EdButton, Field, Segmented } from '../ui/controls'
 import { ShapeEditorHelp } from './ShapeEditorHelp'
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '@/components/ui/context-menu'
 
 const selectCollision = (c: EditorContextValue) => ({
   nodes: c.activeMap?.nodes,
   activeLayerId: c.activeLayerId,
   addCollisionTiles: c.addCollisionTiles,
-  renameNode: c.renameNode,
   editNode: c.editNode,
   deleteNodes: c.deleteNodes,
   selectedEntityId: c.selectedEntityId,
@@ -34,14 +30,13 @@ export function pickCollisionItem(item: CollisionItem | null): void {
 }
 
 /**
- * The right sidebar while a collision layer is active (see useDockviewLayout): the layer's items (sets of painted tiles
- * and shapes), the brush, and the picked shape. A click on the map paints the picked tiles item with the Tiles brush,
+ * The right sidebar while a collision layer is active (see useDockviewLayout): the brush, new items and the picked item
+ * (the items themselves, sets of painted tiles and shapes, are rows of the Scene panel). A click on the map paints the picked tiles item with the Tiles brush,
  * or draws and edits shapes with the Shape brush.
  */
 export function CollisionPanel() {
-  const { nodes, activeLayerId, addCollisionTiles, renameNode, editNode, deleteNodes, selectedEntityId } = useEditorSelector(selectCollision)
+  const { nodes, activeLayerId, addCollisionTiles, editNode, deleteNodes, selectedEntityId } = useEditorSelector(selectCollision)
   const { selectedShapeId, brush, drawing } = usePolygonEdit()
-  const [renaming, setRenaming] = useState<string | null>(null)
   const index = sceneIndex(nodes ?? [])
   const node = index.byId.get(activeLayerId ?? '')?.node
   const layer = node?.type === 'collision' ? node : null
@@ -95,7 +90,6 @@ export function CollisionPanel() {
         actions={
           <>
             <ShapeEditorHelp />
-            <Badge>{items.length}</Badge>
           </>
         }
         bodyClassName="flex flex-col gap-2"
@@ -122,47 +116,7 @@ export function CollisionPanel() {
           {status}
           {locked && ' · locked'}
         </div>
-        {items.length === 0 ? (
-          <p className="ed-hint">No items yet: paint tiles or draw a shape on the map.</p>
-        ) : (
-          <div className="flex flex-col gap-0.5" data-testid="collision-items">
-            {items.map((item) => (
-              <ContextMenu key={item.id}>
-                <ContextMenuTrigger asChild>
-                  <div
-                    className="ed-row"
-                    data-testid="collision-item"
-                    data-selected={item.id === selectedShapeId ? 'true' : undefined}
-                    onClick={() => pickCollisionItem(item.id === selectedShapeId ? null : item)}
-                    onDoubleClick={() => !locked && setRenaming(item.id)}
-                  >
-                    <CollisionItemIcon item={item} />
-                    {renaming === item.id ? (
-                      <RenameInput initial={item.name} label="Item name" onRename={(name) => renameNode(item.id, name)} onClose={() => setRenaming(null)} />
-                    ) : (
-                      <span className="ed-row-label" title={item.name}>{item.name}</span>
-                    )}
-                    <span className="ed-badge" data-tone="count" title={item.kind === 'tiles' ? 'Painted tiles' : 'Points'}>
-                      {item.count}
-                      {item.kind === 'tiles' ? ' tiles' : ' pts'}
-                    </span>
-                  </div>
-                </ContextMenuTrigger>
-                <ContextMenuContent onCloseAutoFocus={(e) => e.preventDefault()}>
-                  <ContextMenuItem disabled={locked} onClick={() => setRenaming(item.id)}>
-                    <Edit2  />
-                    Rename
-                  </ContextMenuItem>
-                  <ContextMenuSeparator />
-                  <ContextMenuItem disabled={locked} onClick={() => remove(item)} destructive>
-                    <Trash2  />
-                    {item.kind === 'tiles' ? 'Delete tiles item' : 'Delete shape'}
-                  </ContextMenuItem>
-                </ContextMenuContent>
-              </ContextMenu>
-            ))}
-          </div>
-        )}
+        {items.length === 0 && <div className="text-xs text-muted-foreground">No items yet: paint tiles or draw a shape on the map.</div>}
       </Card>
       {picked && (
         <Card caps icon={<CollisionItemIcon item={picked} />} title={picked.name} bodyClassName="flex flex-col gap-2" data-testid="collision-picked">

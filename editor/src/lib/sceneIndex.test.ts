@@ -23,7 +23,7 @@ describe('sceneIndex', () => {
     const idx = sceneIndex(tree())
     expect(idx.layers.map((l) => l.id)).toEqual(['ground', 'roofs', 'under'])
     expect(idx.layersTopFirst.map((l) => l.id)).toEqual(['under', 'roofs', 'ground'])
-    expect(idx.spriteHosts.map((h) => h.id)).toEqual(['trees', 'wall']) // the Node2Ds that hold sprites themselves
+    expect(idx.spriteHosts.map((h) => h.id)).toEqual(['trees', 'wall']) // the Nodes that hold sprites themselves
     expect(idx.entities.map((e) => e.id)).toEqual(['a', 'b', 'c', 'd', 'e'])
     expect(idx.pictures.map((p) => p.id)).toEqual(['oak', 'left', 'right', 'pine'])
   })
@@ -34,7 +34,7 @@ describe('sceneIndex', () => {
     expect(nodeOf(idx, null)).toBeUndefined()
     expect(layerOf(idx, 'roofs')?.id).toBe('roofs')
     expect(layerOf(idx, 'town')).toBeUndefined()
-    expect(layerAbove(idx, 'left')).toBeUndefined() // a Node2D is not a layer
+    expect(layerAbove(idx, 'left')).toBeUndefined() // a Node is not a layer
     expect(hostOf(idx, 'left')?.id).toBe('wall')
     expect(hostOf(idx, 'oak')?.id).toBe('trees')
     expect(hostOf(idx, 'trees')?.id).toBe('trees')
@@ -53,7 +53,7 @@ describe('sceneIndex', () => {
     expect(lockedNode(idx, 'ground')).toBe(false)
   })
 
-  it('a sprite is locked by its own lock or a node above it; a Node2D that picks as one does not lock it', () => {
+  it('a sprite is locked by its own lock or a node above it; a Node that picks as one does not lock it', () => {
     const nodes = tree()
     expect(pictureLocked(sceneIndex(nodes), 'left')).toBe(false)
     const lockedLayer = nodes.map((n) => (n.id === 'trees' ? { ...n, locked: true } : n)) as SceneNode[]
@@ -75,7 +75,7 @@ describe('visiblePictures', () => {
 describe('drawPlan', () => {
   it('runs of shown layers and shown entities, bottom to top, leaving out what is hidden', () => {
     const plan = drawPlan(sceneIndex(tree()))
-    expect(plan.segments.map((s) => (s.kind === 'layers' ? s.layers.map((l) => (l.kind === 'layer' ? l.node.id : l.host.id)) : s.entities.map((e) => e.id)))).toEqual([['ground'], ['a', 'b'], ['roofs'], ['d'], ['trees']]) // a run of sprites per host; the wall Node2D stays in its parent's run
+    expect(plan.segments.map((s) => (s.kind === 'layers' ? s.layers.map((l) => (l.kind === 'layer' ? l.node.id : l.host.id)) : s.entities.map((e) => e.id)))).toEqual([['ground'], ['a', 'b'], ['roofs'], ['d'], ['trees']]) // a run of sprites per host; the wall Node stays in its parent's run
     expect(plan.entities.map((e) => e.id)).toEqual(['a', 'b', 'd'])
     expect(new Set(plan.segments.map((s) => s.key)).size).toBe(plan.segments.length)
   })

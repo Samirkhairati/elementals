@@ -202,7 +202,7 @@ describe('groups of pictures', () => {
     expect(result.current.tree.view.primaryId).toBe(gid)
   })
 
-  it('a Node2D that picks as one is picked as a whole by a click on any member; others are not', () => {
+  it('a Node that picks as one is picked as a whole by a click on any member; others are not', () => {
     const { result } = groupedFirstTwo()
     const gid = groupId(result)
     act(() => result.current.layers.setActiveLayerId('I1'))
@@ -278,8 +278,8 @@ describe('groups of pictures', () => {
     act(() => result.current.layers.duplicateNodes([gid]))
     const groups = layer(result).children.filter((n): n is GroupNode => n.type === 'group')
     expect(groups).toHaveLength(2)
-    expect(groups.find((g) => g.id !== gid)).toMatchObject({ name: 'Node2D Copy', pickAsOne: true })
-    expect(groups.map((g) => g.name).sort()).toEqual(['Node2D', 'Node2D Copy'])
+    expect(groups.find((g) => g.id !== gid)).toMatchObject({ name: 'Node Copy', pickAsOne: true })
+    expect(groups.map((g) => g.name).sort()).toEqual(['Node', 'Node Copy'])
     expect(groups[0].children).toHaveLength(2)
     expect(groups[1].children).toHaveLength(2)
   })
@@ -299,7 +299,7 @@ describe('groups of pictures', () => {
     const { result } = setup([four()])
     act(() => result.current.layers.createNode('group', 'I1'))
     const gid = groupId(result)
-    expect(result.current.tree.index.byId.get(gid)!.node).toMatchObject({ name: 'Node2D', children: [] })
+    expect(result.current.tree.index.byId.get(gid)!.node).toMatchObject({ name: 'Node', children: [] })
     act(() => result.current.layers.moveNodes(['c', 'd'], gid, 'inside'))
     expect(picturesOf(result.current.tree.index.byId.get(gid)!.node).map((i) => i.id)).toEqual(['c', 'd'])
     act(() => result.current.layers.moveNodes(['d'], gid, 'above'))
@@ -327,7 +327,7 @@ describe('groups of pictures', () => {
     const target = layer(hook.result, 'I2')
     const groups = target.children.filter((n): n is GroupNode => n.type === 'group')
     expect(groups).toHaveLength(1)
-    expect(groups[0].name).toBe('Node2D Copy')
+    expect(groups[0].name).toBe('Node Copy')
     expect(groups[0].children).toHaveLength(2)
     expect(drawOrderPictures(target)).toHaveLength(2)
   })

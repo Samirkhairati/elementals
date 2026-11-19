@@ -98,7 +98,9 @@ interface HandlesProps {
 
 function MaskHandles({ subjectRef: ref, s, set, profile, maskId, comp, cam, brush, setLook }: HandlesProps) {
   const [cursor, setCursor] = useState<Pt | null>(null)
-  const painting = useRef<{ stroke: BrushStroke } | null>(null)
+  // The stroke being painted: in the mask's space, and in map pixels for the trail drawn while painting.
+  const painting = useRef<{ stroke: BrushStroke; world: number[]; frame: number } | null>(null)
+  const [trail, setTrail] = useState<number[] | null>(null)
   // the latest component (drags write several times before the end)
   const latest = useLatest(comp)
   const k = cam.scale || 1
@@ -116,7 +118,62 @@ function MaskHandles({ subjectRef: ref, s, set, profile, maskId, comp, cam, brus
     write(next, false)
   }
   const r1 = (v: number) => Math.round(v * 10) / 10
+  const stagePoint = (e: Konva.KonvaEventObject<MouseEvent>): Pt | null => {
+    const st = e.target.getStage()
+    const p = st?.getPointerPosition()
+    if (!st || !p) return null
+    return st.getAbsoluteTransform().copy().invert().point(p)
+  }
+  // A catcher over the visible area (behind the handles): a left-drag on the map draws the component anew, as with
+  // Lightroom's gradient and marquee tools, and keeps the drag from reaching the pictures and tiles below.
+  const viewRect = { x: -cam.x / k - 1e4, y: -cam.y / k - 1e4, w: 1e5 + 2e4, h: 1e5 + 2e4 }
+  const drawFrom = useRef<Pt | null>(null)
+  const drawTo = (a: Pt, b: Pt) => {
+    const sa = toS(a)
+    const sb = toS(b)
+    if (comp.type === 'linear') move({ x1: r1(sa.x), y1: r1(sa.y), x2: r1(sb.x), y2: r1(sb.y) })
+    else if (comp.type === 'rect') move({ x: r1(Math.min(sa.x, sb.x)), y: r1(Math.min(sa.y, sb.y)), w: r1(Math.max(1, Math.abs(sb.x - sa.x))), h: r1(Math.max(1, Math.abs(sb.y - sa.y))) })
+    else if (comp.type === 'radial') move({ cx: r1(sa.x), cy: r1(sa.y), rx: r1(Math.max(1, Math.abs(sb.x - sa.x))), ry: r1(Math.max(1, Math.abs(sb.y - sa.y))), rotation: 0 })
+  }
+  const drawCatcher =
+    comp.type === 'linear' || comp.type === 'rect' || comp.type === 'radial' ? (
+      <Rect
+        name="look-mask-draw"
+        x={viewRect.x}
+        y={viewRect.y}
+        width={viewRect.w}
+        height={viewRect.h}
+        fill="rgba(0,0,0,0.001)"
+        onMouseEnter={(e) => ((e.target.getStage()!.container().style.cursor = 'crosshair'))}
+        onMouseLeave={(e) => ((e.target.getStage()!.container().style.cursor = ''))}
+        onMouseDown={(e) => {
+          if (e.evt.button !== 0) return
+          const p = stagePoint(e)
+          if (!p) return
+          e.cancelBubble = true
+          drawFrom.current = p
+        }}
+        onMouseMove={(e) => {
+          const a = drawFrom.current
+          const p = a ? stagePoint(e) : null
+          if (a && p && Math.hypot(p.x - a.x, p.y - a.y) * k > 3) drawTo(a, p)
+        }}
+        onMouseUp={() => {
+          if (!drawFrom.current) return
+          drawFrom.current = null
+          commit()
+        }}
+      />
+    ) : null
 
+  return (
+    <Group>
+      {drawCatcher}
+      {handlesFor()}
+    </Group>
+  )
+
+  function handlesFor(): React.ReactNode {
   switch (comp.type) {
     case 'linear': {
       const a = toW(comp.x1, comp.y1)
@@ -244,13 +301,8 @@ function MaskHandles({ subjectRef: ref, s, set, profile, maskId, comp, cam, brus
     case 'brush': {
       const b = brush
       const r = b.size * unit
-      const stagePoint = (e: Konva.KonvaEventObject<MouseEvent>): Pt | null => {
-        const st = e.target.getStage()
-        const p = st?.getPointerPosition()
-        if (!st || !p) return null
-        const t = st.getAbsoluteTransform().copy().invert()
-        return t.point(p)
-      }
+      // While painting, the stroke shows as a light line on the canvas; the mask (and the grade) is worked out once, on
+      // release: rasterising the brush texture on every mouse move is what made painting lag.
       const add = (p: Pt) => {
         const cur = painting.current
         if (!cur) return
@@ -260,12 +312,20 @@ function MaskHandles({ subjectRef: ref, s, set, profile, maskId, comp, cam, brus
         // a point every quarter radius is enough for a smooth stroke
         if (n >= 2 && Math.hypot(q.x - pts[n - 2], q.y - pts[n - 1]) < Math.max(0.5, b.size / 4)) return
         cur.stroke = { ...cur.stroke, points: [...pts, r1(q.x), r1(q.y)] }
-        const base = latest.current as Extract<MaskComponent, { type: 'brush' }>
-        write({ ...base, strokes: [...base.strokes, cur.stroke] }, false)
+        cur.world.push(p.x, p.y)
+        if (!cur.frame) {
+          cur.frame = requestAnimationFrame(() => {
+            if (painting.current !== cur) return
+            cur.frame = 0
+            setTrail(cur.world.slice())
+          })
+        }
       }
       const finish = () => {
         const cur = painting.current
         painting.current = null
+        if (cur?.frame) cancelAnimationFrame(cur.frame)
+        setTrail(null)
         if (!cur || cur.stroke.points.length === 0) return
         const base = latest.current as Extract<MaskComponent, { type: 'brush' }>
         const next = { ...base, strokes: [...base.strokes, cur.stroke] }
@@ -273,22 +333,21 @@ function MaskHandles({ subjectRef: ref, s, set, profile, maskId, comp, cam, brus
         write(next, true)
       }
       // a catcher over the visible area: left-drag paints (and keeps the tile tools from painting)
-      const viewRect = { x: -cam.x / k, y: -cam.y / k, w: 1e5, h: 1e5 }
       return (
         <Group>
           <Rect
             name="look-mask-brush"
-            x={viewRect.x - 1e4}
-            y={viewRect.y - 1e4}
-            width={viewRect.w + 2e4}
-            height={viewRect.h + 2e4}
+            x={viewRect.x}
+            y={viewRect.y}
+            width={viewRect.w}
+            height={viewRect.h}
             fill="rgba(0,0,0,0.001)"
             onMouseDown={(e) => {
               if (e.evt.button !== 0) return
               const p = stagePoint(e)
               if (!p) return
               e.cancelBubble = true
-              painting.current = { stroke: { points: [], size: b.size, feather: b.feather, flow: b.flow, ...(b.erase ? { erase: true } : {}) } }
+              painting.current = { stroke: { points: [], size: b.size, feather: b.feather, flow: b.flow, ...(b.erase ? { erase: true } : {}) }, world: [], frame: 0 }
               add(p)
             }}
             onMouseMove={(e) => {
@@ -302,6 +361,16 @@ function MaskHandles({ subjectRef: ref, s, set, profile, maskId, comp, cam, brus
               finish()
             }}
           />
+          {trail && trail.length >= 2 ? (
+            <Line
+              points={trail.length === 2 ? [...trail, trail[0] + 0.01, trail[1]] : trail}
+              stroke={b.erase ? 'rgba(248,113,113,0.45)' : 'rgba(255,46,56,0.4)'}
+              strokeWidth={r * 2}
+              lineCap="round"
+              lineJoin="round"
+              listening={false}
+            />
+          ) : null}
           {cursor ? (
             <>
               <Circle x={cursor.x} y={cursor.y} radius={r} stroke={b.erase ? '#f87171' : COLOR} strokeWidth={1.5 / k} shadowColor="#000" shadowBlur={2} listening={false} />
@@ -313,6 +382,7 @@ function MaskHandles({ subjectRef: ref, s, set, profile, maskId, comp, cam, brus
     }
     default:
       return null
+  }
   }
 }
 

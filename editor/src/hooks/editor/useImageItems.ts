@@ -37,7 +37,7 @@ export function useImageItems(tree: SceneTreeApi) {
   }, [pendingImage])
 
   // ── single pictures ───────────────────────────────────────────────────────
-  /** Adds a sprite to a Node2D / YSort (into the open group inside it when one is selected) and picks it. Returns its id. */
+  /** Adds a sprite to a Node (into the open group inside it when one is selected) and picks it. Returns its id. */
   const addImage = useCallback(
     (layerId: string, item: Omit<ImageItem, 'id' | 'type' | 'name' | 'children'> & { name?: string }): string | null => {
       let createdId: string | null = null
@@ -136,7 +136,7 @@ export function useImageItems(tree: SceneTreeApi) {
     [getIndex]
   )
 
-  /** The Node2D / YSort a sprite sits in (the node itself for one; undefined when it is in none). */
+  /** The Node a sprite sits in (the node itself for one; undefined when it is in none). */
   const imageLayerOf = useCallback((id: string) => hostOf(getIndex(), id), [getIndex])
 
   return {

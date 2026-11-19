@@ -1,9 +1,9 @@
 // An entity of the scene tree is an ECS entity whose components are nodes: the entity node keeps its position, its
 // Transform and Tag (and any component this file does not know, untouched), and its children are the rest:
 //
-//   AnimatedSprite2D (`animatedSprite`)  -> Sprite      (props; `visible` is the node's eye)
-//   StaticBody2D (`body`) + its shape    -> Collider    (solid; a one-tile box without a shape)
-//   Area2D (`area`) + its shape          -> Area        (where its events trigger), or the Collider (not solid) when the
+//   AnimatedSprite (`animatedSprite`)  -> Sprite      (props; `visible` is the node's eye)
+//   StaticBody (`body`) + its shape    -> Collider    (solid; a one-tile box without a shape)
+//   Area (`area`) + its shape          -> Area        (where its events trigger), or the Collider (not solid) when the
 //                                                        entity has no body
 //   Wander / PlayerController / Mover    -> Movement    (controller wander / player / none)
 //   Event (`event`)                      -> Event

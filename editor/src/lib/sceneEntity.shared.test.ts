@@ -37,7 +37,7 @@ describe('componentsOfEntity / entityWithComponents', () => {
     expect(out).toEqual(bag)
   })
 
-  it('a non-solid collider becomes an Area2D; with a body the area is the Area component', () => {
+  it('a non-solid collider becomes an Area; with a body the area is the Area component', () => {
     const trigger = entityWithComponents(blank(), { Collider: { width: 64, height: 32, offsetX: 0, offsetY: 0, isSolid: false } })
     expect(trigger.children!.map((c) => c.type)).toEqual(['area'])
     expect(componentsOfEntity(trigger).Collider).toEqual({ width: 64, height: 32, offsetX: 0, offsetY: 0, isSolid: false })
@@ -114,7 +114,7 @@ describe('sceneLayers', () => {
     expect(shown[0].kind === 'sprites' && shown[0].sprites).toHaveLength(1)
   })
 
-  it('a Node2D holding only other nodes is like a folder; a YSort around one sprite counts as a sprite', () => {
+  it('a Node holding only other nodes is like a folder; a YSort around one sprite counts as a sprite', () => {
     const ysort = (id: string, child: SceneNode): SceneNode => ({ id, type: 'ySort', name: id, children: [child] }) as SceneNode
     const folder = sceneLayers([group('f', [group('one', [pic('a')]), group('two', [pic('b')])])])
     expect(folder.map((l) => l.kind === 'sprites' && l.host?.id)).toEqual(['one', 'two'])

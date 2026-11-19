@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 import { TileSelection, ActiveTool, PaintMode, DebugInfo, MapData, Pos } from '@/types/editor'
-import { brushPaint, bucketFill, erase, fillCells, floodRegion, rectangleFill, type TileMap } from '@/lib/paintOps'
+import { brushPaint, bucketFill, cellsOnLine, erase, fillCells, floodRegion, rectangleFill, type TileMap } from '@/lib/paintOps'
 import { fitSelectionToLayer, partSelection, targetLayerIndex } from '@/lib/layerSelection'
 import { paintCollision } from '@/lib/sceneOps'
 import { lockedNode, shown, type SceneIndex } from '@/lib/sceneIndex'
@@ -47,7 +47,7 @@ interface UsePaintToolsProps {
 function locatePaintableLayer(index: SceneIndex, layerId: string): string | DataLayerNode {
   const node = index.byId.get(layerId)?.node
   if (!node) return 'Layer not found'
-  if (node.type === 'group' || node.type === 'ySort') return 'Node2D and YSort hold nodes, not tiles'
+  if (node.type === 'group' || node.type === 'ySort') return 'Node hold nodes, not tiles'
   if (!isDataLayer(node)) return 'Only layers can be painted'
   if (lockedNode(index, layerId) || !shown(index, layerId)) return 'Layer locked/hidden'
   return node
@@ -115,8 +115,12 @@ export function usePaintTools({
 
   const publish = useCallback((layerId: string, data: TileMap, withHistory: boolean) => publishMany(new Map([[layerId, data]]), withHistory), [publishMany])
 
+  /**
+   * Paints (brush) or erases the cell (gridX, gridY); with `from` (the cell the stroke was at before this mouse move), every
+   * cell on the way too, in one change. Success is not reported to the debug info: a stroke would re-render on every cell.
+   */
   const handlePaint = useCallback(
-    (gridX: number, gridY: number) => {
+    (gridX: number, gridY: number, from?: { x: number; y: number }) => {
       const time = Date.now()
       if (!hasMap) { setDebugInfo({ action: 'paint', error: 'No active map', time }); return }
       if (!activeLayerId) { setDebugInfo({ action: 'paint', error: 'No active layer', time }); return }
@@ -127,6 +131,21 @@ export function usePaintTools({
         return
       }
 
+      const cells = from ? cellsOnLine(from.x, from.y, gridX, gridY).slice(1) : [{ x: gridX, y: gridY }]
+      // Each cell of the stroke applied to the data in turn; null when nothing changed.
+      const stroke = (start: TileMap | undefined, one: (data: TileMap | undefined, x: number, y: number) => TileMap | null): TileMap | null => {
+        let data = start
+        let changed = false
+        for (const c of cells) {
+          const next = one(data, c.x, c.y)
+          if (next && next !== data) {
+            data = next
+            changed = true
+          }
+        }
+        return changed && data ? data : null
+      }
+
       if (isMulti && tileSelection) {
         const targets = multiTargets(getIndex(), tileSelection)
         if (targets.length === 0) { setDebugInfo({ action: 'paint', error: 'No paintable layer in the selection', time }); return }
@@ -134,14 +153,13 @@ export function usePaintTools({
         for (const t of targets) {
           const data =
             activeTool === 'brush'
-              ? brushPaint(t.layer.data, size, gridX, gridY, t.selection, multiMode, paintStartPos)
+              ? stroke(t.layer.data, (d, x, y) => brushPaint(d, size, x, y, t.selection, multiMode, paintStartPos))
               : activeTool === 'eraser'
-                ? erase(t.layer.data, size, gridX, gridY)
+                ? stroke(t.layer.data, (d, x, y) => erase(d, size, x, y))
                 : null
           if (data) updates.set(t.layer.id, data)
         }
         if (updates.size > 0) publishMany(updates, false)
-        setDebugInfo({ action: activeTool, error: 'Success', x: gridX, y: gridY, time })
         return
       }
 
@@ -152,17 +170,13 @@ export function usePaintTools({
       if (activeTool === 'brush') {
         const fitted = selectionFor(layer, tileSelection)
         if (!fitted) { setDebugInfo({ action: 'paint', error: 'Pick a tile for this layer', time }); return }
-        data = brushPaint(layer.data, size, gridX, gridY, fitted, paintMode, paintStartPos)
+        data = stroke(layer.data, (d, x, y) => brushPaint(d, size, x, y, fitted, paintMode, paintStartPos))
       } else if (activeTool === 'eraser') {
-        data = erase(layer.data, size, gridX, gridY)
-        if (!data) {
-          setDebugInfo({ action: 'erase', error: 'Already empty', x: gridX, y: gridY, time })
-          return
-        }
+        data = stroke(layer.data, (d, x, y) => erase(d, size, x, y))
+        if (!data) return
       }
 
       if (data) publish(layer.id, data, false)
-      setDebugInfo({ action: activeTool, error: 'Success', x: gridX, y: gridY, time })
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [hasMap, mapWidth, mapHeight, activeLayerId, tileSelection, activeTool, paintMode, paintStartPos, isMulti, multiMode, getIndex, publish, publishMany, setDebugInfo]

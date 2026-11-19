@@ -1774,7 +1774,7 @@
   "type": "map",
   "version": "1.10",
   "width": 18,
-  "schemaVersion": 7,
+  "schemaVersion": 8,
   "entities": [
     {
       "id": "e41e2972-0204-45d2-885a-866dc195464a",

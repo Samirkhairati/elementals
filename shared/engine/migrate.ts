@@ -307,7 +307,7 @@ export function migrateFlatMap<T extends object>(map: T): MigrateResult<T> {
 }
 
 /**
- * Migrates a map to the current schema (7: typed nodes, see sceneTreeMigrate.ts `typedNodes`): every entity becomes canonical, old `polygons` layers become collision layers,
+ * Migrates a map to the current schema (8: typed nodes, YSort a modifier, see sceneTreeMigrate.ts `typedNodes`): every entity becomes canonical, old `polygons` layers become collision layers,
  * and `layers`, `entities`, `entityFolders` and `entitiesIndex` become the node tree `nodes` (`migrateToNodeTree`).
  * A map that already is a tree only has the entities in it migrated and its `schemaVersion` stamped (maps at a newer
  * version keep theirs). Idempotent; returns the same object when nothing changed.

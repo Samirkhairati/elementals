@@ -32,7 +32,7 @@ const fakeCtx = () => {
   return { ctx, calls }
 }
 
-/** A Node2D holding sprites. */
+/** A Node holding sprites. */
 const image = (id: string, pictures: { id: string; graphicId: string; x: number; y: number; visible?: boolean }[]): SceneNode => ({
   id,
   name: id,

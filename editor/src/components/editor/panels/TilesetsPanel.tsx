@@ -78,8 +78,8 @@ export function TilesetsPanel({
   if (activeLayerType === 'group' || activeLayerType === 'ySort') {
     return (
       <div className="ed-empty">
-        <p>{activeLayerType === 'ySort' ? 'YSort' : 'Node2D'}: no tiles to paint</p>
-        <p>Add a TileMap child to paint, or a Sprite2D from the Images panel.</p>
+        <p>{activeLayerType === 'ySort' ? 'YSort' : 'Node'}: no tiles to paint</p>
+        <p>Add a TileMap child to paint, or a Sprite from the Images panel.</p>
       </div>
     )
   }

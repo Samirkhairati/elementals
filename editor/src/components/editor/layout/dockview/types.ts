@@ -18,7 +18,7 @@ export interface PanelInfo {
 
 export const ALL_PANELS: PanelInfo[] = [
   { id: 'maps', title: 'Maps', column: 'left', shortcut: 'Alt+M' },
-  { id: 'layers', title: 'Layers', column: 'left', shortcut: 'Alt+L' },
+  { id: 'layers', title: 'Scene', column: 'left', shortcut: 'Alt+L' },
   { id: 'properties', title: 'Properties', column: 'left', shortcut: 'Alt+P' },
   { id: 'canvas', title: 'Canvas', column: 'center', shortcut: 'Alt+C' },
   { id: 'tilesets', title: 'Tileset Browser', column: 'right', shortcut: 'Alt+T' },

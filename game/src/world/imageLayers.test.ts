@@ -167,7 +167,7 @@ describe("ImageLayerRenderer", () => {
   it("a y-sorted picture (in a YSort) draws among the characters by its anchor's y, the others at the layer's depth", () => {
     const { scene, added } = fakeScene({ [key]: sky });
     const r = new ImageLayerRenderer(scene, realSprites);
-    // A y-sorted picture of an old image layer is wrapped in a YSort; the other one stays in the layer (now a Node2D).
+    // A y-sorted picture of an old image layer is wrapped in a YSort; the other one stays in the layer (now a Node).
     r.show(exported([{ id: "a", graphicId: "images/sky.png", x: 40, y: 64, ySort: true }, { id: "b", graphicId: "images/sky.png", x: 40, y: 96 }]), { ySortDepth: 20 });
     const a = added.find((img) => img.y === 64)!;
     const b = added.find((img) => img.y === 96)!;

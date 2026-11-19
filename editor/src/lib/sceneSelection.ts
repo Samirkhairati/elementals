@@ -24,7 +24,7 @@ export interface SceneSelection {
 
 export const NO_SELECTION: SceneSelection = { ids: [], primary: null, anchor: null, openGroupId: null, lastLayerId: null }
 
-/** A Node2D or YSort whose sprites are picked as one (`pickAsOne`): picking its row picks its sprites and opens it. */
+/** A Node whose sprites are picked as one (`pickAsOne`): picking its row picks its sprites and opens it. */
 export function isPictureGroup(index: SceneIndex, id: string): boolean {
   const node = nodeOf(index, id)
   return !!node && isBranch(node) && node.pickAsOne === true
@@ -32,7 +32,7 @@ export function isPictureGroup(index: SceneIndex, id: string): boolean {
 
 /**
  * The node the panels treat as the active one (the "layer") for a node: a layer is itself, a collision item or a Look
- * of a TileMap stands for its layer, a sprite (or its Look) for the Node2D / YSort it sits in, a Node2D / YSort is
+ * of a TileMap stands for its layer, a sprite (or its Look) for the Node it sits in, a Node is
  * itself. Undefined for an entity, its component nodes or an unknown id.
  */
 export function activeLayerFor(index: SceneIndex, id: string | null | undefined): string | undefined {
@@ -164,7 +164,7 @@ export function viewOf(sel: SceneSelection, index: SceneIndex): SelectionView {
     primaryId: primary,
     activeLayerId,
     selectedLayerIds: layerIds.length > 0 ? layerIds : NONE,
-    // A component node (AnimatedSprite2D, Area2D, ...) shows its entity in the entity panels.
+    // A component node (AnimatedSprite, Area, ...) shows its entity in the entity panels.
     selectedEntityId: primaryEntity ? primaryEntity.id : null,
     selectedImageId: primaryNode?.type === 'picture' ? primaryNode.id : pickedImageIds[0] ?? null,
     pickedImageIds: pickedImageIds.length > 0 ? pickedImageIds : NONE,

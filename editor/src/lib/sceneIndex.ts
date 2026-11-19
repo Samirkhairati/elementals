@@ -33,7 +33,7 @@ export interface SceneIndex {
   /** Every entity as the editor's entity code reads it: the node with its whole bag of components (`entityView`). */
   entities: readonly EntityNode[]
   pictures: readonly PictureNode[]
-  /** Every Node2D and YSort that holds sprites itself, in draw order. */
+  /** Every Node that holds sprites itself, in draw order. */
   spriteHosts: readonly BranchNode[]
 }
 
@@ -97,7 +97,7 @@ export function lockedNode(index: SceneIndex, id: string): boolean {
   return !!entry && isLocked(entry.node, entry.ancestors)
 }
 
-/** The nearest layer node at or above `id` (a collision item's StaticBody2D, a Look's TileMap; the node itself for a layer). */
+/** The nearest layer node at or above `id` (a collision item's StaticBody, a Look's TileMap; the node itself for a layer). */
 export function layerAbove(index: SceneIndex, id: string | null | undefined): LayerNode | undefined {
   const entry = id ? index.byId.get(id) : undefined
   if (!entry) return undefined
@@ -109,7 +109,7 @@ export function layerAbove(index: SceneIndex, id: string | null | undefined): La
   return undefined
 }
 
-/** The Node2D or YSort a sprite (or a node below a sprite) sits in: its sprite host. The node itself for a Node2D / YSort. */
+/** The Node a sprite (or a node below a sprite) sits in: its sprite host. The node itself for a Node. */
 export function hostOf(index: SceneIndex, id: string | null | undefined): BranchNode | undefined {
   const entry = id ? index.byId.get(id) : undefined
   if (!entry) return undefined
@@ -137,7 +137,7 @@ export function pictureLocked(index: SceneIndex, id: string): boolean {
 const shownPictures = new WeakMap<SceneNode, PictureNode[]>()
 
 /**
- * The shown sprites of a Node2D or YSort and of the Node2Ds and YSorts inside it (not hidden themselves or by a node in
+ * The shown sprites of a Node and of the Nodes inside it (not hidden themselves or by a node in
  * between), in the order they draw: `z`, then tree order.
  */
 export function visiblePictures(host: SceneNode): PictureNode[] {
@@ -181,7 +181,7 @@ const plans = new WeakMap<readonly SceneNode[], DrawPlan>()
 /**
  * What the canvas draws, bottom to top: the tree's layers (`sceneLayers`: layer nodes and runs of sprites) and its
  * entities in draw order, everything hidden (the node or an ancestor) left out, neighbouring layers in one segment and
- * neighbouring entities in another. Node2Ds themselves draw nothing.
+ * neighbouring entities in another. Nodes themselves draw nothing.
  */
 export function drawPlan(index: SceneIndex): DrawPlan {
   const hit = plans.get(index.nodes)

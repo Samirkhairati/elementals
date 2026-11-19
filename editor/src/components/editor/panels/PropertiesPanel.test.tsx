@@ -125,16 +125,24 @@ describe('PropertiesPanel entity inspector', () => {
       <PropertiesPanel nodes={[{ id: 'l', name: 'Ground', type: 'tile', children: [] }]} activeLayerId="l" editNode={vi.fn()} />,
       { activeMap: null as any },
     )
-    expect(screen.getByLabelText('Layer name')).toHaveValue('Ground')
+    expect(screen.getByLabelText('Node name')).toHaveValue('Ground')
+    expect(screen.getByText('TileMap')).toBeTruthy()
   })
 })
 
-describe('PropertiesPanel image layer', () => {
-  it('keeps only the layer fields: the pictures live in the Images panel on the right', () => {
-    const layer = { id: 'i1', name: 'Sky', type: 'image', children: [{ id: 'a', type: 'picture', name: 'a', graphicId: 'sky/cloud.png', x: 4, y: 5 }] }
-    renderWithEditor(<PropertiesPanel nodes={[layer] as any} activeLayerId="i1" editNode={vi.fn()} />, {} as any)
-    expect(screen.getByLabelText('Layer name')).toHaveValue('Sky')
+describe('PropertiesPanel Node', () => {
+  it('edits the Node\'s own fields (z, opacity, pick as one); the sprites live in the Scene and Images panels', () => {
+    const layer = { id: 'i1', name: 'Sky', type: 'group', children: [{ id: 'a', type: 'picture', name: 'a', graphicId: 'sky/cloud.png', x: 4, y: 5 }] }
+    const editNode = vi.fn()
+    renderWithEditor(<PropertiesPanel nodes={[layer] as any} activeLayerId="i1" editNode={editNode} />, {} as any)
+    expect(screen.getByLabelText('Node name')).toHaveValue('Sky')
     expect(screen.queryByTestId('image-list')).toBeNull()
+    fireEvent.click(screen.getByRole('switch', { name: 'Pick sprites as one' }))
+    expect(editNode).toHaveBeenLastCalledWith('i1', { pickAsOne: true })
+    const opacity = screen.getByLabelText('Node opacity')
+    fireEvent.change(opacity, { target: { value: '1' } })
+    fireEvent.keyDown(opacity, { key: 'Enter' })
+    expect(editNode).toHaveBeenCalledTimes(1) // fully opaque is the default: nothing to store
   })
 })
 

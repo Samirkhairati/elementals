@@ -18,12 +18,12 @@ import { cloneJson } from './engine/util.ts'
 
 // ── node types ─────────────────────────────────────────────────────────────────────────────────────
 //
-// Scene nodes sit in the map root, a Node2D or a YSort: Node2D (`group`), YSort, TileMap (`tile`), Terrain, Encounters,
-// Objects, StaticBody2D (`collision`, the map's collision: painted tiles and shapes) and Entity; Sprite2D (`picture`)
-// sits in a Node2D or YSort.
-// A Look grades its parent. An entity is an ECS entity whose components are its child nodes: AnimatedSprite2D
-// (Sprite), StaticBody2D (`body`: a solid Collider) and Area2D (`area`: where its events trigger), each with a
-// CollisionShape2D, a movement node (Wander, PlayerController or Mover: Movement) and an Event (Event); see
+// Scene nodes sit in the map root or a Node (`group`): Node, TileMap (`tile`), Terrain, Encounters, Objects, StaticBody
+// (`collision`, the map's collision: painted tiles and shapes) and Entity; a Sprite (`picture`) sits in a Node.
+// Modifier nodes change their parent: a Look grades it, a YSort (in a Node) makes the sprites below it draw sorted by
+// their feet among the characters. An entity is an ECS entity whose components are its child nodes: AnimatedSprite
+// (Sprite), StaticBody (`body`: a solid Collider) and Area (`area`: where its events trigger), each with a
+// CollisionShape, a movement node (Wander, PlayerController or Mover: Movement) and an Event (Event); see
 // shared/sceneEntity.ts. `canHold` says what may sit where.
 
 export type SceneNodeType =
@@ -67,7 +67,7 @@ interface ContainerFields {
   collapsed?: boolean
 }
 
-/** Drawing settings of a Node2D or YSort, passed down to what is below it. */
+/** Drawing settings of a Node, passed down to what is below it. */
 interface CanvasFields {
   /** Game depth of the sprites below it that have no nearer setting (nearest set value wins). */
   z?: number
@@ -77,13 +77,13 @@ interface CanvasFields {
   pickAsOne?: boolean
 }
 
-/** Node2D: holds any scene node (the folders, picture groups, image layers and entity folders of old maps). */
+/** Node: holds any scene node (the folders, picture groups, image layers and entity folders of old maps). */
 export interface GroupNode extends NodeBase, ContainerFields, CanvasFields {
   type: 'group'
 }
 
-/** YSort: like a Node2D, but the sprites below it draw sorted by their feet among the characters. */
-export interface YSortNode extends NodeBase, ContainerFields, CanvasFields {
+/** YSort: a modifier of the Node it sits in; while shown, the sprites below that Node draw sorted by their feet among the characters. */
+export interface YSortNode extends NodeBase {
   type: 'ySort'
 }
 
@@ -95,7 +95,7 @@ export interface TileLayerNode extends NodeBase, ContainerFields {
 }
 
 /**
- * Sprite2D: one freely placed picture, drawn at a pixel position (its anchor: bottom-centre of the picture). It is either
+ * Sprite: one freely placed picture, drawn at a pixel position (its anchor: bottom-centre of the picture). It is either
  * a sprite asset (`assetId`, its first frame) or a plain picture from the graphics library (`graphicId`), never both. May
  * hold a Look.
  */
@@ -116,13 +116,13 @@ export interface PictureNode extends NodeBase, ContainerFields {
   opacity?: number
 }
 
-/** Look: the colour grading (and drop shadow) of its parent and, for a Node2D or YSort, of what is below it. */
+/** Look: the colour grading (and drop shadow) of its parent and, for a Node, of what is below it. */
 export interface LookNode extends NodeBase {
   type: 'look'
   look: LookSet
 }
 
-/** StaticBody2D of the map: its collision, as sets of painted tiles and single shapes. The painted cells are this node's `data`. */
+/** StaticBody of the map: its collision, as sets of painted tiles and single shapes. The painted cells are this node's `data`. */
 export interface CollisionLayerNode extends NodeBase, ContainerFields {
   type: 'collision'
   /** Cells; `group` = the id of a `collisionTiles` child (a cell with no or an unknown group belongs to the first one). */
@@ -144,7 +144,7 @@ export interface ShapeBox {
 }
 
 /**
- * CollisionShape2D: a closed polygon or an open line (`points`, in map pixels in the map's StaticBody2D, relative to the
+ * CollisionShape: a closed polygon or an open line (`points`, in map pixels in the map's StaticBody, relative to the
  * anchor in an entity), or, in an entity, a `box`. `name` is '' when it has none.
  */
 export interface CollisionShapeNode extends NodeBase {
@@ -163,18 +163,18 @@ export interface EntityNode extends NodeBase, ContainerFields {
   components: Record<string, Record<string, unknown> | undefined>
 }
 
-/** AnimatedSprite2D: the entity's Sprite component (`props`, without `visible`: that is the node's eye). */
+/** AnimatedSprite: the entity's Sprite component (`props`, without `visible`: that is the node's eye). */
 export interface AnimatedSpriteNode extends NodeBase {
   type: 'animatedSprite'
   props: Record<string, unknown>
 }
 
-/** StaticBody2D of an entity: its solid Collider, the shape of its CollisionShape2D (a one-tile box without one). */
+/** StaticBody of an entity: its solid Collider, the shape of its CollisionShape (a one-tile box without one). */
 export interface BodyNode extends NodeBase, ContainerFields {
   type: 'body'
 }
 
-/** Area2D of an entity: where its events trigger (non-solid), the shape of its CollisionShape2D. */
+/** Area of an entity: where its events trigger (non-solid), the shape of its CollisionShape. */
 export interface AreaNode extends NodeBase, ContainerFields {
   type: 'area'
 }
@@ -229,9 +229,9 @@ export interface ObjectsLayerNode extends NodeBase {
   z?: number
 }
 
-export type ContainerNode = GroupNode | YSortNode | TileLayerNode | PictureNode | CollisionLayerNode | EntityNode | BodyNode | AreaNode
-/** Node2D and YSort: what holds scene nodes (and the map root). */
-export type BranchNode = GroupNode | YSortNode
+export type ContainerNode = GroupNode | TileLayerNode | PictureNode | CollisionLayerNode | EntityNode | BodyNode | AreaNode
+/** Node: what holds scene nodes (and the map root). */
+export type BranchNode = GroupNode
 /** The nodes that are layers of the exported map: a tile layer, the map's static body or one of the gameplay layers. */
 export type LayerNode = TileLayerNode | CollisionLayerNode | TerrainNode | EncountersNode | ObjectsLayerNode
 /** Layers that hold painted cells of a tileset (everything but the static body). */
@@ -276,21 +276,21 @@ const info = (type: SceneNodeType, label: string, description: string, icon: str
 
 /** One entry per node type; data only. */
 export const NODE_TYPES: Record<SceneNodeType, NodeTypeInfo> = {
-  group: info('group', 'Node2D', 'Holds other nodes; its z, opacity and look pass down to what is inside', 'circle-dot', '#60a5fa', true, 'scene', true, true),
-  ySort: info('ySort', 'YSort', 'Like a Node2D, and the sprites inside draw sorted by their feet among the characters', 'arrow-down-wide-narrow', '#38bdf8', true, 'scene', true, true),
+  group: info('group', 'Node', 'Holds other nodes; its z, opacity, look and y-sort pass down to what is inside', 'circle-dot', '#60a5fa', true, 'scene', true, true),
+  ySort: info('ySort', 'YSort', 'Makes the sprites inside its Node draw sorted by their feet among the characters (hide it to switch it off)', 'arrow-down-wide-narrow', '#38bdf8', false, 'drawing'),
   tile: info('tile', 'TileMap', 'Tiles painted from a tileset', 'grid-2x2', '#cbd5e1', true, 'drawing', true, true),
   terrain: info('terrain', 'Terrain', 'Water, ice and other ground kinds the game reads (one per map)', 'droplet', '#60a5fa', false, 'drawing', true),
   encounters: info('encounters', 'Encounters', 'Where wild encounters happen (one per map)', 'leaf', '#4ade80', false, 'drawing', true),
   objects: info('objects', 'Objects Layer', 'Kept for old maps', 'box', '#fbbf24', false, 'drawing', true),
-  picture: info('picture', 'Sprite2D', 'A picture or the first frame of a sprite, placed anywhere', 'image', '#a78bfa', true, 'drawing', true, true),
-  look: info('look', 'Look', 'Colour grading and drop shadow of its parent (and of what is inside a Node2D)', 'palette', '#f472b6', false, 'drawing'),
-  collision: info('collision', 'StaticBody2D', 'The map\'s collision: painted tiles and shapes the player cannot cross', 'brick-wall', '#f87171', true, 'collision', true),
+  picture: info('picture', 'Sprite', 'A picture or the first frame of a sprite, placed anywhere', 'image', '#a78bfa', true, 'drawing', true, true),
+  look: info('look', 'Look', 'Colour grading and drop shadow of its parent (and of what is inside a Node)', 'palette', '#f472b6', false, 'drawing'),
+  collision: info('collision', 'StaticBody', 'The map\'s collision: painted tiles and shapes the player cannot cross', 'brick-wall', '#f87171', true, 'collision', true),
   collisionTiles: info('collisionTiles', 'Collision Tiles', 'A named set of the painted collision tiles', 'grid-3x3', '#fca5a5', false, 'collision'),
-  collisionShape: info('collisionShape', 'CollisionShape2D', 'A polygon, a line or a box', 'pentagon', '#fca5a5', false, 'collision'),
+  collisionShape: info('collisionShape', 'CollisionShape', 'A polygon, a line or a box', 'pentagon', '#fca5a5', false, 'collision'),
   entity: info('entity', 'Entity', 'A character, object or trigger; its components are the nodes inside it', 'user', '#38bdf8', true, 'entity'),
-  animatedSprite: info('animatedSprite', 'AnimatedSprite2D', 'What the entity looks like: a sprite asset and its animations', 'clapperboard', '#c084fc', false, 'component'),
-  body: info('body', 'StaticBody2D', 'Makes the entity solid: nothing walks through its shape', 'brick-wall', '#f87171', true, 'component'),
-  area: info('area', 'Area2D', 'Where the entity\'s events trigger (stepping on it, touching it)', 'scan', '#34d399', true, 'component'),
+  animatedSprite: info('animatedSprite', 'AnimatedSprite', 'What the entity looks like: a sprite asset and its animations', 'clapperboard', '#c084fc', false, 'component'),
+  body: info('body', 'StaticBody', 'Makes the entity solid: nothing walks through its shape', 'brick-wall', '#f87171', true, 'component'),
+  area: info('area', 'Area', 'Where the entity\'s events trigger (stepping on it, touching it)', 'scan', '#34d399', true, 'component'),
   wander: info('wander', 'Wander', 'Walks around on its own near where it starts', 'footprints', '#4ade80', false, 'component'),
   playerController: info('playerController', 'PlayerController', 'The player drives it with the keys', 'gamepad-2', '#4ade80', false, 'component'),
   mover: info('mover', 'Mover', 'Moves only when an event moves it (its speed)', 'move', '#4ade80', false, 'component'),
@@ -300,10 +300,10 @@ export const NODE_TYPES: Record<SceneNodeType, NodeTypeInfo> = {
 /** Every node type, in the order the Add Node menu lists them. */
 export const NODE_TYPE_LIST: readonly SceneNodeType[] = [
   'group',
-  'ySort',
   'tile',
   'picture',
   'look',
+  'ySort',
   'terrain',
   'encounters',
   'objects',
@@ -327,7 +327,7 @@ const MOVEMENT_TYPES: readonly SceneNodeType[] = ['wander', 'playerController', 
 const COMPONENT_TYPES: readonly SceneNodeType[] = ['animatedSprite', 'body', 'area', ...MOVEMENT_TYPES, 'event']
 
 export const isContainer = (node: SceneNode): node is ContainerNode => CONTAINER_TYPES.has(node.type)
-export const isBranch = (node: SceneNode): node is BranchNode => node.type === 'group' || node.type === 'ySort'
+export const isBranch = (node: SceneNode): node is BranchNode => node.type === 'group'
 export const isLayerNode = (node: SceneNode): node is LayerNode =>
   node.type === 'tile' || node.type === 'collision' || node.type === 'terrain' || node.type === 'encounters' || node.type === 'objects'
 export const isDataLayer = (node: SceneNode): node is DataLayerNode => isCellLayer(node) || node.type === 'collision'
@@ -456,11 +456,10 @@ export function nodeIds(nodes: readonly SceneNode[]): Set<string> {
 
 // ── placement rules ────────────────────────────────────────────────────────────────────────────────
 
-const ROOT_CHILDREN: readonly SceneNodeType[] = ['group', 'ySort', 'tile', 'terrain', 'encounters', 'objects', 'collision', 'entity']
-const BRANCH_CHILDREN: readonly SceneNodeType[] = [...ROOT_CHILDREN, 'picture', 'look']
+const ROOT_CHILDREN: readonly SceneNodeType[] = ['group', 'tile', 'terrain', 'encounters', 'objects', 'collision', 'entity']
+const BRANCH_CHILDREN: readonly SceneNodeType[] = [...ROOT_CHILDREN, 'picture', 'look', 'ySort']
 const HOLDS: Partial<Record<SceneNodeType, readonly SceneNodeType[]>> = {
   group: BRANCH_CHILDREN,
-  ySort: BRANCH_CHILDREN,
   tile: ['look'],
   picture: ['look'],
   collision: ['collisionTiles', 'collisionShape'],
@@ -472,7 +471,7 @@ const SINGLETON_TYPES: readonly SceneNodeType[] = ['terrain', 'encounters']
 
 /** The slot a child takes in its parent when a parent holds at most one of it (one look, one sprite, one movement...). */
 function slotOf(parent: SceneNode | undefined, type: SceneNodeType): string | null {
-  if (type === 'look') return 'look'
+  if (type === 'look' || type === 'ySort') return type
   if (!parent) return null
   if (parent.type === 'entity') return isMovementType(type) ? 'movement' : type
   if ((parent.type === 'body' || parent.type === 'area') && type === 'collisionShape') return 'shape'
@@ -491,13 +490,13 @@ export function childTypesOf(parentPath: readonly SceneNode[]): SceneNodeType[] 
  * Whether a node of `childType` may sit directly under the node at the end of `parentPath` (the path from the root; empty
  * = the map root):
  *
- *  - the root holds the scene nodes (Node2D, YSort, TileMap, Terrain, Encounters, Objects, the map's StaticBody2D,
- *    Entity); a Node2D and a YSort hold them too, and Sprite2Ds (every sprite sits in one: its z, look and y-sort come
+ *  - the root holds the scene nodes (Node, YSort, TileMap, Terrain, Encounters, Objects, the map's StaticBody,
+ *    Entity); a Node hold them too, and Sprites (every sprite sits in one: its z, look and y-sort come
  *    from there) and a Look;
- *  - a TileMap and a Sprite2D hold only a Look (a sprite inside a sprite makes no sense);
- *  - the map's StaticBody2D holds collision tiles and shapes;
- *  - an Entity holds its components: AnimatedSprite2D, StaticBody2D, Area2D, one movement node and Event;
- *  - an entity's StaticBody2D and Area2D hold a CollisionShape2D;
+ *  - a TileMap and a Sprite hold only a Look (a sprite inside a sprite makes no sense);
+ *  - the map's StaticBody holds collision tiles and shapes;
+ *  - an Entity holds its components: AnimatedSprite, StaticBody, Area, one movement node and Event;
+ *  - an entity's StaticBody and Area hold a CollisionShape;
  *  - every other node holds nothing.
  *
  * A parent holds at most one Look, and an entity at most one of each component (one movement node) and its body or area
@@ -620,6 +619,28 @@ export const collisionShapeNodes = (layer: CollisionLayerNode): CollisionShapeNo
 /** A collision layer node as the layer shape the cell helpers of collisionLayers.ts work on (`tileGroups`, `shapes`). */
 export function collisionLayerLike(layer: CollisionLayerNode): CollisionLayerLike & { id: string } {
   return { id: layer.id, type: 'collision', data: layer.data, tileGroups: collisionTileNodes(layer).map((t) => ({ id: t.id, name: t.name })), shapes: collisionShapeNodes(layer) }
+}
+
+const shownCellsCache = new WeakMap<CollisionLayerNode, NodeCells | undefined>()
+
+/**
+ * The cells of a collision layer the editor draws: without those of a hidden tiles item (hiding an item is a view
+ * setting, like Godot's: the game still collides with it). The layer's own `data` when no item is hidden; cached per node.
+ */
+export function shownCollisionCells(layer: CollisionLayerNode): NodeCells | undefined {
+  if (shownCellsCache.has(layer)) return shownCellsCache.get(layer)
+  const hidden = new Set(collisionTileNodes(layer).filter((t) => t.visible === false).map((t) => t.id))
+  let out = layer.data
+  if (hidden.size > 0 && layer.data) {
+    const data: NodeCells = {}
+    for (const [key, cell] of Object.entries(layer.data)) {
+      const owner = cellGroupOf(layer, cell)
+      if (owner === null || !hidden.has(owner)) data[key] = cell
+    }
+    out = data
+  }
+  shownCellsCache.set(layer, out)
+  return out
 }
 
 /** The item list of a collision layer node: the tiles items (with their cell counts), then the shapes. */
@@ -873,17 +894,31 @@ export function isLocked(node: SceneNode, ancestors: readonly SceneNode[]): bool
   return node.locked === true || ancestors.some((a) => a.locked === true)
 }
 
-/** Whether a node draws y-sorted among the characters: it is a YSort or sits below one. */
+/** The YSort modifier a node holds (its first one), if any. */
+export function ySortNodeOf(node: SceneNode | undefined): YSortNode | undefined {
+  return node ? (childrenOf(node).find((c) => c.type === 'ySort') as YSortNode | undefined) : undefined
+}
+
+/** A Node that y-sorts what is below it: it holds a shown YSort. */
+export function sortsBelow(node: SceneNode): boolean {
+  const y = isBranch(node) ? ySortNodeOf(node) : undefined
+  return y !== undefined && y.visible !== false
+}
+
+/** Whether a node draws y-sorted among the characters: it is a Node holding a shown YSort, or sits below one. */
 export function effectiveYSort(node: SceneNode, ancestors: readonly SceneNode[]): boolean {
-  return node.type === 'ySort' || inheritedYSort(ancestors)
+  return sortsBelow(node) || inheritedYSort(ancestors)
 }
 
-/** Whether what sits below `ancestors` is y-sorted (one of them is a YSort). */
+/** Whether what sits below `ancestors` is y-sorted (one of them holds a shown YSort). */
 export function inheritedYSort(ancestors: readonly SceneNode[]): boolean {
-  return ancestors.some((a) => a.type === 'ySort')
+  return ancestors.some(sortsBelow)
 }
 
-const opacityOf = (node: SceneNode): number => ((node.type === 'picture' || node.type === 'group' || node.type === 'ySort') && node.opacity !== undefined ? node.opacity : 1)
+/** Modifier nodes change their parent instead of drawing: Look and YSort. */
+export const isModifier = (node: SceneNode): boolean => node.type === 'look' || node.type === 'ySort'
+
+const opacityOf = (node: SceneNode): number => ((node.type === 'picture' || node.type === 'group') && node.opacity !== undefined ? node.opacity : 1)
 
 /** The node's opacity multiplied by every ancestor's (1 = opaque). */
 export function effectiveOpacity(node: SceneNode, ancestors: readonly SceneNode[]): number {
@@ -902,7 +937,7 @@ export function ownLook(node: SceneNode | undefined): LookSet | undefined {
 }
 
 /**
- * The look that grades a node as a layer: its own Look, else the nearest one of a Node2D or YSort above it. For a run of
+ * The look that grades a node as a layer: its own Look, else the nearest one of a Node above it. For a run of
  * sprites pass their parent as `node` (the sprites' own Looks grade each sprite).
  */
 export function effectiveLook(node: SceneNode | undefined, ancestors: readonly SceneNode[]): LookSet | undefined {
@@ -917,7 +952,7 @@ export function effectiveLook(node: SceneNode | undefined, ancestors: readonly S
 
 const zOf = (node: SceneNode): number | undefined => (isBranch(node) ? node.z : undefined)
 
-/** The game depth of the sprites directly under `parent` (path `ancestors` above it): the nearest z of a Node2D or YSort. */
+/** The game depth of the sprites directly under `parent` (path `ancestors` above it): the nearest z of a Node. */
 export function inheritedZ(parent: SceneNode | undefined, ancestors: readonly SceneNode[]): number | undefined {
   return inheritedValue(parent, ancestors, zOf)
 }

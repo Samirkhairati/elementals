@@ -112,15 +112,15 @@ export function useLayerManager(tree: SceneTreeApi) {
     [commit]
   )
 
-  /** Y-sort on (a Node2D becomes a YSort) or off (a YSort becomes a Node2D). */
+  /** Y-sort of a Node on (it gets a YSort child) or off (its YSort child goes). */
   const setNodeYSort = useCallback((id: string, value: boolean | undefined) => commit((prev) => setYSort(prev, id, value)), [commit])
 
-  /** Whether a click on one of the sprites of a Node2D / YSort picks all of them. */
+  /** Whether a click on one of the sprites of a Node picks all of them. */
   const setPickAsOne = useCallback(
     (id: string, value: boolean) =>
       commit((prev) => {
         const node = sceneIndex(prev).byId.get(id)?.node
-        if (!node || (node.type !== 'group' && node.type !== 'ySort') || (node.pickAsOne === true) === value) return prev
+        if (!node || node.type !== 'group' || (node.pickAsOne === true) === value) return prev
         if (value) return patchNode(prev, id, { pickAsOne: true })
         return updateNode(prev, id, (n) => {
           const { pickAsOne: _p, ...rest } = n as typeof node
@@ -147,7 +147,7 @@ export function useLayerManager(tree: SceneTreeApi) {
       let made: string | null = null
       commit(
         (prev) => {
-          // Next to the selection when that is a layer or a Node2D; leaves (entities, pictures...) do not decide where a layer goes.
+          // Next to the selection when that is a layer or a Node; leaves (entities, pictures...) do not decide where a layer goes.
           const sel = getSelection().primary
           const selected = sel ? sceneIndex(prev).byId.get(sel)?.node : undefined
           const home = selected && (isLayerNode(selected) || isBranch(selected)) ? selected.id : null

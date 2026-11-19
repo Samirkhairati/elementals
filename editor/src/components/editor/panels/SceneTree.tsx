@@ -1,7 +1,8 @@
-// The Scene panel (dock panel `layers`): the map's whole scene tree as one list. Every node is one row from the same row
-// component: its icon, name, badges, eye and lock; containers (Node2D, YSort, entities, bodies...) open and close.
+// The Scene panel (dock panel `layers`): the map's whole scene tree under one root row, the map itself (its children are
+// the map's `nodes`). Every node is one row from the same row component: its icon, name, badges, eye and lock; a node
+// with children opens and closes, and connector lines join each node to its parent, as in Godot.
 // Right-click › Add Child Node offers what the node may hold (shared/sceneTree.ts `canHold`): an entity holds its
-// components, a StaticBody2D or Area2D a CollisionShape2D, a sprite or TileMap a Look.
+// components, a StaticBody or Area a CollisionShape, a Sprite or TileMap a Look, a Node a YSort.
 // A container lists its children last first, so the top row is the one drawn on top. Click selects (Ctrl/Cmd+click adds,
 // Shift+click picks a range), double-click renames, drag moves between any places the placement rules allow (the lower half
 // of a container's row drops inside it) and right-click opens the menu of that kind of node.
@@ -23,6 +24,8 @@ import {
   ChevronDown,
   ChevronRight,
   ClipboardPaste,
+  Map as MapIcon,
+  Sparkles,
   Copy,
   CopyPlus,
   Droplet,
@@ -32,7 +35,6 @@ import {
   Grid3x3,
   Group as GroupIcon,
   Image as ImageIcon,
-  ImagePlus,
   Layers as LayersIcon,
   Leaf,
   Lock,
@@ -42,9 +44,6 @@ import {
   Trash2,
   Ungroup,
   Unlock,
-  XSquare,
-  ArrowDown,
-  ArrowUp,
   Zap,
   type LucideIcon,
 } from 'lucide-react'
@@ -54,12 +53,10 @@ import {
   canHold,
   childTypesOf,
   collisionItemsOf,
-  drawOrderPictures,
   effectiveYSort,
   isBranch,
   isContainer,
   isLayerNode,
-  ownLook,
   walkPanel,
   type NodeCategory,
   type SceneNode,
@@ -67,7 +64,7 @@ import {
   type WalkEntry,
 } from '../../../../../shared/sceneTree'
 import { entityView, sceneIndex } from '@/lib/sceneIndex'
-import { canDrop, countWithin, topLevelIds, type DropWhere } from '@/lib/sceneOps'
+import { SCENE_ROOT_ID, canDrop, countWithin, topLevelIds, type DropWhere } from '@/lib/sceneOps'
 import { useEditorClipboard } from '@/store/editorClipboard'
 import { describeBindings } from '@/lib/shortcuts'
 import { useBindings } from '@/store/shortcutStore'
@@ -75,11 +72,10 @@ import { imagePickName } from '@/lib/graphicAssets'
 import { entityIconName, summarizeEntity } from '@/lib/entityVisuals'
 import { openEventEditor } from '@/lib/openEventEditor'
 import { openPicturePicker } from '@/lib/picturePickerEvent'
+import { PRESET_PREFABS } from '@/lib/componentRegistry'
 import { usePolygonEdit } from '@/lib/polygonEditStore'
-import { hasShadow } from '@/lib/look/lookEdit'
 import { useEditorSelector, type EditorContextValue } from '../layout/EditorContext'
-import { YSortBadge } from '../ui/YSortMenuItem'
-import { DropShadowMenuItem, useDropShadow } from '../look/DropShadowMenuItem'
+import { YSortBadge } from '../ui/YSortBadge'
 import { Badge, IconButton } from '../ui/controls'
 import { NamedIcon } from '../ui/icons'
 import { RenameInput } from '../ui/RenameInput'
@@ -95,7 +91,7 @@ import {
   ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
-import { EntitySubmenu, entityCreators } from './EntityMenu'
+import { entityCreators, type Prefab } from './EntityMenu'
 import { CollisionItemIcon, pickCollisionItem } from './CollisionPanel'
 
 // ── what a row looks like ──────────────────────────────────────────────────────────────────────────
@@ -186,29 +182,82 @@ const isCollisionItem = (t: SceneNodeType) => t === 'collisionTiles' || t === 'c
 /** Everything a row shows and reacts to: plain values, so a row only redraws when something about it changed. */
 interface RowInfo {
   node: SceneNode
+  /** Depth in the panel: the root row is 0, the map's own nodes 1. */
   depth: number
+  /** The last row listed among its siblings (its connector line stops at it). */
+  last: boolean
+  /** Per level above its parent's: whether that ancestor's line runs on past this row (it has siblings listed below). */
+  through: boolean[]
   /** A group above it is hidden. */
   hiddenAbove: boolean
   /** A group or layer above it is locked. */
   lockedAbove: boolean
-  /** It y-sorts and from where (own, or followed from above). */
+  /** It y-sorts and from where (own YSort, or followed from above). */
   ySort: false | 'own' | 'inherited'
-  /** A Node2D / YSort whose sprites a click on the map picks as one (`pickAsOne`). */
+  /** A Node whose sprites a click on the map picks as one (`pickAsOne`). */
   pictureGroup: boolean
 }
 
 function rowInfos(entries: readonly WalkEntry[]): RowInfo[] {
-  return entries.map(({ node, ancestors, depth }) => ({
+  // The panel lists a container's children last first: the one listed last is the first child (index 0).
+  const lastById = new Map<string, boolean>()
+  for (const e of entries) lastById.set(e.node.id, e.index === 0)
+  return entries.map(({ node, ancestors, depth, index }) => ({
     node,
-    depth,
+    depth: depth + 1,
+    last: index === 0,
+    // Level 0 is the root's line: it runs on past this row when the map node this row sits in is not the last listed.
+    through: ancestors.map((a) => !lastById.get(a.id)),
     hiddenAbove: ancestors.some((a) => a.visible === false),
     lockedAbove: ancestors.some((a) => a.locked === true),
-    ySort: node.type === 'ySort' ? 'own' : (isBranch(node) || node.type === 'picture') && effectiveYSort(node, ancestors) ? 'inherited' : false,
+    ySort: isBranch(node) && effectiveYSort(node, []) ? 'own' : (isBranch(node) || node.type === 'picture') && effectiveYSort(node, ancestors) ? 'inherited' : false,
     pictureGroup: isBranch(node) && node.pickAsOne === true,
   }))
 }
 
 // ── one row ────────────────────────────────────────────────────────────────────────────────────────
+
+/** Row geometry: left padding, the indent per level and the width of the chevron slot (lines run down its centre). */
+const PAD = 4
+const INDENT = 16
+const SLOT = 16
+const lineX = (level: number) => PAD + level * INDENT + SLOT / 2
+const LINE = 'hsl(var(--muted-foreground) / 0.5)'
+
+/** Godot-style connector lines of a row at `depth`: the lines of the ancestors that run past it, then its own elbow. */
+function Guides({ depth, through, last, hasChevron }: { depth: number; through: readonly boolean[]; last: boolean; hasChevron: boolean }) {
+  if (depth === 0) return null
+  const own = depth - 1
+  const elbowEnd = PAD + depth * INDENT + (hasChevron ? 1 : SLOT - 2)
+  return (
+    <span aria-hidden className="pointer-events-none absolute inset-y-[-1px] left-0" data-testid="tree-guides">
+      {through.map((on, level) => (on ? <span key={level} className="absolute inset-y-0 w-px" style={{ left: lineX(level), background: LINE }} /> : null))}
+      <span className="absolute top-0 w-px" style={{ left: lineX(own), height: last ? '50%' : '100%', background: LINE }} />
+      <span className="absolute top-1/2 h-px" style={{ left: lineX(own), width: elbowEnd - lineX(own), background: LINE }} />
+    </span>
+  )
+}
+
+/** The open / close chevron of a node with children; an empty slot (the elbow line runs through it) otherwise. */
+function Chevron({ open, show, name, onToggle }: { open: boolean; show: boolean; name: string; onToggle: () => void }) {
+  if (!show) return <span className="shrink-0" style={{ width: SLOT }} aria-hidden />
+  return (
+    <button
+      type="button"
+      className="inline-flex shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground [&>svg]:size-3.5"
+      style={{ width: SLOT, height: SLOT }}
+      aria-label={open ? `Close ${name}` : `Open ${name}`}
+      aria-expanded={open}
+      onClick={(e) => {
+        e.stopPropagation()
+        onToggle()
+      }}
+      onDoubleClick={(e) => e.stopPropagation()}
+    >
+      {open ? <ChevronDown /> : <ChevronRight />}
+    </button>
+  )
+}
 
 interface RowProps {
   info: RowInfo
@@ -238,11 +287,13 @@ interface RowHandlers {
   renderMenu: (id: string) => React.ReactNode
 }
 
+const rowStyle = (depth: number): React.CSSProperties => ({ paddingLeft: PAD + depth * INDENT })
+
 const SceneRow = memo(function SceneRow({ info, selected, multi, editing, dragging, drop, picked, handlers }: RowProps) {
   const { node, depth } = info
   const container = isContainer(node)
-  const open = container && node.collapsed !== true
-  const item = isCollisionItem(node.type)
+  const hasChildren = container && node.children.length > 0
+  const open = hasChildren && node.collapsed !== true
   const hidden = node.visible === false || info.hiddenAbove
   const locked = node.locked === true
   const kind = NODE_TYPES[node.type]
@@ -254,8 +305,8 @@ const SceneRow = memo(function SceneRow({ info, selected, multi, editing, draggi
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <div
-          className="ed-row group"
-          style={{ marginLeft: depth * 14, width: `calc(100% - ${depth * 14}px)` }}
+          className="ed-row group gap-1.5"
+          style={rowStyle(depth)}
           data-testid={`scene-row-${node.id}`}
           data-node-type={node.type}
           data-selected={selected || picked ? 'true' : undefined}
@@ -270,30 +321,15 @@ const SceneRow = memo(function SceneRow({ info, selected, multi, editing, draggi
           onDragEnd={handlers.onDragEnd}
           onDrop={(e) => handlers.onDrop(e, node)}
         >
+          <Guides depth={depth} through={info.through} last={info.last} hasChevron={hasChildren} />
           {drop && drop !== 'inside' && (
-            <div className={`pointer-events-none absolute left-0 right-0 z-30 h-[2px] rounded-full bg-primary ${drop === 'above' ? '-top-[2px]' : '-bottom-[2px]'}`} data-testid="drop-line" />
+            <div className={`pointer-events-none absolute right-0 z-30 h-[2px] rounded-full bg-primary ${drop === 'above' ? '-top-[2px]' : '-bottom-[2px]'}`} style={{ left: PAD + depth * INDENT }} data-testid="drop-line" />
           )}
-          {container ? (
-            <button
-              type="button"
-              className="ed-iconbtn"
-              aria-label={open ? `Close ${node.name}` : `Open ${node.name}`}
-              aria-expanded={open}
-              onClick={(e) => {
-                e.stopPropagation()
-                handlers.onChevron(node.id)
-              }}
-              onDoubleClick={(e) => e.stopPropagation()}
-            >
-              {open ? <ChevronDown /> : <ChevronRight />}
-            </button>
-          ) : (
-            <span className="ed-icon" aria-hidden />
-          )}
+          <Chevron open={open} show={hasChildren} name={node.name} onToggle={() => handlers.onChevron(node.id)} />
           {entity ? (
-            <div className="flex h-5 w-5 shrink-0 items-center justify-center">
+            <span className="flex size-[var(--icon-size)] shrink-0 items-center justify-center">
               <EntityGlyph entity={entity} />
-            </div>
+            </span>
           ) : node.type === 'collisionTiles' || node.type === 'collisionShape' ? (
             <CollisionItemIcon item={{ kind: node.type === 'collisionTiles' ? 'tiles' : 'shape', closed: node.type === 'collisionShape' ? node.closed : undefined }} className="text-red-300" />
           ) : (
@@ -309,7 +345,7 @@ const SceneRow = memo(function SceneRow({ info, selected, multi, editing, draggi
           )}
 
           <div className="ed-row-actions" onDoubleClick={(e) => e.stopPropagation()}>
-            {info.ySort && node.type !== 'ySort' && <YSortBadge inherited={info.ySort === 'inherited'} />}
+            {info.ySort === 'inherited' && <YSortBadge inherited />}
             {info.pictureGroup && (
               <span className="ed-badge" title="A click on one of its sprites on the map picks all of them (select this row to pick single ones)" data-testid="pick-as-one">
                 <GroupIcon />
@@ -326,15 +362,19 @@ const SceneRow = memo(function SceneRow({ info, selected, multi, editing, draggi
               </span>
             )}
             {entity && <EntityBadges entity={entity} />}
-            {container && (isBranch(node) || node.type === 'collision') && (
-              <span className="ed-badge" data-tone="count" title={node.type === 'collision' ? 'Collision tiles and shapes in it' : 'Nodes inside'} data-testid="node-count">
-                {node.type === 'collision' ? <XSquare /> : <LayersIcon />}
-                {node.type === 'collision' ? collisionItemsOf(node).length : node.children.length}
+            {node.type === 'collision' && (
+              <span className="ed-badge" data-tone="count" title="Collision tiles and shapes in it" data-testid="node-count">
+                {collisionItemsOf(node).length}
               </span>
             )}
-            {item && (
-              <span className="ed-badge" data-tone="count" title={node.type === 'collisionTiles' ? 'Painted tiles item' : node.type === 'collisionShape' && node.box ? 'A box' : 'Points'}>
-                {node.type === 'collisionShape' ? (node.box ? 'box' : `${node.points.length} pts`) : 'tiles'}
+            {node.type === 'collisionTiles' && (
+              <span className="ed-badge" data-tone="count" title="Painted tiles item">
+                tiles
+              </span>
+            )}
+            {node.type === 'collisionShape' && !node.box && (
+              <span className="ed-badge" data-tone="count" title="Points">
+                {node.points.length} pts
               </span>
             )}
             {(isLayerNode(node) && node.type !== 'collision') || (isBranch(node) && node.z !== undefined) ? (
@@ -347,44 +387,40 @@ const SceneRow = memo(function SceneRow({ info, selected, multi, editing, draggi
                 z {node.z}
               </span>
             )}
-            {!item && (
-              <>
-                {locked || info.lockedAbove ? (
-                  <IconButton
-                    title={locked ? 'Locked: click to unlock' : 'Locked by a group above'}
-                    aria-label={locked ? `Unlock ${node.name}` : `Locked by a group above`}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      if (locked) handlers.onToggleLock(node.id)
-                    }}
-                  >
-                    <Lock className="text-amber-400" />
-                  </IconButton>
-                ) : (
-                  <IconButton
-                    title="Lock"
-                    aria-label={`Lock ${node.name}`}
-                    className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handlers.onToggleLock(node.id)
-                    }}
-                  >
-                    <Unlock />
-                  </IconButton>
-                )}
-                <IconButton
-                  title={node.visible === false ? 'Show' : 'Hide'}
-                  aria-label={node.visible === false ? `Show ${node.name}` : `Hide ${node.name}`}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handlers.onToggleVisible(node.id)
-                  }}
-                >
-                  {node.visible === false ? <EyeOff className="text-amber-400/90" /> : <Eye />}
-                </IconButton>
-              </>
+            {locked || info.lockedAbove ? (
+              <IconButton
+                title={locked ? 'Locked: click to unlock' : 'Locked by a group above'}
+                aria-label={locked ? `Unlock ${label}` : `Locked by a group above`}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (locked) handlers.onToggleLock(node.id)
+                }}
+              >
+                <Lock className="text-amber-400" />
+              </IconButton>
+            ) : (
+              <IconButton
+                title="Lock"
+                aria-label={`Lock ${label}`}
+                className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handlers.onToggleLock(node.id)
+                }}
+              >
+                <Unlock />
+              </IconButton>
             )}
+            <IconButton
+              title={node.visible === false ? 'Show' : node.type === 'ySort' ? 'Hide (y-sort off)' : 'Hide'}
+              aria-label={node.visible === false ? `Show ${label}` : `Hide ${label}`}
+              onClick={(e) => {
+                e.stopPropagation()
+                handlers.onToggleVisible(node.id)
+              }}
+            >
+              {node.visible === false ? <EyeOff className="text-amber-400/90" /> : <Eye />}
+            </IconButton>
           </div>
         </div>
       </ContextMenuTrigger>
@@ -400,18 +436,12 @@ const selectMenu = (c: EditorContextValue) => ({
   view: c.selectionView,
   selectNode: c.selectNode,
   createNode: c.createNode,
-  renameNode: c.renameNode,
-  toggleNodeVisibility: c.toggleNodeVisibility,
-  toggleNodeLock: c.toggleNodeLock,
-  setNodeYSort: c.setNodeYSort,
-  setPickAsOne: c.setPickAsOne,
   deleteNodes: c.deleteNodes,
   copyNodes: c.copyNodes,
   pasteNodes: c.pasteNodes,
   duplicateNodes: c.duplicateNodes,
   groupNodes: c.groupNodes,
   ungroupNode: c.ungroupNode,
-  reorderImage: c.reorderImage,
   placeMultiple: c.placeMultiple,
   startPlacement: c.startPlacement,
   handleCreateEntity: c.handleCreateEntity,
@@ -421,14 +451,17 @@ const selectMenu = (c: EditorContextValue) => ({
 const NO_NODES: SceneNode[] = []
 
 const CATEGORY_LABELS: Record<NodeCategory, string> = { scene: 'Scene', drawing: 'Drawing', collision: 'Collision', entity: 'Entity', component: 'Components' }
+/** Types kept for old maps only: never offered for new nodes. */
+const LEGACY_TYPES: readonly SceneNodeType[] = ['objects']
 
 /**
  * The node types that can go under `parentPath` (the map root when empty), grouped by category, each disabled when the
- * parent already has one of it (one Look, one sprite or movement per entity, one terrain per map...). A pick makes it.
+ * parent already has one of it (one Look, one YSort, one sprite or movement per entity, one terrain per map...). A pick
+ * makes it; where an entity may go, the prefabs are offered next to it.
  */
-function AddNodeItems({ parentPath, nodes, onPick }: { parentPath: readonly SceneNode[]; nodes: readonly SceneNode[]; onPick: (type: SceneNodeType) => void }) {
+function AddNodeItems({ parentPath, nodes, onPick, onPrefab }: { parentPath: readonly SceneNode[]; nodes: readonly SceneNode[]; onPick: (type: SceneNodeType) => void; onPrefab: (prefab: Prefab) => void }) {
   const bindings = useBindings()
-  const types = childTypesOf(parentPath)
+  const types = childTypesOf(parentPath).filter((t) => !LEGACY_TYPES.includes(t))
   const keyOf: Partial<Record<SceneNodeType, string>> = { tile: describeBindings('layer.new', bindings), group: describeBindings('layer.newFolder', bindings) }
   const categories = (Object.keys(CATEGORY_LABELS) as NodeCategory[]).filter((c) => types.some((t) => NODE_TYPES[t].category === c))
   return (
@@ -450,6 +483,22 @@ function AddNodeItems({ parentPath, nodes, onPick }: { parentPath: readonly Scen
                 </ContextMenuItem>
               )
             })}
+          {category === 'entity' && (
+            <ContextMenuSub>
+              <ContextMenuSubTrigger data-testid="add-prefab">
+                <Sparkles className="text-amber-400" />
+                Entity from prefab
+              </ContextMenuSubTrigger>
+              <ContextMenuSubContent>
+                {PRESET_PREFABS.map((prefab) => (
+                  <ContextMenuItem key={prefab.id} onClick={() => onPrefab(prefab)} title={prefab.description}>
+                    <NamedIcon name={prefab.icon} className="text-muted-foreground" />
+                    {prefab.name}
+                  </ContextMenuItem>
+                ))}
+              </ContextMenuSubContent>
+            </ContextMenuSub>
+          )}
         </React.Fragment>
       ))}
     </>
@@ -459,28 +508,32 @@ function AddNodeItems({ parentPath, nodes, onPick }: { parentPath: readonly Scen
 /** Makes a node of `type` inside the node `parentId` (null = the map root): entities are placed on the map, sprites picked from the library first. */
 function useAddNode() {
   const ctx = useEditorSelector(selectMenu)
-  const { placeNew } = entityCreators({ startPlacement: ctx.startPlacement, createEntity: ctx.handleCreateEntity })
-  return (type: SceneNodeType, parentId: string | null) => {
+  const { placeNew, placePrefab } = entityCreators({ startPlacement: ctx.startPlacement, createEntity: ctx.handleCreateEntity })
+  const add = (type: SceneNodeType, parentId: string | null) => {
     if (type === 'entity') {
       if (parentId) ctx.selectNode(parentId)
       placeNew(parentId)
       return
     }
     if (type === 'picture') {
-      // The picture picker places the sprite into the selected Node2D / YSort.
+      // The picture picker places the sprite into the selected Node.
       if (parentId) ctx.selectNode(parentId)
       openPicturePicker()
       return
     }
     ctx.createNode(type, parentId)
   }
+  const prefab = (p: Prefab, parentId: string | null) => {
+    if (parentId) ctx.selectNode(parentId)
+    placePrefab(p, parentId)
+  }
+  return { add, prefab }
 }
 
 /** The right-click menu of one row, built when it opens. */
 function RowMenu({ id, onRename }: { id: string; onRename: (id: string) => void }) {
   const ctx = useEditorSelector(selectMenu)
   const bindings = useBindings()
-  const dropShadow = useDropShadow()
   const addNode = useAddNode()
   const canPaste = useEditorClipboard((s) => s.content?.kind === 'nodes')
   const nodes = ctx.nodes ?? NO_NODES
@@ -495,32 +548,25 @@ function RowMenu({ id, onRename }: { id: string; onRename: (id: string) => void 
     place: describeBindings('image.placeMultiple', bindings),
     ungroup: describeBindings('image.ungroup', bindings),
   }
-  const { placePrefab } = entityCreators({ startPlacement: ctx.startPlacement, createEntity: ctx.handleCreateEntity })
   // The row is part of the selection: the command acts on all of it, otherwise on this row alone.
   const targets = ctx.view.ids.includes(id) ? ctx.view.ids : [id]
   const tops = topLevelIds(nodes, targets)
   const lockedHere = node.locked === true
   const item = isCollisionItem(node.type)
   const component = NODE_TYPES[node.type].category === 'component'
-  const hidden = node.visible === false
   const path = [...ancestors, node]
   const parent = ancestors[ancestors.length - 1]
-  const canHaveChildren = childTypesOf(path).length > 0
-  const siblingTypes = childTypesOf(ancestors)
-  // A sprite's place in the draw order of the Node2D / YSort it sits in.
+  const canHaveChildren = childTypesOf(path).some((t) => !LEGACY_TYPES.includes(t))
   const host = [...ancestors].reverse().find(isBranch)
-  const drawOrder = node.type === 'picture' && host ? drawOrderPictures(host) : []
-  const drawPlace = drawOrder.findIndex((p) => p.id === id)
-  const drawCount = drawOrder.length
   const entity = node.type === 'entity' ? (entityView(node) as unknown as EntityData) : null
   const eventOwner = node.type === 'event' ? parent : entity?.components.Event ? node : null
-  const entityHome = canHold(path, 'entity', nodes) ? id : canHold(ancestors, 'entity', nodes) ? (parent?.id ?? null) : undefined
+  const groupable = !component && !item && node.type !== 'look' && node.type !== 'ySort'
 
   const confirmDelete = () => {
     const ids = tops.length > 0 ? tops : [id]
     const withIn = countWithin(nodes, ids)
     const only = ids.length === 1 ? node : null
-    if (ids.every((n) => ['picture', 'collisionTiles', 'collisionShape', 'look'].includes(index.byId.get(n)?.node.type ?? '') || NODE_TYPES[index.byId.get(n)?.node.type ?? 'group'].category === 'component')) {
+    if (ids.every((n) => ['picture', 'collisionTiles', 'collisionShape', 'look', 'ySort'].includes(index.byId.get(n)?.node.type ?? '') || NODE_TYPES[index.byId.get(n)?.node.type ?? 'group'].category === 'component')) {
       ctx.deleteNodes(ids)
       return
     }
@@ -547,78 +593,36 @@ function RowMenu({ id, onRename }: { id: string; onRename: (id: string) => void 
           Edit event…
         </ContextMenuItem>
       )}
-      <ContextMenuItem onClick={() => onRename(id)}>
-        <Edit2 />
-        Rename
-      </ContextMenuItem>
-      {isBranch(node) && (
-        <ContextMenuItem
-          disabled={lockedHere}
-          onClick={() => {
-            ctx.selectNode(id)
-            openPicturePicker()
-          }}
-        >
-          <ImagePlus />
-          Add Sprite2D…
-        </ContextMenuItem>
-      )}
-      {node.type === 'picture' && (
-        <>
-          <ContextMenuItem disabled={lockedHere} onClick={() => ctx.placeMultiple(host?.id ?? '', id)} title="Click the map to add more copies: same picture, crop, scale and flips">
-            <Stamp />
-            Place more copies
-            {keys.place && <ContextMenuShortcut>{keys.place}</ContextMenuShortcut>}
-          </ContextMenuItem>
-          <ContextMenuItem disabled={lockedHere || drawPlace === drawCount - 1} onClick={() => ctx.reorderImage(host?.id ?? '', id, 1)}>
-            <ArrowUp />
-            Bring forward
-          </ContextMenuItem>
-          <ContextMenuItem disabled={lockedHere || drawPlace === 0} onClick={() => ctx.reorderImage(host?.id ?? '', id, -1)}>
-            <ArrowDown />
-            Send backward
-          </ContextMenuItem>
-        </>
-      )}
-      <ContextMenuSeparator />
       {canHaveChildren && (
         <ContextMenuSub>
-          <ContextMenuSubTrigger data-testid="add-child-node">
+          <ContextMenuSubTrigger data-testid="add-child-node" disabled={lockedHere}>
             <Plus />
             Add Child Node
           </ContextMenuSubTrigger>
           <ContextMenuSubContent>
-            <AddNodeItems parentPath={path} nodes={nodes} onPick={(type) => addNode(type, id)} />
+            <AddNodeItems parentPath={path} nodes={nodes} onPick={(type) => addNode.add(type, id)} onPrefab={(p) => addNode.prefab(p, id)} />
           </ContextMenuSubContent>
         </ContextMenuSub>
       )}
-      {siblingTypes.length > 0 && (
-        <ContextMenuSub>
-          <ContextMenuSubTrigger>
-            <Plus />
-            Add Sibling Node
-          </ContextMenuSubTrigger>
-          <ContextMenuSubContent>
-            <AddNodeItems parentPath={ancestors} nodes={nodes} onPick={(type) => addNode(type, parent?.id ?? null)} />
-          </ContextMenuSubContent>
-        </ContextMenuSub>
+      {node.type === 'picture' && (
+        <ContextMenuItem disabled={lockedHere} onClick={() => ctx.placeMultiple(host?.id ?? '', id)} title="Click the map to add more copies: same picture, crop, scale and flips">
+          <Stamp />
+          Place more copies
+          {keys.place && <ContextMenuShortcut>{keys.place}</ContextMenuShortcut>}
+        </ContextMenuItem>
       )}
-      {entityHome !== undefined && <EntitySubmenu onNew={() => addNode('entity', entityHome)} onPrefab={(p) => placePrefab(p, entityHome)} />}
+      {(eventOwner || canHaveChildren || node.type === 'picture') && <ContextMenuSeparator />}
+      <ContextMenuItem onClick={() => onRename(id)}>
+        <Edit2 />
+        Rename
+      </ContextMenuItem>
       {!item && (
         <>
-          <ContextMenuSeparator />
           <ContextMenuItem onClick={() => ctx.copyNodes(tops)}>
             <Copy />
             Copy
             {keys.copy && <ContextMenuShortcut>{keys.copy}</ContextMenuShortcut>}
           </ContextMenuItem>
-          {!component && (
-            <ContextMenuItem onClick={() => ctx.duplicateNodes(tops)}>
-              <CopyPlus />
-              Duplicate
-              {keys.duplicate && <ContextMenuShortcut>{keys.duplicate}</ContextMenuShortcut>}
-            </ContextMenuItem>
-          )}
           <ContextMenuItem
             disabled={!canPaste}
             onClick={() => ctx.pasteNodes(id)}
@@ -628,72 +632,55 @@ function RowMenu({ id, onRename }: { id: string; onRename: (id: string) => void 
             {isContainer(node) ? 'Paste inside' : 'Paste'}
             {keys.paste && <ContextMenuShortcut>{keys.paste}</ContextMenuShortcut>}
           </ContextMenuItem>
-          {!component && node.type !== 'look' && (
-            <ContextMenuItem disabled={tops.length === 0 || tops.some((t) => !index.byId.get(t) || ['collisionTiles', 'collisionShape', 'look'].includes(index.byId.get(t)!.node.type))} onClick={() => ctx.groupNodes(tops)} title="Put the selected nodes in one new Node2D">
-              <GroupIcon />
-              {tops.length > 1 ? `Group ${tops.length} nodes` : 'Group in a Node2D'}
+          {!component && (
+            <ContextMenuItem onClick={() => ctx.duplicateNodes(tops)}>
+              <CopyPlus />
+              Duplicate
+              {keys.duplicate && <ContextMenuShortcut>{keys.duplicate}</ContextMenuShortcut>}
             </ContextMenuItem>
           )}
-          {isBranch(node) && (
-            <ContextMenuItem onClick={() => ctx.ungroupNode(id)} title="What is inside stays where it is, in this node's place">
-              <Ungroup />
-              Ungroup
-              {keys.ungroup && <ContextMenuShortcut>{keys.ungroup}</ContextMenuShortcut>}
-            </ContextMenuItem>
-          )}
-          <ContextMenuSeparator />
-          <ContextMenuItem onClick={() => ctx.toggleNodeVisibility(id)}>
-            {hidden ? <Eye /> : <EyeOff />}
-            {hidden ? 'Show' : 'Hide'}
-          </ContextMenuItem>
-          <ContextMenuItem onClick={() => ctx.toggleNodeLock(id)}>
-            {lockedHere ? <Unlock /> : <Lock />}
-            {lockedHere ? 'Unlock' : 'Lock'}
-          </ContextMenuItem>
-          {isBranch(node) && (
-            <>
-              <ContextMenuItem disabled={lockedHere} onClick={() => ctx.setNodeYSort(id, node.type !== 'ySort')} title={node.type === 'ySort' ? 'Make it a Node2D: the sprites inside draw in tree order again' : 'Make it a YSort: the sprites inside draw among the characters by how far down they stand'}>
-                <ArrowDownWideNarrow />
-                {node.type === 'ySort' ? 'Change to Node2D' : 'Change to YSort'}
-              </ContextMenuItem>
-              <ContextMenuItem disabled={lockedHere} onClick={() => ctx.setPickAsOne(id, node.pickAsOne !== true)} title="A click on one of its sprites on the map picks all of them">
-                <GroupIcon />
-                {node.pickAsOne ? 'Pick sprites one by one' : 'Pick sprites as one'}
-              </ContextMenuItem>
-            </>
-          )}
-          {(node.type === 'tile' || isBranch(node)) && <DropShadowMenuItem has={hasShadow(ownLook(node))} onClick={() => dropShadow({ kind: 'layer', layerId: id })} />}
-          {node.type === 'picture' && <DropShadowMenuItem has={hasShadow(ownLook(node))} disabled={lockedHere} onClick={() => dropShadow({ kind: 'picture', layerId: host?.id ?? '', imageId: id })} />}
         </>
+      )}
+      {(groupable || isBranch(node)) && <ContextMenuSeparator />}
+      {groupable && (
+        <ContextMenuItem disabled={tops.length === 0 || tops.some((t) => !index.byId.get(t) || ['collisionTiles', 'collisionShape', 'look', 'ySort'].includes(index.byId.get(t)!.node.type))} onClick={() => ctx.groupNodes(tops)} title="Put the selected nodes in one new Node">
+          <GroupIcon />
+          {tops.length > 1 ? `Group ${tops.length} nodes` : 'Group in a Node'}
+        </ContextMenuItem>
+      )}
+      {isBranch(node) && (
+        <ContextMenuItem onClick={() => ctx.ungroupNode(id)} title="What is inside stays where it is, in this node's place">
+          <Ungroup />
+          Ungroup
+          {keys.ungroup && <ContextMenuShortcut>{keys.ungroup}</ContextMenuShortcut>}
+        </ContextMenuItem>
       )}
       <ContextMenuSeparator />
       <ContextMenuItem onClick={confirmDelete} destructive>
         <Trash2 />
-        {item ? (node.type === 'collisionTiles' ? 'Delete tiles item' : 'Delete shape') : tops.length > 1 ? `Delete ${tops.length} nodes` : `Delete ${NODE_TYPES[node.type].label}`}
+        {tops.length > 1 ? `Delete ${tops.length} nodes` : `Delete ${NODE_TYPES[node.type].label}`}
       </ContextMenuItem>
     </>
   )
 }
 
-/** The menu of the panel's empty space: new nodes at the top of the map. */
-function BackgroundMenu() {
+/** The menu of the root row (the map) and of the panel's empty space: new nodes at the top of the map. */
+function RootMenu() {
   const ctx = useEditorSelector(selectMenu)
   const addNode = useAddNode()
   const canPaste = useEditorClipboard((s) => s.content?.kind === 'nodes')
   const nodes = ctx.nodes ?? NO_NODES
-  const { placePrefab } = entityCreators({ startPlacement: ctx.startPlacement, createEntity: ctx.handleCreateEntity })
   return (
     <>
       <ContextMenuSub>
         <ContextMenuSubTrigger data-testid="add-node">
           <Plus />
-          Add Node
+          Add Child Node
         </ContextMenuSubTrigger>
         <ContextMenuSubContent>
-          <AddNodeItems parentPath={[]} nodes={nodes} onPick={(type) => addNode(type, null)} />
+          <AddNodeItems parentPath={[]} nodes={nodes} onPick={(type) => addNode.add(type, null)} onPrefab={(p) => addNode.prefab(p, null)} />
         </ContextMenuSubContent>
       </ContextMenuSub>
-      <EntitySubmenu onNew={() => addNode('entity', null)} onPrefab={(p) => placePrefab(p, null)} />
       <ContextMenuSeparator />
       <ContextMenuItem disabled={!canPaste} onClick={() => ctx.pasteNodes(null)}>
         <ClipboardPaste />
@@ -709,6 +696,8 @@ const selectPanel = (c: EditorContextValue) => ({
   setFocusedDomain: c.setFocusedDomain,
   nodes: c.activeMap?.nodes,
   hasActiveMap: !!c.activeMap,
+  mapName: c.activeMap ? c.activeMap.name || c.activeMap.fileName || 'Scene' : '',
+  mapHasLook: !!c.activeMap?.look,
   view: c.selectionView,
   selectNode: c.selectNode,
   clearSelection: c.clearSelection,
@@ -722,9 +711,61 @@ const selectPanel = (c: EditorContextValue) => ({
 
 /** What a drag over a row means: the top half drops above it, the bottom half below it, and the lower half of a container inside it. */
 export function dropWhere(node: SceneNode, fraction: number): DropWhere {
-  // A TileMap or a Sprite2D only takes a Look: its lower half still means "below", so layers and sprites reorder.
+  // A TileMap or a Sprite only takes a Look: its lower half still means "below", so layers and sprites reorder.
   if (isContainer(node) && childTypesOf([node]).some((t) => t !== 'look')) return fraction < 0.5 ? 'above' : 'inside'
   return fraction < 0.5 ? 'above' : 'below'
+}
+
+/** The root row: the map itself. Selected while nothing else is (the Look panel then edits the map's look). */
+function RootRow({ name, hasLook, open, selected, hasChildren, drop, onClick, onToggle, onDragOver, onDrop }: {
+  name: string
+  hasLook: boolean
+  open: boolean
+  selected: boolean
+  hasChildren: boolean
+  drop: boolean
+  onClick: () => void
+  onToggle: () => void
+  onDragOver: (e: React.DragEvent) => void
+  onDrop: (e: React.DragEvent) => void
+}) {
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div
+          className="ed-row gap-1.5"
+          style={rowStyle(0)}
+          data-testid="scene-root"
+          data-selected={selected ? 'true' : undefined}
+          data-drop={drop ? 'true' : undefined}
+          onClick={(e) => {
+            e.stopPropagation()
+            onClick()
+          }}
+          onDragOver={onDragOver}
+          onDrop={onDrop}
+          title="The map: everything in it is below this node"
+        >
+          {open && hasChildren && <span aria-hidden className="pointer-events-none absolute bottom-[-1px] top-1/2 w-px" style={{ left: lineX(0), background: LINE }} />}
+          <Chevron open={open} show={hasChildren} name={name} onToggle={onToggle} />
+          <MapIcon className="ed-icon" style={{ color: '#93c5fd' }} />
+          <span className="ed-row-label font-medium" title={name}>
+            {name}
+          </span>
+          <div className="ed-row-actions">
+            {hasLook && (
+              <span className="ed-badge" title="The map has a look">
+                <Palette />
+              </span>
+            )}
+          </div>
+        </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent onCloseAutoFocus={(e) => e.preventDefault()}>
+        <RootMenu />
+      </ContextMenuContent>
+    </ContextMenu>
+  )
 }
 
 export function SceneTree() {
@@ -732,6 +773,7 @@ export function SceneTree() {
   const { view } = ctx
   const nodes = ctx.nodes ?? NO_NODES
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [rootOpen, setRootOpen] = useState(true)
   // What is being dragged and where it would land: refs for the handlers (so the rows' handlers stay the same objects while a
   // drag moves over them) and state for what the rows show.
   const draggedRef = React.useRef<string[] | null>(null)
@@ -761,9 +803,16 @@ export function SceneTree() {
   const nodesRef = React.useRef(nodes)
   nodesRef.current = nodes
 
+  const endDrag = () => {
+    draggedRef.current = null
+    setDragged(null)
+    setDrop(null)
+  }
+
   const handlers = useMemo<RowHandlers>(
     () => ({
       onClick: (e, node) => {
+        e.stopPropagation()
         if (node.type === 'collisionTiles' || node.type === 'collisionShape') {
           // A collision item picks its layer and becomes the item the Collision panel paints into / edits.
           const owner = sceneIndex(nodesRef.current).byId.get(node.id)?.ancestors.find((a) => a.type === 'collision')
@@ -777,7 +826,7 @@ export function SceneTree() {
         }
         const mode = e.shiftKey ? 'range' : e.metaKey || e.ctrlKey ? 'toggle' : 'replace'
         const v = viewRef.current
-        // Clicking the only selected layer again deselects it.
+        // Clicking the only selected layer again deselects it (the root is selected then).
         if (mode === 'replace' && v.primaryId === node.id && v.ids.length === 1 && (isLayerNode(node) || isBranch(node))) clearSelection()
         else selectNode(node.id, mode)
       },
@@ -810,23 +859,18 @@ export function SceneTree() {
         e.dataTransfer.dropEffect = 'move'
         setDrop({ id: node.id, where })
       },
-      onDragEnd: () => {
-        draggedRef.current = null
-        setDragged(null)
-        setDrop(null)
-      },
+      onDragEnd: endDrag,
       onDrop: (e, node) => {
         e.preventDefault()
         e.stopPropagation()
         const ids = draggedRef.current
         const drop = dropRef.current
         if (ids && drop?.id === node.id) moveNodes(ids, node.id, drop.where)
-        draggedRef.current = null
-        setDragged(null)
-        setDrop(null)
+        endDrag()
       },
       renderMenu: (id) => <RowMenu id={id} onRename={(rid) => void setTimeout(() => setEditingId(rid), 60)} />,
     }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [selectNode, clearSelection, toggleCollapsed, renameNode, toggleNodeVisibility, toggleNodeLock, moveNodes]
   )
 
@@ -836,34 +880,52 @@ export function SceneTree() {
   return (
     <ContextMenu>
       <ContextMenuTrigger className="block min-h-full h-full w-full">
-        <div
-          className="flex min-h-full h-full w-full flex-col gap-0.5"
-          data-testid="scene-tree"
-          onClick={() => ctx.setFocusedDomain('layers')}
-        >
-          {rows.length === 0 && (
-            <div className="ed-empty">
-              <p>Nothing in this map yet.</p>
-              <p className="ed-hint">Right-click here to add a node.</p>
-            </div>
-          )}
-          {rows.map((info) => (
-            <SceneRow
-              key={info.node.id}
-              info={info}
-              selected={view.primaryId === info.node.id}
-              multi={view.primaryId !== info.node.id && view.ids.includes(info.node.id)}
-              editing={editingId === info.node.id}
-              dragging={draggedSet.has(info.node.id)}
-              drop={dropAt?.id === info.node.id ? dropAt.where : null}
-              picked={pickedItem === info.node.id && isCollisionItem(info.node.type)}
-              handlers={handlers}
-            />
-          ))}
+        <div className="flex min-h-full h-full w-full flex-col" data-testid="scene-tree" onClick={() => ctx.setFocusedDomain('layers')}>
+          <RootRow
+            name={ctx.mapName}
+            hasLook={ctx.mapHasLook}
+            open={rootOpen}
+            selected={view.ids.length === 0}
+            hasChildren={rows.length > 0}
+            drop={dropAt?.id === SCENE_ROOT_ID}
+            onClick={() => {
+              ctx.setFocusedDomain('layers')
+              clearSelection()
+            }}
+            onToggle={() => setRootOpen((o) => !o)}
+            onDragOver={(e) => {
+              const ids = draggedRef.current
+              if (!ids || !canDrop(nodesRef.current, ids, SCENE_ROOT_ID, 'inside')) return setDrop(null)
+              e.preventDefault()
+              e.dataTransfer.dropEffect = 'move'
+              setDrop({ id: SCENE_ROOT_ID, where: 'inside' })
+            }}
+            onDrop={(e) => {
+              e.preventDefault()
+              const ids = draggedRef.current
+              if (ids && dropRef.current?.id === SCENE_ROOT_ID) moveNodes(ids, SCENE_ROOT_ID, 'inside')
+              endDrag()
+            }}
+          />
+          {rootOpen &&
+            rows.map((info) => (
+              <SceneRow
+                key={info.node.id}
+                info={info}
+                selected={view.primaryId === info.node.id}
+                multi={view.primaryId !== info.node.id && view.ids.includes(info.node.id)}
+                editing={editingId === info.node.id}
+                dragging={draggedSet.has(info.node.id)}
+                drop={dropAt?.id === info.node.id ? dropAt.where : null}
+                picked={pickedItem === info.node.id && isCollisionItem(info.node.type)}
+                handlers={handlers}
+              />
+            ))}
+          {rows.length === 0 && <div className="ed-empty">Nothing in this map yet: right-click the map to add a node.</div>}
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent>
-        <BackgroundMenu />
+        <RootMenu />
       </ContextMenuContent>
     </ContextMenu>
   )

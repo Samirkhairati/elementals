@@ -1,5 +1,5 @@
 /**
- * Where an entity's events trigger when that is not its Collider: the Area2D of an entity that also has a solid body
+ * Where an entity's events trigger when that is not its Collider: the Area of an entity that also has a solid body
  * (shared/sceneEntity.ts). A box bottom-centred on the Transform anchor, shifted by the offsets (+y is down).
  */
 export interface AreaComponentInit {

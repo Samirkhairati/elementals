@@ -144,7 +144,7 @@ describe('EditorPage wiring', () => {
     act(() => ctx.toggleCollapsed(group.id))
     expect(ctx.historyLength).toBe(steps)
     await waitFor(() => expect(saveMap).toHaveBeenCalledTimes(1), { timeout: 1500 })
-    expect((saveMap.mock.calls[0][2] as MapData).nodes.find(n => n.type === 'group')).toMatchObject({ name: 'Node2D', collapsed: true })
+    expect((saveMap.mock.calls[0][2] as MapData).nodes.find(n => n.type === 'group')).toMatchObject({ name: 'Node', collapsed: true })
   })
 
   it('moving an entity into a group and undoing it', async () => {
@@ -186,7 +186,7 @@ describe('EditorPage wiring', () => {
       expect(ctx.justCreatedLayer?.id).toBe(top().id)
       press('N', { ctrlKey: true, shiftKey: true })
       await waitFor(() => expect(ctx.activeMap!.nodes).toHaveLength(before + 2))
-      expect(top()).toMatchObject({ type: 'group', name: 'Node2D' })
+      expect(top()).toMatchObject({ type: 'group', name: 'Node' })
       expect(ctx.justCreatedLayer?.id).toBe(top().id)
       expect(ctx.justCreatedLayer?.n).toBe(2)
     })

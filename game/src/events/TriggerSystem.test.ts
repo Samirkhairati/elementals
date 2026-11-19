@@ -171,7 +171,7 @@ describe('action trigger', () => {
     expect(gameState.isInputLocked).toBe(false);
   });
 
-  it('an Area2D next to a solid body is where the events trigger', async () => {
+  it('an Area next to a solid body is where the events trigger', async () => {
     rig.addPlayer(5, 5, 'down');
     const def = makeEntityDef({ id: 'sign', col: 5, row: 8, states: [state([say('read me')])] });
     def.components.Area = { width: 32, height: 96, offsetX: 0, offsetY: 0 }; // rows 6..8; the body is row 8 only

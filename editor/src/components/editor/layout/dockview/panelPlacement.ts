@@ -17,7 +17,7 @@ export interface PanelPlacement {
 export const PANEL_PLACEMENT: Record<string, PanelPlacement> = {
   maps: { title: 'MAPS', anchors: [[['layers', 'properties'], 'above']], mapSide: 'left' },
   layers: {
-    title: 'LAYERS',
+    title: 'SCENE',
     anchors: [
       [['maps'], 'below'],
       [['properties'], 'above'],
