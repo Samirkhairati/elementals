@@ -45,9 +45,11 @@ masks.
 **Detail pass** (`LOOK_DETAIL_FRAG`, `lookDetailUniforms`): Lightroom-style texture, clarity and dehaze run after the
 grade on the graded image, only when one of them is set (`CompiledLook.detail`, `hasDetail()`; the LUT hash leaves them
 out). Texture boosts the difference to a small blur (2 px radius: fine detail), clarity to a wide one (10 px) weighted
-to the midtones; dehaze estimates the haze with the dark channel prior (darkest channel over a 5×5 neighbourhood, taps
-3 px apart) and removes it (`(c − 1) / t + 1`, transmission `t = max(1 − 0.95·k·dark, 0.3)`), or adds haze when
-negative. The editor runs it as its own WebGL pass (`lookGL.ts`); the game as the `LookDetail` post pipeline on the
+to the midtones, both limited (±0.12, ±0.15) so pixel-art edges do not ring; dehaze estimates the haze with the dark
+channel prior (the mean of the darkest channel over 5×5 taps 4 px apart, counted where bright and grey:
+`smoothstep(0.3, 0.9, dark)`) and removes it (`(c − A) / t + A`, A = 0.95, `t = 1 − 0.45·k·haze`) plus a little
+contrast and saturation everywhere, or lays a light haze over it when negative. Keep it gentle: the first version
+divided by up to 3.3 and made the map look over-processed. The editor runs it as its own WebGL pass (`lookGL.ts`); the game as the `LookDetail` post pipeline on the
 camera (`game/src/look/pipelines.ts`).
 
 **Game** (`game/src/look/`): `LookRuntime` builds the subjects from the map's `look` properties

@@ -189,11 +189,13 @@ void main() {
  * object or the camera). `uLookUvToWorld` is the same mapping as the grade pass's (its size gives the uv of one map
  * pixel, so the radii are in map pixels whatever the zoom); `uLookDetail` = texture, clarity, dehaze (-1..1), unused.
  *
- *  - Texture: the luminance minus a blur of radius ~2 px, added back (+) or taken away (-): medium detail.
- *  - Clarity: the luminance minus a blur of radius ~10 px, weighted to the midtones: local contrast.
- *  - Dehaze (as Lightroom's, the dark channel prior): the darkest channel over a neighbourhood estimates the haze in
- *    front of each pixel (the light is taken as white); + divides it out (contrast and colour come back where it was
- *    hazy), - lays a light haze over the picture, thicker where it is already light.
+ *  - Texture: the luminance minus a blur of radius ~2 px, added back (+) or taken away (-), at most ±0.12: fine detail.
+ *  - Clarity: the luminance minus a blur of radius ~10 px, weighted to the midtones, at most ±0.15: local contrast.
+ *    (Limited so the hard edges of pixel art do not ring.)
+ *  - Dehaze (as Lightroom's, the dark channel prior): the mean of the darkest channel over a neighbourhood (smooth, so
+ *    no blocks) says how hazy it is there, counted only where bright and grey; + divides that haze out (transmission at
+ *    least 0.55) and adds a little contrast and colour everywhere, - lays a light haze over the picture, thicker where
+ *    it is already hazy. Calibrated to stay close to the old per-pixel dehaze at small amounts.
  *
  * Transparent pixels around are left out of the blurs (alpha-weighted), so a sprite's edge does not darken.
  */
@@ -231,33 +233,45 @@ void main() {
   vec2 px = 1.0 / max(abs(uLookUvToWorld.zw), vec2(1e-6));
   float L = detailLum(c);
 
+  // Texture and clarity add back the difference to a blur, limited so hard pixel-art edges do not ring.
   if (uLookDetail.x != 0.0) {
     float fine = detailBlur(outTexCoord, px * 2.0, L, s.a);
-    c += (L - fine) * uLookDetail.x * (uLookDetail.x > 0.0 ? 2.2 : 1.0);
+    c += clamp((L - fine) * uLookDetail.x * 0.9, -0.12, 0.12);
   }
   if (uLookDetail.y != 0.0) {
     float wide = detailBlur(outTexCoord, px * 10.0, L, s.a);
     float mid = 1.0 - pow(abs(2.0 * L - 1.0), 2.0);
-    c += (L - wide) * uLookDetail.y * (uLookDetail.y > 0.0 ? 1.6 : 0.9) * (0.35 + 0.65 * mid);
+    c += clamp((L - wide) * uLookDetail.y * 0.7 * (0.3 + 0.7 * mid), -0.15, 0.15);
   }
   if (uLookDetail.z != 0.0) {
-    // the dark channel: the darkest channel over a 13 x 13 px neighbourhood (sparse taps), opaque pixels only
-    float dark = min(c.r, min(c.g, c.b));
+    // How hazy the neighbourhood is: the mean of the darkest channel over 5 x 5 taps 4 px apart (smooth, so no blocks),
+    // counted only where it is bright and grey (colourful pixel art is not haze).
+    float darkSum = 0.0;
+    float n = 0.0;
     for (int y = -2; y <= 2; y++) {
       for (int x = -2; x <= 2; x++) {
-        vec4 t = texture2D(uMainSampler, outTexCoord + vec2(float(x), float(y)) * px * 3.0);
-        if (t.a > 0.5) dark = min(dark, min(t.r, min(t.g, t.b)) / t.a);
+        vec4 t = texture2D(uMainSampler, outTexCoord + vec2(float(x), float(y)) * px * 4.0);
+        if (t.a > 0.5) {
+          darkSum += min(t.r, min(t.g, t.b)) / t.a;
+          n += 1.0;
+        }
       }
     }
+    float dark = n > 0.0 ? darkSum / n : min(c.r, min(c.g, c.b));
+    float haze = smoothstep(0.3, 0.9, dark);
     float k = uLookDetail.z;
+    const vec3 airlight = vec3(0.95);
     if (k > 0.0) {
-      float t = max(1.0 - 0.95 * k * dark, 0.3);
-      c = (c - vec3(1.0)) / t + vec3(1.0);
-      // the haze also lifted the blacks: pull them back down a little as Lightroom does
-      c = mix(c, c * c, 0.15 * k);
+      // remove the haze where there is some (transmission at least 0.55), then a little contrast and colour everywhere
+      float t = 1.0 - 0.45 * k * haze;
+      c = (c - airlight) / t + airlight;
+      float L2 = detailLum(c);
+      c = mix(vec3(L2), c, 1.0 + 0.2 * k);
+      c = (c - 0.5) * (1.0 + 0.12 * k) + 0.5 - 0.03 * k;
     } else {
-      float haze = -k * (0.45 + 0.4 * dark);
-      c = mix(c, vec3(0.62 + 0.3 * L), haze * 0.75);
+      // add haze: towards a light grey, more where it is already hazy, a little everywhere
+      float amount = -k * (0.12 + 0.18 * haze);
+      c = mix(c, vec3(0.55 + 0.35 * L), amount);
     }
   }
   c = clamp(c, 0.0, 1.0);
