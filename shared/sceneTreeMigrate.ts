@@ -1,8 +1,8 @@
-// Maps as one tree of nodes (schema 6) and back: `migrateToNodeTree` turns the layers, folders, picture groups, entity
-// folders, collision items and the Entities row of schema 5 and older into `map.nodes`; `nodeTreeToLegacy` is its exact
-// inverse for any tree the migration can produce. See docs/node-tree-plan.md ("Implementation decisions") and docs/maps.md.
+// Maps as one tree of nodes (schema 6): `migrateToNodeTree` turns the layers, folders, picture groups, entity folders,
+// collision items and the Entities row of schema 5 and older into `map.nodes`. See docs/node-tree-plan.md
+// ("Implementation decisions") and docs/maps.md.
 //
-// Both are pure and idempotent, never mutate their input and keep the very same object when there is nothing to do.
+// It is pure and idempotent, never mutate their input and keep the very same object when there is nothing to do.
 // Ids the migration makes are deterministic (`deterministicId`), so migrating the same map twice gives the same tree.
 // Nothing is written back to disk until the author edits.
 //
@@ -42,8 +42,8 @@ import { allEntities, allPictures } from './sceneTree.ts'
 /** The id of the group that holds the entities of a migrated map (the old Entities row). */
 export const ENTITIES_GROUP_ID = deterministicId('node-tree/entities-group')
 export const ENTITIES_GROUP_NAME = 'Entities'
-/** The schema version of maps made of `layers` and `entities`, which the editor still works on until it moves to nodes. */
-export const LEGACY_SCHEMA_VERSION = 5
+/** The last schema version of maps made of `layers` and `entities` (before the node tree). */
+export const FLAT_SCHEMA_VERSION = 5
 
 type Rec = Record<string, unknown>
 
@@ -294,134 +294,6 @@ export function migrateToNodeTree<T extends object>(map: T): MigrateResult<T> {
   const nodes = layersToNodes({ layers, entities, entityFolders, entitiesIndex })
   const version = typeof rest.schemaVersion === 'number' && rest.schemaVersion > SCHEMA_VERSION ? rest.schemaVersion : SCHEMA_VERSION
   return { value: { ...rest, schemaVersion: version, nodes } as unknown as T, changed: true }
-}
-
-/** Same as `migrateToNodeTree`, named for the bridge: schema 5 -> 6. */
-export const legacyToNodeTree = migrateToNodeTree
-
-// ── v6 -> v5 (TEMPORARY bridge until the editor works on nodes, phase 2) ───────────────────────────
-
-const legacyFlags = (node: SceneNode): Rec => ({ visible: node.visible !== false, locked: node.locked === true })
-
-function legacyPicture(node: PictureNode, groupId: string | null): Rec {
-  const { type: _type, id, name, visible: _v, locked: _l, ...rest } = node
-  return { id, ...(name ? { name } : {}), ...rest, ...(groupId !== null ? { groupId } : {}) }
-}
-
-function legacyImageLayer(node: ImageLayerNode): Rec {
-  const images: Rec[] = []
-  const groups: Rec[] = []
-  const visit = (list: readonly SceneNode[], groupId: string | null) => {
-    for (const child of list) {
-      if (child.type === 'picture') images.push(legacyPicture(child, groupId))
-      else if (child.type === 'group') {
-        groups.push({ id: child.id, name: child.name, ...(child.locked ? { locked: true } : {}), ...(typeof child.ySort === 'boolean' ? { ySort: child.ySort } : {}) })
-        visit(child.children, child.id)
-      }
-    }
-  }
-  visit(node.children, null)
-  return {
-    id: node.id,
-    name: node.name,
-    type: 'image',
-    ...legacyFlags(node),
-    ...copyDefined(node as unknown as Rec, ['z', 'ySort', 'look']),
-    images,
-    ...(groups.length > 0 ? { groups } : {}),
-  }
-}
-
-function legacyCollisionLayer(node: CollisionLayerNode): Rec {
-  const tileGroups = node.children.filter((c): c is CollisionTilesNode => c.type === 'collisionTiles').map((c) => ({ id: c.id, name: c.name }))
-  const shapes = node.children
-    .filter((c): c is CollisionShapeNode => c.type === 'collisionShape')
-    .map((c) => ({ id: c.id, ...(c.name ? { name: c.name } : {}), points: c.points, closed: c.closed }))
-  return {
-    id: node.id,
-    name: node.name,
-    type: 'collision',
-    ...legacyFlags(node),
-    ...copyDefined(node as unknown as Rec, ['z', 'data']),
-    ...(tileGroups.length > 0 ? { tileGroups } : {}),
-    ...(shapes.length > 0 ? { shapes } : {}),
-  }
-}
-
-function legacyLayer(node: SceneNode): Rec | null {
-  if (node.type === 'image') return legacyImageLayer(node)
-  if (node.type === 'collision') return legacyCollisionLayer(node)
-  if (node.type === 'tile' || node.type === 'terrain' || node.type === 'encounters' || node.type === 'objects') {
-    return { id: node.id, name: node.name, type: node.type, ...legacyFlags(node), ...copyDefined(node as unknown as Rec, ['z', 'data', ...(node.type === 'tile' ? ['look'] : [])]) }
-  }
-  return null
-}
-
-function legacyEntity(node: EntityNode, folder: string | undefined): Rec {
-  const { type: _type, locked: _locked, ...rest } = node as unknown as Rec
-  return folder !== undefined ? { ...rest, folder } : rest
-}
-
-/**
- * TEMPORARY bridge until the editor works on nodes (phase 2): a schema 6 map as the schema 5 shape the editor still uses
- * (`layers` top first, `entities`, `entityFolders`, `entitiesIndex`, `schemaVersion: 5`). It is the exact inverse of
- * `migrateToNodeTree` for any tree the migration can produce. Trees it cannot produce are flattened: a group at the top
- * is a folder (groups below it join it), a group inside the Entities group is an entity folder, an entity anywhere is an
- * entity. A map without `nodes` comes back as it is.
- */
-export function nodeTreeToLegacy<T extends object>(map: T): T {
-  if (!isRecord(map) || !Array.isArray(map.nodes)) return map
-  const { nodes, ...rest } = map as Rec & { nodes: SceneNode[] }
-  const layers: Rec[] = []
-  const at: { entities: number | null } = { entities: null }
-  // The Entities row sits below as many layer rows as there were when the first entity (or the Entities group) came.
-  const noteEntities = () => {
-    if (at.entities === null) at.entities = layers.length
-  }
-
-  for (const root of nodes.slice().reverse()) {
-    if (root.type === 'group' && root.id === ENTITIES_GROUP_ID) {
-      noteEntities()
-    } else if (root.type === 'group') {
-      layers.push({ id: root.id, name: root.name, type: 'folder', ...legacyFlags(root), ...(root.collapsed ? { collapsed: true } : {}), ...(typeof root.ySort === 'boolean' ? { ySort: root.ySort } : {}) })
-      const hold = (list: SceneNode[]) => {
-        for (const child of list.slice().reverse()) {
-          if (child.type === 'group') {
-            hold(child.children)
-            continue
-          }
-          const row = legacyLayer(child)
-          if (row) layers.push(FOLDER_MEMBER_TYPES.includes(child.type) ? { ...row, folderId: root.id } : row)
-        }
-      }
-      hold(root.children)
-    } else if (root.type === 'entity') {
-      noteEntities()
-    } else {
-      const row = legacyLayer(root)
-      if (row) layers.push(row)
-    }
-  }
-
-  const entityGroup = nodes.find((n): n is GroupNode => n.type === 'group' && n.id === ENTITIES_GROUP_ID)
-  const entityFolders: Rec[] = []
-  const folderOf = new Map<string, string>()
-  for (const child of entityGroup?.children ?? []) {
-    if (child.type !== 'group') continue
-    entityFolders.push({ id: child.id, name: child.name, ...(child.collapsed ? { expanded: false } : {}), ...(child.visible === false ? { visible: false } : {}) })
-    for (const e of allEntities(child.children)) folderOf.set(e.id, child.id)
-  }
-  const entities = allEntities(nodes).map((e) => legacyEntity(e, folderOf.get(e.id)))
-  if (entities.length > 0) noteEntities()
-
-  return {
-    ...rest,
-    layers,
-    entities,
-    ...(entityFolders.length > 0 ? { entityFolders } : {}),
-    ...(at.entities ? { entitiesIndex: at.entities } : {}),
-    schemaVersion: LEGACY_SCHEMA_VERSION,
-  } as unknown as T
 }
 
 // ── reading a map either way ───────────────────────────────────────────────────────────────────────

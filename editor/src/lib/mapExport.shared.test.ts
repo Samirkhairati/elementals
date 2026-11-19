@@ -7,7 +7,7 @@ import { collectUsedTilesetIds, convertEditorMapToTiled, serializeTiledMap } fro
 import { readPngSize } from '../../../shared/png'
 import { validateTiledMap } from '../../../shared/mapSchema'
 import type { EditorMap, TilesetInfo } from '../../../shared/mapTypes'
-import { migrateMapToLegacy } from '../../../shared/engine/migrate'
+import { migrateFlatMap } from '../../../shared/engine/migrate'
 
 // ── Reference implementation ────────────────────────────────────────────────
 // Verbatim copy of the conversion that lived in hooks/useExportMap.ts before it moved to
@@ -121,7 +121,7 @@ function legacyConvert(mapToExport: any, tilesets: TilesetInfo[]) {
     width: mapToExport.width,
     // The only differences from the hook: maps are schema 6 now (nodes), and the editor-only entity `folder` is not kept.
     schemaVersion: 6,
-    entities: (migrateMapToLegacy(mapToExport).value.entities || []).map(({ folder: _folder, ...entity }: any) => entity),
+    entities: (migrateFlatMap(mapToExport).value.entities || []).map(({ folder: _folder, ...entity }: any) => entity),
   }
   return JSON.stringify(tiledMap, null, 2)
 }

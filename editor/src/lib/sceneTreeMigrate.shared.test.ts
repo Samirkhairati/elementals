@@ -3,18 +3,16 @@ import { describe, it, expect } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { migrateMap, migrateMapToLegacy } from '../../../shared/engine/migrate'
+import { migrateMap, migrateFlatMap } from '../../../shared/engine/migrate'
 import { SCHEMA_VERSION } from '../../../shared/engine/types'
 import { deterministicId } from '../../../shared/engine/ids'
 import {
   ENTITIES_GROUP_ID,
-  LEGACY_SCHEMA_VERSION,
+  FLAT_SCHEMA_VERSION,
   entitiesOfMap,
   hasNodeTree,
   layersToNodes,
-  legacyToNodeTree,
   migrateToNodeTree,
-  nodeTreeToLegacy,
   nodesOfMap,
   picturesOfMap,
 } from '../../../shared/sceneTreeMigrate'
@@ -305,7 +303,6 @@ describe('migrateToNodeTree: purity', () => {
     expect(twice.changed).toBe(false)
     expect(twice.value).toBe(once.value)
     expect(migrateToNodeTree(m).value).toEqual(once.value) // deterministic
-    expect(legacyToNodeTree).toBe(migrateToNodeTree)
   })
 
   it('leaves anything that is not a legacy map alone', () => {
@@ -365,9 +362,9 @@ describe('migrateMap (schema 6)', () => {
     expect(migrateMap([] as any).changed).toBe(false)
   })
 
-  it('migrateMapToLegacy stops at the schema 5 shape', () => {
-    const r = migrateMapToLegacy(map({ schemaVersion: undefined, layers: [layer('p', 'polygons')], entities: [] }) as any)
-    expect(r.value.schemaVersion).toBe(LEGACY_SCHEMA_VERSION)
+  it('migrateFlatMap stops at the schema 5 shape', () => {
+    const r = migrateFlatMap(map({ schemaVersion: undefined, layers: [layer('p', 'polygons')], entities: [] }) as any)
+    expect(r.value.schemaVersion).toBe(FLAT_SCHEMA_VERSION)
     expect((r.value as any).layers[0].type).toBe('collision')
     expect(r.value).not.toHaveProperty('nodes')
   })
@@ -414,78 +411,6 @@ describe.each([...real, ...synthetic])('%s', (_name, source) => {
     expect(walk(nodes).filter((e) => ['tile', 'image', 'collision', 'terrain', 'encounters', 'objects'].includes(e.node.type)).length).toBe(layers.length)
     expect(allPictures(nodes).length).toBe(layers.reduce((n: number, l: any) => n + (l.images?.length ?? 0), 0))
     expect(allEntities(nodes).map((e) => e.id).sort()).toEqual((source.entities ?? []).map((e: any) => e.id).sort())
-  })
-
-  it('goes back to the schema 5 shape and forward again to the very same tree', () => {
-    const legacy = nodeTreeToLegacy(v6) as any
-    expect(legacy.schemaVersion).toBe(5)
-    expect(legacy).not.toHaveProperty('nodes')
-    expect(migrateToNodeTree(legacy).value).toEqual(v6)
-  })
-})
-
-describe('nodeTreeToLegacy: the schema 5 shape the editor still works on', () => {
-  it('is the inverse of the migration for the things the editor edits', () => {
-    const source = map({
-      layers: [
-        layer('top', 'tile', { z: 2, data: { 1: { tilesetId: 'a.png', x: 0, y: 0 } } }),
-        layer('F', 'folder', { collapsed: true, ySort: true }),
-        layer('i', 'image', { folderId: 'F', z: 7, images: [{ id: 'p', graphicId: 'x.png', x: 1, y: 2, z: 3, groupId: 'G' }, { id: 'q', assetId: 'objects/chest', name: 'Chest', x: 1, y: 2 }], groups: [{ id: 'G', name: 'G', locked: true }, { id: 'E', name: 'Empty' }] }),
-        layer('c', 'collision', { folderId: 'F', tileGroups: [{ id: 'tg', name: 'T' }], shapes: [{ id: 's', closed: false, points: [{ x: 0, y: 0 }, { x: 1, y: 1 }] }], data: { 5: { tilesetId: '__collision__', x: 0, y: 0, group: 'tg' } } }),
-        layer('t', 'terrain', { visible: false, locked: true }),
-      ],
-      entitiesIndex: 1,
-      entityFolders: [{ id: 'ef', name: 'NPCs', expanded: false }],
-      entities: [ent('e1'), ent('e2', { folder: 'ef', visible: false })],
-    })
-    const back: any = nodeTreeToLegacy(migrateMap(source).value)
-    expect(back.entitiesIndex).toBe(1)
-    expect(back.entityFolders).toEqual([{ id: 'ef', name: 'NPCs', expanded: false }])
-    expect(back.entities).toEqual([ent('e1'), ent('e2', { folder: 'ef', visible: false })])
-    expect(back.layers.map((l: any) => [l.id, l.type, l.folderId])).toEqual([
-      ['top', 'tile', undefined],
-      ['F', 'folder', undefined],
-      ['i', 'image', 'F'],
-      ['c', 'collision', 'F'],
-      ['t', 'terrain', undefined],
-    ])
-    const folder = back.layers[1]
-    expect(folder).toMatchObject({ visible: true, locked: false, collapsed: true, ySort: true })
-    const imageLayer = back.layers[2]
-    expect(imageLayer.images).toEqual([
-      { id: 'q', name: 'Chest', assetId: 'objects/chest', x: 1, y: 2 },
-      { id: 'p', graphicId: 'x.png', x: 1, y: 2, z: 3, groupId: 'G' },
-    ])
-    expect(imageLayer.groups).toEqual([{ id: 'E', name: 'Empty' }, { id: 'G', name: 'G', locked: true }])
-    expect(back.layers[3]).toMatchObject({ tileGroups: [{ id: 'tg', name: 'T' }], shapes: [{ id: 's', closed: false, points: [{ x: 0, y: 0 }, { x: 1, y: 1 }] }], data: { 5: { group: 'tg' } } })
-    expect(back.layers[4]).toMatchObject({ visible: false, locked: true })
-    expect(back.layers[0]).toEqual(layer('top', 'tile', { z: 2, data: { 1: { tilesetId: 'a.png', x: 0, y: 0 } } }))
-  })
-
-  it('returns a map without nodes as it is, and leaves out an empty entity setup', () => {
-    const legacy = { name: 'm', layers: [] }
-    expect(nodeTreeToLegacy(legacy)).toBe(legacy)
-    const back: any = nodeTreeToLegacy(migrateMap(map({ layers: [layer('a', 'tile')] })).value)
-    expect(back).not.toHaveProperty('entityFolders')
-    expect(back).not.toHaveProperty('entitiesIndex')
-    expect(back.entities).toEqual([])
-    expect(back.schemaVersion).toBe(5)
-  })
-
-  it('flattens trees the migration cannot produce: groups at the top are folders, entities anywhere are entities', () => {
-    const tree: any = {
-      name: 'm',
-      schemaVersion: 6,
-      nodes: [
-        { id: 'a', type: 'tile', name: 'a' },
-        { id: 'F', type: 'group', name: 'F', children: [{ id: 'G', type: 'group', name: 'G', children: [{ id: 'b', type: 'tile', name: 'b' }, { id: 'e1', type: 'entity', name: 'e1', x: 0, y: 0, components: {} }] }, { id: 'c', type: 'terrain', name: 'c' }] },
-        { id: 'e2', type: 'entity', name: 'e2', x: 0, y: 0, components: {} },
-      ],
-    }
-    const back: any = nodeTreeToLegacy(tree)
-    expect(back.layers.map((l: any) => [l.id, l.folderId])).toEqual([['F', undefined], ['c', undefined], ['b', 'F'], ['a', undefined]])
-    expect(back.entities.map((e: any) => e.id)).toEqual(['e1', 'e2'])
-    expect(back.entitiesIndex).toBeUndefined() // the first entity is on top
   })
 })
 
@@ -547,17 +472,13 @@ function randomLegacyMap(seed: number): any {
 
 describe('random legacy maps', () => {
   for (let seed = 1; seed <= 150; seed++) {
-    it(`seed ${seed}: migrates to a valid tree, round-trips and exports stably`, () => {
+    it(`seed ${seed}: migrates to a valid tree, deterministically, and is idempotent`, () => {
       const source = randomLegacyMap(seed)
       const v6: any = migrateMap(source).value
       const ids = walk(v6.nodes).map((e) => e.node.id)
       expect(new Set(ids).size).toBe(ids.length)
       for (const { node, ancestors } of walk(v6.nodes)) expect(canHold(ancestors, node.type)).toBe(true)
-      const back = nodeTreeToLegacy(v6) as any
-      expect(migrateToNodeTree(back).value).toEqual(v6)
-      // a legacy map the editor loads and saves (v5 shape) migrates to the same tree as the original
-      const throughEditor = migrateToNodeTree(migrateMapToLegacy(back).value).value
-      expect(throughEditor).toEqual(v6)
+      expect(migrateMap(structuredClone(source)).value).toEqual(v6)
       expect(migrateMap(v6).value).toBe(v6)
     })
   }

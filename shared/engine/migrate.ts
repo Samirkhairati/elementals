@@ -23,11 +23,11 @@
 //   schemaVersion 5: the trigger names action / playerTouch / eventTouch / autorun / parallel become a start kind
 //   plus `blocks` (autorun and parallel also `repeat`); see triggers.ts.
 //   schemaVersion 6: a map is one tree of nodes (`nodes`) instead of `layers` + `entities` + `entityFolders` + `entitiesIndex`;
-//   see sceneTreeMigrate.ts. `migrateMap` produces it; `migrateMapToLegacy` stops at the schema 5 shape (the editor works on
-//   that until it moves to nodes).
+//   see sceneTreeMigrate.ts. `migrateMap` produces it; `migrateFlatMap` is its first step (the entity and layer migrations
+//   of a map that is not a tree yet), which stops at the schema 5 shape.
 
 import { migrateCollisionLayers } from '../collisionLayers.ts';
-import { LEGACY_SCHEMA_VERSION, hasNodeTree, migrateToNodeTree } from '../sceneTreeMigrate.ts';
+import { FLAT_SCHEMA_VERSION, hasNodeTree, migrateToNodeTree } from '../sceneTreeMigrate.ts';
 import { mapTree } from '../sceneTree.ts';
 import type { SceneNode } from '../sceneTree.ts';
 import type { Command, EngineEntity, EventState, LegacyComponentType } from './types.ts';
@@ -265,11 +265,11 @@ export function migrateEntity(entity: EntityLike): MigrateResult<EngineEntity> {
 }
 
 /**
- * Migrates every entity of a map made of `layers` and `entities` (schema 5 and older) and stamps schemaVersion 5 (maps at
- * a newer version keep theirs). This is the shape the editor still works on; `migrateMap` goes on to the node tree.
- * Returns the same object when nothing changed.
+ * The first step of `migrateMap` for a map made of `layers` and `entities` (schema 5 and older): migrates every entity and
+ * old `polygons` layer and stamps schemaVersion 5 (maps at a newer version keep theirs); `migrateMap` then builds the node
+ * tree from it. Returns the same object when nothing changed.
  */
-export function migrateMapToLegacy<T extends object>(map: T): MigrateResult<T> {
+export function migrateFlatMap<T extends object>(map: T): MigrateResult<T> {
   if (!isRecord(map)) return { value: map, changed: false };
   const out: Record<string, unknown> = { ...map };
   let changed = false;
@@ -297,8 +297,8 @@ export function migrateMapToLegacy<T extends object>(map: T): MigrateResult<T> {
     }
   }
 
-  if (typeof map.schemaVersion !== 'number' || map.schemaVersion < LEGACY_SCHEMA_VERSION) {
-    out.schemaVersion = LEGACY_SCHEMA_VERSION;
+  if (typeof map.schemaVersion !== 'number' || map.schemaVersion < FLAT_SCHEMA_VERSION) {
+    out.schemaVersion = FLAT_SCHEMA_VERSION;
     changed = true;
   }
 
@@ -313,7 +313,7 @@ export function migrateMapToLegacy<T extends object>(map: T): MigrateResult<T> {
  */
 export function migrateMap<T extends object>(map: T): MigrateResult<T> {
   if (!isRecord(map)) return { value: map, changed: false };
-  if (!hasNodeTree(map)) return migrateToNodeTree(migrateMapToLegacy(map).value);
+  if (!hasNodeTree(map)) return migrateToNodeTree(migrateFlatMap(map).value);
 
   const out: Record<string, unknown> = { ...map };
   let changed = false;
