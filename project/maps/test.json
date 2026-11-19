@@ -1,0 +1,59 @@
+{
+  "name": "test",
+  "width": 41,
+  "height": 23,
+  "pixelWidth": 1285,
+  "pixelHeight": 720,
+  "schemaVersion": 7,
+  "nodes": [
+    {
+      "id": "3fcfb2dd-0070-441e-89d7-ddac23a35cf5",
+      "type": "tile",
+      "name": "ground",
+      "z": 1,
+      "data": {},
+      "children": []
+    },
+    {
+      "id": "14d1a0eb-e664-4fee-962b-69ef1ecb1700",
+      "type": "tile",
+      "name": "building",
+      "z": 10,
+      "data": {},
+      "children": []
+    },
+    {
+      "id": "f0ef260b-4f4e-4d6d-bc12-eb54786f47be",
+      "type": "tile",
+      "name": "decorations",
+      "z": 20,
+      "data": {},
+      "children": []
+    },
+    {
+      "id": "a78cc27b-b41d-4ac5-8556-ff8d8ed8cd6d",
+      "type": "encounters",
+      "name": "encounters",
+      "data": {}
+    },
+    {
+      "id": "2549a82b-7387-46bf-997d-17fbf3969864",
+      "type": "terrain",
+      "name": "terrain",
+      "data": {}
+    },
+    {
+      "id": "bf2ffbbf-0649-4f70-9f5f-ce9ead58ae26",
+      "type": "collision",
+      "name": "collisions",
+      "data": {},
+      "children": []
+    },
+    {
+      "id": "4b8c1efd-7b3c-41d9-93f2-3874752ec2a6",
+      "type": "group",
+      "name": "Entities",
+      "children": []
+    }
+  ]
+}
