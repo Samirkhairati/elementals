@@ -1,6 +1,7 @@
 import { TransformComponent } from "./components/TransformComponent";
 import { SpriteComponent } from "./components/SpriteComponent";
 import { ColliderComponent } from "./components/ColliderComponent";
+import { AreaComponent } from "./components/AreaComponent";
 import { GridMovementComponent } from "./components/GridMovementComponent";
 import { FreeMovementComponent } from "./components/FreeMovementComponent";
 import { PlayerControlComponent } from "./components/PlayerControlComponent";
@@ -29,6 +30,7 @@ export interface ComponentTypeMap {
   Transform: TransformComponent;
   Sprite: SpriteComponent;
   Collider: ColliderComponent;
+  Area: AreaComponent;
   Movement: GridMovementComponent;
   Event: EventComponent;
   Tag: TagComponent;
@@ -148,6 +150,8 @@ const FACTORIES: { [K in ComponentTypeName]: Factory<ComponentTypeMap[K]> } = {
         isSolid: bool(d, "isSolid"),
       }),
     ),
+
+  Area: (d) => new AreaComponent(defined({ width: num(d, "width"), height: num(d, "height"), offsetX: num(d, "offsetX"), offsetY: num(d, "offsetY") })),
 
   GridMovement: (d) =>
     new GridMovementComponent(defined({ speed: num(d, "speed"), direction: oneOf(d, "direction", DIRECTIONS) })),

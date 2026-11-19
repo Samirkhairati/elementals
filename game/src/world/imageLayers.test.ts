@@ -146,16 +146,19 @@ describe("ImageLayerRenderer", () => {
     expect(added[0]).toMatchObject({ x: 40, y: 64, texture: key, frame: "__BASE", origin: [0.5, 1], depth: 5, alpha: 0.5, flip: [true, false], display: null });
   });
 
-  it("a y-sorted picture (from its layer) draws among the characters by its anchor's y, the others at the layer's depth", () => {
+  it("a y-sorted picture (in a YSort) draws among the characters by its anchor's y, the others at the layer's depth", () => {
     const { scene, added } = fakeScene({ [key]: sky });
     const r = new ImageLayerRenderer(scene, realSprites);
-    r.show(exported([{ id: "a", graphicId: "images/sky.png", x: 40, y: 64 }, { id: "b", graphicId: "images/sky.png", x: 40, y: 96, ySort: false }], { ySort: true }), { ySortDepth: 20 });
-    expect(added[0].depth).toBeGreaterThan(20);
-    expect(added[0].depth).toBeLessThan(21);
+    // A y-sorted picture of an old image layer is wrapped in a YSort; the other one stays in the layer (now a Node2D).
+    r.show(exported([{ id: "a", graphicId: "images/sky.png", x: 40, y: 64, ySort: true }, { id: "b", graphicId: "images/sky.png", x: 40, y: 96 }]), { ySortDepth: 20 });
+    const a = added.find((img) => img.y === 64)!;
+    const b = added.find((img) => img.y === 96)!;
+    expect(a.depth).toBeGreaterThan(20);
+    expect(a.depth).toBeLessThan(21);
     // A character above its anchor is behind it, one below is in front of it.
-    expect(r.ySort.entityDepth(20, 40)).toBeLessThan(added[0].depth);
-    expect(r.ySort.entityDepth(20, 70)).toBeGreaterThan(added[0].depth);
-    expect(added[1].depth).toBe(5);
+    expect(r.ySort.entityDepth(20, 40)).toBeLessThan(a.depth);
+    expect(r.ySort.entityDepth(20, 70)).toBeGreaterThan(a.depth);
+    expect(b.depth).toBe(5);
   });
 
   it("y-sorted pictures keep the layer's draw order, whatever their y: only the characters move between them", () => {

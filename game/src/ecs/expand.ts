@@ -11,6 +11,7 @@ import { spriteRegistry, type SpriteRegistry } from "@/data/spriteRegistry";
 import { buildSpriteComponents } from "@/sprites/spriteState";
 import { TransformComponent } from "./components/TransformComponent";
 import { ColliderComponent } from "./components/ColliderComponent";
+import { AreaComponent } from "./components/AreaComponent";
 import { GridMovementComponent } from "./components/GridMovementComponent";
 import { FreeMovementComponent } from "./components/FreeMovementComponent";
 import { PlayerControlComponent } from "./components/PlayerControlComponent";
@@ -57,6 +58,7 @@ export function expandMovement(props: MovementProps, facing: SpriteProps["facing
  *  - Sprite    -> SpriteComponent (+ AnimatorComponent); an empty asset means no
  *                 graphic, an unknown asset warns and means no graphic
  *  - Collider  -> ColliderComponent
+ *  - Area      -> AreaComponent (where events trigger, when not the Collider)
  *  - Movement  -> GridMovement (+ FreeMovement + PlayerControl for `player`, + AIWander for `wander`)
  *  - Event     -> EventComponent (states; the state selector applies state overrides later)
  *  - Tag       -> TagComponent
@@ -98,6 +100,10 @@ export function expandEntity(entity: EngineEntity, ctx: ExpandContext = defaultE
     const c = normalizeProps("Collider", components.Collider);
     baseSolid = c.isSolid;
     out.push(new ColliderComponent(c));
+  }
+
+  if (components.Area !== undefined) {
+    out.push(new AreaComponent(normalizeProps("Area", components.Area)));
   }
 
   if (components.Movement !== undefined) {

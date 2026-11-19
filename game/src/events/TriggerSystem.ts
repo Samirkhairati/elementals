@@ -14,7 +14,7 @@ import { gameState } from "@/core/GameState";
 import { EventBus, Events } from "@/utils/EventBus";
 import { GAME_CONSTANTS } from "@/constants/game";
 import type { EventRuntime } from "./EventRuntime";
-import { coversTile, footprint, tileOfAnchor, type Tile } from "./footprint";
+import { coversTile, footprint, tileOfAnchor, triggerArea, type Tile } from "./footprint";
 
 const OFFSETS: Record<Facing, { dc: number; dr: number }> = {
   left: { dc: -1, dr: 0 },
@@ -251,7 +251,7 @@ export class TriggerSystem extends System {
       const state = ev.states[ev.activeState];
       if (state.trigger !== trigger || (accept && !accept(state))) continue;
       if (this.runtime.isRunning(entity)) continue;
-      const range = footprint(transform, world.getComponent(entity, ColliderComponent), this.tileSize);
+      const range = footprint(transform, triggerArea(world, entity), this.tileSize);
       if (coversTile(range, tile)) out.push({ entity, index: ev.activeState, state, dist });
     }
     return out;
@@ -365,7 +365,7 @@ export class TriggerSystem extends System {
     return this.findAt(world, from, trigger).filter((m) => {
       if (m.entity === self) return false;
       const t = world.getComponent(m.entity, TransformComponent);
-      return !t || !coversTile(footprint(t, world.getComponent(m.entity, ColliderComponent), this.tileSize), to);
+      return !t || !coversTile(footprint(t, triggerArea(world, m.entity), this.tileSize), to);
     });
   }
 
@@ -384,7 +384,7 @@ export class TriggerSystem extends System {
         rec = { state, inside: false };
         this.near.set(entity, rec);
       }
-      const area = footprint(transform, world.getComponent(entity, ColliderComponent), this.tileSize);
+      const area = footprint(transform, triggerArea(world, entity), this.tileSize);
       const dist = Math.max(area.minCol - tile.col, 0, tile.col - area.maxCol, area.minRow - tile.row, 0, tile.row - area.maxRow);
       const inside = dist <= stateRange(state) && (!state.lineOfSight || this.canSee(entity, area, tile));
       if (!inside) {

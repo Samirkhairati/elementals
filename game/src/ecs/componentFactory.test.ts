@@ -28,7 +28,7 @@ describe('createComponentFromData: type coverage', () => {
   it('handles exactly the shared COMPONENT_TYPES plus the legacy names', () => {
     const expected = [...COMPONENT_TYPES, ...LEGACY_COMPONENT_TYPES].sort();
     expect([...COMPONENT_TYPE_NAMES].sort()).toEqual(expected);
-    expect(expected).toHaveLength(13);
+    expect(expected).toHaveLength(14);
     for (const type of expected) {
       const c = createComponentFromData(type, MINIMAL_PROPS[type] ?? {});
       expect(c, type).not.toBeNull();
@@ -38,7 +38,7 @@ describe('createComponentFromData: type coverage', () => {
   it('pins the expected names', () => {
     expect([...COMPONENT_TYPE_NAMES].sort()).toEqual(
       [
-        'Transform', 'Sprite', 'Collider', 'Movement', 'Event', 'Tag',
+        'Transform', 'Sprite', 'Collider', 'Area', 'Movement', 'Event', 'Tag',
         'SpriteView', 'GridMovement', 'FreeMovement', 'PlayerControl', 'CharacterAnimation', 'Interactable', 'AIWander',
       ].sort(),
     );

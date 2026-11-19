@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { tileToAnchor } from '@shared/engine/index.ts';
-import { makeRig, cmd, state, flush, type Rig } from '@/test/rig';
+import { makeRig, makeEntityDef, cmd, state, flush, type Rig } from '@/test/rig';
 import { TriggerSystem } from './TriggerSystem';
 import { MovementSystem } from '@/ecs/systems/MovementSystem';
 import { SpatialSystem } from '@/ecs/systems/SpatialSystem';
@@ -169,6 +169,19 @@ describe('action trigger', () => {
     await step();
     expect(rig.ui.texts).toEqual([]);
     expect(gameState.isInputLocked).toBe(false);
+  });
+
+  it('an Area2D next to a solid body is where the events trigger', async () => {
+    rig.addPlayer(5, 5, 'down');
+    const def = makeEntityDef({ id: 'sign', col: 5, row: 8, states: [state([say('read me')])] });
+    def.components.Area = { width: 32, height: 96, offsetX: 0, offsetY: 0 }; // rows 6..8; the body is row 8 only
+    const { entities } = hydrateMapEntities(rig.world, [def], rig.expandCtx);
+    rig.runtime.states.refresh(entities[0]);
+    triggers.resetTouchState(rig.world);
+    triggers.requestAction();
+    await step();
+    expect(rig.ui.texts[0]?.text).toBe('read me');
+    expect(rig.world.getComponent(entities[0], ColliderComponent)!.height).toBe(32);
   });
 
   it('only triggers action states; other triggers are ignored by the action key', async () => {

@@ -6,6 +6,7 @@ export * from "./components/TransformComponent";
 export * from "./components/SpriteComponent";
 export * from "./components/TagComponent";
 export * from "./components/ColliderComponent";
+export * from "./components/AreaComponent";
 export * from "./components/GridMovementComponent";
 export * from "./components/FreeMovementComponent";
 export * from "./components/PlayerControlComponent";

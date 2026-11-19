@@ -1,6 +1,9 @@
 import { TILE_SIZE } from "@shared/engine/index.ts";
 import type { TransformComponent } from "@/ecs/components/TransformComponent";
-import type { ColliderComponent } from "@/ecs/components/ColliderComponent";
+import { ColliderComponent } from "@/ecs/components/ColliderComponent";
+import { AreaComponent } from "@/ecs/components/AreaComponent";
+import type { Entity } from "@/ecs/Entity";
+import type { World } from "@/ecs/World";
 
 export interface TileRange {
   minCol: number;
@@ -42,6 +45,11 @@ export function footprint(
     minRow: Math.floor(top / tileSize),
     maxRow: Math.floor((bottom - EPS) / tileSize),
   };
+}
+
+/** The box an entity's events trigger in: its Area when it has one, else its Collider (none = its anchor's tile). */
+export function triggerArea(world: World, entity: Entity): Pick<ColliderComponent, "width" | "height" | "offsetX" | "offsetY"> | undefined {
+  return world.getComponent(entity, AreaComponent) ?? world.getComponent(entity, ColliderComponent);
 }
 
 export function coversTile(range: TileRange, tile: Tile): boolean {
