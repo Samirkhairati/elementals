@@ -2,6 +2,58 @@
   "version": 2,
   "characters": [
     {
+      "id": "animated/waterfall",
+      "def": {
+        "version": 2,
+        "name": "waterfall",
+        "tags": [],
+        "profile": "prop",
+        "facing": "none",
+        "pivot": {
+          "x": 0.5,
+          "y": 1
+        },
+        "sheets": {
+          "gif": {
+            "image": "images/city-exports/waterfall.gif",
+            "frameWidth": 394,
+            "frameHeight": 434,
+            "margin": 0,
+            "spacing": 0
+          }
+        },
+        "clips": {
+          "idle": {
+            "sheet": "gif",
+            "fps": 7,
+            "loop": true,
+            "directional": false,
+            "frames": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8
+            ]
+          }
+        },
+        "bindings": {
+          "idle": "idle"
+        },
+        "still": {
+          "sheet": "gif",
+          "frame": 0
+        }
+      },
+      "files": {
+        "gif": "graphics/images/city-exports/waterfall.gif.png"
+      }
+    },
+    {
       "id": "characters/npc-blue",
       "def": {
         "version": 2,

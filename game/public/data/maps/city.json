@@ -1,18 +1,83 @@
 {
+  "properties": [
+    {
+      "name": "pixelWidth",
+      "type": "int",
+      "value": 1972
+    },
+    {
+      "name": "pixelHeight",
+      "type": "int",
+      "value": 813
+    }
+  ],
   "compressionlevel": -1,
-  "height": 27,
+  "height": 26,
   "infinite": false,
   "layers": [
     {
       "id": 1,
-      "name": "silhouettes",
+      "name": "Collision shapes",
       "objects": [
         {
           "id": 1,
+          "name": "",
+          "type": "",
+          "x": 578,
+          "y": 536,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "polygon": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 118,
+              "y": 0
+            },
+            {
+              "x": 119,
+              "y": -109
+            },
+            {
+              "x": -3,
+              "y": -109
+            },
+            {
+              "x": -3,
+              "y": 0
+            }
+          ]
+        }
+      ],
+      "opacity": 1,
+      "type": "objectgroup",
+      "visible": true,
+      "width": 62,
+      "height": 26,
+      "x": 0,
+      "y": 0,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "collision"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "silhouettes",
+      "objects": [
+        {
+          "id": 2,
           "name": "images/city-exports/foreground.png",
           "type": "image",
-          "x": 1007,
-          "y": 1058,
+          "x": 993,
+          "y": 1050,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -29,8 +94,8 @@
       "opacity": 1,
       "type": "objectgroup",
       "visible": true,
-      "width": 63,
-      "height": 27,
+      "width": 62,
+      "height": 26,
       "x": 0,
       "y": 0,
       "properties": [
@@ -47,15 +112,15 @@
       ]
     },
     {
-      "id": 2,
+      "id": 3,
       "name": "wall",
       "objects": [
         {
-          "id": 2,
+          "id": 3,
           "name": "images/city-exports/dam-wall.png",
           "type": "image",
-          "x": 1024,
-          "y": 821,
+          "x": 995,
+          "y": 800,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -72,8 +137,8 @@
       "opacity": 1,
       "type": "objectgroup",
       "visible": true,
-      "width": 63,
-      "height": 27,
+      "width": 62,
+      "height": 26,
       "x": 0,
       "y": 0,
       "properties": [
@@ -90,15 +155,15 @@
       ]
     },
     {
-      "id": 3,
+      "id": 4,
       "name": "props",
       "objects": [
         {
-          "id": 3,
+          "id": 4,
           "name": "images/city-exports/props/middle-pole.png",
           "type": "image",
-          "x": 1167,
-          "y": 609,
+          "x": 1153,
+          "y": 601,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -117,11 +182,11 @@
           ]
         },
         {
-          "id": 4,
+          "id": 5,
           "name": "images/city-exports/props/cycle.png",
           "type": "image",
-          "x": 1131,
-          "y": 611,
+          "x": 1117,
+          "y": 603,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -140,11 +205,11 @@
           ]
         },
         {
-          "id": 5,
+          "id": 6,
           "name": "images/city-exports/props/pump.png",
           "type": "image",
-          "x": 1154,
-          "y": 629,
+          "x": 1140,
+          "y": 621,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -163,11 +228,11 @@
           ]
         },
         {
-          "id": 6,
+          "id": 7,
           "name": "images/city-exports/props/postbox.png",
           "type": "image",
-          "x": 955,
-          "y": 613,
+          "x": 941,
+          "y": 605,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -186,11 +251,11 @@
           ]
         },
         {
-          "id": 7,
+          "id": 8,
           "name": "images/city-exports/props/crate.png",
           "type": "image",
-          "x": 1048,
-          "y": 618,
+          "x": 1034,
+          "y": 610,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -209,11 +274,11 @@
           ]
         },
         {
-          "id": 8,
+          "id": 9,
           "name": "images/city-exports/props/left-pole.png",
           "type": "image",
-          "x": 417,
-          "y": 703,
+          "x": 403,
+          "y": 695,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -232,11 +297,11 @@
           ]
         },
         {
-          "id": 9,
+          "id": 10,
           "name": "images/city-exports/props/left-fence.png",
           "type": "image",
-          "x": 522,
-          "y": 743,
+          "x": 508,
+          "y": 735,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -255,11 +320,11 @@
           ]
         },
         {
-          "id": 10,
+          "id": 11,
           "name": "images/city-exports/props/down-fence.png",
           "type": "image",
-          "x": 1038,
-          "y": 743,
+          "x": 1024,
+          "y": 735,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -281,8 +346,8 @@
       "opacity": 1,
       "type": "objectgroup",
       "visible": true,
-      "width": 63,
-      "height": 27,
+      "width": 62,
+      "height": 26,
       "x": 0,
       "y": 0,
       "properties": [
@@ -299,15 +364,15 @@
       ]
     },
     {
-      "id": 4,
+      "id": 5,
       "name": "tall grass",
       "objects": [
         {
-          "id": 11,
+          "id": 12,
           "name": "images/city-exports/decorations/tall-grass/stairs-grass.png",
           "type": "image",
-          "x": 556,
-          "y": 749,
+          "x": 542,
+          "y": 741,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -326,11 +391,11 @@
           ]
         },
         {
-          "id": 12,
+          "id": 13,
           "name": "images/city-exports/decorations/tall-grass/back-grass.png",
           "type": "image",
-          "x": 829,
-          "y": 734,
+          "x": 815,
+          "y": 726,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -349,11 +414,11 @@
           ]
         },
         {
-          "id": 13,
+          "id": 14,
           "name": "images/city-exports/decorations/tall-grass/front-grass.png",
           "type": "image",
-          "x": 928,
-          "y": 745,
+          "x": 914,
+          "y": 737,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -375,8 +440,8 @@
       "opacity": 1,
       "type": "objectgroup",
       "visible": true,
-      "width": 63,
-      "height": 27,
+      "width": 62,
+      "height": 26,
       "x": 0,
       "y": 0,
       "properties": [
@@ -393,15 +458,15 @@
       ]
     },
     {
-      "id": 5,
+      "id": 6,
       "name": "pit",
       "objects": [
         {
-          "id": 14,
+          "id": 15,
           "name": "images/city-exports/buildings/pit/pit-back.png",
           "type": "image",
-          "x": 1033,
-          "y": 565,
+          "x": 1019,
+          "y": 557,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -420,11 +485,11 @@
           ]
         },
         {
-          "id": 15,
+          "id": 16,
           "name": "images/city-exports/buildings/pit/orange-fence.png",
           "type": "image",
-          "x": 1053,
-          "y": 605,
+          "x": 1039,
+          "y": 597,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -443,11 +508,11 @@
           ]
         },
         {
-          "id": 16,
+          "id": 17,
           "name": "images/city-exports/buildings/pit/subway.png",
           "type": "image",
-          "x": 857,
-          "y": 606,
+          "x": 843,
+          "y": 598,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -469,8 +534,8 @@
       "opacity": 1,
       "type": "objectgroup",
       "visible": true,
-      "width": 63,
-      "height": 27,
+      "width": 62,
+      "height": 26,
       "x": 0,
       "y": 0,
       "properties": [
@@ -487,15 +552,15 @@
       ]
     },
     {
-      "id": 6,
+      "id": 7,
       "name": "right",
       "objects": [
         {
-          "id": 17,
+          "id": 18,
           "name": "images/city-exports/buildings/buildings-right/top-up.png",
           "type": "image",
-          "x": 1851,
-          "y": 251,
+          "x": 1837,
+          "y": 243,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -514,11 +579,11 @@
           ]
         },
         {
-          "id": 18,
+          "id": 19,
           "name": "images/city-exports/buildings/buildings-right/top-left.png",
           "type": "image",
-          "x": 1811,
-          "y": 396,
+          "x": 1797,
+          "y": 388,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -537,11 +602,11 @@
           ]
         },
         {
-          "id": 19,
+          "id": 20,
           "name": "images/city-exports/buildings/buildings-right/top-right.png",
           "type": "image",
-          "x": 1930,
-          "y": 345,
+          "x": 1916,
+          "y": 337,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -560,11 +625,11 @@
           ]
         },
         {
-          "id": 20,
+          "id": 21,
           "name": "images/city-exports/buildings/buildings-right/rightmost.png",
           "type": "image",
-          "x": 1926,
-          "y": 625,
+          "x": 1912,
+          "y": 617,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -583,11 +648,11 @@
           ]
         },
         {
-          "id": 21,
+          "id": 22,
           "name": "images/city-exports/buildings/buildings-right/tata.png",
           "type": "image",
-          "x": 1809,
-          "y": 676,
+          "x": 1795,
+          "y": 668,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -606,11 +671,11 @@
           ]
         },
         {
-          "id": 22,
+          "id": 23,
           "name": "images/city-exports/buildings/buildings-right/fridge.png",
           "type": "image",
-          "x": 1612,
-          "y": 635,
+          "x": 1598,
+          "y": 627,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -629,11 +694,11 @@
           ]
         },
         {
-          "id": 23,
+          "id": 24,
           "name": "images/city-exports/buildings/buildings-right/bluehut.png",
           "type": "image",
-          "x": 1358,
-          "y": 629,
+          "x": 1345,
+          "y": 621,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -652,11 +717,11 @@
           ]
         },
         {
-          "id": 24,
+          "id": 25,
           "name": "images/city-exports/buildings/buildings-right/chicken.png",
           "type": "image",
-          "x": 1481,
-          "y": 674,
+          "x": 1467,
+          "y": 666,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -678,8 +743,8 @@
       "opacity": 1,
       "type": "objectgroup",
       "visible": true,
-      "width": 63,
-      "height": 27,
+      "width": 62,
+      "height": 26,
       "x": 0,
       "y": 0,
       "properties": [
@@ -696,15 +761,15 @@
       ]
     },
     {
-      "id": 7,
+      "id": 8,
       "name": "left",
       "objects": [
         {
-          "id": 25,
+          "id": 26,
           "name": "images/city-exports/buildings/left/left-background.png",
           "type": "image",
-          "x": 689,
-          "y": 461,
+          "x": 684,
+          "y": 378,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -716,6 +781,26 @@
               "value": "images/city-exports/buildings/left/left-background.png"
             },
             {
+              "name": "cropX",
+              "type": "int",
+              "value": 0
+            },
+            {
+              "name": "cropY",
+              "type": "int",
+              "value": 0
+            },
+            {
+              "name": "cropW",
+              "type": "int",
+              "value": 600
+            },
+            {
+              "name": "cropH",
+              "type": "int",
+              "value": 323
+            },
+            {
               "name": "ySort",
               "type": "bool",
               "value": true
@@ -723,11 +808,11 @@
           ]
         },
         {
-          "id": 26,
+          "id": 27,
           "name": "images/city-exports/buildings/left/oldbrown-side.png",
           "type": "image",
-          "x": 917,
-          "y": 385,
+          "x": 903,
+          "y": 377,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -746,11 +831,11 @@
           ]
         },
         {
-          "id": 27,
+          "id": 28,
           "name": "images/city-exports/buildings/left/movie.png",
           "type": "image",
-          "x": 657,
-          "y": 545,
+          "x": 643,
+          "y": 537,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -762,6 +847,26 @@
               "value": "images/city-exports/buildings/left/movie.png"
             },
             {
+              "name": "cropX",
+              "type": "int",
+              "value": 0
+            },
+            {
+              "name": "cropY",
+              "type": "int",
+              "value": 0
+            },
+            {
+              "name": "cropW",
+              "type": "int",
+              "value": 154
+            },
+            {
+              "name": "cropH",
+              "type": "int",
+              "value": 439
+            },
+            {
               "name": "ySort",
               "type": "bool",
               "value": true
@@ -769,11 +874,11 @@
           ]
         },
         {
-          "id": 28,
+          "id": 29,
           "name": "images/city-exports/buildings/left/ramen.png",
           "type": "image",
-          "x": 392,
-          "y": 542,
+          "x": 378,
+          "y": 534,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -792,11 +897,11 @@
           ]
         },
         {
-          "id": 29,
+          "id": 30,
           "name": "images/city-exports/buildings/left/coffee.png",
           "type": "image",
-          "x": 497,
-          "y": 542,
+          "x": 483,
+          "y": 534,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -815,11 +920,11 @@
           ]
         },
         {
-          "id": 30,
+          "id": 31,
           "name": "images/city-exports/buildings/left/oldbrown.png",
           "type": "image",
-          "x": 820,
-          "y": 390,
+          "x": 806,
+          "y": 382,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -838,11 +943,11 @@
           ]
         },
         {
-          "id": 31,
+          "id": 32,
           "name": "images/city-exports/buildings/left/princess.png",
           "type": "image",
-          "x": 1051,
-          "y": 377,
+          "x": 1037,
+          "y": 369,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -861,11 +966,11 @@
           ]
         },
         {
-          "id": 32,
+          "id": 33,
           "name": "images/city-exports/buildings/left/right-background.png",
           "type": "image",
-          "x": 1466,
-          "y": 375,
+          "x": 1452,
+          "y": 367,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -887,8 +992,8 @@
       "opacity": 1,
       "type": "objectgroup",
       "visible": true,
-      "width": 63,
-      "height": 27,
+      "width": 62,
+      "height": 26,
       "x": 0,
       "y": 0,
       "properties": [
@@ -905,15 +1010,15 @@
       ]
     },
     {
-      "id": 8,
+      "id": 9,
       "name": "leftmost",
       "objects": [
         {
-          "id": 33,
+          "id": 34,
           "name": "images/city-exports/buildings/left/leftmost-building.png",
           "type": "image",
-          "x": 99,
-          "y": 792,
+          "x": 85,
+          "y": 784,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -935,8 +1040,8 @@
       "opacity": 1,
       "type": "objectgroup",
       "visible": true,
-      "width": 63,
-      "height": 27,
+      "width": 62,
+      "height": 26,
       "x": 0,
       "y": 0,
       "properties": [
@@ -953,15 +1058,15 @@
       ]
     },
     {
-      "id": 9,
+      "id": 10,
       "name": "top",
       "objects": [
         {
-          "id": 34,
+          "id": 35,
           "name": "images/city-exports/top-stairs.png",
           "type": "image",
-          "x": 1171,
-          "y": 357,
+          "x": 1157,
+          "y": 349,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -978,8 +1083,8 @@
       "opacity": 1,
       "type": "objectgroup",
       "visible": true,
-      "width": 63,
-      "height": 27,
+      "width": 62,
+      "height": 26,
       "x": 0,
       "y": 0,
       "properties": [
@@ -991,20 +1096,20 @@
         {
           "name": "z",
           "type": "int",
-          "value": 2
+          "value": 5
         }
       ]
     },
     {
-      "id": 10,
+      "id": 11,
       "name": "middle",
       "objects": [
         {
-          "id": 35,
+          "id": 36,
           "name": "images/city-exports/stairs-middle.png",
           "type": "image",
-          "x": 1230,
-          "y": 629,
+          "x": 1216,
+          "y": 621,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -1021,8 +1126,8 @@
       "opacity": 1,
       "type": "objectgroup",
       "visible": true,
-      "width": 63,
-      "height": 27,
+      "width": 62,
+      "height": 26,
       "x": 0,
       "y": 0,
       "properties": [
@@ -1034,20 +1139,20 @@
         {
           "name": "z",
           "type": "int",
-          "value": 2
+          "value": 5
         }
       ]
     },
     {
-      "id": 11,
+      "id": 12,
       "name": "bottom",
       "objects": [
         {
-          "id": 36,
+          "id": 37,
           "name": "images/city-exports/stairs-down.png",
           "type": "image",
-          "x": 1247,
-          "y": 871,
+          "x": 1233,
+          "y": 863,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -1064,8 +1169,8 @@
       "opacity": 1,
       "type": "objectgroup",
       "visible": true,
-      "width": 63,
-      "height": 27,
+      "width": 62,
+      "height": 26,
       "x": 0,
       "y": 0,
       "properties": [
@@ -1077,20 +1182,20 @@
         {
           "name": "z",
           "type": "int",
-          "value": 2
+          "value": 5
         }
       ]
     },
     {
-      "id": 12,
+      "id": 13,
       "name": "wall structure",
       "objects": [
         {
-          "id": 37,
+          "id": 38,
           "name": "images/city-exports/walls.png",
           "type": "image",
-          "x": 921,
-          "y": 691,
+          "x": 907,
+          "y": 683,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -1107,8 +1212,8 @@
       "opacity": 1,
       "type": "objectgroup",
       "visible": true,
-      "width": 63,
-      "height": 27,
+      "width": 62,
+      "height": 26,
       "x": 0,
       "y": 0,
       "properties": [
@@ -1120,20 +1225,20 @@
         {
           "name": "z",
           "type": "int",
-          "value": 1
+          "value": 3
         }
       ]
     },
     {
-      "id": 13,
+      "id": 14,
       "name": "background",
       "objects": [
         {
-          "id": 38,
+          "id": 39,
           "name": "images/city-exports/right-background/distant-building.png",
           "type": "image",
-          "x": 1721,
-          "y": 458,
+          "x": 1707,
+          "y": 450,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -1147,11 +1252,11 @@
           ]
         },
         {
-          "id": 39,
+          "id": 40,
           "name": "images/city-exports/right-background/distant-building-overlay.png",
           "type": "image",
-          "x": 1703,
-          "y": 453,
+          "x": 1689,
+          "y": 445,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -1190,11 +1295,11 @@
           ]
         },
         {
-          "id": 40,
+          "id": 41,
           "name": "images/city-exports/right-background/alley-darkness.png",
           "type": "image",
-          "x": 1705,
-          "y": 469,
+          "x": 1691,
+          "y": 461,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -1211,177 +1316,8 @@
       "opacity": 1,
       "type": "objectgroup",
       "visible": true,
-      "width": 63,
-      "height": 27,
-      "x": 0,
-      "y": 0,
-      "properties": [
-        {
-          "name": "kind",
-          "type": "string",
-          "value": "image"
-        },
-        {
-          "name": "z",
-          "type": "int",
-          "value": 4
-        }
-      ]
-    },
-    {
-      "id": 14,
-      "name": "dirt",
-      "objects": [
-        {
-          "id": 41,
-          "name": "images/city-exports/decorations/dirt/1.png",
-          "type": "image",
-          "x": 1847,
-          "y": 712,
-          "width": 0,
-          "height": 0,
-          "rotation": 0,
-          "visible": true,
-          "properties": [
-            {
-              "name": "graphic",
-              "type": "string",
-              "value": "images/city-exports/decorations/dirt/1.png"
-            }
-          ]
-        },
-        {
-          "id": 42,
-          "name": "images/city-exports/decorations/dirt/2.png",
-          "type": "image",
-          "x": 773,
-          "y": 630,
-          "width": 0,
-          "height": 0,
-          "rotation": 0,
-          "visible": true,
-          "properties": [
-            {
-              "name": "graphic",
-              "type": "string",
-              "value": "images/city-exports/decorations/dirt/2.png"
-            }
-          ]
-        },
-        {
-          "id": 43,
-          "name": "images/city-exports/decorations/dirt/3.png",
-          "type": "image",
-          "x": 1550,
-          "y": 714,
-          "width": 0,
-          "height": 0,
-          "rotation": 0,
-          "visible": true,
-          "properties": [
-            {
-              "name": "graphic",
-              "type": "string",
-              "value": "images/city-exports/decorations/dirt/3.png"
-            }
-          ]
-        },
-        {
-          "id": 44,
-          "name": "images/city-exports/decorations/dirt/4.png",
-          "type": "image",
-          "x": 828,
-          "y": 693,
-          "width": 0,
-          "height": 0,
-          "rotation": 0,
-          "visible": true,
-          "properties": [
-            {
-              "name": "graphic",
-              "type": "string",
-              "value": "images/city-exports/decorations/dirt/4.png"
-            }
-          ]
-        },
-        {
-          "id": 45,
-          "name": "images/city-exports/decorations/dirt/5.png",
-          "type": "image",
-          "x": 1307,
-          "y": 658,
-          "width": 0,
-          "height": 0,
-          "rotation": 0,
-          "visible": true,
-          "properties": [
-            {
-              "name": "graphic",
-              "type": "string",
-              "value": "images/city-exports/decorations/dirt/5.png"
-            }
-          ]
-        },
-        {
-          "id": 46,
-          "name": "images/city-exports/decorations/dirt/5.png",
-          "type": "image",
-          "x": 1367,
-          "y": 662,
-          "width": 0,
-          "height": 0,
-          "rotation": 0,
-          "visible": true,
-          "properties": [
-            {
-              "name": "graphic",
-              "type": "string",
-              "value": "images/city-exports/decorations/dirt/5.png"
-            }
-          ]
-        },
-        {
-          "id": 47,
-          "name": "images/city-exports/decorations/dirt/5.png",
-          "type": "image",
-          "x": 1689,
-          "y": 622,
-          "width": 0,
-          "height": 0,
-          "rotation": 0,
-          "visible": true,
-          "properties": [
-            {
-              "name": "graphic",
-              "type": "string",
-              "value": "images/city-exports/decorations/dirt/5.png"
-            }
-          ]
-        },
-        {
-          "id": 48,
-          "name": "1 2",
-          "type": "image",
-          "x": 1724,
-          "y": 725,
-          "width": 0,
-          "height": 0,
-          "rotation": 0,
-          "visible": true,
-          "properties": [
-            {
-              "name": "graphic",
-              "type": "string",
-              "value": "images/city-exports/decorations/dirt/1.png"
-            }
-          ]
-        }
-      ],
-      "opacity": 1,
-      "type": "objectgroup",
-      "visible": true,
-      "width": 63,
-      "height": 27,
+      "width": 62,
+      "height": 26,
       "x": 0,
       "y": 0,
       "properties": [
@@ -1399,14 +1335,183 @@
     },
     {
       "id": 15,
+      "name": "dirt",
+      "objects": [
+        {
+          "id": 42,
+          "name": "images/city-exports/decorations/dirt/1.png",
+          "type": "image",
+          "x": 1833,
+          "y": 704,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "graphic",
+              "type": "string",
+              "value": "images/city-exports/decorations/dirt/1.png"
+            }
+          ]
+        },
+        {
+          "id": 43,
+          "name": "images/city-exports/decorations/dirt/2.png",
+          "type": "image",
+          "x": 759,
+          "y": 622,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "graphic",
+              "type": "string",
+              "value": "images/city-exports/decorations/dirt/2.png"
+            }
+          ]
+        },
+        {
+          "id": 44,
+          "name": "images/city-exports/decorations/dirt/3.png",
+          "type": "image",
+          "x": 1536,
+          "y": 706,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "graphic",
+              "type": "string",
+              "value": "images/city-exports/decorations/dirt/3.png"
+            }
+          ]
+        },
+        {
+          "id": 45,
+          "name": "images/city-exports/decorations/dirt/4.png",
+          "type": "image",
+          "x": 814,
+          "y": 685,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "graphic",
+              "type": "string",
+              "value": "images/city-exports/decorations/dirt/4.png"
+            }
+          ]
+        },
+        {
+          "id": 46,
+          "name": "images/city-exports/decorations/dirt/5.png",
+          "type": "image",
+          "x": 1293,
+          "y": 650,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "graphic",
+              "type": "string",
+              "value": "images/city-exports/decorations/dirt/5.png"
+            }
+          ]
+        },
+        {
+          "id": 47,
+          "name": "images/city-exports/decorations/dirt/5.png",
+          "type": "image",
+          "x": 1353,
+          "y": 654,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "graphic",
+              "type": "string",
+              "value": "images/city-exports/decorations/dirt/5.png"
+            }
+          ]
+        },
+        {
+          "id": 48,
+          "name": "images/city-exports/decorations/dirt/5.png",
+          "type": "image",
+          "x": 1675,
+          "y": 614,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "graphic",
+              "type": "string",
+              "value": "images/city-exports/decorations/dirt/5.png"
+            }
+          ]
+        },
+        {
+          "id": 49,
+          "name": "1 2",
+          "type": "image",
+          "x": 1710,
+          "y": 717,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "graphic",
+              "type": "string",
+              "value": "images/city-exports/decorations/dirt/1.png"
+            }
+          ]
+        }
+      ],
+      "opacity": 1,
+      "type": "objectgroup",
+      "visible": true,
+      "width": 62,
+      "height": 26,
+      "x": 0,
+      "y": 0,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "image"
+        },
+        {
+          "name": "z",
+          "type": "int",
+          "value": 2
+        }
+      ]
+    },
+    {
+      "id": 16,
       "name": "grass",
       "objects": [
         {
-          "id": 49,
+          "id": 50,
           "name": "images/city-exports/decorations/grass-overlay.png",
           "type": "image",
-          "x": 1039,
-          "y": 742,
+          "x": 1025,
+          "y": 734,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -1423,8 +1528,8 @@
       "opacity": 1,
       "type": "objectgroup",
       "visible": true,
-      "width": 63,
-      "height": 27,
+      "width": 62,
+      "height": 26,
       "x": 0,
       "y": 0,
       "properties": [
@@ -1441,15 +1546,15 @@
       ]
     },
     {
-      "id": 16,
+      "id": 17,
       "name": "pavement",
       "objects": [
         {
-          "id": 50,
+          "id": 51,
           "name": "images/city-exports/level-1-pavement.png",
           "type": "image",
-          "x": 1021,
-          "y": 747,
+          "x": 1007,
+          "y": 739,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -1466,8 +1571,8 @@
       "opacity": 1,
       "type": "objectgroup",
       "visible": true,
-      "width": 63,
-      "height": 27,
+      "width": 62,
+      "height": 26,
       "x": 0,
       "y": 0,
       "properties": [
@@ -1479,8 +1584,8 @@
       ]
     }
   ],
-  "nextlayerid": 17,
-  "nextobjectid": 51,
+  "nextlayerid": 18,
+  "nextobjectid": 52,
   "orientation": "orthogonal",
   "renderorder": "right-down",
   "tiledversion": "1.10.2",
@@ -1489,7 +1594,64 @@
   "tilewidth": 32,
   "type": "map",
   "version": "1.10",
-  "width": 63,
-  "schemaVersion": 5,
-  "entities": []
+  "width": 62,
+  "schemaVersion": 7,
+  "entities": [
+    {
+      "id": "ef579837-d137-4616-8396-a93c3c2b0711",
+      "name": "New Entity",
+      "x": 368,
+      "y": 384,
+      "visible": true,
+      "components": {
+        "Transform": {
+          "x": 368,
+          "y": 384,
+          "depth": 0,
+          "free": false
+        },
+        "Sprite": {
+          "asset": "animated/waterfall",
+          "facing": "down",
+          "animation": "",
+          "animSpeed": 1,
+          "frame": 0,
+          "offsetX": 0,
+          "offsetY": 34,
+          "scale": 1,
+          "flipX": false,
+          "tint": "",
+          "opacity": 1,
+          "visible": true
+        },
+        "Event": {
+          "states": [
+            {
+              "id": "0676b4b6-7f9c-403f-b18a-67354344468b",
+              "name": "State 1",
+              "conditions": [],
+              "trigger": "interact",
+              "blocks": true,
+              "graph": {
+                "nodes": [
+                  {
+                    "id": "c6b65258-1926-4bf3-9ae1-ae975212e8e2",
+                    "type": "start",
+                    "params": {},
+                    "out": {},
+                    "x": 0,
+                    "y": 0
+                  }
+                ],
+                "frames": []
+              },
+              "faceOnInteract": true,
+              "solid": null,
+              "appearance": {}
+            }
+          ]
+        }
+      }
+    }
+  ]
 }
