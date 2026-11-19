@@ -3,6 +3,7 @@ import type { TilemapData } from "@/world/tilemap/interfaces";
 import { TilesetManager } from "@/world/tilemap/TilesetManager";
 import { LayerManager } from "@/world/tilemap/LayerManager";
 import { GameLayer } from "@/world/tilemap/GameLayer";
+import { layerDepth } from "@/ecs/depth";
 
 export class PhaserTilemapAdapter {
   private scene: Scene;
@@ -47,7 +48,7 @@ export class PhaserTilemapAdapter {
 
     // Iteratively build layers wrapped within the GameLayer structure
     // Tiled data layers dictate our rendering loops
-    mapData.layers.forEach((layerData) => {
+    mapData.layers.forEach((layerData, topIndex) => {
       // By checking type we support extendibility (e.g object groups later)
       if (layerData.type === "tilelayer") {
         const phaserLayer = this.map!.createLayer(
@@ -62,11 +63,9 @@ export class PhaserTilemapAdapter {
           // The collision layer is data for the CollisionSystem, never drawn.
           phaserLayer.setVisible(layerData.name !== "collision" && (layerData.visible ?? true));
 
-          // Handle custom z-depth property for layering
+          // Depth = the layer's `z` (0 without one); layers of the same z keep the editor's order (`layerDepth`).
           const zProp = layerData.properties?.find((p) => p.name === "z");
-          if (zProp) {
-            phaserLayer.setDepth(zProp.value as number);
-          }
+          phaserLayer.setDepth(layerDepth(typeof zProp?.value === "number" ? zProp.value : 0, topIndex));
 
           const gameLayer = new GameLayer(layerData.name, phaserLayer);
           this.layerManager.addLayer(layerData.name, gameLayer);

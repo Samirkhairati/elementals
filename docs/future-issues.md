@@ -98,12 +98,6 @@ Left for later:
 
 ## Node tree (schema 7)
 
-- **Equal-`z` layers draw in the opposite order in the game.** The exporter writes layers top first (`sceneLayers(...).reverse()` in
-  `shared/mapExport.ts`) and the game creates them in file order, so of two tile or image layers with the same `z` the game draws the
-  upper one *under* the lower one, the reverse of the editor (in `city`, `pit` and `right` are both z 26). Sprites inside one object group
-  are in draw order, so this only shows between groups; that is why a Node2D without a z of its own stays in its parent's run
-  (`hostIndex` in `shared/sceneLayers.ts`). Fixing it (the game creating layers last-first, or the exporter writing bottom first as
-  Tiled does) changes how existing maps look in the game where equal-`z` layers overlap, so it waits for a decision.
 - **`maps:check` drift on the committed maps is older than schema 7**: `game/public/data/maps/city.json` was re-exported in 1b89482
   from a city map with y-sorted layers that was never committed (the committed `project/maps/city.json` has no y-sort), and
   `market.json` still has the entity field `folder` dropped in schema 6. Export to Game from the editor (or

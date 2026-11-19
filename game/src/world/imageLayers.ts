@@ -6,7 +6,7 @@
 import { normalizeProps } from "@shared/engine/index.ts";
 import type { SpriteRegistry } from "@/data/spriteRegistry";
 import { buildSpriteComponents } from "@/sprites/spriteState";
-import { YSortField, type DepthRect } from "@/ecs/depth";
+import { YSortField, layerDepth, type DepthRect } from "@/ecs/depth";
 import { finiteOr as num, isRecord, rawLayers, tiledProps } from "./tiledRaw";
 import { parseLookProp } from "@/look/readLooks";
 import type { LookSet } from "@shared/look/types.ts";
@@ -35,14 +35,15 @@ export interface ImageObjectDef {
   layerLook?: LookSet;
 }
 
-/** Every image of every visible image layer of a raw (exported) map, in draw order (layers in file order, items as exported). */
+/** Every image of every visible image layer of a raw (exported) map: layers in file order, items as exported; `depth` orders them. */
 export function readImageObjects(raw: unknown): ImageObjectDef[] {
   const out: ImageObjectDef[] = [];
-  for (const layer of rawLayers(raw)) {
+  for (const [topIndex, layer] of rawLayers(raw).entries()) {
     if (!isRecord(layer) || layer.type !== "objectgroup" || layer.visible === false) continue;
     const layerProps = tiledProps(layer);
     if (layerProps.kind !== "image") continue;
-    const depth = num(layerProps.z, 0);
+    // Same depth rule as tile layers: equal-z layers keep the editor's order.
+    const depth = layerDepth(num(layerProps.z, 0), topIndex);
     const layerLook = parseLookProp(layerProps.look);
     for (const obj of Array.isArray(layer.objects) ? layer.objects : []) {
       if (!isRecord(obj) || obj.visible === false) continue;
@@ -191,7 +192,7 @@ export class ImageLayerRenderer {
       this.shown.push(image);
       this.drawn.push({ image, def });
     }
-    // The y-sorted pictures in the order the layers draw them (z, then file order), each at a fixed depth in the
+    // The y-sorted pictures in the order the layers draw them (`depth`: z, then the editor's order), each at a fixed depth in the
     // characters' band, so only the characters move between them.
     sorted.sort((a, b) => a.def.depth - b.def.depth);
     this.ySort.set(ySortDepth, sorted.map((s) => s.def.y), sorted.map((s) => s.box));

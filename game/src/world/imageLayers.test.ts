@@ -96,6 +96,24 @@ describe("readImageObjects", () => {
     expect(c).toMatchObject({ sprite: "objects/chest", graphic: undefined });
   });
 
+  it("of two layers with the same z, the one higher in the editor's list draws on top, as in the editor", () => {
+    const map = {
+      name: "town",
+      width: 4,
+      height: 4,
+      layers: [
+        { id: "u", name: "Upper", type: "image", visible: true, locked: false, z: 26, images: [{ id: "a", graphicId: "up.png", x: 0, y: 0 }] },
+        { id: "l", name: "Lower", type: "image", visible: true, locked: false, z: 26, images: [{ id: "b", graphicId: "low.png", x: 0, y: 0 }] },
+      ],
+      entities: [],
+    };
+    const [up, low] = readImageObjects(JSON.parse(JSON.stringify(convertEditorMapToTiled(map as never, []))));
+    expect(up.graphic).toBe("up.png");
+    expect(up.depth).toBeGreaterThan(low.depth);
+    expect(Math.round(up.depth)).toBe(26);
+    expect(Math.round(low.depth)).toBe(26);
+  });
+
   it("skips hidden layers, other object groups and objects without a picture or sprite", () => {
     expect(readImageObjects(exported([{ id: "a", graphicId: "x.png", x: 0, y: 0 }], { visible: false }))).toEqual([]);
     const raw = exported([{ id: "a", graphicId: "x.png", x: 0, y: 0 }]);

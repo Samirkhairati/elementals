@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { YSortField, sortDepth } from "./depth";
+import { YSortField, layerDepth, sortDepth } from "./depth";
 
 describe("YSortField", () => {
   it("without pictures (or at another depth) a character sorts by its y like any sprite", () => {
@@ -76,5 +76,19 @@ describe("YSortField", () => {
     expect(f.entityDepth(20, 450, { left: 50, top: 418, right: 80, bottom: 450 })).toBeLessThan(p[0]);
     // Touching neither: plain y order against all of them, as without boxes.
     expect(f.entityDepth(20, 450, { left: 250, top: 418, right: 280, bottom: 450 })).toBe(f.entityDepth(20, 450));
+  });
+});
+
+describe("layerDepth", () => {
+  it("keeps the z; a layer lower in the file (the editor's list) sits a hair below an equal-z one above it", () => {
+    expect(layerDepth(26, 0)).toBe(26);
+    expect(layerDepth(26, 1)).toBeLessThan(layerDepth(26, 0));
+    expect(layerDepth(26, 5)).toBeGreaterThan(25.999);
+  });
+
+  it("never drops into the band of the sprites one depth below, and stays under a sprite at its own depth", () => {
+    expect(layerDepth(20, 100000)).toBeGreaterThan(sortDepth(19, 1e9));
+    expect(layerDepth(20, 3)).toBeLessThanOrEqual(sortDepth(20, 0));
+    expect(layerDepth(27, 0)).toBeGreaterThan(layerDepth(26, 0));
   });
 });

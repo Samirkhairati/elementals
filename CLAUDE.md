@@ -86,7 +86,7 @@ editor  --writes-->  project/maps/*.json (editor map format, tile index keyed)
   `components/` (HUDs: dialogue, choices, debug), `core/` (GameState, settings, boot params). The `@/` alias is `game/src`.
 * URL params: `?map=<id>`, `?renderer=canvas|webgl|auto`, `?debug=1` (debug HUD + `window.__game`). Dialogue / choice HUDs are driven through the `EventBus`.
 * The view is **16:9, 32 x 18 tiles by default** (`settingsStore.view`, from the game settings), fitted to the window at any zoom (whole-number zoom is a setting). Movement and the camera are frame-rate independent and sub-pixel (pixel snapping is a setting): do not add `Math.round`/`floor` to positions or camera scroll. Smaller maps are centred on the screen.
-* Tile-layer depth comes from the layer's `z` property (Phaser depth). Layers are created in file order.
+* Tile and image layer depth is the layer's `z` (Phaser depth), nudged by `layerDepth` (`ecs/depth.ts`) so layers of equal `z` draw in the editor's list order (the export lists layers top first).
 * The game needs WebGL (or `?renderer=canvas`); some embedded browser panes cannot create the framebuffer and show a blank canvas.
 
 ## Editor (`editor/`)

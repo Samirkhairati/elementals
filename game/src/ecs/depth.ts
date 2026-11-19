@@ -10,6 +10,18 @@ export function sortDepth(depth: number, y: number): number {
   return depth + Math.min(Math.max(y, 0) / Y_SORT_RANGE, 0.999);
 }
 
+/**
+ * Depth of a map layer (tile or image) from its `z` and its place in the exported file, which lists the layers top first
+ * (`topIndex` 0 = the top one). Layers of the same `z` draw like the editor's list: each one lower in the list sits a
+ * hair below the one above it. The nudge stays under 0.001, so a layer never drops into the band of the sprites one
+ * depth below (those reach `z - 0.001`), and a sprite at the layer's own depth still draws over it.
+ */
+const LAYER_STEP = 1e-6;
+const MAX_LAYER_STEPS = 999;
+export function layerDepth(z: number, topIndex: number): number {
+  return z - Math.min(Math.max(topIndex, 0), MAX_LAYER_STEPS) * LAYER_STEP;
+}
+
 /** A box in map pixels (left < right, top < bottom). */
 export interface DepthRect {
   left: number;
