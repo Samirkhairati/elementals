@@ -70,7 +70,7 @@ blur of the whole layer. Shadows fall on what is drawn below the subject; layers
   own look copies the default first ("= Default" badge). Presets (built-in groups + project presets), copy / paste look,
   save as preset. Tabs: **Edit** (Shadow, the adjustment sections, Vignette, Grain), **Masks**, **Shaders**. Every slider
   commits one undo step on release (`setLook(ref, set, commit)` in `routes/editor.tsx`).
-* **Drop shadow**: right-click a tile or image layer, a picture in the Images panel or a picture on the canvas › **Add
+* **Drop shadow**: right-click a tile or image layer, a picture in the Scene panel or a picture on the canvas › **Add
   drop shadow** (in every profile; then the Look panel opens on it, pinned). The Look panel's **Shadow** section sets
   direction, distance, softness, darkness, colour and blend; a picture shows its layer's shadow and can take its own or
   switch it off.

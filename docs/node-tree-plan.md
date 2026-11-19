@@ -1,6 +1,6 @@
 # One node tree for maps: migration plan
 
-Status: **being implemented on `feat/node-tree`** (see "Implementation decisions" at the end; they win where they differ from the text above). Goal: replace the map's mix of layers, folders, picture groups, the
+Status: **phases 1–4 implemented on `feat/node-tree`** (the editor works on the tree and saves schema 6; see "Implementation decisions" at the end, which win where they differ from the text above). Phase 5 (generalised properties) and phase 6 (game node paths) are not started. Goal: replace the map's mix of layers, folders, picture groups, the
 Entities row, entity folders and collision items with **one tree of nodes**, the way Godot's scene tree works. Every
 node type gets the same treatment: one row, one menu, one inspector, one selection, and the same inherited properties.
 

@@ -67,7 +67,7 @@ Legacy maps (no `schemaVersion`, or components named in `LegacyComponentType`) a
 (`useMapManager.loadMaps` / `onSelectMap`, nothing is written back until the author edits), the exporter migrates
 on export (Tiled JSON always has canonical `entities` and the current `schemaVersion`, 6), and the game migrates defensively on
 load. `migrateMap` also turns a schema 5 map (`layers`, `entities`, ...) into a schema 6 map (one tree of `nodes`, see docs/maps.md);
-`migrateMapToLegacy` stops at the schema 5 shape. Rules for the entities:
+its first step, `migrateFlatMap`, brings older maps to the schema 5 shape. Rules for the entities:
 
 | Legacy | Becomes |
 |---|---|
@@ -216,7 +216,7 @@ entity simply has no graphic until one is picked. `instantiatePrefab(prefab, { x
 * One kind of entity: its area is its Collider box (one tile without a Collider). On the map the magnet snaps placing, dragging and
   resizing (the area's edges land on grid lines; off, whole pixels); the handles on the selected entity resize the area. The inspector's
   numbers (position, collider) take any value and the collider diagram snaps to 4px (Shift = single pixels). New entities come from
-  right-click › Entity › New / Prefab (the Layers panel and the map), and are placed with the same snapping. Duplicate and paste put
+  right-click › Entity › New / Prefab (the Scene panel and the map), and are placed with the same snapping. Duplicate and paste put
   the copy one whole tile down-right, so an entity on the grid stays on it.
 * Inspector = one card per component with a coloured header, consistent 8px spacing scale, schema-driven
   fields, and *custom editors* where a form is not enough: Sprite (asset picker + live preview + animation
