@@ -3,8 +3,8 @@
 // last layer that was active. The old per-kind views (active layer, picked pictures, selected entity...) are derived from it.
 // Everything here is pure: a transition takes the selection and the tree index and returns the next selection.
 
-import { isLayerNode } from '../../../shared/sceneTree'
-import { layerAbove, nodeOf, type SceneIndex } from './sceneIndex'
+import { isBranch, isLayerNode } from '../../../shared/sceneTree'
+import { entityOf, hostOf, layerAbove, nodeOf, type SceneIndex } from './sceneIndex'
 import { pictureIdsBelow } from './sceneOps'
 
 export type SelectMode = 'replace' | 'toggle' | 'range'
@@ -24,32 +24,36 @@ export interface SceneSelection {
 
 export const NO_SELECTION: SceneSelection = { ids: [], primary: null, anchor: null, openGroupId: null, lastLayerId: null }
 
-/** A group that sits inside an image layer: it holds pictures and is picked, moved and locked as a set of them. */
+/** A Node2D or YSort whose sprites are picked as one (`pickAsOne`): picking its row picks its sprites and opens it. */
 export function isPictureGroup(index: SceneIndex, id: string): boolean {
-  const entry = index.byId.get(id)
-  return !!entry && entry.node.type === 'group' && entry.ancestors.some((a) => a.type === 'image')
+  const node = nodeOf(index, id)
+  return !!node && isBranch(node) && node.pickAsOne === true
 }
 
 /**
- * The layer (or group) the panels treat as the active one for a node: a layer is itself, a picture, picture group or
- * collision item stands for its layer, a plain group is itself. Undefined for an entity or a node outside any layer.
+ * The node the panels treat as the active one (the "layer") for a node: a layer is itself, a collision item or a Look
+ * of a TileMap stands for its layer, a sprite (or its Look) for the Node2D / YSort it sits in, a Node2D / YSort is
+ * itself. Undefined for an entity, its component nodes or an unknown id.
  */
 export function activeLayerFor(index: SceneIndex, id: string | null | undefined): string | undefined {
-  const node = nodeOf(index, id)
-  if (!node) return undefined
+  const entry = id ? index.byId.get(id) : undefined
+  if (!entry) return undefined
+  const { node, ancestors } = entry
+  if (entityOf(index, node.id)) return undefined
+  if (node.type === 'picture' || ancestors.some((a) => a.type === 'picture')) return hostOf(index, node.id)?.id
   const layer = layerAbove(index, node.id)
   if (layer) return layer.id
-  return node.type === 'group' ? node.id : undefined
+  return hostOf(index, node.id)?.id
 }
 
 /** Ids a click on a picture should pick: the picture, or every picture of the outermost locked group it is in (unless that group is the open one or above it). */
 export function expandPictureClick(index: SceneIndex, pictureId: string, openGroupId: string | null): string[] {
   const entry = index.byId.get(pictureId)
   if (!entry) return [pictureId]
-  const groups = entry.ancestors.filter((a, i) => a.type === 'group' && entry.ancestors.slice(0, i).some((p) => p.type === 'image'))
+  const groups = entry.ancestors.filter((a) => isBranch(a))
   // Groups up to and including the open one do not hold the click together any more.
   const openAt = openGroupId ? groups.findIndex((g) => g.id === openGroupId) : -1
-  const holding = groups.slice(openAt + 1).find((g) => g.locked === true)
+  const holding = groups.slice(openAt + 1).find((g) => isBranch(g) && g.pickAsOne === true)
   return holding ? pictureIdsBelow(holding) : [pictureId]
 }
 
@@ -146,20 +150,22 @@ export function viewOf(sel: SceneSelection, index: SceneIndex): SelectionView {
   const primary = sel.primary && index.byId.has(sel.primary) ? sel.primary : null
   const primaryNode = nodeOf(index, primary)
   let activeLayerId: string | null = null
-  if (primaryNode?.type === 'entity') activeLayerId = sel.lastLayerId && index.byId.has(sel.lastLayerId) ? sel.lastLayerId : null
+  const primaryEntity = entityOf(index, primary)
+  if (primaryEntity) activeLayerId = sel.lastLayerId && index.byId.has(sel.lastLayerId) ? sel.lastLayerId : null
   else activeLayerId = activeLayerFor(index, primary) ?? null
 
   const pictures = ids.filter((id) => index.byId.get(id)?.node.type === 'picture')
   const pickedImageIds = primary && pictures.includes(primary) ? [primary, ...pictures.filter((id) => id !== primary)] : pictures
   const layerIds = ids.filter((id) => {
     const n = index.byId.get(id)?.node
-    return !!n && id !== activeLayerId && (isLayerNode(n) || (n.type === 'group' && !isPictureGroup(index, id)))
+    return !!n && id !== activeLayerId && (isLayerNode(n) || (isBranch(n) && !isPictureGroup(index, id)))
   })
   return {
     primaryId: primary,
     activeLayerId,
     selectedLayerIds: layerIds.length > 0 ? layerIds : NONE,
-    selectedEntityId: primaryNode?.type === 'entity' ? primaryNode.id : null,
+    // A component node (AnimatedSprite2D, Area2D, ...) shows its entity in the entity panels.
+    selectedEntityId: primaryEntity ? primaryEntity.id : null,
     selectedImageId: primaryNode?.type === 'picture' ? primaryNode.id : pickedImageIds[0] ?? null,
     pickedImageIds: pickedImageIds.length > 0 ? pickedImageIds : NONE,
     openImageGroupId: sel.openGroupId && index.byId.has(sel.openGroupId) ? sel.openGroupId : null,

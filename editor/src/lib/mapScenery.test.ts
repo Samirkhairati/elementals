@@ -32,19 +32,19 @@ const fakeCtx = () => {
   return { ctx, calls }
 }
 
-/** An image layer node holding pictures. */
+/** A Node2D holding sprites. */
 const image = (id: string, pictures: { id: string; graphicId: string; x: number; y: number; visible?: boolean }[]): SceneNode => ({
   id,
   name: id,
-  type: 'image',
-  children: pictures.map((p) => ({ type: 'picture', name: p.id, ...p })),
+  type: 'group',
+  children: pictures.map((p) => ({ type: 'picture', name: p.id, children: [], ...p })),
 }) as SceneNode
 
 describe('LAYER_SCENERY', () => {
-  it('says what every layer type contributes: tiles and pictures are drawn, gameplay data and structure are not', () => {
-    const all: LayerType[] = ['tile', 'collision', 'terrain', 'objects', 'encounters', 'image']
+  it('says what every layer type contributes: tiles are drawn, gameplay data is not (sprites are drawn as runs)', () => {
+    const all: LayerType[] = ['tile', 'collision', 'terrain', 'objects', 'encounters']
     expect(Object.keys(LAYER_SCENERY).sort()).toEqual([...all].sort())
-    expect(all.filter((t) => LAYER_SCENERY[t] !== 'none').sort()).toEqual(['image', 'tile'])
+    expect(all.filter((t) => LAYER_SCENERY[t] !== 'none').sort()).toEqual(['tile'])
   })
 })
 
@@ -65,8 +65,8 @@ describe('drawMapScenery', () => {
     const { ctx } = fakeCtx()
     // the tree is in draw order: a hidden tile layer at the very back, tiles over it, pictures on top
     const nodes = [
-      { id: 'h', name: 'h', type: 'tile', visible: false, data: { 1: { tilesetId: 'ts', x: 0, y: 0 } } },
-      { id: 't', name: 't', type: 'tile', data: { 0: { tilesetId: 'ts', x: 0, y: 0 } } },
+      { id: 'h', name: 'h', type: 'tile', visible: false, data: { 1: { tilesetId: 'ts', x: 0, y: 0 } }, children: [] },
+      { id: 't', name: 't', type: 'tile', data: { 0: { tilesetId: 'ts', x: 0, y: 0 } }, children: [] },
       image('i', [{ id: 'a', graphicId: 'p.png', x: 1, y: 2 }]),
     ] as SceneNode[]
     drawMapScenery(ctx, { width: 4, nodes }, { tileImages: { get: () => loaded }, assets: { 'graphic:p.png': asset } })
@@ -80,7 +80,7 @@ describe('drawMapScenery', () => {
     order.length = 0
     const { ctx } = fakeCtx()
     const nodes = [
-      { id: 'g', name: 'g', type: 'group', visible: false, children: [{ id: 't', name: 't', type: 'tile', data: { 0: { tilesetId: 'ts', x: 0, y: 0 } } }] },
+      { id: 'g', name: 'g', type: 'group', visible: false, children: [{ id: 't', name: 't', type: 'tile', data: { 0: { tilesetId: 'ts', x: 0, y: 0 } }, children: [] }] },
       image('i', [{ id: 'a', graphicId: 'p.png', x: 1, y: 2 }, { id: 'b', graphicId: 'p.png', x: 3, y: 4, visible: false }]),
     ] as SceneNode[]
     drawMapScenery(ctx, { width: 4, nodes }, { tileImages: { get: () => loaded }, assets: { 'graphic:p.png': asset } })
@@ -89,7 +89,7 @@ describe('drawMapScenery', () => {
 
   it('places a tile by its index and skips collision markers, missing and unfinished images', () => {
     const { ctx, calls } = fakeCtx()
-    const nodes = [{ id: 't', name: 't', type: 'tile', data: { 5: { tilesetId: 'ts', x: 1, y: 1 }, 6: { tilesetId: '__collision__', x: 0, y: 0 }, 7: { tilesetId: 'later', x: 0, y: 0 } } }] as SceneNode[]
+    const nodes = [{ id: 't', name: 't', type: 'tile', data: { 5: { tilesetId: 'ts', x: 1, y: 1 }, 6: { tilesetId: '__collision__', x: 0, y: 0 }, 7: { tilesetId: 'later', x: 0, y: 0 } }, children: [] }] as SceneNode[]
     drawMapScenery(ctx, { width: 4, nodes }, { tileImages: { get: (id) => (id === 'ts' ? loaded : id === 'later' ? ({ complete: false, naturalWidth: 0 } as HTMLImageElement) : undefined) } })
     expect(calls).toEqual(['tile@32,32']) // index 5 on a 4-wide map = column 1, row 1
   })

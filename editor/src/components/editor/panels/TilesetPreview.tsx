@@ -101,11 +101,11 @@ export function TilesetPreview({
     setTilesetSelectionCurrent,
   ])
 
-  if (activeLayerType === 'image') {
+  if (activeLayerType === 'group' || activeLayerType === 'ySort') {
     return (
       <div className="ed-empty">
-        <p>Image Layer</p>
-        <p className="ed-hint">Pick a sprite with Add in the layer's properties, then click the map to place it.</p>
+        <p>{activeLayerType === 'ySort' ? 'YSort' : 'Node2D'}: no tiles to paint</p>
+        <p>Add a TileMap child to paint, or a Sprite2D from the Images panel.</p>
       </div>
     )
   }

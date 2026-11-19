@@ -1,4 +1,5 @@
 import { StrictMode } from 'react'
+import { SCHEMA_VERSION } from '../../../shared/engine/types'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { act, render, waitFor } from '@testing-library/react'
 import type { MapData } from '@/types/editor'
@@ -89,8 +90,8 @@ describe('EditorPage wiring', () => {
     const firstPayload = saveMap.mock.calls[0][2] as MapData
     expect(saveMap.mock.calls[0][0]).toBeNull()
     expect(saveMap.mock.calls[0][1]).toBe('test.json')
-    // schema 6: the tree is what is written, no layers / entities next to it
-    expect(firstPayload.schemaVersion).toBe(6)
+    // the tree is what is written, no layers / entities next to it
+    expect(firstPayload.schemaVersion).toBe(SCHEMA_VERSION)
     expect(firstPayload).not.toHaveProperty('layers')
     expect(firstPayload).not.toHaveProperty('entities')
     expect(firstPayload.nodes.filter(n => n.type === 'entity')).toHaveLength(1)
@@ -143,7 +144,7 @@ describe('EditorPage wiring', () => {
     act(() => ctx.toggleCollapsed(group.id))
     expect(ctx.historyLength).toBe(steps)
     await waitFor(() => expect(saveMap).toHaveBeenCalledTimes(1), { timeout: 1500 })
-    expect((saveMap.mock.calls[0][2] as MapData).nodes.find(n => n.type === 'group')).toMatchObject({ name: 'Group', collapsed: true })
+    expect((saveMap.mock.calls[0][2] as MapData).nodes.find(n => n.type === 'group')).toMatchObject({ name: 'Node2D', collapsed: true })
   })
 
   it('moving an entity into a group and undoing it', async () => {
@@ -185,7 +186,7 @@ describe('EditorPage wiring', () => {
       expect(ctx.justCreatedLayer?.id).toBe(top().id)
       press('N', { ctrlKey: true, shiftKey: true })
       await waitFor(() => expect(ctx.activeMap!.nodes).toHaveLength(before + 2))
-      expect(top()).toMatchObject({ type: 'group', name: 'Group' })
+      expect(top()).toMatchObject({ type: 'group', name: 'Node2D' })
       expect(ctx.justCreatedLayer?.id).toBe(top().id)
       expect(ctx.justCreatedLayer?.n).toBe(2)
     })

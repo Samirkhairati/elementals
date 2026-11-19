@@ -36,7 +36,8 @@ import { CanvasContextMenu } from './CanvasContextMenu'
 import { CanvasNavigator, type ViewportHandle } from './CanvasNavigator'
 import { PendingEntityPlacement } from '@/hooks/editor/useEntityPlacement'
 import { useCanvasView } from '@/hooks/editor/canvas/canvasView'
-import type { ImageLayerNode } from '../../../../../shared/sceneTree'
+import { isBranch, ownLook, type BranchNode } from '../../../../../shared/sceneTree'
+import { entityView, type SceneIndex } from '@/lib/sceneIndex'
 import { mapPixelSize } from '../../../../../shared/mapSize'
 import { useEditorSelector, type EditorContextValue } from '@/components/editor/layout/EditorContext'
 import { useDropShadow } from '@/components/editor/look/DropShadowMenuItem'
@@ -108,6 +109,12 @@ interface MapCanvasProps {
   setCollisionShapes?: (layerId: string, shapes: readonly CollisionShape[]) => void
   /** Removes an item (tiles item or shape) of the active collision layer. */
   deleteCollisionItem?: (itemId: string) => void
+}
+
+/** The sprite hosts that are not inside another one of the list (picking a host's handles covers the hosts inside it). */
+function outermostHosts(hosts: readonly BranchNode[], index: SceneIndex): BranchNode[] {
+  const ids = new Set(hosts.map((h) => h.id))
+  return hosts.filter((h) => !index.byId.get(h.id)?.ancestors.some((a) => ids.has(a.id)))
 }
 
 export function MapCanvas({
@@ -247,14 +254,15 @@ export function MapCanvas({
   const imageDrag = useRef<ImageDrag | null>(null)
 
   const activeLayer = useMemo(() => index.byId.get(activeLayerId ?? '')?.node ?? null, [index, activeLayerId])
-  const activeImageLayer = activeLayer?.type === 'image' ? activeLayer : null
+  // A Node2D or YSort is the "image layer" of the sprites inside it: while it is active they can be picked and placed.
+  const activeImageLayer = activeLayer && isBranch(activeLayer) ? activeLayer : null
   const isImageLayerActive = activeImageLayer !== null
   const { brush: collisionBrush } = usePolygonEdit()
   // Entity placement and image placement both need clicks to land on the map, not on pictures.
   const placingAnything = !!pendingImage || !!pendingPlacement
   // Toolbar lock off: while no layer or an image layer is active (never a tile layer: painting wins) any image can be picked.
   const otherImageLayers = useMemo(
-    () => (!view.lockImages && !placingAnything && (activeLayer === null || isImageLayerActive) ? index.layers.filter((l): l is ImageLayerNode => l.type === 'image') : []),
+    () => (!view.lockImages && !placingAnything && (activeLayer === null || isImageLayerActive) ? outermostHosts(index.spriteHosts, index) : []),
     [view.lockImages, placingAnything, activeLayer, isImageLayerActive, index]
   )
 
@@ -267,7 +275,8 @@ export function MapCanvas({
   }, [placingAnything, entities, selectedEntityId])
   const handleResizeEntity = useCallback(
     (entityId: string, patch: ColliderPatch) => {
-      const hasCollider = !!(index.byId.get(entityId)?.node as EntityData | undefined)?.components.Collider
+      const node = index.byId.get(entityId)?.node
+      const hasCollider = node?.type === 'entity' && !!entityView(node).components.Collider
       const props: PropBag = hasCollider ? { ...patch } : { ...(COMPONENT_SCHEMAS.Collider.defaultProps as PropBag), isSolid: false, ...patch }
       if (updateComponentProps) updateComponentProps(entityId, 'Collider', props)
       else for (const [key, value] of Object.entries(props)) updateComponentProp?.(entityId, 'Collider', key, value)
@@ -505,9 +514,9 @@ export function MapCanvas({
         onPlaceMultiple={onPlaceMultiple}
         pictureShadow={(imageId) => {
           const entry = index.byId.get(imageId)
-          const layer = entry?.ancestors.find((a) => a.type === 'image')
+          const layer = entry && [...entry.ancestors].reverse().find(isBranch)
           if (!entry || entry.node.type !== 'picture' || !layer) return null
-          return { has: hasShadow(entry.node.look), add: () => dropShadow({ kind: 'picture', layerId: layer.id, imageId }) }
+          return { has: hasShadow(ownLook(entry.node)), add: () => dropShadow({ kind: 'picture', layerId: layer.id, imageId }) }
         }}
         placeMultipleKeys={placeMultipleKeys}
         snapToGrid={snapToGrid}

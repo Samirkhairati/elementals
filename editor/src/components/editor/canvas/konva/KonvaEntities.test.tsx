@@ -34,7 +34,7 @@ vi.mock('./entityDraw', async (orig) => ({
 }))
 
 import { KonvaEntities } from './KonvaEntities'
-import { makeEntity, makeMap } from '@/test/helpers'
+import { makeEntityView, makeMap } from '@/test/helpers'
 
 const fakeCtx = () => ({ _context: new Proxy({}, { get: (_t, k) => (k === 'measureText' ? () => ({ width: 10 }) : () => undefined), set: () => true }) })
 const stage = (scale: number) => ({ scaleX: () => scale, x: () => 0, y: () => 0, width: () => 2000, height: () => 2000 })
@@ -56,7 +56,7 @@ function renderEntities(entities: EntityData[], over: Partial<Omit<React.Compone
 }
 
 const entity = (id: string, x: number, y: number, components: Record<string, any> = {}, extra: Partial<EntityData> = {}) =>
-  makeEntity(id, { x, y, components: { Transform: { x, y, depth: 10 }, ...components }, ...extra })
+  makeEntityView(id, { x, y, components: { Transform: { x, y, depth: 10 }, ...components }, ...extra })
 
 const overlay = () => recorded.filter((r) => r.kind === 'Shape' && r.props.name === 'entity-overlays').at(-1)!
 const runOverlay = (scale = 1) => overlay().props.sceneFunc(fakeCtx(), { getStage: () => stage(scale), getParent: () => null })

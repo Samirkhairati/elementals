@@ -6,10 +6,10 @@ import { resetLookLibrary } from '@/lib/look/lookLibrary'
 import { getLookView, resetLookView } from '@/lib/look/lookView'
 import { LookPanel } from './LookPanel'
 
-// Draw order: the image layer draws over the tile layer.
+// Draw order: the Node2D of sprites draws over the TileMap.
 const nodes = [
-  { id: 'i1', name: 'Sky', type: 'image', children: [{ id: 'pic', type: 'picture', graphicId: 'sky/a.png', x: 0, y: 0, name: 'Cloud' }] },
-  { id: 't1', name: 'Ground', type: 'tile' },
+  { id: 'i1', name: 'Sky', type: 'group', children: [{ id: 'pic', type: 'picture', graphicId: 'sky/a.png', x: 0, y: 0, name: 'Cloud', children: [] }] },
+  { id: 't1', name: 'Ground', type: 'tile', children: [] },
 ]
 const mapWith = (n: unknown[]) => ({ name: 'Town', fileName: 'town', width: 10, height: 8, tileWidth: 32, tileHeight: 32, nodes: n })
 const map = mapWith(nodes)
@@ -44,7 +44,8 @@ describe('LookPanel', () => {
   })
 
   it('a profile tab edits that profile, copied from the default, not the default', () => {
-    const withDefault = [nodes[0], { ...nodes[1], look: { default: { adjust: { exposure: 1, contrast: 7 } } } }]
+    // (the TileMap's look is its Look child)
+    const withDefault = [nodes[0], { ...nodes[1], children: [{ id: 't1:look', type: 'look', name: 'Look', look: { default: { adjust: { exposure: 1, contrast: 7 } } } }] }]
     const setLook = setup({ activeMap: mapWith(withDefault) })
     fireEvent.click(screen.getByRole('radio', { name: 'Night' }))
     expect(getLookView().profile).toBe('night')
@@ -77,7 +78,7 @@ describe('LookPanel', () => {
     expect(setLook.mock.calls[0][0]).toEqual({ kind: 'map' })
   })
 
-  it('edits the selected picture of the active image layer', () => {
+  it('edits the selected sprite of the active Node2D', () => {
     const setLook = setup({ activeLayerId: 'i1', selectedImageId: 'pic' })
     expect(screen.getByText('Look · Cloud')).toBeInTheDocument()
     fireEvent.keyDown(exposure(), { key: 'ArrowRight' })

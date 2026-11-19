@@ -165,7 +165,7 @@ describe('WarpTilePicker pictures', () => {
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx as unknown as CanvasRenderingContext2D)
     const draw = vi.spyOn(scenery, 'drawMapScenery').mockReturnValue([])
     const spriteAssets = { 'graphic:city/wall.png': {} as SpriteAssetInfo }
-    const pictures: MapData = { ...town, nodes: [{ id: 'l', name: 'wall', type: 'image', children: [{ id: 'i', type: 'picture', name: 'i', graphicId: 'city/wall.png', x: 64, y: 96 }] }] }
+    const pictures: MapData = { ...town, nodes: [{ id: 'l', name: 'wall', type: 'group', children: [{ id: 'i', type: 'picture', name: 'i', graphicId: 'city/wall.png', x: 64, y: 96, children: [] }] }] }
     render(
       <EventEnvProvider value={makeEnv({ mapPreview: { getMap: () => pictures, tilesets: [], spriteAssets } })}>
         <WarpTilePicker mapId="town" x={0} y={0} onPick={() => {}} />

@@ -1,7 +1,7 @@
 import { StrictMode, type ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
-import type { GroupNode, ImageLayerNode, PictureNode, SceneNode } from '../../../../shared/sceneTree'
+import type { GroupNode, BranchNode, PictureNode, SceneNode } from '../../../../shared/sceneTree'
 import { drawOrderPictures, picturesOf } from '../../../../shared/sceneTree'
 import { makeGroup, makeImageLayer, makeLayer, makeMap, makePicture } from '@/test/helpers'
 import { useSceneHarness } from '@/test/sceneHarness'
@@ -19,7 +19,7 @@ type R = ReturnType<typeof setup>['result']
 
 const img = (id: string, x: number, name?: string): PictureNode => makePicture(id, { assetId: undefined, graphicId: 'images/city/dam-wall.png', x, y: 64, name: name ?? id })
 const imageLayer = (pictures: SceneNode[], id = 'I1', extra: Record<string, unknown> = {}) => makeImageLayer(id, pictures as never, { name: 'Images', ...extra })
-const layer = (r: R, id = 'I1') => r.current.tree.index.byId.get(id)!.node as ImageLayerNode
+const layer = (r: R, id = 'I1') => r.current.tree.index.byId.get(id)!.node as BranchNode
 const parentOf = (r: R, id: string) => r.current.tree.index.byId.get(id)?.ancestors.slice(-1)[0]?.id ?? null
 
 afterEach(() => useEditorClipboard.getState().set(null))
@@ -202,14 +202,15 @@ describe('groups of pictures', () => {
     expect(result.current.tree.view.primaryId).toBe(gid)
   })
 
-  it('a locked group is picked as a whole by a click on any member; unlocked ones are not', () => {
+  it('a Node2D that picks as one is picked as a whole by a click on any member; others are not', () => {
     const { result } = groupedFirstTwo()
     const gid = groupId(result)
     act(() => result.current.layers.setActiveLayerId('I1'))
     act(() => result.current.layers.selectImage('I1', 'a', 'replace'))
     expect(result.current.layers.pickedImageIds).toEqual(['a'])
-    act(() => result.current.layers.toggleNodeLock(gid))
-    expect(result.current.tree.index.byId.get(gid)!.node.locked).toBe(true)
+    act(() => result.current.layers.setPickAsOne(gid, true))
+    expect(result.current.tree.index.byId.get(gid)!.node).toMatchObject({ pickAsOne: true })
+    expect(result.current.tree.index.byId.get(gid)!.node.locked).toBeUndefined()
     act(() => result.current.layers.setActiveLayerId('I1'))
     act(() => result.current.layers.selectImage('I1', 'a', 'replace'))
     expect([...result.current.layers.pickedImageIds].sort()).toEqual(['a', 'b'])
@@ -219,7 +220,7 @@ describe('groups of pictures', () => {
   it('selecting the group row opens it: then one member can be picked on its own, until another picture is clicked', () => {
     const { result } = groupedFirstTwo()
     const gid = groupId(result)
-    act(() => result.current.layers.toggleNodeLock(gid))
+    act(() => result.current.layers.setPickAsOne(gid, true))
     act(() => result.current.layers.select(gid))
     expect([...result.current.layers.pickedImageIds].sort()).toEqual(['a', 'b'])
     expect(result.current.layers.openImageGroupId).toBe(gid)
@@ -232,9 +233,9 @@ describe('groups of pictures', () => {
     expect([...result.current.layers.pickedImageIds].sort()).toEqual(['a', 'b'])
   })
 
-  it('Ctrl/Cmd+click on a locked group toggles all of it in or out', () => {
+  it('Ctrl/Cmd+click on a pick-as-one group toggles all of it in or out', () => {
     const { result } = groupedFirstTwo()
-    act(() => result.current.layers.toggleNodeLock(groupId(result)))
+    act(() => result.current.layers.setPickAsOne(groupId(result), true))
     act(() => result.current.layers.selectImage('I1', 'c', 'replace'))
     act(() => result.current.layers.selectImage('I1', 'a', 'toggle'))
     expect([...result.current.layers.pickedImageIds].sort()).toEqual(['a', 'b', 'c'])
@@ -270,15 +271,15 @@ describe('groups of pictures', () => {
     expect(onCommitHistory).toHaveBeenCalledTimes(1)
   })
 
-  it('duplicating a whole group makes a new group of copies ("Copy" name, same lock); the original is untouched', () => {
+  it('duplicating a whole group makes a new group of copies ("Copy" name, same settings); the original is untouched', () => {
     const { result } = groupedFirstTwo()
     const gid = groupId(result)
-    act(() => result.current.layers.toggleNodeLock(gid))
+    act(() => result.current.layers.setPickAsOne(gid, true))
     act(() => result.current.layers.duplicateNodes([gid]))
     const groups = layer(result).children.filter((n): n is GroupNode => n.type === 'group')
     expect(groups).toHaveLength(2)
-    expect(groups[1]).toMatchObject({ name: 'Group Copy', locked: true })
-    expect(groups[1].id).not.toBe(gid)
+    expect(groups.find((g) => g.id !== gid)).toMatchObject({ name: 'Node2D Copy', pickAsOne: true })
+    expect(groups.map((g) => g.name).sort()).toEqual(['Node2D', 'Node2D Copy'])
     expect(groups[0].children).toHaveLength(2)
     expect(groups[1].children).toHaveLength(2)
   })
@@ -298,7 +299,7 @@ describe('groups of pictures', () => {
     const { result } = setup([four()])
     act(() => result.current.layers.createNode('group', 'I1'))
     const gid = groupId(result)
-    expect(result.current.tree.index.byId.get(gid)!.node).toMatchObject({ name: 'Group', children: [] })
+    expect(result.current.tree.index.byId.get(gid)!.node).toMatchObject({ name: 'Node2D', children: [] })
     act(() => result.current.layers.moveNodes(['c', 'd'], gid, 'inside'))
     expect(picturesOf(result.current.tree.index.byId.get(gid)!.node).map((i) => i.id)).toEqual(['c', 'd'])
     act(() => result.current.layers.moveNodes(['d'], gid, 'above'))
@@ -326,7 +327,7 @@ describe('groups of pictures', () => {
     const target = layer(hook.result, 'I2')
     const groups = target.children.filter((n): n is GroupNode => n.type === 'group')
     expect(groups).toHaveLength(1)
-    expect(groups[0].name).toBe('Group Copy')
+    expect(groups[0].name).toBe('Node2D Copy')
     expect(groups[0].children).toHaveLength(2)
     expect(drawOrderPictures(target)).toHaveLength(2)
   })

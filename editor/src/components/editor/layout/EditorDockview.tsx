@@ -22,7 +22,7 @@ const selectDockInputs = (c: EditorContextValue) => ({
   onSelectMap: c.onSelectMap,
   onClearActiveMap: c.onClearActiveMap,
   entityFocus: !!c.selectedEntityId,
-  imageFocus: c.activeLayerType === 'image',
+  imageFocus: c.activeLayerType === 'group' || c.activeLayerType === 'ySort',
   collisionFocus: c.activeLayerType === 'collision',
 });
 

@@ -6,7 +6,7 @@ import { canAddComponent, canAddMask, editLookSet, hasShadow, withShadowEverywhe
 
 const layers = [
   { id: 't', type: 'tile', name: 'T' },
-  { id: 'i', type: 'image', name: 'I', children: [{ id: 'p1', type: 'picture', name: 'P', x: 0, y: 0 }] },
+  { id: 'i', type: 'group', name: 'I', children: [{ id: 'p1', type: 'picture', name: 'P', x: 0, y: 0, children: [] }] },
   { id: 'c', type: 'collision', name: 'C', children: [] },
   { id: 'f', type: 'group', name: 'F', children: [] },
 ] as SceneNode[]
@@ -18,7 +18,8 @@ describe('selectedSubject', () => {
     expect(selectedSubject(layers, 'i', 'nope')).toEqual({ kind: 'layer', layerId: 'i' })
     expect(selectedSubject(layers, 't', 'p1')).toEqual({ kind: 'layer', layerId: 't' })
     expect(selectedSubject(layers, 'c', null)).toEqual({ kind: 'map' })
-    expect(selectedSubject(layers, 'f', null)).toEqual({ kind: 'map' })
+    expect(selectedSubject(layers, 'f', null)).toEqual({ kind: 'layer', layerId: 'f' }) // a Node2D's Look grades what is inside
+    expect(selectedSubject(layers, 'p1', null)).toEqual({ kind: 'picture', layerId: 'i', imageId: 'p1' }) // a sprite as the active node
     expect(selectedSubject(layers, 'missing', null)).toEqual({ kind: 'map' })
     expect(selectedSubject(layers, null, null)).toEqual({ kind: 'map' })
   })

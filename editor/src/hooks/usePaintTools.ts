@@ -47,8 +47,7 @@ interface UsePaintToolsProps {
 function locatePaintableLayer(index: SceneIndex, layerId: string): string | DataLayerNode {
   const node = index.byId.get(layerId)?.node
   if (!node) return 'Layer not found'
-  if (node.type === 'image') return 'Image layers hold images, not tiles'
-  if (node.type === 'group') return 'Groups hold layers, not tiles'
+  if (node.type === 'group' || node.type === 'ySort') return 'Node2D and YSort hold nodes, not tiles'
   if (!isDataLayer(node)) return 'Only layers can be painted'
   if (lockedNode(index, layerId) || !shown(index, layerId)) return 'Layer locked/hidden'
   return node

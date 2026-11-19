@@ -19,7 +19,7 @@ import { Badge, Card, EdButton, EyeButton, Field, IconButton, InfoTip, Segmented
 import { ColorField } from '../ui/fields'
 import { RenameInput } from '../ui/RenameInput'
 import { sceneIndex } from '@/lib/sceneIndex'
-import type { LookSet } from '../../../../../shared/look/types'
+import { ownLook as ownLookOf } from '../../../../../shared/sceneTree'
 import { LookAdjustEditor } from './LookAdjustEditor'
 import { LookMasksEditor } from './LookMasksEditor'
 import { LookShadersEditor } from './LookShadersEditor'
@@ -244,7 +244,7 @@ export function LookPanel() {
   const counts = { masks: shown.masks?.length ?? 0, shaders: shown.shaders?.length ?? 0 }
   const enabled = shown.enabled !== false
   // a picture without its own shadow gets its layer's
-  const layerShadow = ref.kind === 'picture' ? (resolveLook((layer as { look?: LookSet } | undefined)?.look, profile)?.shadow ?? undefined) : undefined
+  const layerShadow = ref.kind === 'picture' ? (resolveLook(ownLookOf(layer), profile)?.shadow ?? undefined) : undefined
 
   return (
     <div className="flex w-full flex-col gap-3 text-left" data-testid="look-panel">

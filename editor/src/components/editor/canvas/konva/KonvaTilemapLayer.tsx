@@ -3,10 +3,11 @@ import React from 'react'
 import { Shape, Group } from 'react-konva'
 import type Konva from 'konva'
 import type { MapData, ImageItem } from '@/types/editor'
-import { isDataLayer, type DataLayerNode, type ImageLayerNode, type LayerNode } from '../../../../../../shared/sceneTree'
+import { isDataLayer, ownLook, type DataLayerNode } from '../../../../../../shared/sceneTree'
+import type { LookSet } from '../../../../../../shared/look/types'
 import type { SpriteAssetInfo } from '../../../../../../shared/engine/types'
 import { drawResolvedSprite, useSpriteImagesVersion } from '@/lib/spriteImages'
-import { visiblePictures } from '@/lib/sceneIndex'
+import type { DrawLayer } from '@/lib/sceneIndex'
 import { resolveImageItem } from '@/lib/imageItems'
 import { imagePickKey } from '@/lib/graphicAssets'
 import { mapPixelSize } from '../../../../../../shared/mapSize'
@@ -21,8 +22,8 @@ import { shadowFor } from '../../../../../../shared/look/shadow'
 const NO_ASSETS: Record<string, SpriteAssetInfo> = {}
 
 interface KonvaTilemapLayerProps {
-  /** The layers to draw, bottom first (a run of the tree's draw order, hidden layers already left out). */
-  layers: readonly LayerNode[]
+  /** The layers to draw, bottom first (a run of the tree's draw order, hidden nodes already left out): layer nodes and runs of sprites. */
+  layers: readonly DrawLayer[]
   images: Record<string, HTMLImageElement>
   activeMap: MapData
   spriteAssets?: Record<string, SpriteAssetInfo>
@@ -30,9 +31,9 @@ interface KonvaTilemapLayerProps {
   dragRef?: React.MutableRefObject<ImageDrag | null>
 }
 
-/** Looks to draw a picture with: its layer, the map size and the profile in view (absent = drawn plainly). */
+/** Looks to draw a picture with: the Node2D it sits in and the look it passes down, the map size and the profile in view (absent = drawn plainly). */
 export interface PictureLookContext {
-  layer: Pick<ImageLayerNode, 'id' | 'look'>
+  layer: { id: string; look?: LookSet }
   mapSize: { w: number; h: number }
   view: LookViewState
 }
@@ -43,11 +44,12 @@ export function drawImageItem(ctx: CanvasRenderingContext2D, item: ImageItem, sp
   if (!resolved) return
   const at = drag && drag.id === item.id ? drag : drag?.along?.ids.includes(item.id) ? { x: item.x + drag.along.dx, y: item.y + drag.along.dy } : item
   if (looks && looks.view.enabled) {
-    const shadow = shadowFor([item.look, looks.layer.look], looks.view.profile)
+    const own = ownLook(item)
+    const shadow = shadowFor([own, looks.layer.look], looks.view.profile)
     const { src } = resolved
     const { box, mirrorX, mirrorY } = pictureBox(item, resolved, at)
     if (shadow) drawPictureShadow(ctx, shadow, { img: resolved.img, src, box, mirrorX, mirrorY, opacity: item.opacity })
-    const stack = pictureStack(item, looks.layer, looks.view.profile)
+    const stack = pictureStack({ look: own }, looks.layer, looks.view.profile)
     if (stack.length > 0) {
       const key = `${imagePickKey(item)}@${src.x},${src.y},${src.w},${src.h}`
       const subject = subjectKey({ kind: 'picture', layerId: looks.layer.id, imageId: item.id })
@@ -105,9 +107,15 @@ export function stageViewRect(stage: Konva.Stage | null): { x: number; y: number
   return { x: -stage.x() / scale, y: -stage.y() / scale, w: stage.width() / scale, h: stage.height() / scale }
 }
 
-/** Same layer nodes in the same order: the tree handed out a new array but nothing in this run changed. */
+// The same layer: the same node and look, or the same host, look and sprites.
+function sameLayer(a: DrawLayer, b: DrawLayer): boolean {
+  if (a.kind === 'layer') return b.kind === 'layer' && a.node === b.node && a.look === b.look
+  return b.kind === 'sprites' && a.host === b.host && a.look === b.look && a.pictures.length === b.pictures.length && a.pictures.every((p, i) => p === b.pictures[i])
+}
+
+/** Same layers in the same order: the tree handed out a new plan but nothing in this run changed. */
 const sameLayers = (a: KonvaTilemapLayerProps, b: KonvaTilemapLayerProps) =>
-  a.images === b.images && a.activeMap === b.activeMap && a.spriteAssets === b.spriteAssets && a.dragRef === b.dragRef && a.layers.length === b.layers.length && a.layers.every((l, i) => l === b.layers[i])
+  a.images === b.images && a.activeMap === b.activeMap && a.spriteAssets === b.spriteAssets && a.dragRef === b.dragRef && a.layers.length === b.layers.length && a.layers.every((l, i) => sameLayer(l, b.layers[i]))
 
 export const KonvaTilemapLayer = React.memo(function KonvaTilemapLayer({
   layers,
@@ -127,29 +135,31 @@ export const KonvaTilemapLayer = React.memo(function KonvaTilemapLayer({
 
   return (
     <Group listening={false}>
-      {layers.map(layer => layer.type === 'image' ? (
+      {layers.map((entry) => entry.kind === 'sprites' ? (
         <Shape
-          key={`${layer.id}:${imagesVersion}`}
+          key={`${entry.key}:${imagesVersion}`}
           listening={false}
           perfectDrawEnabled={false}
           shadowForStrokeEnabled={false}
           sceneFunc={(context) => {
             const ctx = context._context as CanvasRenderingContext2D
-            const looks = { layer, mapSize, view }
-            for (const item of visiblePictures(layer)) {
+            const looks = { layer: { id: entry.host.id, look: entry.look }, mapSize, view }
+            for (const item of entry.pictures) {
               drawImageItem(ctx, item, spriteAssets, dragRef?.current ?? null, looks)
             }
           }}
         />
       ) : (
         <Shape
-          key={layer.id}
+          key={entry.key}
           listening={false}
           perfectDrawEnabled={false}
           shadowForStrokeEnabled={false}
           sceneFunc={(context, shape) => {
             const ctx = context._context as CanvasRenderingContext2D
             ctx.imageSmoothingEnabled = false
+            const layer = entry.node
+            const look = entry.look
 
             if (!isDataLayer(layer)) return
             const data = layer.data
@@ -176,12 +186,12 @@ export const KonvaTilemapLayer = React.memo(function KonvaTilemapLayer({
             if (maxTileX < minTileX || maxTileY < minTileY) return
 
             // Its drop shadow first, under the tiles.
-            const shadow = view.enabled && layer.type === 'tile' ? shadowFor([layer.look], view.profile) : null
+            const shadow = view.enabled && layer.type === 'tile' ? shadowFor([look], view.profile) : null
             if (shadow) drawLayerShadow(ctx, shadow, { layerId: layer.id, data, tilesets: images, mapW: mapWidth, mapH: mapHeight, view: rect ?? { x: 0, y: 0, w: mapSize.w, h: mapSize.h } })
 
             // A layer with a look: the visible tiles are drawn offscreen, graded with the game's shader, drawn back.
-            if (view.enabled && layer.type === 'tile' && layer.look) {
-              const stack = worldStack(layer.look, view.profile)
+            if (view.enabled && layer.type === 'tile' && look) {
+              const stack = worldStack(look, view.profile)
               const area = { x: minTileX * 32, y: minTileY * 32, w: (maxTileX - minTileX + 1) * 32, h: (maxTileY - minTileY + 1) * 32 }
               const subject = subjectKey({ kind: 'layer', layerId: layer.id })
               const frame = rect ?? { x: 0, y: 0, w: mapSize.w, h: mapSize.h }

@@ -14,8 +14,8 @@ import {
   type HistorySnapshot,
 } from './history'
 
-const layer = (id: string, data?: TileLayerNode['data']): TileLayerNode => ({ id, name: id, type: 'tile', data })
-const entity = (id: string, x = 0): EntityNode => ({ id, type: 'entity', name: id, x, y: 0, components: {} })
+const layer = (id: string, data?: TileLayerNode['data']): TileLayerNode => ({ id, name: id, type: 'tile', data, children: [] })
+const entity = (id: string, x = 0): EntityNode => ({ id, type: 'entity', name: id, x, y: 0, components: {}, children: [] })
 const snap = (n: number, entities: EntityNode[] = []): HistorySnapshot => ({
   nodes: [layer('L', { [n]: { tilesetId: 't', x: n, y: 0 } }), ...entities],
 })

@@ -4,6 +4,7 @@
 import { characterGraphics, isValidGraphicId, validateCharacterSet, type CharacterInfo, type GraphicInfo } from '../../../shared/engine/graphics'
 import { TILE_SIZE } from '../../../shared/engine/constants'
 import { allEntities, isDataLayer, layerNodes, type SceneNode } from '../../../shared/sceneTree'
+import { componentsOfEntity } from '../../../shared/sceneEntity'
 import { nodesOfMap } from '../../../shared/sceneTreeMigrate'
 
 export type TableGroup = 'visual' | 'design' | 'world' | 'text' | 'game'
@@ -167,7 +168,7 @@ export function summarizeMap(map: MapLike): MapSummary {
   for (const layer of layers) if (isDataLayer(layer)) for (const t of Object.values(layer.data ?? {})) tilesets.add(t.tilesetId)
   const characters = new Set<string>()
   for (const e of entities) {
-    const sprite = e.components?.Sprite as { asset?: unknown } | undefined
+    const sprite = componentsOfEntity(e).Sprite as { asset?: unknown } | undefined
     if (sprite && typeof sprite.asset === 'string' && sprite.asset) characters.add(sprite.asset)
   }
   return {

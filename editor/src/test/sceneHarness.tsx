@@ -57,6 +57,7 @@ export function sceneContext(h: ReturnType<typeof useSceneHarness>): Partial<Edi
     toggleNodeVisibility: l.toggleNodeVisibility,
     toggleNodeLock: l.toggleNodeLock,
     setNodeYSort: l.setNodeYSort,
+    setPickAsOne: l.setPickAsOne,
     toggleCollapsed: l.toggleCollapsed,
     deleteNodes: l.deleteNodes,
     requestDeleteNodes: l.deleteNodes,

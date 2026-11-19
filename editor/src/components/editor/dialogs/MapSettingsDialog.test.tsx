@@ -6,8 +6,8 @@ import { MapSettingsDialog } from './MapSettingsDialog'
 const map = (extra: Partial<MapData> = {}): MapData => ({
   name: 'City', fileName: 'city.json', folderPath: null, width: 40, height: 23, pixelWidth: 1280, pixelHeight: 720,
   nodes: [
-    { id: 'b', name: 'Roofs', type: 'image', z: 30, children: [] },
-    { id: 'a', name: 'Ground', type: 'tile', z: 0 },
+    { id: 'b', name: 'Roofs', type: 'group', z: 30, children: [{ id: 'p', type: 'picture', name: 'p', graphicId: 'roof.png', x: 0, y: 0, children: [] }] },
+    { id: 'a', name: 'Ground', type: 'tile', z: 0, children: [] },
   ],
   ...extra,
 })
@@ -16,7 +16,7 @@ describe('MapSettingsDialog', () => {
   it('shows the player z-index (default 20), how many layers draw over the player, and the size', () => {
     render(<MapSettingsDialog map={map()} onClose={vi.fn()} onSave={vi.fn()} />)
     expect(screen.getByLabelText('Player z-index')).toHaveValue('20')
-    expect(screen.getByTestId('player-z-layers')).toHaveTextContent('1 of 2 tile and image layers draw over the player')
+    expect(screen.getByTestId('player-z-layers')).toHaveTextContent('1 of 2 TileMaps and sprite Node2Ds draw over the player')
     expect(screen.getByTestId('map-size')).toHaveTextContent('1280 × 720 px · 40 × 23 tiles')
   })
 

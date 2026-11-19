@@ -1,4 +1,4 @@
-// The right-hand panel while an image layer is active (it takes the place of the tileset panels). The pictures themselves
+// The right-hand panel while a Node2D or YSort is active (it takes the place of the tileset panels). The pictures themselves
 // (and the groups of them) are rows of the Scene panel; this panel is where they are added (the picture browser, the
 // picture waiting to be placed) and where the picked one is looked at: a zoomable preview with the Crop button, and its
 // properties. The layer's own name and z stay in the Properties panel on the left.
@@ -12,7 +12,7 @@ import { snapPicture } from '@/lib/imageSnap'
 import { describeBindings } from '@/lib/shortcuts'
 import { useBindings } from '@/store/shortcutStore'
 import type { ImageItem } from '@/types/editor'
-import { drawOrderPictures, type GroupNode } from '../../../../../shared/sceneTree'
+import { drawOrderPictures, isBranch, type BranchNode } from '../../../../../shared/sceneTree'
 import { lockedNode, pictureLocked, sceneIndex } from '@/lib/sceneIndex'
 import { OPEN_PICTURE_PICKER_EVENT } from '@/lib/picturePickerEvent'
 import { Badge, Card, EdButton, Field, IconButton, NumberField, TextField, Toggle } from '../ui/controls'
@@ -58,7 +58,8 @@ export function ImagesPanel() {
   const ctx = useEditorSelector(selectImages)
   const index = sceneIndex(ctx.nodes ?? NO_NODES)
   const found = index.byId.get(ctx.activeLayerId ?? '')?.node
-  const layer = found?.type === 'image' ? found : null
+  // The Node2D / YSort the sprites are added to: the active one (a sprite's own host when a sprite is picked).
+  const layer = found && isBranch(found) ? found : null
   const [pickerOpen, setPickerOpen] = useState(false)
   const [cropOpen, setCropOpen] = useState(false)
   // The shortcuts act on whatever the panel can do right now (set below, once the picked item is known).
@@ -101,7 +102,7 @@ export function ImagesPanel() {
   const cropKeys = describeBindings('image.crop', bindings)
   const resizeKeys = describeBindings('image.resize', bindings)
 
-  if (!layer) return <div className="ed-empty select-none">Select an image layer to place pictures.</div>
+  if (!layer) return <div className="ed-empty select-none">Select a Node2D or YSort to place sprites.</div>
 
   // The layer (or a group above it) is locked; a locked picture is frozen too.
   const locked = lockedNode(index, layer.id) || (selected ? pictureLocked(index, selected.id) : false)
@@ -119,7 +120,8 @@ export function ImagesPanel() {
   const resizing = !!selected && ctx.resizingImageId === selected.id
   const toggleResize = () => selected && ctx.setResizingImageId(resizing ? null : selected.id)
   // Group puts the picked pictures in a new group; Ungroup acts on the open group, or the group of the picked picture.
-  const parentGroup = selected ? [...(index.byId.get(selected.id)?.ancestors ?? [])].reverse().find((a): a is GroupNode => a.type === 'group') : undefined
+  const below = selected ? (index.byId.get(selected.id)?.ancestors ?? []) : []
+  const parentGroup = below.slice(below.indexOf(layer) + 1).reverse().find((a): a is BranchNode => isBranch(a))
   const groupOfPicked = ctx.openImageGroupId ?? parentGroup?.id ?? null
   actions.current = {
     group: !layerLocked && picked.length > 0 ? () => ctx.groupNodes(picked) : undefined,
@@ -130,7 +132,7 @@ export function ImagesPanel() {
   // After a crop, the preview centres on (and fits) the cropped part of the whole picture.
   const cropFocus = whole && selected?.crop ? { x: selected.crop.x * previewScale, y: selected.crop.y * previewScale, w: selected.crop.w * previewScale, h: selected.crop.h * previewScale } : null
 
-  const openGroup = ctx.openImageGroupId ? (index.byId.get(ctx.openImageGroupId)?.node as GroupNode | undefined) : undefined
+  const openGroup = ctx.openImageGroupId ? (index.byId.get(ctx.openImageGroupId)?.node as BranchNode | undefined) : undefined
   // New pictures from the picker (uploaded, dropped, pasted) are filed under pasted/<map name> and placed straight away.
   const importTo = pastedFolder(ctx.mapName)
   const importPictures: PictureImport = async (files) => {

@@ -12,8 +12,10 @@ import {
   findNode,
   findPath,
   insertNode,
+  isBranch,
   isContainer,
   locate,
+  NODE_TYPES,
   moveNode,
   removeNodes,
   updateNode,
@@ -29,7 +31,8 @@ import {
 } from '../../../shared/sceneTree'
 import { ENTITIES_GROUP_ID } from '../../../shared/sceneTreeMigrate'
 import { assignNewCells, hasNewCells, nextTileGroupName } from '../../../shared/collisionLayers'
-import { cloneEntity } from '../../../shared/engine/components'
+import { cloneEntity, createDefaultComponent, createDefaultEventProps } from '../../../shared/engine/components'
+import { engineEntityOf, entityWithComponents, type ComponentBag } from '../../../shared/sceneEntity'
 import { withDerivedFree } from '../../../shared/engine/placement'
 import type { EngineEntity } from '../../../shared/engine/types'
 import { imagePickName } from './graphicAssets'
@@ -64,14 +67,17 @@ export function newNodeName(nodes: readonly SceneNode[], type: SceneNodeType): s
     collision: 'Collision',
     terrain: 'Terrain',
     encounters: 'Encounters',
-    image: 'Images',
     objects: 'Objects',
-    group: 'Group',
+    group: 'Node2D',
+    ySort: 'YSort',
     collisionTiles: 'Tiles',
     collisionShape: 'Shape',
-    picture: 'Picture',
+    picture: 'Sprite',
+    look: 'Look',
   }
-  return uniqueName(base[type] ?? 'Node', taken)
+  // Component nodes keep their type's name (an entity has one of each): AnimatedSprite2D, Area2D, Wander...
+  if (isComponentType(type)) return NODE_TYPES[type].label
+  return uniqueName(base[type] ?? NODE_TYPES[type]?.label ?? 'Node', taken)
 }
 
 /** `name` + " Copy", " Copy 2"...: free among `taken` (the names are added to it). */
@@ -84,23 +90,66 @@ export function copyName(name: string, taken: Set<string>): string {
 
 // ── making layers and groups ───────────────────────────────────────────────────────────────────────
 
-export type NewNodeType = 'group' | 'tile' | 'image' | 'collision' | 'terrain' | 'encounters' | 'objects'
+/** Every type the Add Node menu makes with `makeNode` (an entity is made by the entity manager, a sprite by placing it). */
+export type NewNodeType = Exclude<SceneNodeType, 'entity'>
 
-/** An empty node of a type (no id clash is checked here). */
-export function makeNode(type: NewNodeType, id: string, name: string): SceneNode {
-  if (type === 'group' || type === 'image') return { id, type, name, children: [] }
-  if (type === 'collision') return { id, type, name, data: {}, children: [] }
-  return { id, type, name }
+const isComponentType = (type: SceneNodeType) => NODE_TYPES[type]?.category === 'component'
+
+/** The default Movement props of a movement node of `type` (without the controller: that is the type). */
+function movementProps(): Record<string, unknown> {
+  const { controller: _c, ...rest } = createDefaultComponent('Movement') as unknown as Record<string, unknown>
+  return rest
+}
+
+/**
+ * An empty node of a type (no id clash is checked here). `parentType` is the type of the node it goes into: a
+ * CollisionShape2D of an entity's body or area is a one-tile box, one of the map's StaticBody2D a polygon to draw.
+ */
+export function makeNode(type: NewNodeType, id: string, name: string, parentType?: SceneNodeType): SceneNode {
+  switch (type) {
+    case 'group':
+    case 'ySort':
+    case 'tile':
+      return { id, type, name, children: [] }
+    case 'picture':
+      return { id, type, name, x: 0, y: 0, children: [] }
+    case 'look':
+      return { id, type, name, look: {} }
+    case 'collision':
+      return { id, type, name, data: {}, children: [] }
+    case 'collisionShape':
+      return parentType === 'body' || parentType === 'area'
+        ? { id, type, name: '', points: [], closed: true, box: { width: 32, height: 32, offsetX: 0, offsetY: 0 } }
+        : { id, type, name: '', points: [], closed: true }
+    case 'body':
+    case 'area':
+      return { id, type, name, children: [{ id: `${id}:shape`, type: 'collisionShape', name: '', points: [], closed: true, box: { width: 32, height: 32, offsetX: 0, offsetY: 0 } }] }
+    case 'animatedSprite': {
+      const { visible: _v, ...props } = createDefaultComponent('Sprite') as unknown as Record<string, unknown>
+      return { id, type, name, props }
+    }
+    case 'wander':
+    case 'playerController':
+    case 'mover':
+      return { id, type, name, props: movementProps() }
+    case 'event':
+      return { id, type, name, props: createDefaultEventProps() as unknown as Record<string, unknown> }
+    case 'collisionTiles':
+    case 'terrain':
+    case 'encounters':
+    case 'objects':
+      return { id, type, name } as SceneNode
+  }
 }
 
 const SPECIAL_LAYERS: readonly SceneNodeType[] = ['collision', 'terrain', 'encounters']
 
 /**
- * Where a new node goes among the children of `parent`: the top (last), except that a tile or image layer goes below the
- * special layers (collision, terrain, encounters) that sit at the top, which stay on top by default.
+ * Where a new node goes among the children of `parent`: the top (last), except that a TileMap, Node2D or YSort goes below
+ * the special layers (collision, terrain, encounters) that sit at the top, which stay on top by default.
  */
 export function defaultIndex(children: readonly SceneNode[], type: SceneNodeType): number {
-  if (type !== 'tile' && type !== 'image') return children.length
+  if (type !== 'tile' && type !== 'group' && type !== 'ySort') return children.length
   let at = children.length
   while (at > 0 && SPECIAL_LAYERS.includes(children[at - 1].type)) at--
   return at
@@ -138,7 +187,7 @@ export function addEntity(nodes: SceneNode[], entity: EntityNode, anchorId?: str
   const anchor = anchorId ? findNode(nodes, anchorId) : undefined
   const path = anchor ? findPath(nodes, anchor.id) : undefined
   if (anchor && path) {
-    if (anchor.type === 'group' && canHold(path, 'entity', nodes)) return insertNode(nodes, anchor.id, entity)
+    if (isBranch(anchor) && canHold(path, 'entity', nodes)) return insertNode(nodes, anchor.id, entity)
     if (anchor.type === 'entity') {
       const at = locate(nodes, anchor.id)
       if (at) return insertNode(nodes, at.parent?.id ?? null, entity, at.index + 1)
@@ -188,9 +237,13 @@ export function carryView(current: readonly SceneNode[], restored: SceneNode[]):
   })
 }
 
-/** Y-sort on, off or (undefined) following the parent, for a group, image layer or picture. */
+/** Y-sort on (the Node2D becomes a YSort) or off (the YSort becomes a Node2D); anything else is left alone. */
 export const setYSort = (nodes: SceneNode[], id: string, value: boolean | undefined): SceneNode[] =>
-  updateNode(nodes, id, (n) => (n.type === 'group' || n.type === 'image' || n.type === 'picture' ? withField(n, 'ySort', value) : n))
+  updateNode(nodes, id, (n) => {
+    if (n.type === 'group' && value === true) return { ...n, type: 'ySort', name: n.name === NODE_TYPES.group.label ? NODE_TYPES.ySort.label : n.name }
+    if (n.type === 'ySort' && value !== true) return { ...n, type: 'group', name: n.name === NODE_TYPES.ySort.label ? NODE_TYPES.group.label : n.name }
+    return n
+  })
 
 /** Renames a node (a blank name is ignored). */
 export function renameNode(nodes: SceneNode[], id: string, name: string): SceneNode[] {
@@ -210,13 +263,9 @@ export function patchNode(nodes: SceneNode[], id: string, patch: Record<string, 
 
 // ── locks ──────────────────────────────────────────────────────────────────────────────────────────
 
-/**
- * Whether a place (the path from the root to a container) is locked: it, or something above it, has its lock on. A locked
- * group inside an image layer is not counted: that lock only makes a click on its pictures pick the group as a whole.
- */
+/** Whether a place (the path from the root to a container) is locked: it, or something above it, has its lock on. */
 export function isLockedPlace(path: readonly SceneNode[]): boolean {
-  const imageAt = path.findIndex((n) => n.type === 'image')
-  return path.some((n, i) => n.locked === true && !(n.type === 'group' && imageAt !== -1 && i > imageAt))
+  return path.some((n) => n.locked === true)
 }
 
 // ── groups, deleting ───────────────────────────────────────────────────────────────────────────────
@@ -294,11 +343,11 @@ const COPY_OFFSET = 32
 function movedCopy(node: SceneNode, dx: number, dy: number): SceneNode {
   const shift = (n: SceneNode): SceneNode => {
     if (n.type === 'entity') {
-      const cloned = cloneEntity(n as unknown as EngineEntity, true) as unknown as EntityNode
-      const entity: EntityNode = { ...cloned, id: n.id, x: n.x + dx, y: n.y + dy }
-      const transform = entity.components.Transform
-      if (transform) entity.components = { ...entity.components, Transform: { ...transform, x: entity.x, y: entity.y } }
-      return withDerivedFree(entity)
+      // Fresh event ids, the position moved; the components go back into the (already copied) component nodes.
+      const cloned = cloneEntity(engineEntityOf(n) as unknown as EngineEntity, true) as unknown as { components: ComponentBag }
+      const components: ComponentBag = { ...cloned.components }
+      if (components.Transform) components.Transform = { ...components.Transform, x: n.x + dx, y: n.y + dy }
+      return withDerivedFree(entityWithComponents({ ...n, x: n.x + dx, y: n.y + dy }, components))
     }
     if (n.type === 'picture') return { ...n, x: n.x + dx, y: n.y + dy }
     if (n.type === 'collisionShape') return { ...n, points: n.points.map((p) => ({ ...p, x: p.x + dx, y: p.y + dy })) }
@@ -327,7 +376,7 @@ function destinationFor(
         const siblings = parent ? parent.children : nodes
         const idx = siblings.indexOf(child)
         // Layers and groups go below, pictures (and groups of pictures), entities and shapes above.
-        const below = node.type !== 'entity' && node.type !== 'picture' && node.type !== 'collisionShape' && !(node.type === 'group' && parentPath.some((n) => n.type === 'image'))
+        const below = node.type !== 'entity' && node.type !== 'picture' && node.type !== 'collisionShape' && !isComponentType(node.type)
         return { parentId: parent?.id ?? null, index: below ? idx : idx + 1 }
       }
       child = parentPath[parentPath.length - 1]
@@ -373,9 +422,7 @@ export function pasteCopies(nodes: SceneNode[], copies: readonly SceneNode[], ta
     if (!dest) continue
     // Names: a picture takes a free "Name 2" among the pictures of its layer, the rest a free "Name Copy".
     if (fresh.type === 'picture') {
-      const layerId = dest.parentId
-      const layerPath = layerId ? findPath(tree, layerId) : undefined
-      const layer = layerPath?.find((n) => n.type === 'image')
+      const layer = dest.parentId ? findNode(tree, dest.parentId) : undefined
       const names = (layer ? drawOrderPictures(layer) : []).map((p) => p.name || imagePickName(p))
       fresh = { ...fresh, name: nextImageName(fresh.name || imagePickName(fresh), names) }
     } else {
@@ -397,7 +444,7 @@ export function duplicateNodes(nodes: SceneNode[], ids: readonly string[], newId
   if (copies.length === 0) return { nodes, ids: [] }
   const order = walk(nodes)
   const originals = copies.map((c) => order.find((e) => e.node.id === c.id)).filter((e): e is NonNullable<typeof e> => !!e)
-  const layerLike = originals.every(({ node, ancestors }) => node.type !== 'entity' && node.type !== 'picture' && node.type !== 'collisionShape' && !(node.type === 'group' && ancestors.some((a) => a.type === 'image')))
+  const layerLike = originals.every(({ node }) => node.type !== 'entity' && node.type !== 'picture' && node.type !== 'collisionShape' && !isComponentType(node.type))
   const anchor = layerLike ? originals[0] : originals[originals.length - 1]
   return pasteCopies(nodes, copies, anchor.node.id, newId, { mode: 'beside' })
 }
@@ -498,7 +545,7 @@ export function paintCollision(layer: CollisionLayerNode, data: NonNullable<Coll
  */
 export function movePictureStep(nodes: SceneNode[], layerId: string, pictureId: string, direction: 1 | -1): SceneNode[] {
   const layer = findNode(nodes, layerId)
-  if (!layer || layer.type !== 'image') return nodes
+  if (!layer || !isBranch(layer)) return nodes
   const sorted = drawOrderPictures(layer)
   const from = sorted.findIndex((p) => p.id === pictureId)
   const to = from + direction
@@ -533,8 +580,8 @@ export function movePictureStep(nodes: SceneNode[], layerId: string, pictureId: 
 export function settlePictureZ(nodes: SceneNode[], id: string): SceneNode[] {
   const at = locate(nodes, id)
   if (!at) return nodes
-  const layer = at.ancestors.find((n) => n.type === 'image')
-  if (!layer || (at.node.type !== 'picture' && at.node.type !== 'group')) return nodes
+  const layer = [...at.ancestors].reverse().find(isBranch)
+  if (!layer || (at.node.type !== 'picture' && !isBranch(at.node))) return nodes
   const moving = new Set(at.node.type === 'picture' ? [id] : pictureIdsBelow(at.node))
   if (moving.size === 0) return nodes
   const flat = walk([layer]).filter((e) => e.node.type === 'picture').map((e) => e.node as PictureNode)

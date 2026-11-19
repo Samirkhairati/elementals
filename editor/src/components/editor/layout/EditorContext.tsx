@@ -86,6 +86,7 @@ export interface EditorBaseContextValue
       | 'toggleNodeVisibility'
       | 'toggleNodeLock'
       | 'setNodeYSort'
+      | 'setPickAsOne'
       | 'toggleCollapsed'
       | 'deleteNodes'
       | 'copyNodes'

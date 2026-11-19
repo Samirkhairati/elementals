@@ -1,4 +1,6 @@
 import { StrictMode, type ReactNode } from 'react'
+import { entityView } from '@/lib/sceneIndex'
+import { SCHEMA_VERSION } from '../../../../shared/engine/types'
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { commandNodes } from '../../../../shared/engine/graph'
@@ -55,15 +57,16 @@ describe('useMapManager', () => {
     entities: [{ id: 'sign', name: 'Sign', x: 16, y: 32, components: { Transform: { x: 16, y: 32, depth: 10 }, Interactable: { type: 'on_interact', message: 'hello', eventKey: '' } } }],
     ...extra,
   })
-  const entityOf = (m: { nodes: unknown[] }, id: string) => allEntities(m.nodes as never).find((e) => e.id === id) as EntityNode
+  // as the entity code reads it: the node with all its components (its child nodes')
+  const entityOf = (m: { nodes: unknown[] }, id: string) => entityView(allEntities(m.nodes as never).find((e) => e.id === id) as EntityNode)
 
-  it('onSelectMap migrates an old map to the scene tree (entities canonical, schema 6)', () => {
+  it('onSelectMap migrates an old map to the scene tree (entities canonical, current schema)', () => {
     const onMapSelected = vi.fn()
     const legacy = legacyMap({ schemaVersion: 2 }) as never as ReturnType<typeof makeMap>
     const { result } = renderHook(() => useMapManager({ onMapSelected }), { wrapper })
     act(() => result.current.onSelectMap(legacy))
     const active = result.current.activeMap!
-    expect(active.schemaVersion).toBe(6)
+    expect(active.schemaVersion).toBe(SCHEMA_VERSION)
     expect(active).not.toHaveProperty('layers')
     expect(active).not.toHaveProperty('entities')
     expect(active.nodes.map((n) => [n.type, n.name])).toEqual([['tile', 'ground'], ['group', 'Entities']])
@@ -83,13 +86,13 @@ describe('useMapManager', () => {
       await result.current.loadMaps()
     })
     const loaded = result.current.maps[0]
-    expect(loaded.schemaVersion).toBe(6)
+    expect(loaded.schemaVersion).toBe(SCHEMA_VERSION)
     expect(entityOf(loaded, 'p').components.Movement).toMatchObject({ controller: 'player' })
     expect(entityOf(loaded, 'p').components.Sprite).toMatchObject({ asset: 'characters/player' })
     expect(saveMap).not.toHaveBeenCalled()
   })
 
-  it('loads a schema 6 map as the tree it is', async () => {
+  it('loads a schema 6 tree as the same tree, typed (its nodes keep their ids and order)', async () => {
     const v6 = {
       name: 'Tree',
       fileName: 'tree.json',
@@ -108,8 +111,9 @@ describe('useMapManager', () => {
       await result.current.loadMaps()
     })
     const loaded = result.current.maps[0]
-    expect(loaded).toBe(v6)
+    expect(loaded.schemaVersion).toBe(SCHEMA_VERSION)
     expect(loaded.nodes.map((n) => [n.id, n.type])).toEqual([['a', 'tile'], [ENTITIES_GROUP_ID, 'group']])
+    expect(loaded.nodes[0]).toMatchObject({ children: [] })
   })
 
   it('already canonical maps are used as they are (same object, no churn)', async () => {

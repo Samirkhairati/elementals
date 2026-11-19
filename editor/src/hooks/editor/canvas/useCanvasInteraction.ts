@@ -20,7 +20,7 @@ import {
 import { getBoundingBox } from '@/components/editor/canvas/canvasUtils'
 import { sampleSelection, sampledLayers } from '@/lib/layerSelection'
 import { lockedNode, shown, type SceneIndex } from '@/lib/sceneIndex'
-import { isDataLayer, type DataLayerNode } from '../../../../../shared/sceneTree'
+import { isBranch, isDataLayer, type DataLayerNode } from '../../../../../shared/sceneTree'
 import { TileCoords } from './useCanvasViewport'
 import { PendingEntityPlacement } from '@/hooks/editor/useEntityPlacement'
 import {
@@ -407,9 +407,9 @@ export function useCanvasInteraction({
         return
       }
 
-      // Image layer: a click drops the pending image, otherwise it only deselects (tiles are never painted here).
+      // A Node2D / YSort (the sprites' "image layer"): a click drops the pending image, otherwise it only deselects (tiles are never painted here).
       const activeLayer = indexRef.current.byId.get(activeLayerIdRef.current ?? '')?.node
-      if (activeLayer?.type === 'image') {
+      if (activeLayer && isBranch(activeLayer)) {
         if (button === 0) {
           // Anywhere, the map's edge included: pictures can sit partly or wholly outside the map.
           if (pendingImage && !lockedNode(indexRef.current, activeLayer.id) && shown(indexRef.current, activeLayer.id)) {

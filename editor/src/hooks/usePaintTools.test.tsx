@@ -107,7 +107,7 @@ describe('usePaintTools (StrictMode)', () => {
       [{ activeLayerId: 'missing' }, 'Layer not found', [0, 0]],
       [{ layer: { locked: true } }, 'Layer locked/hidden', [0, 0]],
       [{ layer: { visible: false } }, 'Layer locked/hidden', [0, 0]],
-      [{ layer: { type: 'image', children: [] } }, 'Image layers hold images, not tiles', [0, 0]],
+      [{ layer: { type: 'group', children: [] } }, 'Node2D and YSort hold nodes, not tiles', [0, 0]],
     ]
     for (const [opts, message, [x, y]] of cases) {
       const { result, setDebugInfo } = setup(opts)

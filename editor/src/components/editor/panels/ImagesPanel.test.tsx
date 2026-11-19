@@ -28,7 +28,7 @@ function setup(images: any[], extra: Record<string, unknown> = {}, layerOver: Re
     groupNodes: vi.fn(),
     ungroupNode: vi.fn(),
   }
-  const layer = { id: 'i1', name: 'Sky', type: 'image', children: pictures(images), ...layerOver }
+  const layer = { id: 'i1', name: 'Sky', type: 'group', children: pictures(images), ...layerOver }
   renderWithEditor(<ImagesPanel />, {
     activeMap: { name: 'Town', nodes: [layer] },
     activeLayerId: 'i1',
@@ -157,9 +157,9 @@ describe('ImagesPanel', () => {
     expect(f.placeMultiple).toHaveBeenCalledWith('i1', 'b')
   })
 
-  it('asks for an image layer when the active layer is another kind', () => {
+  it('asks for a Node2D or YSort when the active node is another kind', () => {
     renderWithEditor(<ImagesPanel />, { layers: [{ id: 't', name: 'Ground', type: 'tile', visible: true, locked: false }], activeLayerId: 't' } as any)
-    expect(screen.getByText(/Select an image layer/)).toBeInTheDocument()
+    expect(screen.getByText(/Select a Node2D or YSort/)).toBeInTheDocument()
   })
 
   describe('Resize and the Crop / Resize shortcuts', () => {
@@ -229,13 +229,16 @@ describe('ImagesPanel', () => {
     expect(f.updateImage).toHaveBeenCalledWith('i1', 'a', { name: 'Big cloud' })
   })
 
-  it('a locked picture freezes its fields, the layer still takes new pictures; a locked picture group only picks as one', () => {
+  it('a locked sprite freezes its fields, the Node2D still takes new sprites; a pick-as-one Node2D does not freeze them', () => {
     setup([{ ...items[0], locked: true }], { selectedImageId: 'a' })
     expect(screen.getByLabelText('Image scale')).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Add image' })).not.toBeDisabled()
     cleanup()
-    setup([makeGroup('g', pictures([items[0]]), { locked: true })], { selectedImageId: 'a' })
+    setup([makeGroup('g', pictures([items[0]]), { pickAsOne: true })], { selectedImageId: 'a' })
     expect(screen.getByLabelText('Image scale')).not.toBeDisabled()
+    cleanup()
+    setup([makeGroup('g', pictures([items[0]]), { locked: true })], { selectedImageId: 'a' })
+    expect(screen.getByLabelText('Image scale')).toBeDisabled() // a lock above a sprite freezes it
   })
 
   it('a picture inside a group: Add says it goes into the open group', () => {

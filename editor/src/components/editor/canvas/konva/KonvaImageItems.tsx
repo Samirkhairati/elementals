@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react'
 import { Group, Line, Rect, Shape } from 'react-konva'
 import type { ImageItem } from '@/types/editor'
-import type { ImageLayerNode } from '../../../../../../shared/sceneTree'
+import type { BranchNode } from '../../../../../../shared/sceneTree'
 import { lockedNode, pictureLocked, shown, visiblePictures, type SceneIndex } from '@/lib/sceneIndex'
 import type { SpriteAssetInfo } from '../../../../../../shared/engine/types'
 import { drawResolvedSprite, useSpriteImagesVersion } from '@/lib/spriteImages'
@@ -15,7 +15,7 @@ import { setStageCursor } from '../canvasUtils'
 import { KonvaImageResize } from './KonvaImageResize'
 
 const NO_ASSETS: Record<string, SpriteAssetInfo> = {}
-const NO_LAYERS: ImageLayerNode[] = []
+const NO_LAYERS: BranchNode[] = []
 /** Guide lines are drawn this far to each side of the picture (further than any map). */
 const GUIDE_EXTENT = 100000
 const GUIDE_STROKE = '#38bdf8'
@@ -35,9 +35,9 @@ interface KonvaImageItemsProps {
   /** The scene tree's index: what is hidden or locked once the groups above are counted. */
   index: SceneIndex
   /** The active image layer: its images can always be picked and dragged. */
-  layer: ImageLayerNode | null
+  layer: BranchNode | null
   /** Other image layers whose images can be picked too (the toolbar lock is off); picking one makes its layer the active one. */
-  otherLayers?: readonly ImageLayerNode[]
+  otherLayers?: readonly BranchNode[]
   activateLayer?: (layerId: string) => void
   selectedImageId: string | null
   /** Everything picked (Ctrl/Cmd+click adds or removes a picture); falls back to `selectedImageId` alone. */
@@ -131,7 +131,7 @@ function ImageLayerHandles({
   resizeImage,
 }: {
   index: SceneIndex
-  layer: ImageLayerNode
+  layer: BranchNode
   active: boolean
   interactive: boolean
   selectedImageId: string | null

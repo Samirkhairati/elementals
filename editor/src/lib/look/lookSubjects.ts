@@ -5,13 +5,13 @@
 import { compileLooks, type CompiledLook, type LookLayer } from '../../../../shared/look/compile'
 import { resolveLook } from '../../../../shared/look/schema'
 import type { Look, LookSet } from '../../../../shared/look/types'
-import type { ImageItem, MapData } from '@/types/editor'
-import { updateNode, type SceneNode } from '../../../../shared/sceneTree'
+import type { MapData } from '@/types/editor'
+import { childrenOf, isContainer, lookNodeOf, updateNode, type LookNode, type SceneNode } from '../../../../shared/sceneTree'
 import { sceneIndex } from '../sceneIndex'
 import type { LookSubjectRef } from './lookView'
 
-/** Nodes that can carry a look: tile and image layers, and pictures. */
-export const layerHasLook = (l: Pick<SceneNode, 'type'>): boolean => l.type === 'tile' || l.type === 'image'
+/** Nodes graded as a layer by their Look child: TileMaps, and Node2Ds / YSorts (their Look grades the sprites below them). */
+export const layerHasLook = (l: Pick<SceneNode, 'type'>): boolean => l.type === 'tile' || l.type === 'group' || l.type === 'ySort'
 
 const subjectNode = (nodes: readonly SceneNode[], ref: Exclude<LookSubjectRef, { kind: 'map' }>): SceneNode | undefined =>
   sceneIndex(nodes).byId.get(ref.kind === 'layer' ? ref.layerId : ref.imageId)?.node
@@ -20,8 +20,8 @@ export function getLookSet(map: Pick<MapData, 'look'> | null, nodes: readonly Sc
   if (ref.kind === 'map') return map?.look
   const node = subjectNode(nodes, ref)
   if (!node) return undefined
-  if (ref.kind === 'layer') return layerHasLook(node) ? (node as { look?: LookSet }).look : undefined
-  return node.type === 'picture' ? node.look : undefined
+  if (ref.kind === 'layer') return layerHasLook(node) ? lookNodeOf(node)?.look : undefined
+  return node.type === 'picture' ? lookNodeOf(node)?.look : undefined
 }
 
 /** The subject still exists (a layer / picture may have been deleted). */
@@ -37,13 +37,24 @@ const withLook = <T extends { look?: LookSet }>(o: T, set: LookSet | undefined):
   return (set ? { ...rest, look: set } : rest) as T
 }
 
-/** The tree with a layer's or a picture's look replaced (undefined removes it); the same array when nothing changed. */
+/**
+ * The tree with the look of a layer or a picture replaced: written into its Look child, which is added (first, at the
+ * back) when it has none. Undefined empties the look; a Look node the author added stays until it is deleted from the
+ * tree. The same array when nothing changed.
+ */
 export function setNodeLook(nodes: SceneNode[], ref: Exclude<LookSubjectRef, { kind: 'map' }>, set: LookSet | undefined): SceneNode[] {
   const id = ref.kind === 'layer' ? ref.layerId : ref.imageId
   return updateNode(nodes, id, (n) => {
-    if (!(layerHasLook(n) || n.type === 'picture')) return n
-    const current = (n as { look?: LookSet }).look
-    return current === set ? n : withLook(n as SceneNode & { look?: LookSet }, set)
+    if (!(layerHasLook(n) || n.type === 'picture') || !isContainer(n)) return n
+    const current = lookNodeOf(n)
+    if (current) {
+      const next = set ?? {}
+      if (current.look === next || (!set && !current.look.default && !current.look.profiles)) return n
+      return { ...n, children: childrenOf(n).map((c) => (c === current ? { ...current, look: next } : c)) } as SceneNode
+    }
+    if (!set) return n
+    const look: LookNode = { id: `${n.id}:look`, type: 'look', name: 'Look', look: set }
+    return { ...n, children: [look, ...childrenOf(n)] } as SceneNode
   })
 }
 
@@ -101,8 +112,8 @@ export function compileCached(stack: readonly LookLayer[], options: { subjectSiz
   return c
 }
 
-/** The looks a picture is drawn with (its own, then its layer's) in a profile; empty = none. */
-export function pictureStack(item: Pick<ImageItem, 'look'>, layer: { look?: LookSet }, profile: string | null): LookLayer[] {
+/** The looks a picture is drawn with (its own Look, then the one its Node2D passes down) in a profile; empty = none. */
+export function pictureStack(item: { look?: LookSet }, layer: { look?: LookSet }, profile: string | null): LookLayer[] {
   const own = resolveLook(item.look, profile)
   const outer = resolveLook(layer.look, profile)
   return [...(own ? [{ look: own, space: 'subject' as const }] : []), ...(outer ? [{ look: outer, space: 'world' as const }] : [])]

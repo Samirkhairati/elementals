@@ -5,6 +5,7 @@ import { fireEvent, screen, within } from '@testing-library/react'
 import { PropertiesPanel } from './PropertiesPanel'
 import { renderWithEditor } from '@/test/editorContext'
 import { makeEntity } from '@/test/helpers'
+import { entityView } from '@/lib/sceneIndex'
 import { createDefaultEventProps } from '../../../../../shared/engine/components'
 
 function setup(components: Record<string, any>, x = 80, y = 128) {
@@ -13,7 +14,7 @@ function setup(components: Record<string, any>, x = 80, y = 128) {
     nodes: [entity],
     activeLayerId: null,
     editNode: vi.fn(),
-    entities: [entity],
+    entities: [entityView(entity)],
     selectedEntityId: 'e1',
     renameEntity: vi.fn(),
     moveEntity: vi.fn(),
@@ -121,7 +122,7 @@ describe('PropertiesPanel entity inspector', () => {
 
   it('falls back to the layer view and then to the empty hint', () => {
     renderWithEditor(
-      <PropertiesPanel nodes={[{ id: 'l', name: 'Ground', type: 'tile' }]} activeLayerId="l" editNode={vi.fn()} />,
+      <PropertiesPanel nodes={[{ id: 'l', name: 'Ground', type: 'tile', children: [] }]} activeLayerId="l" editNode={vi.fn()} />,
       { activeMap: null as any },
     )
     expect(screen.getByLabelText('Layer name')).toHaveValue('Ground')

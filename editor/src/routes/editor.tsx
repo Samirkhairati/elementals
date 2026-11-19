@@ -448,6 +448,7 @@ export function EditorPage() {
     toggleNodeVisibility: layerManager.toggleNodeVisibility,
     toggleNodeLock: layerManager.toggleNodeLock,
     setNodeYSort: layerManager.setNodeYSort,
+    setPickAsOne: layerManager.setPickAsOne,
     toggleCollapsed: layerManager.toggleCollapsed,
     deleteNodes: layerManager.deleteNodes,
     requestDeleteNodes,

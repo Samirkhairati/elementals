@@ -9,13 +9,21 @@ import { createDefaultComponent } from '../../../../shared/engine/components'
 import { withDerivedFree } from '../../../../shared/engine/placement'
 import { withCharacterDepth } from '@/lib/entityDepth'
 import { addEntity, deleteNodes, duplicateNodes, patchNode, renameNode, setVisible } from '@/lib/sceneOps'
-import { sceneIndex } from '@/lib/sceneIndex'
+import { entityView, sceneIndex } from '@/lib/sceneIndex'
 import { pruneSelection } from '@/lib/sceneSelection'
-import { updateNode, type EntityNode } from '../../../../shared/sceneTree'
+import { updateNode, type EntityNode, type SceneNode } from '../../../../shared/sceneTree'
+import { entityNodeFrom, entityWithComponents, type ComponentBag } from '../../../../shared/sceneEntity'
 import { useStableArray } from '@/hooks/useShallowStable'
 import type { SceneTreeApi } from './useSceneTree'
 
 const newId = () => crypto.randomUUID()
+
+/** An edited entity view written back into its node: the node's fields, and its components into the node and its children. */
+export function applyEntityView(nodes: readonly SceneNode[], node: EntityNode, view: EntityData): EntityNode {
+  const { components, children: _children, type: _type, ...fields } = view as unknown as EntityNode
+  const index = sceneIndex(nodes)
+  return entityWithComponents({ ...node, ...fields, type: 'entity', children: node.children } as EntityNode, components as ComponentBag, (id) => index.byId.has(id))
+}
 
 export function useEntityManager(tree: SceneTreeApi) {
   const { commit, index, view, getSelection, getIndex, select, selectMany, setSelection } = tree
@@ -40,14 +48,18 @@ export function useEntityManager(tree: SceneTreeApi) {
     [select, getSelection, getIndex, setSelection]
   )
 
-  /** Applies `fn` to one entity (not to anything else with that id). */
+  /**
+   * Applies `fn` to one entity, as its view (all its components in `components`); what changed goes back into the node
+   * and its component nodes (shared/sceneEntity.ts).
+   */
   const editEntity = useCallback(
     (id: string, fn: (entity: EntityData) => EntityData) => {
       commit((prev) =>
         updateNode(prev, id, (n) => {
           if (n.type !== 'entity') return n
-          const next = fn(n as unknown as EntityData)
-          return next === (n as unknown as EntityData) ? n : (next as unknown as EntityNode)
+          const view = entityView(n) as unknown as EntityData
+          const next = fn(view)
+          return next === view ? n : applyEntityView(prev, n, next)
         })
       )
     },
@@ -80,14 +92,9 @@ export function useEntityManager(tree: SceneTreeApi) {
           // Entity position and Transform are one thing: prefabs carry a placeholder Transform.
           defaultComponents.Transform = { ...defaultComponents.Transform, x, y }
 
-          const entity = withDerivedFree({
-            id: crypto.randomUUID(),
-            type: 'entity',
-            name: cleanName,
-            x,
-            y,
-            components: JSON.parse(JSON.stringify(defaultComponents)),
-          } as EntityNode)
+          const fields = withDerivedFree({ id: crypto.randomUUID(), type: 'entity', name: cleanName, x, y, components: JSON.parse(JSON.stringify(defaultComponents)) } as EntityNode)
+          const index = sceneIndex(prev)
+          const entity = entityNodeFrom(fields, fields.components as ComponentBag, (cid) => index.byId.has(cid))
           const next = addEntity(prev, entity, anchorId === undefined ? getSelection().primary : anchorId)
           if (next !== prev) createdId = entity.id
           return next

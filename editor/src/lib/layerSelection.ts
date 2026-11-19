@@ -1,8 +1,8 @@
 import type { CopiedTile, Layer, SelectionLayerPart, TileSelection } from '@/types/editor'
 import { isDataLayer, type DataLayerNode } from '../../../shared/sceneTree'
 
-/** Layers that hold tile cells and so can be sampled into / painted from a selection (image layers cannot). */
-export const isSampleableLayer = (layer: Pick<Layer, 'type'>) => layer.type !== 'image' && layer.type !== 'objects'
+/** Layers that hold tile cells and so can be sampled into / painted from a selection (the objects layer cannot). */
+export const isSampleableLayer = (layer: Pick<Layer, 'type'>) => layer.type !== 'objects'
 
 /**
  * The layers a pinned right-drag samples: the active layer plus every multi-selected one, in list order

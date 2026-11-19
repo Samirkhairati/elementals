@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { componentsOfEntity } from '../../../shared/sceneEntity'
 import type { CharacterDef } from '../../../shared/engine/characters'
 import type { EntityNode, MapData } from '@/types/editor'
 import { buildProjectReferences, groupReferences } from './referenceIndex'
@@ -60,7 +61,7 @@ describe('safe rename and delete', () => {
     expect(plan.unrewritable.every((r) => r.source.table === 'prefab')).toBe(true)
     expect(plan.unrewritable.length).toBeGreaterThan(0)
     expect(plan.maps).toHaveLength(1)
-    expect(((plan.maps[0].nodes[0] as EntityNode).components.Sprite as { asset: string }).asset).toBe('objects/crate')
+    expect((componentsOfEntity(plan.maps[0].nodes[0] as EntityNode).Sprite as { asset: string }).asset).toBe('objects/crate')
   })
 
   it('refuses invalid, unchanged and taken ids without touching any map', () => {

@@ -7,8 +7,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { imagePickName, type ImagePick } from '@/lib/graphicAssets'
 import { ARROW_DELTAS, nudgeStep } from '@/lib/imageNudge'
 import { movePictureStep, patchNode, setYSort } from '@/lib/sceneOps'
-import { layerOf, lockedNode, pictureLocked, sceneIndex, shown } from '@/lib/sceneIndex'
-import { insertNode, findNode, type PictureNode, type SceneNode } from '../../../../shared/sceneTree'
+import { hostOf, lockedNode, pictureLocked, sceneIndex, shown } from '@/lib/sceneIndex'
+import { insertNode, findNode, isBranch, type PictureNode, type SceneNode } from '../../../../shared/sceneTree'
 import type { ImageItem } from '@/types/editor'
 import type { SceneTreeApi } from './useSceneTree'
 
@@ -37,17 +37,18 @@ export function useImageItems(tree: SceneTreeApi) {
   }, [pendingImage])
 
   // ── single pictures ───────────────────────────────────────────────────────
-  /** Adds a picture to an image layer (into the open group of the layer when one is selected) and picks it. Returns its id. */
+  /** Adds a sprite to a Node2D / YSort (into the open group inside it when one is selected) and picks it. Returns its id. */
   const addImage = useCallback(
-    (layerId: string, item: Omit<ImageItem, 'id' | 'type' | 'name'> & { name?: string }): string | null => {
+    (layerId: string, item: Omit<ImageItem, 'id' | 'type' | 'name' | 'children'> & { name?: string }): string | null => {
       let createdId: string | null = null
       commit(
         (prev) => {
           const layer = findNode(prev, layerId)
-          if (!layer || layer.type !== 'image' || lockedNode(sceneIndex(prev), layerId)) return prev
+          if (!layer || !isBranch(layer) || lockedNode(sceneIndex(prev), layerId)) return prev
           const open = getSelection().openGroupId
-          const parent = open && findNode([layer], open)?.type === 'group' ? open : layerId
-          const picture: PictureNode = { ...item, id: crypto.randomUUID(), type: 'picture', name: item.name ?? imagePickName(item) }
+          const openNode = open ? findNode([layer], open) : undefined
+          const parent = openNode && isBranch(openNode) ? open! : layerId
+          const picture: PictureNode = { ...item, id: crypto.randomUUID(), type: 'picture', name: item.name ?? imagePickName(item), children: [] }
           const next = insertNode(prev, parent, picture)
           if (next !== prev) createdId = picture.id
           return next
@@ -116,7 +117,7 @@ export function useImageItems(tree: SceneTreeApi) {
       if (node?.type !== 'picture' || pictureLocked(index, node.id) || !shown(index, node.id)) return
       e.preventDefault()
       const step = nudgeStep(e.shiftKey)
-      const layerId = index.byId.get(node.id)?.ancestors.find((a) => a.type === 'image')?.id ?? ''
+      const layerId = hostOf(index, node.id)?.id ?? ''
       updateImage(layerId, node.id, { x: node.x + delta.dx * step, y: node.y + delta.dy * step })
     }
     window.addEventListener('keydown', onKey)
@@ -135,15 +136,8 @@ export function useImageItems(tree: SceneTreeApi) {
     [getIndex]
   )
 
-  /** The image layer a picture or group sits in (undefined when it is in none). */
-  const imageLayerOf = useCallback(
-    (id: string) => {
-      const entry = getIndex().byId.get(id)
-      const layer = entry && (entry.node.type === 'image' ? entry.node : entry.ancestors.find((a) => a.type === 'image'))
-      return layer ? layerOf(getIndex(), layer.id) : undefined
-    },
-    [getIndex]
-  )
+  /** The Node2D / YSort a sprite sits in (the node itself for one; undefined when it is in none). */
+  const imageLayerOf = useCallback((id: string) => hostOf(getIndex(), id), [getIndex])
 
   return {
     pendingImage,

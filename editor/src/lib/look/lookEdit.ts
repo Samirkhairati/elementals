@@ -4,20 +4,29 @@
 import { lookId, MAX_COMPONENTS, MAX_MASKS } from '../../../../shared/look/schema'
 import type { Look, LookAdjust, LookMask, LookSet, LookShadow, MaskComponent, MaskComponentType, MaskMode } from '../../../../shared/look/types'
 import type { ImageItem } from '@/types/editor'
-import type { SceneNode } from '../../../../shared/sceneTree'
+import { isBranch, type SceneNode } from '../../../../shared/sceneTree'
 import { sceneIndex } from '../sceneIndex'
 import { layerHasLook, ownLook, withProfileLook } from './lookSubjects'
 import type { LookSubjectRef } from './lookView'
 
 type Box = { x: number; y: number; w: number; h: number }
 
-/** The subject the selection points at: the picked picture, else the active tile / image layer, else the map. */
+/**
+ * The subject the selection points at: the picked sprite, else the active TileMap / Node2D / YSort, else the map. A
+ * selected Look node stands for the node it grades.
+ */
 export function selectedSubject(nodes: readonly SceneNode[], activeLayerId: string | null, selectedImageId: string | null): LookSubjectRef {
   const index = sceneIndex(nodes)
-  const layer = activeLayerId ? index.byId.get(activeLayerId)?.node : undefined
+  const active = activeLayerId ? index.byId.get(activeLayerId) : undefined
+  const layer = active?.node.type === 'look' ? active.ancestors[active.ancestors.length - 1] : active?.node
+  if (layer?.type === 'picture') {
+    const host = index.byId.get(layer.id)?.ancestors.slice(-1)[0]
+    return host ? { kind: 'picture', layerId: host.id, imageId: layer.id } : { kind: 'map' }
+  }
   if (!layer || !layerHasLook(layer)) return { kind: 'map' }
-  if (layer.type === 'image' && selectedImageId && index.byId.get(selectedImageId)?.ancestors.some((a) => a.id === layer.id)) {
-    return { kind: 'picture', layerId: layer.id, imageId: selectedImageId }
+  if (isBranch(layer) && selectedImageId && index.byId.get(selectedImageId)?.ancestors.some((a) => a.id === layer.id)) {
+    const host = index.byId.get(selectedImageId)!.ancestors.slice(-1)[0]
+    return { kind: 'picture', layerId: host.id, imageId: selectedImageId }
   }
   return { kind: 'layer', layerId: layer.id }
 }

@@ -4,12 +4,12 @@ import type { Layer } from '@/types/editor'
 import { ResizeMapDialog } from './ResizeMapDialog'
 
 const ground: Layer = {
-  id: 'g', name: 'ground', type: 'tile',
+  id: 'g', name: 'ground', type: 'tile', children: [],
   data: { 0: { tilesetId: 'grass.png', x: 0, y: 0 }, 3: { tilesetId: 'grass.png', x: 1, y: 0 }, 11: { tilesetId: 'grass.png', x: 2, y: 0 } },
 }
 const map = {
   name: 'Town', width: 4, height: 3,
-  nodes: [ground, { id: 'e1', type: 'entity' as const, name: 'Sign', x: 3 * 32 + 16, y: 32, components: {} }],
+  nodes: [ground, { id: 'e1', type: 'entity' as const, name: 'Sign', x: 3 * 32 + 16, y: 32, components: {}, children: [] }],
 }
 
 const setup = () => {

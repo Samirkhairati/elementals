@@ -27,8 +27,9 @@ export function MapSettingsDialog({ map, onClose, onSave, onResize }: Props) {
   if (!map) return <Dialog open={false} />
   const px = mapPixelSize(map)
   // Layers drawn over the player (a higher z) and under it, so the number means something.
-  const imageAndTile = sceneIndex(map.nodes).layers.filter((l) => l.type === 'tile' || l.type === 'image')
-  const above = imageAndTile.filter((l) => (l.z ?? 0) > playerZ).length
+  const index = sceneIndex(map.nodes)
+  const drawn: { z?: number }[] = [...index.layers.filter((l) => l.type === 'tile'), ...index.spriteHosts]
+  const above = drawn.filter((l) => (l.z ?? 0) > playerZ).length
   const save = () => {
     const { playerZ: _old, ...rest } = map.settings ?? {}
     onSave(playerZ === DEFAULT_PLAYER_Z ? rest : { ...rest, playerZ })
@@ -46,13 +47,13 @@ export function MapSettingsDialog({ map, onClose, onSave, onResize }: Props) {
               <span className="ed-label flex items-center gap-1">
                 Player z-index
                 <InfoTip>
-                  The depth the player draws at in the game. Tile and image layers with a higher z draw over the player, lower ones under it.
-                  Y-sorted pictures sort among the characters at this depth. Default {DEFAULT_PLAYER_Z}.
+                  The depth the player draws at in the game. TileMaps and the Node2Ds holding sprites with a higher z draw over the player, lower ones under it.
+                  Sprites under a YSort sort among the characters at this depth. Default {DEFAULT_PLAYER_Z}.
                 </InfoTip>
               </span>
               <NumberField aria-label="Player z-index" integer min={-999} max={999} value={playerZ} onCommit={setPlayerZ} />
               <span className="ed-hint" data-testid="player-z-layers">
-                {above} of {imageAndTile.length} tile and image layers draw over the player
+                {above} of {drawn.length} TileMaps and sprite Node2Ds draw over the player
               </span>
             </div>
             <div className="flex items-center gap-2">

@@ -22,13 +22,14 @@ import {
   setVisible,
   setYSort,
   moveNodesTo,
+  parentPathFor,
   ungroupNode,
   type DropWhere,
   type NewNodeType,
 } from '@/lib/sceneOps'
 import { sceneIndex } from '@/lib/sceneIndex'
 import { NO_SELECTION, pruneSelection, selectNode, type SelectMode } from '@/lib/sceneSelection'
-import { collisionLayerLike, insertNode, isContainer, isLayerNode, type CollisionShapeNode } from '../../../../shared/sceneTree'
+import { collisionLayerLike, insertNode, isBranch, isContainer, isLayerNode, updateNode, type CollisionShapeNode } from '../../../../shared/sceneTree'
 import { nextTileGroupName } from '../../../../shared/collisionLayers'
 import type { CollisionShape } from '../../../../shared/collisionShapes'
 import { useImageItems } from './useImageItems'
@@ -111,8 +112,23 @@ export function useLayerManager(tree: SceneTreeApi) {
     [commit]
   )
 
-  /** Y-sort on or off for a group, image layer or picture; undefined goes back to following the parent (see shared/ySort.ts). */
+  /** Y-sort on (a Node2D becomes a YSort) or off (a YSort becomes a Node2D). */
   const setNodeYSort = useCallback((id: string, value: boolean | undefined) => commit((prev) => setYSort(prev, id, value)), [commit])
+
+  /** Whether a click on one of the sprites of a Node2D / YSort picks all of them. */
+  const setPickAsOne = useCallback(
+    (id: string, value: boolean) =>
+      commit((prev) => {
+        const node = sceneIndex(prev).byId.get(id)?.node
+        if (!node || (node.type !== 'group' && node.type !== 'ySort') || (node.pickAsOne === true) === value) return prev
+        if (value) return patchNode(prev, id, { pickAsOne: true })
+        return updateNode(prev, id, (n) => {
+          const { pickAsOne: _p, ...rest } = n as typeof node
+          return rest as typeof n
+        })
+      }),
+    [commit]
+  )
 
   /** Opening or closing a container in the list is a view change: it is saved with the map but is not an undo step. */
   const toggleCollapsed = useCallback(
@@ -131,11 +147,14 @@ export function useLayerManager(tree: SceneTreeApi) {
       let made: string | null = null
       commit(
         (prev) => {
-          // Next to the selection when that is a layer or a group; leaves (entities, pictures...) do not decide where a layer goes.
+          // Next to the selection when that is a layer or a Node2D; leaves (entities, pictures...) do not decide where a layer goes.
           const sel = getSelection().primary
           const selected = sel ? sceneIndex(prev).byId.get(sel)?.node : undefined
-          const home = selected && (isLayerNode(selected) || selected.type === 'group') ? selected.id : null
-          const result = addNode(prev, makeNode(type, newId(), newNodeName(prev, type)), anchorId === undefined ? home : anchorId)
+          const home = selected && (isLayerNode(selected) || isBranch(selected)) ? selected.id : null
+          const anchor = anchorId === undefined ? home : anchorId
+          const parentPath = parentPathFor(prev, type, anchor)
+          const id = newId()
+          const result = addNode(prev, makeNode(type, id, newNodeName(prev, type), parentPath[parentPath.length - 1]?.type), anchor)
           if (!result.node) return prev
           made = result.node.id
           return expandTo(result.nodes, result.node.id)
@@ -357,6 +376,7 @@ export function useLayerManager(tree: SceneTreeApi) {
     toggleNodeVisibility,
     toggleNodeLock,
     setNodeYSort,
+    setPickAsOne,
     toggleCollapsed,
     deleteNodes: deleteNodesById,
     copyNodes,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { collisionShapeNodes, layerNodes, type CollisionLayerNode, type EntityNode, type ImageLayerNode, type PictureNode, type SceneNode, type TileLayerNode } from '../../../shared/sceneTree'
+import { collisionShapeNodes, findNode, layerNodes, type CollisionLayerNode, type EntityNode, type GroupNode, type PictureNode, type SceneNode, type TileLayerNode } from '../../../shared/sceneTree'
 import {
   applyResize,
   describeLoss,
@@ -21,11 +21,11 @@ const tile = (x = 0, y = 0) => ({ tilesetId: 'grass.png', x, y })
 
 // 4 x 3 map. Tile layer: (0,0) (3,0) (1,1) (3,2). Entity on (2,1), picture anchored on (0,2).
 function makeMap(): ResizableMap {
-  const ground: TileLayerNode = { id: 'g', name: 'ground', type: 'tile', data: { 0: tile(1), 3: tile(2), 5: tile(3), 11: tile(4) } }
-  const pics: ImageLayerNode = { id: 'p', name: 'pics', type: 'image', children: [{ id: 'i1', type: 'picture', name: 'i1', graphicId: 'a.png', x: 16, y: 96 }] }
+  const ground: TileLayerNode = { id: 'g', name: 'ground', type: 'tile', data: { 0: tile(1), 3: tile(2), 5: tile(3), 11: tile(4) }, children: [] }
+  const pics: GroupNode = { id: 'p', name: 'pics', type: 'group', children: [{ id: 'i1', type: 'picture', name: 'i1', graphicId: 'a.png', x: 16, y: 96, children: [] }] }
   const ent: EntityNode = {
     id: 'e1', type: 'entity', name: 'Sign', x: 2 * 32 + 16, y: 2 * 32,
-    components: { Transform: { x: 2 * 32 + 16, y: 2 * 32, depth: 0 } },
+    components: { Transform: { x: 2 * 32 + 16, y: 2 * 32, depth: 0 } }, children: [],
   }
   return { width: 4, height: 3, nodes: [ground, pics, ent] }
 }
@@ -33,7 +33,7 @@ function makeMap(): ResizableMap {
 const layerOf = (m: ResizableMap, id: string): SceneNode => layerNodes(m.nodes).find((l) => l.id === id)!
 const ground = (m: ResizableMap) => layerOf(m, 'g') as TileLayerNode
 const entityOf = (m: ResizableMap) => m.nodes.find((n) => n.type === 'entity') as EntityNode
-const pictureOf = (m: ResizableMap) => (layerOf(m, 'p') as ImageLayerNode).children[0] as PictureNode
+const pictureOf = (m: ResizableMap) => (findNode(m.nodes, 'p') as GroupNode).children[0] as PictureNode
 
 describe('resizedSize / resizeProblem', () => {
   it('adds the edges to the size in pixels', () => {

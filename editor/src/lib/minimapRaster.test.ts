@@ -54,7 +54,7 @@ describe('rasterizeMap', () => {
   })
 
   it('marks entities by their anchor tile and ignores ones outside the map', () => {
-    const at = (x: number, y: number): EntityNode => ({ id: `${x},${y}`, type: 'entity', name: 'e', x, y, components: {} })
+    const at = (x: number, y: number): EntityNode => ({ id: `${x},${y}`, type: 'entity', name: 'e', x, y, components: {}, children: [] })
     const px = rasterizeMap({ width: 3, height: 3, nodes: [] }, [at(1 * 32 + 16, 2 * 32), at(-16, 32), at(500, 500)], lookup)
     expect(pixel(px, 1 * 3 + 1).slice(0, 3)).toEqual([...MINIMAP_ENTITY]) // col 1, row 1
     expect(px.filter((_, i) => i % 4 === 0 && px[i] === MINIMAP_ENTITY[0]).length).toBe(1)

@@ -53,7 +53,9 @@ afterEach(() => {
 describe('SceneTree: what it lists', () => {
   it('lists the tree top first (the top row draws on top), a container\'s children under it, indented', () => {
     setup()
-    expect(order()).toEqual(['trees', 'pine', 'oak', 'town', 'roofs', 'npc', 'ground', 'deco'])
+    // an entity lists its component nodes (the Elder's Event)
+    expect(order()).toEqual(['trees', 'pine', 'oak', 'town', 'roofs', 'npc', 'npc:event', 'ground', 'deco'])
+    expect(row('npc:event').style.marginLeft).toBe('28px')
     expect(row('pine').style.marginLeft).toBe('14px')
     expect(row('trees').style.marginLeft).toBe('0px')
   })
@@ -109,7 +111,7 @@ describe('SceneTree: selection', () => {
     fireEvent.click(row('deco'), { metaKey: true })
     expect(view().ids).toEqual(['ground'])
     fireEvent.click(row('town'), { shiftKey: true })
-    expect([...view().ids].sort()).toEqual(['ground', 'npc', 'roofs', 'town'].sort())
+    expect([...view().ids].sort()).toEqual(['ground', 'npc', 'npc:event', 'roofs', 'town'].sort())
   })
 
   it('clicking the only selected layer again deselects it; a picture stays picked', () => {
@@ -162,12 +164,12 @@ describe('SceneTree: eye, lock and rename', () => {
   it('double-click renames: Enter keeps the new name, Esc keeps the old one', () => {
     const { node } = setup()
     fireEvent.doubleClick(row('ground'))
-    const input = within(row('ground')).getByLabelText('Tile Layer name')
+    const input = within(row('ground')).getByLabelText('TileMap name')
     fireEvent.change(input, { target: { value: 'Grass' } })
     fireEvent.keyDown(input, { key: 'Enter' })
     expect(node('ground').name).toBe('Grass')
     fireEvent.doubleClick(row('oak'))
-    const again = within(row('oak')).getByLabelText('Picture name')
+    const again = within(row('oak')).getByLabelText('Sprite2D name')
     fireEvent.change(again, { target: { value: 'Nope' } })
     fireEvent.keyDown(again, { key: 'Escape' })
     expect(node('oak').name).toBe('Oak')
@@ -178,10 +180,11 @@ describe('SceneTree: eye, lock and rename', () => {
     try {
       const { tree } = setup()
       menu('deco')
-      fireEvent.click(item(/New Group/))
+      fireEvent.click(item(/Add Sibling Node/))
+      fireEvent.click(item(/^Node2D/))
       act(() => vi.advanceTimersByTime(100))
       const input = screen.getByRole('textbox') as HTMLInputElement
-      expect(input.value).toBe('Group')
+      expect(input.value).toBe('Node2D')
       fireEvent.change(input, { target: { value: 'Scenery' } })
       fireEvent.keyDown(input, { key: 'Enter' })
       expect(tree().some((n) => n.name === 'Scenery' && n.type === 'group')).toBe(true)
@@ -192,26 +195,50 @@ describe('SceneTree: eye, lock and rename', () => {
 })
 
 describe('SceneTree: menus', () => {
-  it('New Layer and New Group from a row in a group make the node in that group', () => {
+  it('Add Sibling Node from a row in a Node2D makes the node in that Node2D; Add Child Node makes it inside the row', () => {
     const { node } = setup()
     menu('roofs')
-    fireEvent.click(item(/New Layer/))
-    fireEvent.click(item('Tile Layer'))
+    fireEvent.click(item(/Add Sibling Node/))
+    fireEvent.click(item(/^TileMap/))
     expect(node('town').children.map((c: SceneNode) => c.type)).toEqual(['entity', 'tile', 'tile'])
+    menu('town')
+    fireEvent.click(item(/Add Child Node/))
+    fireEvent.click(item(/^YSort/))
+    expect(node('town').children.map((c: SceneNode) => c.type)).toContain('ySort')
   })
 
-  it('the New Layer submenu greys out a second terrain; collision layers can be many', () => {
+  it('offers only what fits: a second terrain or Look is greyed out, a sprite offers only a Look, an entity its components', () => {
     setup([makeLayer('t', { type: 'terrain', name: 'Terrain' }), makeLayer('g', { name: 'Ground' })])
     menu('g')
-    fireEvent.click(item(/New Layer/))
-    expect(item('Terrain Layer')).toHaveAttribute('data-disabled')
-    expect(item('Collision Layer')).not.toHaveAttribute('data-disabled')
+    fireEvent.click(item(/Add Sibling Node/))
+    expect(item(/^Terrain/)).toHaveAttribute('data-disabled')
+    expect(item(/^StaticBody2D/)).not.toHaveAttribute('data-disabled')
+    expect(screen.queryByRole('menuitem', { name: /^Sprite2D/ })).toBeNull() // not at the map root
   })
 
-  it('the empty space of the panel makes layers and groups at the top of the map', () => {
+  it('a sprite\'s Add Child Node lists only a Look, and no sprite inside it', () => {
+    setup()
+    menu('oak')
+    fireEvent.click(item(/Add Child Node/))
+    expect(screen.getByTestId('add-node-look')).toBeInTheDocument()
+    expect(screen.queryByTestId('add-node-picture')).toBeNull()
+  })
+
+  it('an entity\'s Add Child Node lists its components, the ones it has greyed out', () => {
+    setup()
+    menu('npc')
+    fireEvent.click(item(/Add Child Node/))
+    expect(screen.getByTestId('add-node-event')).toHaveAttribute('data-disabled')
+    expect(screen.getByTestId('add-node-animatedSprite')).not.toHaveAttribute('data-disabled')
+    expect(screen.getByTestId('add-node-area')).toBeInTheDocument()
+    expect(screen.queryByTestId('add-node-tile')).toBeNull()
+  })
+
+  it('the empty space of the panel adds nodes at the top of the map', () => {
     const { tree } = setup([makeLayer('g', { name: 'Ground' })])
     fireEvent.contextMenu(screen.getByTestId('scene-tree'))
-    fireEvent.click(item(/New Group/))
+    fireEvent.click(item(/Add Node/))
+    fireEvent.click(item(/^Node2D/))
     expect(tree().map((n) => n.type)).toEqual(['tile', 'group'])
   })
 
@@ -249,14 +276,14 @@ describe('SceneTree: menus', () => {
     vi.useFakeTimers()
     try {
       menu('town')
-      fireEvent.click(item(/Delete Group/))
+      fireEvent.click(item(/Delete Node2D/))
       act(() => vi.advanceTimersByTime(10))
     } finally {
       vi.useRealTimers()
     }
     const asked = setConfirmDialog.mock.calls[0][0] as unknown as { title: string; description: string; action: () => void }
-    expect(asked.title).toBe('Delete Group')
-    expect(asked.description).toMatch(/the 2 nodes inside it/)
+    expect(asked.title).toBe('Delete Node2D')
+    expect(asked.description).toMatch(/the 3 nodes inside it/) // the Elder, its Event and the roofs
     expect(node('town')).toBeDefined()
     act(() => asked.action())
     expect(node('town')).toBeUndefined()
@@ -266,7 +293,7 @@ describe('SceneTree: menus', () => {
     expect(node('oak')).toBeUndefined()
   })
 
-  it('a picture\'s menu reorders it, places more copies and y-sorts it', () => {
+  it('a sprite\'s menu reorders it and places more copies; a Node2D\'s menu changes it to a YSort', () => {
     const placeMultiple = vi.fn()
     const { node } = setup(town(), { extra: { placeMultiple } })
     menu('oak')
@@ -276,28 +303,22 @@ describe('SceneTree: menus', () => {
     menu('oak')
     fireEvent.click(item(/Place more copies/))
     expect(placeMultiple).toHaveBeenCalledWith('trees', 'oak')
-    menu('oak')
-    fireEvent.click(item(/Enable Y-sort/))
-    expect(node('oak').ySort).toBe(true)
+    menu('trees')
+    fireEvent.click(item(/Change to YSort/))
+    expect(node('trees').type).toBe('ySort')
+    expect(within(row('oak')).getByTestId('ysort-badge')).toBeInTheDocument() // what is inside sorts
+    menu('trees')
+    fireEvent.click(item(/Change to Node2D/))
+    expect(node('trees').type).toBe('group')
   })
 
-  it('pictures of a y-sorted layer show the badge and can be taken out of it', () => {
-    const nodes = town()
-    ;(nodes[3] as any).ySort = true
-    const { node } = setup(nodes)
-    expect(within(row('oak')).getByTestId('ysort-badge')).toBeInTheDocument()
-    menu('oak')
-    fireEvent.click(item(/Disable Y-sort/))
-    expect(node('oak').ySort).toBe(false)
-  })
-
-  it('a picture group offers Add picture inside, and its lock means "pick as one"', () => {
+  it('a Node2D offers Add Sprite2D, and "pick sprites as one" is its own setting, apart from the lock', () => {
     const { node } = setup([makeImageLayer('trees', [makeGroup('wall', [makePicture('a')], { name: 'Dam wall' }) as any], { name: 'Trees' })])
     menu('wall')
-    expect(item(/Add picture inside/)).toBeInTheDocument()
-    fireEvent.click(item('Lock'))
-    expect(node('wall').locked).toBe(true)
-    // the members are not locked by it: no "locked by a group above" on them
+    expect(item(/Add Sprite2D/)).toBeInTheDocument()
+    fireEvent.click(item(/Pick sprites as one/))
+    expect(node('wall')).toMatchObject({ pickAsOne: true })
+    expect(node('wall').locked).toBeUndefined()
     expect(within(row('a')).queryByRole('button', { name: 'Locked by a group above' })).toBeNull()
   })
 
@@ -313,10 +334,11 @@ describe('SceneTree: menus', () => {
 
 describe('SceneTree: drag and drop', () => {
   it('reads the top half of a row as above, the bottom half as below, and the lower half of a container as inside', () => {
-    const leaf = makeLayer('l')
+    const leaf = makeLayer('l') // a TileMap only takes a Look: its lower half is "below"
     const group = makeGroup('g')
     expect(dropWhere(leaf, 0.2)).toBe('above')
     expect(dropWhere(leaf, 0.8)).toBe('below')
+    expect(dropWhere(makeEntity('e'), 0.8)).toBe('inside')
     expect(dropWhere(group, 0.2)).toBe('above')
     expect(dropWhere(group, 0.8)).toBe('inside')
   })
@@ -335,11 +357,11 @@ describe('SceneTree: drag and drop', () => {
     expect(tree().map((n) => n.id)).toEqual(['deco', 'town', 'trees'])
   })
 
-  it('refuses places the rules do not allow: a picture outside an image layer, a layer into an image layer', () => {
+  it('refuses places the rules do not allow: a sprite at the map root, a layer into an entity', () => {
     const { tree } = setup()
     const before = JSON.stringify(tree())
     drag('oak', 'ground', 0.2)
-    drag('ground', 'trees', 0.8)
+    drag('ground', 'npc', 0.8)
     expect(JSON.stringify(tree())).toBe(before)
   })
 

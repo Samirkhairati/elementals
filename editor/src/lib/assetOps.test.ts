@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { CharacterDef } from '../../../shared/engine/characters'
 import type { CharacterInfo } from '../../../shared/engine/graphics'
 import type { MapData } from '@/types/editor'
-import type { ImageLayerNode, TileLayerNode } from '../../../shared/sceneTree'
+import type { GroupNode, TileLayerNode } from '../../../shared/sceneTree'
 import { buildProjectReferences } from './referenceIndex'
 import { allFolders, applyAssetPlan, canMoveFolder, folderChanges, graphicDeleteGuard, planGraphicChanges, planTilesetRename, summarizeReferences, tilesetDeleteGuard } from './assetOps'
 
@@ -54,7 +54,7 @@ describe('planGraphicChanges', () => {
     expect(plan.ok).toBe(true)
     expect(plan.characters.map((c) => [c.id, c.def.sheets.sheet.image])).toEqual([['objects/chest', 'boxes/chest.png']])
     expect(plan.maps.map((m) => m.fileName)).toEqual(['park.json'])
-    expect((plan.maps[0].nodes[0] as ImageLayerNode).children[0]).toMatchObject({ graphicId: 'sky/cloud.png' })
+    expect((plan.maps[0].nodes[0] as GroupNode).children[0]).toMatchObject({ graphicId: 'sky/cloud.png' })
     expect(plan.references).toHaveLength(2)
     expect(characters['objects/chest'].def.sheets.sheet.image).toBe('props/chest.png')
   })

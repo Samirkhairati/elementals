@@ -7,15 +7,14 @@
 import type { SpriteAssetInfo } from '../../../shared/engine/types'
 import { TILE_SIZE } from '../../../shared/engine/constants'
 import type { LayerType, MapData } from '@/types/editor'
-import { isDataLayer, isLayerNode, isVisible, type DataLayerNode } from '../../../shared/sceneTree'
+import { isDataLayer, type DataLayerNode } from '../../../shared/sceneTree'
+import { runDrawOrder, sceneLayers } from '../../../shared/sceneLayers'
 import { resolveImageItem } from './imageItems'
-import { sceneIndex, visiblePictures } from './sceneIndex'
 import { drawResolvedSprite } from './spriteImages'
 
 /** What a layer type contributes to how the map looks: painted tiles, placed pictures, or nothing a preview should draw. */
-export const LAYER_SCENERY: Record<LayerType, 'tiles' | 'images' | 'none'> = {
+export const LAYER_SCENERY: Record<LayerType, 'tiles' | 'none'> = {
   tile: 'tiles',
-  image: 'images',
   // gameplay data and editor-only structure: not scenery
   collision: 'none',
   terrain: 'none',
@@ -58,12 +57,10 @@ export function usedTilesetIds(layers: readonly Pick<DataLayerNode, 'data'>[]): 
 export function drawMapScenery(ctx: CanvasRenderingContext2D, map: SceneryMap, opts: SceneryOptions): ItemPoint[] {
   const unresolved: ItemPoint[] = []
   const bleed = opts.bleed ?? 0
-  // The tree is in draw order: paint from the first node up, leaving out what a hidden group hides.
-  for (const { node: layer, ancestors } of sceneIndex(map.nodes).entries) {
-    if (!isLayerNode(layer) || !isVisible(layer, ancestors)) continue
-    const kind = LAYER_SCENERY[layer.type]
-    if (kind === 'images') {
-      for (const it of visiblePictures(layer)) {
+  // The tree's layers in draw order (layer nodes and runs of sprites), leaving out what a hidden node hides.
+  for (const entry of sceneLayers(map.nodes, { shownOnly: true })) {
+    if (entry.kind === 'sprites') {
+      for (const { node: it } of runDrawOrder(entry)) {
         const resolved = opts.assets ? resolveImageItem(it, opts.assets) : null
         if (!resolved) {
           unresolved.push(it)
@@ -71,7 +68,10 @@ export function drawMapScenery(ctx: CanvasRenderingContext2D, map: SceneryMap, o
         }
         drawResolvedSprite(ctx, resolved, { anchorX: it.x, anchorY: it.y, opacity: it.opacity, mirrorX: it.flipX, mirrorY: it.flipY, smooth: opts.smooth })
       }
-    } else if (kind === 'tiles' && isDataLayer(layer)) {
+      continue
+    }
+    const layer = entry.node
+    if (LAYER_SCENERY[layer.type] === 'tiles' && isDataLayer(layer)) {
       for (const [key, tile] of Object.entries(layer.data ?? {})) {
         if (tile.tilesetId === '__collision__') continue
         const img = opts.tileImages.get(tile.tilesetId)

@@ -1,27 +1,37 @@
 import { fireEvent, screen, within } from '@testing-library/react'
 import type { MapData } from '@/types/editor'
-import type { EntityNode, LayerNode, PictureNode, SceneNode } from '../../../shared/sceneTree'
+import type { BranchNode, EntityNode, LayerNode, PictureNode, SceneNode } from '../../../shared/sceneTree'
+import { entityWithComponents, type ComponentBag } from '../../../shared/sceneEntity'
+import { entityView } from '@/lib/sceneIndex'
+import { SCHEMA_VERSION } from '../../../shared/engine/types'
 
 /** A layer node (a tile layer unless `type` says otherwise); `visible` / `locked` are only set when given. */
 export function makeLayer(id: string, overrides: Record<string, unknown> = {}): LayerNode {
-  return { id, name: id, type: 'tile', ...overrides } as LayerNode
+  return { id, name: id, type: 'tile', children: [], ...overrides } as LayerNode
 }
 
-/** An image layer holding `pictures` (nodes, or ids that become pictures of an asset). */
-export function makeImageLayer(id: string, pictures: (PictureNode | string)[] = [], overrides: Record<string, unknown> = {}): LayerNode {
-  return { id, name: id, type: 'image', children: pictures.map((p) => (typeof p === 'string' ? makePicture(p) : p)), ...overrides } as LayerNode
+/**
+ * A Node2D holding sprites (what an image layer became): `pictures` are nodes, or ids that become sprites of an asset.
+ * `ySort: true` in `overrides` makes it a YSort.
+ */
+export function makeImageLayer(id: string, pictures: (PictureNode | string)[] = [], overrides: Record<string, unknown> = {}): BranchNode {
+  const { ySort, ...rest } = overrides
+  return { id, name: id, type: ySort ? 'ySort' : 'group', children: pictures.map((p) => (typeof p === 'string' ? makePicture(p) : p)), ...rest } as BranchNode
 }
 
 export function makePicture(id: string, overrides: Partial<PictureNode> = {}): PictureNode {
-  return { id, type: 'picture', name: id, assetId: 'objects/chest', x: 0, y: 0, ...overrides }
+  return { id, type: 'picture', name: id, assetId: 'objects/chest', x: 0, y: 0, children: [], ...overrides }
 }
 
 export function makeGroup(id: string, children: SceneNode[] = [], overrides: Record<string, unknown> = {}): SceneNode {
   return { id, type: 'group', name: id, children, ...overrides } as SceneNode
 }
 
+/** An entity; components in `overrides.components` that are child nodes (Sprite, Collider, ...) become its children. */
 export function makeEntity(id: string, overrides: Record<string, unknown> = {}): EntityNode {
-  return { id, type: 'entity', name: id, x: 0, y: 0, components: { Transform: { x: 0, y: 0 } }, ...overrides } as EntityNode
+  const { components, ...rest } = overrides
+  const node = { id, type: 'entity', name: id, x: 0, y: 0, components: {}, children: [], ...rest } as EntityNode
+  return entityWithComponents(node, (components as ComponentBag | undefined) ?? { Transform: { x: 0, y: 0 } })
 }
 
 export function makeMap(overrides: Partial<MapData> = {}): MapData {
@@ -32,7 +42,7 @@ export function makeMap(overrides: Partial<MapData> = {}): MapData {
     width: 10,
     height: 8,
     nodes: [makeLayer('L1')],
-    schemaVersion: 6,
+    schemaVersion: SCHEMA_VERSION,
     ...overrides,
   }
 }
@@ -68,3 +78,6 @@ export function chooseOption(trigger: HTMLElement, value: string) {
 export function pickOption(name: string | RegExp, value: string) {
   chooseOption(screen.getByRole('combobox', { name }), value)
 }
+
+/** An entity as the editor's entity code reads it (`entityView`: all its components in `components`), for props that take views. */
+export const makeEntityView = (id: string, overrides: Record<string, unknown> = {}): EntityNode => entityView(makeEntity(id, overrides))
