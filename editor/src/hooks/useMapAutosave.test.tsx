@@ -8,7 +8,7 @@ import { useMapAutosave } from './useMapAutosave'
 
 const wrapper = ({ children }: { children: ReactNode }) => <StrictMode>{children}</StrictMode>
 
-const edited = (map: MapData, name: string): MapData => ({ ...map, layers: [makeLayer('L1', { name })] })
+const edited = (map: MapData, name: string): MapData => ({ ...map, nodes: [makeLayer('L1', { name })] })
 
 function setup(initial: MapData | null) {
   const queue = createSaveQueue({ delayMs: 300 })
@@ -53,7 +53,7 @@ describe('useMapAutosave', () => {
     expect(save).not.toHaveBeenCalled()
     vi.advanceTimersByTime(100)
     expect(save).toHaveBeenCalledTimes(1)
-    expect(save.mock.calls[0][0].layers[0].name).toBe('two')
+    expect(save.mock.calls[0][0].nodes[0].name).toBe('two')
   })
 
   it('persists through window.electronAPI.saveMap by default, with the map identity', async () => {
@@ -70,7 +70,7 @@ describe('useMapAutosave', () => {
     const [folder, file, payload] = saveMap.mock.calls[0] as unknown as [string, string, MapData]
     expect(folder).toBe('world')
     expect(file).toBe('town.json')
-    expect(payload.layers[0].name).toBe('x')
+    expect(payload.nodes[0].name).toBe('x')
   })
 
   it('does not re-save content that was already saved', () => {

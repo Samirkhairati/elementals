@@ -17,8 +17,7 @@ function setup(view: CanvasView = { scale: 0.5, x: 0, y: 0 }) {
       dimensions={{ width: 800, height: 600 }}
       mapWidth={40}
       mapHeight={30}
-      layers={[]}
-      entities={[]}
+      nodes={[]}
       images={{}}
     />,
   )

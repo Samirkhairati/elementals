@@ -10,9 +10,9 @@ import { createDefaultEventProps } from '../../../../../shared/engine/components
 function setup(components: Record<string, any>, x = 80, y = 128) {
   const entity = makeEntity('e1', { name: 'Elder', x, y, components: { Transform: { x, y, depth: 10 }, ...components } })
   const props = {
-    layers: [],
+    nodes: [entity],
     activeLayerId: null,
-    updateLayers: vi.fn(),
+    editNode: vi.fn(),
     entities: [entity],
     selectedEntityId: 'e1',
     renameEntity: vi.fn(),
@@ -121,7 +121,7 @@ describe('PropertiesPanel entity inspector', () => {
 
   it('falls back to the layer view and then to the empty hint', () => {
     renderWithEditor(
-      <PropertiesPanel layers={[{ id: 'l', name: 'Ground', type: 'tile', visible: true, locked: false }]} activeLayerId="l" updateLayers={vi.fn()} />,
+      <PropertiesPanel nodes={[{ id: 'l', name: 'Ground', type: 'tile' }]} activeLayerId="l" editNode={vi.fn()} />,
       { activeMap: null as any },
     )
     expect(screen.getByLabelText('Layer name')).toHaveValue('Ground')
@@ -130,8 +130,8 @@ describe('PropertiesPanel entity inspector', () => {
 
 describe('PropertiesPanel image layer', () => {
   it('keeps only the layer fields: the pictures live in the Images panel on the right', () => {
-    const layer = { id: 'i1', name: 'Sky', type: 'image', visible: true, locked: false, images: [{ id: 'a', graphicId: 'sky/cloud.png', x: 4, y: 5 }] }
-    renderWithEditor(<PropertiesPanel layers={[layer] as any} activeLayerId="i1" updateLayers={vi.fn()} />, {} as any)
+    const layer = { id: 'i1', name: 'Sky', type: 'image', children: [{ id: 'a', type: 'picture', name: 'a', graphicId: 'sky/cloud.png', x: 4, y: 5 }] }
+    renderWithEditor(<PropertiesPanel nodes={[layer] as any} activeLayerId="i1" editNode={vi.fn()} />, {} as any)
     expect(screen.getByLabelText('Layer name')).toHaveValue('Sky')
     expect(screen.queryByTestId('image-list')).toBeNull()
   })

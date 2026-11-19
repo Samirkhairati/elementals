@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import type { MapData } from '@/types/editor'
 import { MapsPanel } from './MapsPanel'
 
-const market: MapData = { name: 'market', fileName: 'market.json', folderPath: null, width: 15, height: 15, layers: [], entities: [] }
+const market: MapData = { name: 'market', fileName: 'market.json', folderPath: null, width: 15, height: 15, nodes: [] }
 
 function setup() {
   const handlers = {

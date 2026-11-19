@@ -14,10 +14,14 @@ vi.mock('react-konva', () => {
 })
 
 import { KonvaImageItems } from './KonvaImageItems'
-import { makeLayer } from '@/test/helpers'
+import { makeImageLayer, makePicture } from '@/test/helpers'
+import { sceneIndex } from '@/lib/sceneIndex'
 
-const imageLayer = (id: string, over: Record<string, any> = {}) =>
-  makeLayer(id, { type: 'image', name: id, images: [{ id: `${id}-1`, x: 32, y: 32, z: 0 }], ...over } as any)
+/** An image layer node with pictures (`images` in the old shape: id, x, y, z...). */
+const imageLayer = (id: string, over: Record<string, any> = {}): any => {
+  const { images = [{ id: `${id}-1`, x: 32, y: 32, z: 0 }], ...rest } = over
+  return makeImageLayer(id, images.map((i: any) => makePicture(i.id, { assetId: undefined, ...i })), { name: id, ...rest })
+}
 
 const handles = () => recorded.filter((r) => r.kind === 'Group' && r.props.name === 'image-handle')
 const down = (handle: { props: Record<string, any> }, evt: Record<string, any> = {}) => {
@@ -28,8 +32,10 @@ const down = (handle: { props: Record<string, any> }, evt: Record<string, any> =
 
 function renderItems(over: Record<string, any> = {}) {
   recorded.length = 0
-  const props = { selectedImageId: null, setSelectedImageId: vi.fn(), moveImage: vi.fn(), snapToGrid: true, activateLayer: vi.fn(), ...over }
-  render(<KonvaImageItems {...(props as any)} />)
+  const props = { selectedImageId: null, selectImage: vi.fn(), moveImage: vi.fn(), snapToGrid: true, activateLayer: vi.fn(), ...over }
+  // The scene tree of the layers handed in (a locked / hidden flag is read from it, with the groups above).
+  const index = sceneIndex([...(over.otherLayers ?? []), ...(over.layer ? [over.layer] : [])])
+  render(<KonvaImageItems index={index} {...(props as any)} />)
   return props
 }
 
@@ -49,17 +55,19 @@ describe('KonvaImageItems', () => {
     expect(handles().map((h) => h.props.x)).toEqual([4, 1])
   })
 
-  it('picking an image of another layer makes its layer active first, then selects the image', () => {
-    const calls: string[] = []
-    const props = renderItems({
-      layer: imageLayer('A'),
-      otherLayers: [imageLayer('B')],
-      activateLayer: (id: string) => calls.push(`layer:${id}`),
-      setSelectedImageId: (id: string) => calls.push(`image:${id}`),
-    })
-    void props
+  it('a locked picture does not listen, and a locked group inside the layer only holds the pictures together', () => {
+    const pic = (id: string, over: Record<string, any> = {}) => makePicture(id, { assetId: undefined, x: 32, y: 32, ...over })
+    const group = { id: 'g', type: 'group', name: 'g', locked: true, children: [pic('m1')] }
+    const layer = makeImageLayer('A', [pic('own', { locked: true }), group as any, pic('free')])
+    renderItems({ layer, otherLayers: [] })
+    const byId = Object.fromEntries(handles().map((h) => [h.props.imageId, h.props.listening]))
+    expect(byId).toEqual({ own: false, m1: true, free: true })
+  })
+
+  it('picking an image of another layer selects it (its layer becomes the active one with it)', () => {
+    const props = renderItems({ layer: imageLayer('A'), otherLayers: [imageLayer('B')] })
     const e = down(handles()[0]) // B's handle is first
-    expect(calls).toEqual(['layer:B', 'image:B-1'])
+    expect(props.selectImage).toHaveBeenCalledWith('B', 'B-1', 'replace')
     expect(e.cancelBubble).toBe(true)
   })
 
@@ -67,7 +75,7 @@ describe('KonvaImageItems', () => {
     const props = renderItems({ layer: imageLayer('A'), otherLayers: [imageLayer('B')] })
     down(handles()[1])
     expect(props.activateLayer).not.toHaveBeenCalled()
-    expect(props.setSelectedImageId).toHaveBeenCalledWith('A-1')
+    expect(props.selectImage).toHaveBeenCalledWith('A', 'A-1', 'replace')
   })
 
   it('the selection frame shows on the active layer only, even if another layer reuses the id', () => {
@@ -80,7 +88,7 @@ describe('KonvaImageItems', () => {
     const props = renderItems({ layer: imageLayer('A'), otherLayers: [] })
     const e = down(handles()[0], { shiftKey: true })
     expect(e.cancelBubble).toBe(false)
-    expect(props.setSelectedImageId).not.toHaveBeenCalled()
+    expect(props.selectImage).not.toHaveBeenCalled()
 
     renderItems({ layer: imageLayer('A'), otherLayers: [], placing: true })
     expect(handles()[0].props.listening).toBe(false)

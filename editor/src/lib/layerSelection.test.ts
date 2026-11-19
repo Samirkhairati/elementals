@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { CopiedTile, TileSelection } from '@/types/editor'
+import type { DataLayerNode } from '../../../shared/sceneTree'
 import { makeLayer } from '@/test/helpers'
 import { fitSelectionToLayer, sampleSelection, sampledLayers, targetLayerIndex } from './layerSelection'
 
@@ -24,8 +25,8 @@ describe('sampledLayers', () => {
 })
 
 describe('sampleSelection', () => {
-  const ground = makeLayer('ground', { data: { 5: t(1), 6: t(2) } })
-  const col = makeLayer('col', { type: 'collision', data: { 5: COL, 9: COL } })
+  const ground = makeLayer('ground', { data: { 5: t(1), 6: t(2) } }) as DataLayerNode
+  const col = makeLayer('col', { type: 'collision', children: [], data: { 5: COL, 9: COL } }) as DataLayerNode
   const box = { minX: 1, minY: 1, width: 2, height: 2 } // cells 5,6,9,10
 
   it('a single layer gives the plain selection without parts', () => {

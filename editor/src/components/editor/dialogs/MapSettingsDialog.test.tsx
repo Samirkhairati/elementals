@@ -5,9 +5,9 @@ import { MapSettingsDialog } from './MapSettingsDialog'
 
 const map = (extra: Partial<MapData> = {}): MapData => ({
   name: 'City', fileName: 'city.json', folderPath: null, width: 40, height: 23, pixelWidth: 1280, pixelHeight: 720,
-  layers: [
-    { id: 'a', name: 'Ground', type: 'tile', visible: true, locked: false, z: 0 },
-    { id: 'b', name: 'Roofs', type: 'image', visible: true, locked: false, z: 30 },
+  nodes: [
+    { id: 'b', name: 'Roofs', type: 'image', z: 30, children: [] },
+    { id: 'a', name: 'Ground', type: 'tile', z: 0 },
   ],
   ...extra,
 })

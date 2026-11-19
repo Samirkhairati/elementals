@@ -2,7 +2,7 @@ import { StrictMode, type ReactNode } from 'react'
 import { describe, it, expect, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import type { DebugInfo, TileSelection } from '@/types/editor'
-import { collisionTileNodes, type CellLayerNode, type CollisionLayerNode } from '../../../shared/sceneTree'
+import { collisionTileNodes, type CollisionLayerNode, type DataLayerNode } from '../../../shared/sceneTree'
 import { makeLayer, makeMap } from '@/test/helpers'
 import { useSceneHarness } from '@/test/sceneHarness'
 import { polygonEditStore } from '@/lib/polygonEditStore'
@@ -40,7 +40,7 @@ function setup(opts: Opts = {}) {
           setDebugInfo: setDebugInfo as (i: DebugInfo) => void,
         })
         // The painted layer, read from the map (the tree is the one copy of it).
-        const layer = scene.activeMap!.nodes[0] as CellLayerNode & CollisionLayerNode
+        const layer = scene.activeMap!.nodes[0] as DataLayerNode
         return { tools, layer, activeMap: scene.activeMap }
       },
       { wrapper }
@@ -78,13 +78,13 @@ describe('usePaintTools (StrictMode)', () => {
     })
     // No tileset tile is needed: a collision layer always paints the marker.
     act(() => result.current.tools.handlePaint(1, 0))
-    const [made] = collisionTileNodes(result.current.layer).slice(1)
+    const [made] = collisionTileNodes(result.current.layer as CollisionLayerNode).slice(1)
     expect(made.name).toBe('Tiles 2')
     expect(polygonEditStore.get().selectedShapeId).toBe(made.id)
     expect(result.current.layer.data).toEqual({ 0: marker, 1: { ...marker, group: made.id } })
     // The picked item takes the next cells too.
     act(() => result.current.tools.handlePaint(2, 0))
-    expect(collisionTileNodes(result.current.layer)).toHaveLength(2)
+    expect(collisionTileNodes(result.current.layer as CollisionLayerNode)).toHaveLength(2)
     expect(result.current.layer.data![2]).toEqual({ ...marker, group: made.id })
     polygonEditStore.set({ selectedShapeId: null })
   })

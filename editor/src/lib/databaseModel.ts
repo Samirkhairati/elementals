@@ -119,6 +119,9 @@ export interface MapLike {
   width: number
   height: number
   nodes?: readonly SceneNode[]
+  /** An old map (schema 5): its layers and entities are read through the tree they migrate to. */
+  layers?: readonly unknown[]
+  entities?: readonly unknown[]
 }
 
 /** Maps (and layers) that paint with each tileset, keyed by tileset id (the tileset's file name as maps store it). */

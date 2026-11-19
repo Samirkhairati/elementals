@@ -803,7 +803,8 @@ describe('Tilesets', () => {
       renameTilesetFile: record('renameTilesetFile', { success: true, fileName: 'meadow.png' }),
       moveTileset: record('moveTileset'),
       deleteTileset: record('deleteTileset'),
-      saveMap: (folder: string | null, file: string, map: { layers: { data?: Record<number, { tilesetId: string }> }[] }) => { calls.push(['saveMap', file, map.layers[0].data?.[0]?.tilesetId]); return Promise.resolve({ success: true }) },
+      // Maps are saved as the scene tree they migrate to on load (schema 6).
+      saveMap: (folder: string | null, file: string, map: { nodes: { data?: Record<number, { tilesetId: string }> }[] }) => { calls.push(['saveMap', file, map.nodes[0].data?.[0]?.tilesetId]); return Promise.resolve({ success: true }) },
       getTilesets: () => Promise.resolve({ success: true, folders: ['Outside'], tilesets: [{ name: 'grass', fileName: 'grass.png', folderPath: null, dataUrl: PNG, width: 64, height: 64 }, { name: 'lonely', fileName: 'lonely.png', folderPath: null, dataUrl: PNG, width: 32, height: 32 }] }),
     })
   })

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { CharacterDef } from '../../../shared/engine/characters'
-import type { MapData } from '@/types/editor'
+import type { EntityNode, MapData } from '@/types/editor'
 import { buildProjectReferences, groupReferences } from './referenceIndex'
 import { applyCharacterRename, deleteGuard, planCharacterRename, planClipRenames } from './renameFlow'
 
@@ -10,9 +10,9 @@ const def = (name: string): CharacterDef => ({
   clips: { open: { sheet: 'sheet', fps: 4, loop: false, directional: false, frames: [0] } }, bindings: {},
 })
 const map = (over: Partial<MapData> = {}): MapData => ({
-  name: 'Town', fileName: 'town.json', folderPath: null, width: 4, height: 4, layers: [],
-  entities: [{
-    id: 'c', name: 'Chest', x: 0, y: 0,
+  name: 'Town', fileName: 'town.json', folderPath: null, width: 4, height: 4,
+  nodes: [{
+    id: 'c', type: 'entity', name: 'Chest', x: 0, y: 0,
     components: {
       Sprite: { asset: 'objects/chest', animation: '' },
       Event: { states: [{
@@ -60,7 +60,7 @@ describe('safe rename and delete', () => {
     expect(plan.unrewritable.every((r) => r.source.table === 'prefab')).toBe(true)
     expect(plan.unrewritable.length).toBeGreaterThan(0)
     expect(plan.maps).toHaveLength(1)
-    expect((plan.maps[0].entities?.[0].components.Sprite as { asset: string }).asset).toBe('objects/crate')
+    expect(((plan.maps[0].nodes[0] as EntityNode).components.Sprite as { asset: string }).asset).toBe('objects/crate')
   })
 
   it('refuses invalid, unchanged and taken ids without touching any map', () => {

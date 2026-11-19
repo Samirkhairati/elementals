@@ -14,7 +14,7 @@ import {
 const NO_LAYERS: unknown[] = []
 const NO_ENTITIES: unknown[] = []
 const makeValue = (over: Partial<EditorBaseContextValue>): EditorBaseContextValue =>
-  ({ layers: NO_LAYERS, entities: NO_ENTITIES, activeLayerId: null, ...over }) as unknown as EditorBaseContextValue
+  ({ maps: NO_LAYERS, entities: NO_ENTITIES, activeLayerId: null, ...over }) as unknown as EditorBaseContextValue
 
 let setValue: (v: Partial<EditorBaseContextValue>) => void = () => {}
 
@@ -28,10 +28,10 @@ describe('useEditorSelector', () => {
   it('does not re-render a layers consumer when only entities change', () => {
     const layerRenders = vi.fn()
     const entityRenders = vi.fn()
-    const layers = [{ id: 'L1' }] as unknown as EditorBaseContextValue['layers']
+    const layers = [{ id: 'L1' }] as unknown as EditorBaseContextValue['maps']
 
     function LayersView() {
-      const l = useEditorSelector(c => c.layers)
+      const l = useEditorSelector(c => c.maps)
       layerRenders()
       return <div data-testid="layers">{l.length}</div>
     }
@@ -49,7 +49,7 @@ describe('useEditorSelector', () => {
         </Host>
       </StrictMode>
     )
-    act(() => setValue({ layers }))
+    act(() => setValue({ maps: layers }))
     expect(screen.getByTestId('layers').textContent).toBe('1')
 
     layerRenders.mockClear()
@@ -79,7 +79,7 @@ describe('useEditorSelector', () => {
   it('shallow-compares object selections: a fresh object with equal fields does not re-render', () => {
     const renders = vi.fn()
     function View() {
-      const s = useEditorSelector(c => ({ layers: c.layers, active: c.activeLayerId }))
+      const s = useEditorSelector(c => ({ layers: c.maps, active: c.activeLayerId }))
       renders()
       return <div data-testid="v">{s.active ?? 'none'}</div>
     }
@@ -99,7 +99,7 @@ describe('useEditorSelector', () => {
     const renders = vi.fn()
     function View() {
       const n = useEditorSelector(
-        c => c.layers.length,
+        c => c.maps.length,
         (a, b) => Math.floor(a / 10) === Math.floor(b / 10)
       )
       renders()
@@ -111,13 +111,13 @@ describe('useEditorSelector', () => {
       </Host>
     )
     renders.mockClear()
-    act(() => setValue({ layers: new Array(3).fill({ id: 'x' }) as unknown as EditorBaseContextValue['layers'] }))
+    act(() => setValue({ maps: new Array(3).fill({ id: 'x' }) as unknown as EditorBaseContextValue['maps'] }))
     expect(renders).not.toHaveBeenCalled()
   })
 
   it('works with an inline (unstable) selector without looping', () => {
     function View() {
-      const l = useEditorSelector(c => ({ n: c.layers.length }))
+      const l = useEditorSelector(c => ({ n: c.maps.length }))
       return <div data-testid="n">{l.n}</div>
     }
     render(
@@ -127,14 +127,14 @@ describe('useEditorSelector', () => {
         </Host>
       </StrictMode>
     )
-    act(() => setValue({ layers: [{ id: 'a' }] as unknown as EditorBaseContextValue['layers'] }))
+    act(() => setValue({ maps: [{ id: 'a' }] as unknown as EditorBaseContextValue['maps'] }))
     expect(screen.getByTestId('n').textContent).toBe('1')
   })
 
   it('throws a helpful error outside a provider', () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
     function View() {
-      useEditorSelector(c => c.layers)
+      useEditorSelector(c => c.maps)
       return null
     }
     expect(() => render(<View />)).toThrow(/EditorProvider/)
@@ -150,7 +150,7 @@ describe('useEditorContext', () => {
       renders()
       return (
         <div data-testid="full">
-          {ctx.layers.length}/{ctx.entities.length}/{ctx.activeLayerId ?? 'none'}
+          {ctx.maps.length}/{ctx.entities.length}/{ctx.activeLayerId ?? 'none'}
         </div>
       )
     }

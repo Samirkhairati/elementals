@@ -7,7 +7,7 @@ import { WarpTilePicker, pixelAt, previewCellSize, tileAt } from './WarpTilePick
 import * as scenery from '@/lib/mapScenery'
 import { makeEnv } from './eventTestUtils'
 
-const town: MapData = { name: 'Town', fileName: 'town.json', folderPath: null, width: 10, height: 8, layers: [], entities: [] }
+const town: MapData = { name: 'Town', fileName: 'town.json', folderPath: null, width: 10, height: 8, nodes: [] }
 
 describe('previewCellSize', () => {
   it('fits the longest side into the preview and keeps cells legible', () => {
@@ -165,7 +165,7 @@ describe('WarpTilePicker pictures', () => {
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx as unknown as CanvasRenderingContext2D)
     const draw = vi.spyOn(scenery, 'drawMapScenery').mockReturnValue([])
     const spriteAssets = { 'graphic:city/wall.png': {} as SpriteAssetInfo }
-    const pictures: MapData = { ...town, layers: [{ id: 'l', name: 'wall', type: 'image', visible: true, locked: false, images: [{ id: 'i', graphicId: 'city/wall.png', x: 64, y: 96 }] }] }
+    const pictures: MapData = { ...town, nodes: [{ id: 'l', name: 'wall', type: 'image', children: [{ id: 'i', type: 'picture', name: 'i', graphicId: 'city/wall.png', x: 64, y: 96 }] }] }
     render(
       <EventEnvProvider value={makeEnv({ mapPreview: { getMap: () => pictures, tilesets: [], spriteAssets } })}>
         <WarpTilePicker mapId="town" x={0} y={0} onPick={() => {}} />

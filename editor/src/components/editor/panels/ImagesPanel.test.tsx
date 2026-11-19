@@ -1,8 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- tests build partial editor contexts */
 import { describe, expect, it, vi } from 'vitest'
-import { createEvent, fireEvent, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, screen, within } from '@testing-library/react'
 import { renderWithEditor } from '@/test/editorContext'
+import { makeGroup, makePicture } from '@/test/helpers'
 import { ImagesPanel } from './ImagesPanel'
+
+// The picture rows (and their menus, drag and drop, groups) are rows of the Scene panel: see SceneTree.test.tsx. This panel
+// adds pictures and inspects the picked one.
 
 const graphics = [{ id: 'sky/sheet.png', width: 64, height: 32, bytes: 1, mtimeMs: 0 }]
 const sheetAsset = {
@@ -11,44 +15,27 @@ const sheetAsset = {
   sheets: { 'sheet.png': 'data:image/png;base64,AA==' },
 }
 
+/** Pictures in draw order (the first draws first); plain objects become picture nodes. */
+const pictures = (list: any[]) => list.map((p) => (p.type ? p : makePicture(p.id, { assetId: undefined, ...p })))
+
 function setup(images: any[], extra: Record<string, unknown> = {}, layerOver: Record<string, unknown> = {}) {
   const fns = {
     startImagePlacement: vi.fn(),
     cancelImagePlacement: vi.fn(),
-    setSelectedImageId: vi.fn(),
-    selectImage: vi.fn(),
     placeMultiple: vi.fn(),
-    selectImageGroup: vi.fn(),
-    groupPickedImages: vi.fn(),
-    ungroupImageGroup: vi.fn(),
-    renameImageGroup: vi.fn(),
-    setImageGroupLocked: vi.fn(),
-    deleteImages: vi.fn(),
-    duplicateImages: vi.fn(),
     updateImage: vi.fn(),
-    deleteImage: vi.fn(),
-    duplicateImage: vi.fn(),
-    reorderImage: vi.fn(),
-    moveImageTo: vi.fn(),
     setResizingImageId: vi.fn(),
-    setImagesYSort: vi.fn(),
-    setImageGroupYSort: vi.fn(),
-    moveImageGroupTo: vi.fn(),
-    copyImages: vi.fn(),
-    pasteImages: vi.fn(),
-    createImageGroup: vi.fn(() => 'new-group'),
-    setImagesGroup: vi.fn(),
-    deleteImageGroup: vi.fn(),
+    groupNodes: vi.fn(),
+    ungroupNode: vi.fn(),
   }
-  const layer = { id: 'i1', name: 'Sky', type: 'image', visible: true, locked: false, images, ...layerOver }
+  const layer = { id: 'i1', name: 'Sky', type: 'image', children: pictures(images), ...layerOver }
   renderWithEditor(<ImagesPanel />, {
-    layers: [layer],
+    activeMap: { name: 'Town', nodes: [layer] },
     activeLayerId: 'i1',
     graphics,
     graphicImages: { 'sky/sheet.png': 'data:image/png;base64,AA==' },
     spriteList: [],
     spriteAssets: { 'graphic:sky/sheet.png': sheetAsset },
-    snapEntityPos: (x: number, y: number) => ({ x, y }),
     pendingImage: null,
     selectedImageId: null,
     pickedImageIds: (extra.selectedImageId ? [extra.selectedImageId] : []) as string[],
@@ -58,9 +45,6 @@ function setup(images: any[], extra: Record<string, unknown> = {}, layerOver: Re
   } as any)
   return fns
 }
-
-const menuItem = (name: RegExp | string) => screen.getByRole('menuitem', { name })
-const rowMenu = (row: HTMLElement) => fireEvent.contextMenu(row)
 
 const items = [
   { id: 'a', graphicId: 'sky/sheet.png', x: 4, y: 5, name: 'Cloud' },
@@ -74,91 +58,6 @@ describe('ImagesPanel', () => {
     fireEvent.click(screen.getByRole('radio', { name: /Pictures/ }))
     fireEvent.click(screen.getByTitle('sky/sheet.png'))
     expect(startImagePlacement).toHaveBeenCalledWith({ graphicId: 'sky/sheet.png' })
-  })
-
-  it('lists the items front first, by name (or picture id), and marks cropped ones', () => {
-    setup(items)
-    const rows = within(screen.getByTestId('image-list')).getAllByText(/Cloud|sheet/)
-    expect(rows.map((r) => r.textContent)).toEqual(['sheet', 'Cloud'])
-    expect(screen.getAllByText('crop')).toHaveLength(1)
-  })
-
-  it('disables Add and the row menu actions on a locked layer', () => {
-    setup(items, {}, { locked: true })
-    expect(screen.getByRole('button', { name: 'Add image' })).toBeDisabled()
-    rowMenu(within(screen.getByTestId('image-list')).getByText('Cloud').closest('.ed-row') as HTMLElement)
-    expect(menuItem(/^Duplicate/)).toHaveAttribute('data-disabled')
-  })
-
-  it('has no buttons on the picture rows: everything is in the right-click menu', () => {
-    setup(items)
-    const row = within(screen.getByTestId('image-list')).getByText('Cloud').closest('.ed-row') as HTMLElement
-    expect(within(row).queryAllByRole('button')).toHaveLength(0)
-  })
-
-  it('duplicates, deletes and reorders from the row menu', () => {
-    const f = setup(items)
-    const row = () => within(screen.getByTestId('image-list')).getByText('Cloud').closest('.ed-row') as HTMLElement
-    rowMenu(row())
-    fireEvent.click(menuItem(/^Duplicate/))
-    expect(f.duplicateImages).toHaveBeenCalledWith('i1', ['a'])
-    rowMenu(row())
-    fireEvent.click(menuItem('Bring forward'))
-    expect(f.reorderImage).toHaveBeenCalledWith('i1', 'a', 1)
-    rowMenu(row())
-    // the back item cannot go further back
-    expect(menuItem('Send backward')).toHaveAttribute('data-disabled')
-    fireEvent.click(menuItem(/^Delete/))
-    expect(f.deleteImages).toHaveBeenCalledWith('i1', ['a'])
-  })
-
-  it('turns y-sorting on for a picture from its menu', () => {
-    const f = setup(items)
-    rowMenu(within(screen.getByTestId('image-list')).getByText('Cloud').closest('.ed-row') as HTMLElement)
-    fireEvent.click(menuItem(/Enable Y-sort/))
-    expect(f.setImagesYSort).toHaveBeenCalledWith('i1', ['a'], true)
-  })
-
-  it('pictures of a y-sorted layer show the badge, and one can be taken out of it', () => {
-    const f = setup(items, {}, { ySort: true })
-    expect(screen.getAllByTestId('ysort-badge')).toHaveLength(2)
-    rowMenu(within(screen.getByTestId('image-list')).getByText('Cloud').closest('.ed-row') as HTMLElement)
-    fireEvent.click(menuItem(/Disable Y-sort/))
-    expect(f.setImagesYSort).toHaveBeenCalledWith('i1', ['a'], false)
-  })
-
-  it('dragging a row onto another reorders the draw order in one move', () => {
-    const f = setup(items)
-    const rows = Array.from(screen.getByTestId('image-list').children) as HTMLElement[]
-    // front first: [sky/sheet.png (b), Cloud (a)]. Drag Cloud onto the front one's top half.
-    const [front, back] = rows
-    const data: Record<string, string> = {}
-    const dt = { setData: (k: string, v: string) => { data[k] = v }, getData: (k: string) => data[k], effectAllowed: '', dropEffect: '' }
-    fireEvent.dragStart(back, { dataTransfer: dt })
-    front.getBoundingClientRect = () => ({ top: 0, height: 20, bottom: 20, left: 0, right: 10, width: 10, x: 0, y: 0, toJSON: () => ({}) })
-    const over = createEvent.dragOver(front, { dataTransfer: dt })
-    Object.defineProperty(over, 'clientY', { value: 2 }) // jsdom has no DragEvent, so the pointer position is set by hand
-    fireEvent(front, over)
-    fireEvent.drop(front, { dataTransfer: dt })
-    expect(f.moveImageTo).toHaveBeenCalledWith('i1', 'a', 'b', 'top')
-  })
-
-  it('renames from the row: Enter keeps the new name, Esc keeps the old one', () => {
-    const f = setup(items)
-    const row = within(screen.getByTestId('image-list')).getByText('Cloud').closest('.ed-row') as HTMLElement
-    rowMenu(row)
-    fireEvent.click(menuItem('Rename'))
-    const input = within(row).getByLabelText('Image name')
-    fireEvent.change(input, { target: { value: 'Big cloud' } })
-    fireEvent.blur(input)
-    expect(f.updateImage).toHaveBeenCalledWith('i1', 'a', { name: 'Big cloud' })
-
-    f.updateImage.mockClear()
-    fireEvent.doubleClick(row)
-    const again = within(row).getByLabelText('Image name')
-    fireEvent.change(again, { target: { value: 'Nope' } })
-    fireEvent.keyDown(again, { key: 'Escape' })
-    expect(f.updateImage).not.toHaveBeenCalled()
   })
 
   it('previews a cropped picture as the whole picture with the cropped part outlined', () => {
@@ -263,55 +162,6 @@ describe('ImagesPanel', () => {
     expect(screen.getByText(/Select an image layer/)).toBeInTheDocument()
   })
 
-  it('Place multiple starts placing copies of that picture', () => {
-    const f = setup(items)
-    const row = within(screen.getByTestId('image-list')).getByText('Cloud').closest('.ed-row') as HTMLElement
-    rowMenu(row)
-    fireEvent.click(menuItem(/Place more copies/))
-    expect(f.placeMultiple).toHaveBeenCalledWith('i1', 'a')
-    expect(f.selectImage).not.toHaveBeenCalled()
-  })
-
-  describe('several images', () => {
-    const rowOf = (name: string) => within(screen.getByTestId('image-list')).getByText(name).closest('.ed-row') as HTMLElement
-
-    it('click replaces the selection, Ctrl/Cmd+click toggles, Shift+click extends', () => {
-      const f = setup(items)
-      fireEvent.click(rowOf('Cloud'))
-      expect(f.selectImage).toHaveBeenLastCalledWith('i1', 'a', 'replace')
-      fireEvent.click(rowOf('Cloud'), { ctrlKey: true })
-      expect(f.selectImage).toHaveBeenLastCalledWith('i1', 'a', 'toggle')
-      fireEvent.click(rowOf('Cloud'), { metaKey: true })
-      expect(f.selectImage).toHaveBeenLastCalledWith('i1', 'a', 'toggle')
-      fireEvent.click(rowOf('Cloud'), { shiftKey: true })
-      expect(f.selectImage).toHaveBeenLastCalledWith('i1', 'a', 'range')
-    })
-
-    it('marks every picked row and says how many are selected', () => {
-      setup(items, { pickedImageIds: ['a', 'b'], selectedImageId: 'a' })
-      expect(rowOf('Cloud').dataset.selected).toBe('true')
-      expect(rowOf('sheet').dataset.selected).toBe('true')
-      expect(screen.getByText('2 selected')).toBeTruthy()
-    })
-
-    it('Delete and Duplicate on a picked row act on the whole picked set; on another row, on that row only', () => {
-      const f = setup(items, { pickedImageIds: ['a', 'b'], selectedImageId: 'a' })
-      rowMenu(rowOf('Cloud'))
-      fireEvent.click(menuItem(/^Delete/))
-      expect(f.deleteImages).toHaveBeenLastCalledWith('i1', ['a', 'b'])
-      rowMenu(rowOf('sheet'))
-      fireEvent.click(menuItem(/^Duplicate/))
-      expect(f.duplicateImages).toHaveBeenLastCalledWith('i1', ['a', 'b'])
-    })
-
-    it('a row outside the picked set is acted on alone', () => {
-      const f = setup(items, { pickedImageIds: ['b'], selectedImageId: 'b' })
-      rowMenu(rowOf('Cloud'))
-      fireEvent.click(menuItem(/^Delete/))
-      expect(f.deleteImages).toHaveBeenLastCalledWith('i1', ['a'])
-    })
-  })
-
   describe('Resize and the Crop / Resize shortcuts', () => {
     const key = (k: string, init: KeyboardEventInit = {}) => fireEvent.keyDown(window, { key: k, ...init })
 
@@ -370,159 +220,47 @@ describe('ImagesPanel', () => {
     })
   })
 
-  describe('groups', () => {
-    const grouped = [
-      { id: 'a', graphicId: 'sky/sheet.png', x: 4, y: 5, name: 'Left', groupId: 'g1', z: 1 },
-      { id: 'b', graphicId: 'sky/sheet.png', x: 40, y: 5, name: 'Right', groupId: 'g1', z: 2 },
-      { id: 'c', graphicId: 'sky/sheet.png', x: 80, y: 5, name: 'Loose', z: 3 },
-    ]
-    const withGroup = (extra: Record<string, unknown> = {}, group: Record<string, unknown> = {}, layerOver: Record<string, unknown> = {}) =>
-      setup(grouped, extra, { groups: [{ id: 'g1', name: 'Dam wall', ...group }], ...layerOver })
-    const groupRow = () => within(screen.getByTestId('image-group')).getByText('Dam wall').closest('.ed-row') as HTMLElement
+  it('says how many are picked, and edits the picked picture\'s fields', () => {
+    const f = setup(items, { pickedImageIds: ['a', 'b'], selectedImageId: 'a' })
+    expect(screen.getByText('2 selected')).toBeTruthy()
+    const name = screen.getByLabelText('Name')
+    fireEvent.change(name, { target: { value: 'Big cloud' } })
+    fireEvent.blur(name)
+    expect(f.updateImage).toHaveBeenCalledWith('i1', 'a', { name: 'Big cloud' })
+  })
 
-    it('shows a group as one row with its members under it, and loose pictures as before', () => {
-      withGroup()
-      const order = within(screen.getByTestId('image-list')).getAllByText(/Dam wall|Left|Right|Loose/).map((e) => e.textContent)
-      expect(order).toEqual(['Loose', 'Dam wall', 'Right', 'Left'])
-      expect(within(groupRow()).getByText('2')).toBeTruthy()
-    })
+  it('a locked picture freezes its fields, the layer still takes new pictures; a locked picture group only picks as one', () => {
+    setup([{ ...items[0], locked: true }], { selectedImageId: 'a' })
+    expect(screen.getByLabelText('Image scale')).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Add image' })).not.toBeDisabled()
+    cleanup()
+    setup([makeGroup('g', pictures([items[0]]), { locked: true })], { selectedImageId: 'a' })
+    expect(screen.getByLabelText('Image scale')).not.toBeDisabled()
+  })
 
-    it('can be collapsed to hide its pictures', () => {
-      withGroup()
-      fireEvent.click(screen.getByRole('button', { name: 'Hide the pictures of Dam wall' }))
-      expect(screen.queryByText('Left')).toBeNull()
-      expect(screen.getByText('Loose')).toBeTruthy()
-      fireEvent.click(screen.getByRole('button', { name: 'Show the pictures of Dam wall' }))
-      expect(screen.getByText('Left')).toBeTruthy()
-    })
+  it('a picture inside a group: Add says it goes into the open group', () => {
+    setup([makeGroup('g1', pictures(items), { name: 'Dam wall' })], { openImageGroupId: 'g1' })
+    expect(screen.getByRole('button', { name: 'Add image' }).title).toMatch(/Dam wall/)
+  })
 
-    it('a click on the group row selects the whole group; the open group shows as selected', () => {
-      const f = withGroup({ openImageGroupId: 'g1', pickedImageIds: [], selectedImageId: null })
-      expect(groupRow().dataset.selected).toBe('true')
-      fireEvent.click(groupRow())
-      expect(f.selectImageGroup).toHaveBeenCalledWith('i1', 'g1')
-    })
-
-    it('locks from its menu without selecting it', () => {
-      const f = withGroup()
-      fireEvent.contextMenu(groupRow())
-      fireEvent.click(menuItem('Lock Group'))
-      expect(f.setImageGroupLocked).toHaveBeenCalledWith('i1', 'g1', true)
-      expect(f.selectImageGroup).not.toHaveBeenCalled()
-    })
-
-    it('a locked group shows a lock and unlocks again from its menu', () => {
-      const f = withGroup({}, { locked: true })
-      expect(groupRow().querySelector('.text-amber-400')).toBeTruthy()
-      fireEvent.contextMenu(groupRow())
-      fireEvent.click(menuItem('Unlock Group'))
-      expect(f.setImageGroupLocked).toHaveBeenCalledWith('i1', 'g1', false)
-    })
-
-    it('its menu is laid out like a layer folder', () => {
-      withGroup()
-      fireEvent.contextMenu(groupRow())
-      const names = screen.getAllByRole('menuitem').map((m) => (m.textContent ?? '').replace(/(Ctrl|⌘).*$/, '').trim())
-      expect(names).toEqual(['Rename', 'Add picture inside…', 'New group', 'Copy', 'Duplicate', 'Paste inside', 'Lock Group', 'Enable Y-sort', 'Ungroup', 'Delete Group and Pictures'])
-    })
-
-    it('Add picture inside selects the group and opens the picture browser', () => {
-      const f = withGroup()
-      fireEvent.contextMenu(groupRow())
-      fireEvent.click(menuItem(/Add picture inside/))
-      expect(f.selectImageGroup).toHaveBeenCalledWith('i1', 'g1')
-      expect(screen.getByRole('dialog')).toBeTruthy()
-    })
-
-    it('dragging a group onto a loose picture moves the whole group in the draw order', () => {
-      const f = withGroup()
-      const loose = screen.getByText('Loose').closest('.ed-row') as HTMLElement
-      const data: Record<string, string> = {}
-      const dt = { setData: (k: string, v: string) => { data[k] = v }, getData: (k: string) => data[k], effectAllowed: '', dropEffect: '' }
-      fireEvent.dragStart(groupRow(), { dataTransfer: dt })
-      loose.getBoundingClientRect = () => ({ top: 0, height: 20, bottom: 20, left: 0, right: 10, width: 10, x: 0, y: 0, toJSON: () => ({}) })
-      const over = createEvent.dragOver(loose, { dataTransfer: dt })
-      Object.defineProperty(over, 'clientY', { value: 2 })
-      fireEvent(loose, over)
-      fireEvent.drop(loose, { dataTransfer: dt })
-      expect(f.moveImageGroupTo).toHaveBeenCalledWith('i1', 'g1', { kind: 'item', id: 'c' }, 'top')
-    })
-
-    it('duplicate, delete, ungroup and rename act on the group from its menu (the row only has its open/close button)', () => {
-      const f = withGroup()
-      expect(within(groupRow()).queryAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual(['Hide the pictures of Dam wall'])
-      fireEvent.contextMenu(groupRow())
-      fireEvent.click(menuItem(/^Duplicate/))
-      expect(f.duplicateImages).toHaveBeenCalledWith('i1', ['b', 'a'])
-      fireEvent.contextMenu(groupRow())
-      fireEvent.click(menuItem(/^Delete Group/))
-      expect(f.deleteImageGroup).toHaveBeenCalledWith('i1', 'g1')
-      fireEvent.contextMenu(groupRow())
-      fireEvent.click(menuItem(/^Ungroup/))
-      expect(f.ungroupImageGroup).toHaveBeenCalledWith('i1', 'g1')
-      fireEvent.contextMenu(groupRow())
-      fireEvent.click(menuItem('Rename'))
-      const input = screen.getByLabelText('Group name') as HTMLInputElement
-      fireEvent.change(input, { target: { value: 'Wall' } })
-      fireEvent.keyDown(input, { key: 'Enter' })
-      expect(f.renameImageGroup).toHaveBeenCalledWith('i1', 'g1', 'Wall')
-    })
-
-    it('there are no Group / Ungroup buttons in the header', () => {
-      withGroup()
-      expect(screen.queryByRole('button', { name: 'Group pictures' })).toBeNull()
-      expect(screen.queryByRole('button', { name: 'Ungroup pictures' })).toBeNull()
-    })
-
-    it('right-clicking the list makes a new empty group and opens its name', () => {
-      const f = setup(items)
-      fireEvent.contextMenu(screen.getByTestId('image-list-area'))
-      fireEvent.click(menuItem('New group'))
-      expect(f.createImageGroup).toHaveBeenCalledWith('i1', [])
-    })
-
-    it('an empty group is listed, says so, and takes a picture dragged onto it', () => {
-      const f = setup(grouped, {}, { groups: [{ id: 'g1', name: 'Dam wall' }, { id: 'e', name: 'Empty one' }] })
-      expect(screen.getByTestId('empty-group')).toBeTruthy()
-      const empty = screen.getByText('Empty one').closest('.ed-row') as HTMLElement
-      const loose = screen.getByText('Loose').closest('.ed-row') as HTMLElement
-      const dataTransfer = { setData: vi.fn(), effectAllowed: '', dropEffect: '' }
-      fireEvent.dragStart(loose, { dataTransfer })
-      fireEvent.dragOver(empty, { dataTransfer })
-      fireEvent.drop(empty, { dataTransfer })
-      expect(f.setImagesGroup).toHaveBeenCalledWith('i1', ['c'], 'e')
-    })
-
-    it('a picture row\'s menu groups it, moves it to another group, or takes it out of its group', () => {
-      const f = setup(grouped, {}, { groups: [{ id: 'g1', name: 'Dam wall' }, { id: 'g2', name: 'Roof' }] })
-      const left = () => screen.getByText('Left').closest('.ed-row') as HTMLElement
-      fireEvent.contextMenu(left())
-      fireEvent.click(menuItem(/Take out of group/))
-      expect(f.setImagesGroup).toHaveBeenCalledWith('i1', ['a'], null)
-      fireEvent.contextMenu(left())
-      fireEvent.click(menuItem(/Group this picture/))
-      expect(f.createImageGroup).toHaveBeenCalledWith('i1', ['a'])
-      fireEvent.contextMenu(screen.getByText('Loose').closest('.ed-row') as HTMLElement)
-      expect(screen.queryByRole('menuitem', { name: /Take out of group/ })).toBeNull()
-      expect(menuItem(/Move to group/)).toBeTruthy()
-    })
+  describe('group shortcuts', () => {
+    const grouped = () => [makeGroup('g1', pictures([{ id: 'a', graphicId: 'sky/sheet.png', x: 4, y: 5, name: 'Left' }]), { name: 'Dam wall' }), ...pictures([{ id: 'c', graphicId: 'sky/sheet.png', x: 80, y: 5, name: 'Loose' }])]
 
     it('Ctrl+G groups the picked pictures (one is enough); Ctrl+Shift+G ungroups the picked picture\'s group', () => {
-      const f = withGroup({ selectedImageId: 'c', pickedImageIds: ['c'] })
+      const f = setup(grouped(), { selectedImageId: 'c', pickedImageIds: ['c'] })
       fireEvent.keyDown(window, { key: 'g', ctrlKey: true })
-      expect(f.groupPickedImages).toHaveBeenCalledWith('i1')
-      const g = withGroup({ selectedImageId: 'a', pickedImageIds: ['a'] })
+      expect(f.groupNodes).toHaveBeenCalledWith(['c'])
+      const g = setup(grouped(), { selectedImageId: 'a', pickedImageIds: ['a'] })
       fireEvent.keyDown(window, { key: 'G', ctrlKey: true, shiftKey: true })
-      expect(g.ungroupImageGroup).toHaveBeenCalledWith('i1', 'g1')
+      expect(g.ungroupNode).toHaveBeenCalledWith('g1')
     })
 
-    it('everything about groups is off on a locked layer', () => {
-      withGroup({}, {}, { locked: true })
-      expect(groupRow().getAttribute('draggable')).toBe('false')
-      fireEvent.contextMenu(groupRow())
-      expect(menuItem(/^Ungroup/)).toHaveAttribute('data-disabled')
-      expect(menuItem('Lock Group')).toHaveAttribute('data-disabled')
-      expect(menuItem(/^Delete Group/)).toHaveAttribute('data-disabled')
+    it('are off on a locked layer', () => {
+      const f = setup(grouped(), { selectedImageId: 'a', pickedImageIds: ['a'] }, { locked: true })
+      fireEvent.keyDown(window, { key: 'g', ctrlKey: true })
+      fireEvent.keyDown(window, { key: 'G', ctrlKey: true, shiftKey: true })
+      expect(f.groupNodes).not.toHaveBeenCalled()
+      expect(f.ungroupNode).not.toHaveBeenCalled()
     })
   })
 })

@@ -6,15 +6,17 @@ import { resetLookLibrary } from '@/lib/look/lookLibrary'
 import { getLookView, resetLookView } from '@/lib/look/lookView'
 import { LookPanel } from './LookPanel'
 
-const layers = [
-  { id: 't1', name: 'Ground', type: 'tile', visible: true, locked: false },
-  { id: 'i1', name: 'Sky', type: 'image', visible: true, locked: false, images: [{ id: 'pic', graphicId: 'sky/a.png', x: 0, y: 0, name: 'Cloud' }] },
+// Draw order: the image layer draws over the tile layer.
+const nodes = [
+  { id: 'i1', name: 'Sky', type: 'image', children: [{ id: 'pic', type: 'picture', graphicId: 'sky/a.png', x: 0, y: 0, name: 'Cloud' }] },
+  { id: 't1', name: 'Ground', type: 'tile' },
 ]
-const map = { name: 'Town', fileName: 'town', width: 10, height: 8, tileWidth: 32, tileHeight: 32 }
+const mapWith = (n: unknown[]) => ({ name: 'Town', fileName: 'town', width: 10, height: 8, tileWidth: 32, tileHeight: 32, nodes: n })
+const map = mapWith(nodes)
 
 function setup(over: Record<string, unknown> = {}) {
   const setLook = vi.fn()
-  renderWithEditor(<LookPanel />, { activeMap: map, layers, activeLayerId: 't1', selectedImageId: null, spriteAssets: {}, setLook, ...over } as any)
+  renderWithEditor(<LookPanel />, { activeMap: map, activeLayerId: 't1', selectedImageId: null, spriteAssets: {}, setLook, ...over } as any)
   return setLook
 }
 
@@ -42,8 +44,8 @@ describe('LookPanel', () => {
   })
 
   it('a profile tab edits that profile, copied from the default, not the default', () => {
-    const withDefault = [{ ...layers[0], look: { default: { adjust: { exposure: 1, contrast: 7 } } } }, layers[1]]
-    const setLook = setup({ layers: withDefault })
+    const withDefault = [nodes[0], { ...nodes[1], look: { default: { adjust: { exposure: 1, contrast: 7 } } } }]
+    const setLook = setup({ activeMap: mapWith(withDefault) })
     fireEvent.click(screen.getByRole('radio', { name: 'Night' }))
     expect(getLookView().profile).toBe('night')
     expect(screen.getByText('= Default')).toBeInTheDocument()

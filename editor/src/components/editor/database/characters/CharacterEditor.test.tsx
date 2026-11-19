@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { entitiesOfMap } from '../../../../../../shared/sceneTreeMigrate'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { RouterProvider, createMemoryHistory, createRootRoute, createRoute, createRouter } from '@tanstack/react-router'
 import type { CharacterDef } from '../../../../../../shared/engine/characters'
@@ -361,9 +362,10 @@ describe('rename and delete', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: /Rewrite & rename/ }))
     await waitFor(() => expect(renameCharacter).toHaveBeenCalledWith('characters/hero', 'characters/elder'))
     await waitFor(() => expect(saveMap).toHaveBeenCalledTimes(1))
-    const saved = saveMap.mock.calls[0] as unknown as [null, string, { entities: { components: { Sprite: { asset: string } } }[] }]
+    const saved = saveMap.mock.calls[0] as unknown as [null, string, unknown]
     expect(saved[1]).toBe('town.json')
-    expect(saved[2].entities[0].components.Sprite.asset).toBe('characters/elder')
+    // the old map is saved as the tree it migrated to on load
+    expect((entitiesOfMap(saved[2])[0].components.Sprite as { asset: string }).asset).toBe('characters/elder')
   })
 
   it('refuses a taken or invalid id and leaves the button disabled', async () => {
@@ -414,8 +416,9 @@ describe('rename and delete', () => {
     save()
     await waitFor(() => expect(saved).toHaveLength(1))
     await waitFor(() => expect(saveMap).toHaveBeenCalledTimes(1))
-    const written = (saveMap.mock.calls[0] as unknown as [null, string, { entities: { components: { Event: { states: { graph: { nodes: { params: { animation?: string } }[] } }[] } } }[] }])[2]
-    expect(written.entities[0].components.Event.states[0].graph.nodes[1].params.animation).toBe('stroll')
+    const written = entitiesOfMap((saveMap.mock.calls[0] as unknown as [null, string, unknown])[2])
+    const event = written[0].components.Event as unknown as { states: { graph: { nodes: { params: { animation?: string } }[] } }[] }
+    expect(event.states[0].graph.nodes[1].params.animation).toBe('stroll')
   })
 })
 

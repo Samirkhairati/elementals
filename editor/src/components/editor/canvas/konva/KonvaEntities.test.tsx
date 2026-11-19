@@ -74,18 +74,14 @@ describe('KonvaEntities', () => {
     expect(nodes().map((n) => n.props.x)).toEqual([80, 16, 48])
   })
 
-  it('hides entities hidden in the list or in a hidden folder, and draws nothing when entities are off', () => {
-    const { container } = renderEntities(
-      [entity('a', 16, 32), entity('b', 48, 32, {}, { visible: false }), entity('c', 80, 32, {}, { folder: 'f1' })],
-      { entityFolders: [{ id: 'f1', name: 'F', visible: false }] },
-    )
-    expect(nodes().map((n) => n.props.x)).toEqual([16])
-    renderEntities([entity('a', 16, 32)], { showEntities: false })
-    expect(container.querySelectorAll('[data-kind]').length).toBeGreaterThan(0)
+  it('handles exactly the entities it is given (the canvas hands in the shown ones: hidden ones and those in hidden groups are left out upstream)', () => {
+    renderEntities([entity('a', 16, 32), entity('c', 80, 32)])
+    expect(nodes().map((n) => n.props.x)).toEqual([16, 80])
+    renderEntities([])
     expect(nodes()).toHaveLength(0)
   })
 
-  it('always draws an area for every visible entity (its collider, else its tile), but not for hidden ones', () => {
+  it('always draws an area for every visible entity (its collider, else its tile), but not for hidden ones (those are not handed in)', () => {
     const entities = [entity('a', 16, 32, { Collider: { width: 32, height: 32, offsetX: 0, offsetY: 0, isSolid: true } }), entity('b', 48, 32, { Collider: { width: 16, height: 8, isSolid: false } }), entity('c', 80, 32)]
     renderEntities(entities)
     runOverlay()
@@ -99,7 +95,8 @@ describe('KonvaEntities', () => {
     expect(drawn.footprint.mock.calls.every((c) => c[5] === '255,255,255' && c[7] === false)).toBe(true)
 
     drawn.footprint.mockClear()
-    renderEntities([{ ...entities[0], visible: false }, entities[1]])
+    // a hidden entity is not handed in at all (the draw plan leaves it out)
+    renderEntities([entities[1]])
     runOverlay()
     expect(drawn.footprint).toHaveBeenCalledTimes(1)
   })

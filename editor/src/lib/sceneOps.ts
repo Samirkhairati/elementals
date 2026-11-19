@@ -450,14 +450,14 @@ export function moveNodesTo(nodes: SceneNode[], ids: readonly string[], targetId
     if (where === 'inside') {
       parentId = target.node.id
       index = undefined
-    } else if (previous) {
-      const prev = locate(next, previous)
-      if (!prev) break
-      parentId = prev.parent?.id ?? null
-      index = prev.index + 1
     } else {
-      parentId = target.parent?.id ?? null
-      index = where === 'above' ? target.index + 1 : target.index
+      const anchor = previous ? locate(next, previous) : target
+      if (!anchor) break
+      parentId = anchor.parent?.id ?? null
+      index = previous || where === 'above' ? anchor.index + 1 : anchor.index
+      // `moveNode` counts the index once the node has left its place: one less when it leaves from before the anchor.
+      const from = locate(next, id)
+      if (from && (from.parent?.id ?? null) === parentId && from.index < anchor.index) index -= 1
     }
     const moved = moveNode(next, id, parentId, index)
     if (moved === next) continue

@@ -44,6 +44,7 @@ import {
   NODE_TYPES,
   canHold,
   collisionItemsOf,
+  drawOrderPictures,
   effectiveYSort,
   inheritedYSort,
   isContainer,
@@ -172,12 +173,22 @@ interface RowInfo {
   pictureGroup: boolean
 }
 
+/** Locked by a node above: a locked group inside an image layer does not count (it only makes its pictures pick as one). */
+function lockedAbove(ancestors: readonly SceneNode[]): boolean {
+  let inImage = false
+  for (const a of ancestors) {
+    if (a.locked === true && !(inImage && a.type === 'group')) return true
+    if (a.type === 'image') inImage = true
+  }
+  return false
+}
+
 function rowInfos(entries: readonly WalkEntry[]): RowInfo[] {
   return entries.map(({ node, ancestors, depth }) => ({
     node,
     depth,
     hiddenAbove: ancestors.some((a) => a.visible === false),
-    lockedAbove: ancestors.some((a) => a.locked === true),
+    lockedAbove: lockedAbove(ancestors),
     ySort: node.type === 'group' || node.type === 'image' || node.type === 'picture' ? (effectiveYSort(node, ancestors) ? (node.ySort === undefined ? 'inherited' : 'own') : false) : false,
     pictureGroup: node.type === 'group' && ancestors.some((a) => a.type === 'image'),
   }))
@@ -420,6 +431,11 @@ function RowMenu({ id, onRename }: { id: string; onRename: (id: string) => void 
   const hidden = node.visible === false
   // New nodes go inside this row when it can hold them, else beside it.
   const anchor = id
+  // A picture's place in its layer's draw order: the backmost cannot go further back, the frontmost not further forward.
+  const imageLayer = ancestors.find((a) => a.type === 'image')
+  const drawOrder = node.type === 'picture' && imageLayer ? drawOrderPictures(imageLayer) : []
+  const drawPlace = drawOrder.findIndex((p) => p.id === id)
+  const drawCount = drawOrder.length
 
   const confirmDelete = () => {
     const ids = tops.length > 0 ? tops : [id]
@@ -513,7 +529,7 @@ function RowMenu({ id, onRename }: { id: string; onRename: (id: string) => void 
       {node.type === 'picture' && (
         <ContextMenuItem
           disabled={lockedHere}
-          onClick={() => ctx.placeMultiple(ancestors.find((a) => a.type === 'image')?.id ?? '', id)}
+          onClick={() => ctx.placeMultiple(imageLayer?.id ?? '', id)}
           title="Click the map to add more copies: same picture, crop, scale and flips"
         >
           <Stamp />
@@ -523,11 +539,11 @@ function RowMenu({ id, onRename }: { id: string; onRename: (id: string) => void 
       )}
       {node.type === 'picture' && (
         <>
-          <ContextMenuItem disabled={lockedHere} onClick={() => ctx.reorderImage(ancestors.find((a) => a.type === 'image')?.id ?? '', id, 1)}>
+          <ContextMenuItem disabled={lockedHere || drawPlace === drawCount - 1} onClick={() => ctx.reorderImage(imageLayer?.id ?? '', id, 1)}>
             <ArrowUp />
             Bring forward
           </ContextMenuItem>
-          <ContextMenuItem disabled={lockedHere} onClick={() => ctx.reorderImage(ancestors.find((a) => a.type === 'image')?.id ?? '', id, -1)}>
+          <ContextMenuItem disabled={lockedHere || drawPlace === 0} onClick={() => ctx.reorderImage(imageLayer?.id ?? '', id, -1)}>
             <ArrowDown />
             Send backward
           </ContextMenuItem>
@@ -589,7 +605,7 @@ function RowMenu({ id, onRename }: { id: string; onRename: (id: string) => void 
           )}
           {node.type === 'tile' && <YSortMenuItem own={false} inherited={false} disabled title="Tile layers draw as one piece; put pictures on an image layer to y-sort them" onChange={() => {}} />}
           {(node.type === 'tile' || node.type === 'image') && <DropShadowMenuItem has={hasShadow(node.look)} onClick={() => dropShadow({ kind: 'layer', layerId: id })} />}
-          {node.type === 'picture' && <DropShadowMenuItem has={hasShadow(node.look)} disabled={lockedHere} onClick={() => dropShadow({ kind: 'picture', layerId: ancestors.find((a) => a.type === 'image')?.id ?? '', imageId: id })} />}
+          {node.type === 'picture' && <DropShadowMenuItem has={hasShadow(node.look)} disabled={lockedHere} onClick={() => dropShadow({ kind: 'picture', layerId: imageLayer?.id ?? '', imageId: id })} />}
         </>
       )}
       <ContextMenuSeparator />

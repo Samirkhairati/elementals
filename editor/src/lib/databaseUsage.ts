@@ -10,6 +10,8 @@ export interface UsageMap {
   fileName: string
   name: string
   nodes?: readonly unknown[]
+  /** An old map (schema 5): its entities are read through the tree they migrate to. */
+  entities?: readonly unknown[]
 }
 
 export interface UsageEntity {

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { CharacterDef } from '../../../shared/engine/characters'
 import type { CharacterInfo } from '../../../shared/engine/graphics'
 import type { MapData } from '@/types/editor'
+import type { ImageLayerNode, TileLayerNode } from '../../../shared/sceneTree'
 import { buildProjectReferences } from './referenceIndex'
 import { allFolders, applyAssetPlan, canMoveFolder, folderChanges, graphicDeleteGuard, planGraphicChanges, planTilesetRename, summarizeReferences, tilesetDeleteGuard } from './assetOps'
 
@@ -14,14 +15,14 @@ const characters: Record<string, CharacterInfo> = {
   'objects/rock': { id: 'objects/rock', def: def('props/rock.png'), images: {} },
 }
 const map = (over: Partial<MapData> = {}): MapData => ({
-  fileName: 'park.json', folderPath: null, name: 'Park', width: 4, height: 4, entities: [],
-  layers: [
-    { id: 'g', name: 'ground', type: 'tile', visible: true, data: { 0: { tilesetId: 'grass.png', x: 0, y: 0 } } },
-    { id: 'i', name: 'sky', type: 'image', visible: true, images: [{ id: 'c', graphicId: 'props/cloud.png', x: 0, y: 0 }] },
+  fileName: 'park.json', folderPath: null, name: 'Park', width: 4, height: 4,
+  nodes: [
+    { id: 'i', name: 'sky', type: 'image', children: [{ id: 'c', type: 'picture', name: 'c', graphicId: 'props/cloud.png', x: 0, y: 0 }] },
+    { id: 'g', name: 'ground', type: 'tile', data: { 0: { tilesetId: 'grass.png', x: 0, y: 0 } } },
   ],
   ...over,
 } as unknown as MapData)
-const maps = [map(), map({ fileName: 'other.json', name: 'Other', layers: [] })]
+const maps = [map(), map({ fileName: 'other.json', name: 'Other', nodes: [] })]
 const refs = buildProjectReferences(maps as never, Object.values(characters))
 const existing = new Set(['props/chest.png', 'props/rock.png', 'props/cloud.png', 'props/free.png'])
 
@@ -53,7 +54,7 @@ describe('planGraphicChanges', () => {
     expect(plan.ok).toBe(true)
     expect(plan.characters.map((c) => [c.id, c.def.sheets.sheet.image])).toEqual([['objects/chest', 'boxes/chest.png']])
     expect(plan.maps.map((m) => m.fileName)).toEqual(['park.json'])
-    expect(plan.maps[0].layers[1].images![0].graphicId).toBe('sky/cloud.png')
+    expect((plan.maps[0].nodes[0] as ImageLayerNode).children[0]).toMatchObject({ graphicId: 'sky/cloud.png' })
     expect(plan.references).toHaveLength(2)
     expect(characters['objects/chest'].def.sheets.sheet.image).toBe('props/chest.png')
   })
@@ -78,7 +79,7 @@ describe('planTilesetRename', () => {
     const plan = planTilesetRename(refs, maps, new Set(['grass.png', 'house.png']), 'grass.png', 'meadow')
     expect(plan.ok).toBe(true)
     expect(plan.maps).toHaveLength(1)
-    expect(plan.maps[0].layers[0].data![0].tilesetId).toBe('meadow.png')
+    expect((plan.maps[0].nodes[1] as TileLayerNode).data?.[0].tilesetId).toBe('meadow.png')
     expect(plan.references).toHaveLength(1)
   })
   it('refuses a bad stem, the same name and a taken name', () => {
