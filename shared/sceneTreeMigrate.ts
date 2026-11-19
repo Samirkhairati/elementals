@@ -31,13 +31,17 @@ import type {
   CollisionShapeNode,
   CollisionTilesNode,
   EntityNode,
-  GroupNode,
-  ImageLayerNode,
+  GroupNode as TypedGroupNode,
   NodeCells,
   PictureNode,
   SceneNode,
 } from './sceneTree.ts'
-import { allEntities, allPictures } from './sceneTree.ts'
+import { allEntities, allPictures, isContainer } from './sceneTree.ts'
+import { NODE_COMPONENTS, componentsOfEntity, engineEntityOf, entityWithComponents } from './sceneEntity.ts'
+
+// The schema 6 shapes the v5 -> v6 step builds (`typedNodes` then makes them schema 7).
+type GroupNode = TypedGroupNode & { ySort?: boolean }
+type ImageLayerNode = { id: string; type: 'image'; name: string; children: SceneNode[] } & Rec
 
 /** The id of the group that holds the entities of a migrated map (the old Entities row). */
 export const ENTITIES_GROUP_ID = deterministicId('node-tree/entities-group')
@@ -185,7 +189,7 @@ function layerNode(layer: Rec, pool: IdPool): SceneNode | null {
   const type = layer.type
   if (type === 'image' || type === 'collision' || (CELL_LAYER_TYPES as readonly unknown[]).includes(type)) {
     const id = pool.take(layer.id, 'layer')
-    if (type === 'image') return imageLayerNode(layer, id, pool)
+    if (type === 'image') return imageLayerNode(layer, id, pool) as unknown as SceneNode
     if (type === 'collision') return collisionLayerNode(layer, id, pool)
     return {
       id,
@@ -278,10 +282,10 @@ export function layersToNodes(input: { layers?: unknown; entities?: unknown; ent
   for (const u of above) topFirst.push(convert(u))
   topFirst.push(entitiesGroup(input.entities, input.entityFolders, pool))
   for (const u of below) topFirst.push(convert(u))
-  return topFirst.filter((n): n is SceneNode => n !== null).reverse()
+  return typedNodes(topFirst.filter((n): n is SceneNode => n !== null).reverse())
 }
 
-/** Whether a map is already a tree (schema 6). */
+/** Whether a map is already a tree (schema 6 or later). */
 export const hasNodeTree = (map: unknown): boolean => isRecord(map) && Array.isArray(map.nodes)
 
 /**
@@ -301,12 +305,116 @@ export function migrateToNodeTree<T extends object>(map: T): MigrateResult<T> {
 /** The tree of a map of any schema: its `nodes`, or the tree its layers and entities migrate to (nothing is changed). */
 export function nodesOfMap(map: unknown): SceneNode[] {
   if (!isRecord(map)) return []
-  if (Array.isArray(map.nodes)) return map.nodes as SceneNode[]
+  if (Array.isArray(map.nodes)) return typedNodes(map.nodes)
   return layersToNodes(map)
 }
 
 /** Every picture of every image layer of a map of any schema, in tree order. */
 export const picturesOfMap = (map: unknown): PictureNode[] => allPictures(nodesOfMap(map))
 
-/** Every entity node of a map of any schema, in tree order. */
-export const entitiesOfMap = (map: unknown): EntityNode[] => allEntities(nodesOfMap(map))
+/** Every entity of a map of any schema, in tree order, as the engine reads it: its node with all its components (sceneEntity.ts). */
+export const entitiesOfMap = (map: unknown): ReturnType<typeof engineEntityOf>[] => allEntities(nodesOfMap(map)).map(engineEntityOf)
+
+// ── v6 -> v7 ───────────────────────────────────────────────────────────────────────────────────────
+//
+// Schema 7 types the nodes (see shared/sceneTree.ts):
+//  * an image layer becomes a Node2D (a YSort when it was y-sorted) holding its pictures (Sprite2D) and groups; its `z`
+//    stays on it (the depth of the sprites inside);
+//  * a locked group of pictures (inside an image layer) becomes an unlocked Node2D with `pickAsOne`;
+//  * a group that was y-sorted becomes a YSort (inside one, everything is y-sorted), unless something below it turned
+//    y-sort off: then it stays a Node2D and its children that were y-sorted become YSorts; a y-sorted picture outside a
+//    YSort is wrapped in one (`<picture id>:ysort`);
+//  * a `look` field (tile layers, image layers, pictures) becomes a Look child (`<owner id>:look`);
+//  * an entity's Sprite, Collider, Area, Movement and Event components become its child nodes (shared/sceneEntity.ts);
+//  * tile layers and pictures get `children` (they may hold a Look).
+
+// The types whose `look` field becomes a Look child.
+const TAKES_LOOK = new Set(['tile', 'picture', 'image', 'group', 'ySort'])
+
+const CONTAINERS_NEEDING_CHILDREN = new Set(['group', 'ySort', 'tile', 'picture', 'collision', 'entity', 'body', 'area'])
+
+function needsTyping(list: readonly unknown[]): boolean {
+  return list.some((n) => {
+    if (!isRecord(n)) return false
+    if (n.type === 'image' || typeof n.ySort === 'boolean' || ('look' in n && TAKES_LOOK.has(str(n.type)))) return true
+    if (CONTAINERS_NEEDING_CHILDREN.has(str(n.type)) && !Array.isArray(n.children)) return true
+    if (n.type === 'entity' && isRecord(n.components) && NODE_COMPONENTS.some((c) => c in (n.components as Rec))) return true
+    return Array.isArray(n.children) && needsTyping(n.children)
+  })
+}
+
+const lookChildren = (owner: Rec, look: unknown): SceneNode[] =>
+  isRecord(look) ? [{ id: `${str(owner.id)}:look`, type: 'look', name: 'Look', look } as SceneNode] : []
+
+// Where a node sits for y-sort: `sorted` = the nearest y-sort value set above it said on; `inYSort` = it is already
+// below a YSort node made here (everything there sorts).
+interface SortPlace {
+  sorted: boolean
+  inYSort: boolean
+}
+
+const TOP: SortPlace = { sorted: false, inYSort: false }
+
+// Some node below opts out of y-sort (`ySort: false`): a YSort above it would sort it anyway.
+const optsOut = (list: readonly unknown[]): boolean =>
+  list.some((n) => isRecord(n) && (n.ySort === false || (Array.isArray(n.children) && optsOut(n.children))))
+
+// Something that is not a node (or a node with a `children` that is not a list, or a `ySort` that is not a boolean) is
+// kept as it is, for the validator to report.
+function typedList(list: readonly unknown[], place: SortPlace, inImage = false): SceneNode[] {
+  return list.map((n) => (isRecord(n) ? typedNode(n, place, inImage) : (n as SceneNode)))
+}
+
+function typedNode(node: Rec, place: SortPlace, inImage: boolean): SceneNode {
+  const { ySort, look, ...rest } = node
+  if (ySort !== undefined && typeof ySort !== 'boolean') rest.ySort = ySort
+  // A locked group of pictures was picked as one; locking a Node2D now freezes it, so it becomes `pickAsOne`.
+  if (node.type === 'group' && inImage && node.locked === true) {
+    delete rest.locked
+    rest.pickAsOne = true
+  }
+  if (node.children !== undefined && !Array.isArray(node.children)) return { ...rest } as unknown as SceneNode
+  const children = Array.isArray(node.children) ? node.children : []
+  const here = node.type === 'ySort' ? true : typeof ySort === 'boolean' ? ySort : place.sorted
+  const below: SortPlace = { sorted: here, inYSort: place.inYSort }
+  switch (node.type) {
+    case 'image':
+    case 'group':
+    case 'ySort': {
+      // A YSort sorts everything below it, so a branch with something below that opts out stays a Node2D (and its
+      // children that sort become YSorts themselves).
+      const ySorted = !place.inYSort && here && !optsOut(children)
+      const type = ySorted ? 'ySort' : 'group'
+      const inner: SortPlace = { sorted: here, inYSort: place.inYSort || ySorted }
+      return { ...rest, type, children: [...typedList(children, inner, inImage || node.type === 'image'), ...lookChildren(node, look)] } as SceneNode
+    }
+    case 'picture': {
+      const picture = { ...rest, children: [...typedList(children, below), ...lookChildren(node, look)] } as SceneNode
+      if (!here || place.inYSort) return picture
+      return { id: `${str(node.id)}:ysort`, type: 'ySort', name: `${str(node.name) || 'Sprite'} (y-sort)`, children: [picture] } as SceneNode
+    }
+    case 'tile':
+      return { ...rest, children: [...typedList(children, below), ...lookChildren(node, look)] } as SceneNode
+    case 'entity': {
+      const entity = { ...rest, children: typedList(children, below) } as unknown as EntityNode
+      return entityWithComponents(entity, componentsOfEntity(entity))
+    }
+    default: {
+      // A Look node keeps its look; a look where none is drawn (a terrain layer's, say) is kept for the validator to warn about.
+      const out = look !== undefined ? { ...rest, look } : rest
+      if (isContainer(node as unknown as SceneNode)) return { ...out, children: typedList(children, below) } as SceneNode
+      return out as unknown as SceneNode
+    }
+  }
+}
+
+const typedCache = new WeakMap<readonly unknown[], SceneNode[]>()
+
+/** A tree of schema 6 (or 7) as schema 7 (the rules above). The same array when it already is; cached per array. */
+export function typedNodes(nodes: readonly unknown[]): SceneNode[] {
+  const hit = typedCache.get(nodes)
+  if (hit) return hit
+  const out = needsTyping(nodes) ? typedList(nodes, TOP) : (nodes as SceneNode[])
+  typedCache.set(nodes, out)
+  return out
+}

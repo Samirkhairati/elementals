@@ -5,8 +5,10 @@
 
 import type { CharacterDef } from './characters.ts';
 import { isRecord } from './util.ts';
-import type { SceneNode } from '../sceneTree.ts';
-import { allEntities, layerNodesInListOrder, mapTree, picturesOf } from '../sceneTree.ts';
+import type { EntityNode, SceneNode } from '../sceneTree.ts';
+import { allEntities, layerNodesInListOrder, mapTree, walk } from '../sceneTree.ts';
+import { typedNodes } from '../sceneTreeMigrate.ts';
+import { engineEntityOf, entityWithComponents, type ComponentBag } from '../sceneEntity.ts';
 
 export type RefTarget =
   | { table: 'character'; id: string; clip?: string }
@@ -46,17 +48,32 @@ export interface RefMap {
 /** The layers of a map as the layer list shows them (top first), whichever schema it is. */
 function refLayers(map: RefMap): RefLayer[] {
   if (!map.nodes) return map.layers ?? [];
-  return layerNodesInListOrder(map.nodes).map((n) => ({
+  const nodes = typedNodes(map.nodes);
+  const layers: RefLayer[] = layerNodesInListOrder(nodes).map((n) => ({
     name: n.name,
     type: n.type,
     ...('data' in n && n.data ? { data: n.data as RefLayer['data'] } : {}),
-    ...(n.type === 'image' ? { images: picturesOf(n) } : {}),
   }));
+  // Sprites sit in any Node2D or YSort: one entry per node that holds some, named after it ("" = the map root).
+  const holders = new Map<string, RefLayer>();
+  for (const e of walk(nodes)) {
+    if (e.node.type !== 'picture') continue;
+    const parent = e.ancestors[e.ancestors.length - 1];
+    const key = parent?.id ?? '';
+    let holder = holders.get(key);
+    if (!holder) {
+      holder = { name: parent?.name ?? '', type: 'sprites', images: [] };
+      holders.set(key, holder);
+      layers.push(holder);
+    }
+    holder.images!.push(e.node);
+  }
+  return layers;
 }
 
 /** Every entity of a map, whichever schema it is. */
 function refEntities(map: RefMap): RefEntity[] {
-  return map.nodes ? allEntities(map.nodes) : (map.entities ?? []);
+  return map.nodes ? allEntities(typedNodes(map.nodes)).map(engineEntityOf) : (map.entities ?? []);
 }
 
 export interface RefPrefab {
@@ -207,9 +224,18 @@ export function buildReferenceIndex(input: ReferenceInput): ReferenceIndex {
 /** Deep-maps the entities of a map through `fn`; returns the same map object when nothing changed. */
 function rewriteEntities<M extends RefMap>(map: M, fn: (entity: RefEntity, self: Map<string, RefEntity>) => RefEntity): { map: M; changed: boolean } {
   if (map.nodes) {
-    const byId = new Map(allEntities(map.nodes).map((e) => [e.id, e as RefEntity]));
-    const nodes = mapTree(map.nodes, (node) => (node.type === 'entity' ? (fn(node as RefEntity, byId) as unknown as SceneNode) : node));
-    return nodes === map.nodes ? { map, changed: false } : { map: { ...map, nodes }, changed: true };
+    // Each entity is rewritten as its bag of components; what changed goes back into its child nodes.
+    const typed = typedNodes(map.nodes);
+    const views = new Map(allEntities(typed).map((e) => [e.id, engineEntityOf(e) as RefEntity]));
+    const nodes = mapTree(typed, (node) => {
+      if (node.type !== 'entity') return node;
+      const view = views.get(node.id)!;
+      const next = fn(view, views);
+      if (next === view) return node;
+      const { components, ...fields } = next as RefEntity & Record<string, unknown>;
+      return entityWithComponents({ ...node, ...fields, type: 'entity', children: node.children } as EntityNode, (components ?? {}) as ComponentBag);
+    });
+    return nodes === typed ? { map, changed: false } : { map: { ...map, nodes }, changed: true };
   }
   if (!map.entities) return { map, changed: false };
   const byId = new Map(map.entities.map((e) => [e.id, e]));
@@ -250,8 +276,9 @@ function mapNodes(state: Record<string, unknown>, fn: (node: Record<string, unkn
 /** Maps the items of every image layer through `fn` (same item back = unchanged); the map object is kept when nothing changed. */
 function rewriteImageItems<M extends RefMap>(map: M, fn: (item: { id: string; assetId?: string; graphicId?: string }) => { id: string; assetId?: string; graphicId?: string }): { map: M; changed: boolean } {
   if (map.nodes) {
-    const nodes = mapTree(map.nodes, (node) => (node.type === 'picture' ? (fn(node) as unknown as SceneNode) : node));
-    return nodes === map.nodes ? { map, changed: false } : { map: { ...map, nodes }, changed: true };
+    const typed = typedNodes(map.nodes);
+    const nodes = mapTree(typed, (node) => (node.type === 'picture' ? (fn(node) as unknown as SceneNode) : node));
+    return nodes === typed ? { map, changed: false } : { map: { ...map, nodes }, changed: true };
   }
   if (!map.layers) return { map, changed: false };
   let changed = false;
@@ -282,8 +309,9 @@ export function rewriteTilesetId<M extends RefMap>(map: M, from: string, to: str
     return { ...layer, data: Object.fromEntries(Object.entries(layer.data).map(([k, t]) => [k, t.tilesetId === from ? { ...t, tilesetId: to } : t])) };
   };
   if (map.nodes) {
-    const nodes = mapTree(map.nodes, (node) => (node.type === 'tile' || node.type === 'terrain' || node.type === 'encounters' || node.type === 'objects' || node.type === 'collision' ? retile(node as never) : node));
-    return nodes === map.nodes ? { map, changed: false } : { map: { ...map, nodes }, changed: true };
+    const typed = typedNodes(map.nodes);
+    const nodes = mapTree(typed, (node) => (node.type === 'tile' || node.type === 'terrain' || node.type === 'encounters' || node.type === 'objects' || node.type === 'collision' ? retile(node as never) : node));
+    return nodes === typed ? { map, changed: false } : { map: { ...map, nodes }, changed: true };
   }
   if (!map.layers) return { map, changed: false };
   let changed = false;

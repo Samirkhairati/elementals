@@ -33,7 +33,8 @@ describe('y-sort inheritance (shared/ySort)', () => {
       layers: [folder(true), imageLayer({ images: [{ id: 'a', graphicId: 'p.png', x: 16, y: 32 }, { id: 'b', graphicId: 'p.png', x: 16, y: 32, ySort: false }] })],
     }
     const tiled = convertEditorMapToTiled(map as never, [])
-    const objects = tiled.layers[0].objects!
+    // bottom first (the y-sorted picture is wrapped in a YSort of its own, so it is an object group of its own)
+    const objects = tiled.layers.slice().reverse().flatMap((l) => l.objects ?? [])
     expect(objects[0].properties).toContainEqual({ name: 'ySort', type: 'bool', value: true })
     expect(objects[1].properties?.some((p) => p.name === 'ySort')).toBe(false)
   })

@@ -4,10 +4,12 @@ import { validateEditorMap, validateTiledMap } from '../../../shared/mapSchema'
 import { collectUsedTilesetIds, convertEditorMapToTiled } from '../../../shared/mapExport'
 import { buildReferenceIndex, characterIdsOfMap, rewriteCharacterId, rewriteMapGraphicId, rewriteTilesetId } from '../../../shared/engine/index'
 import { migrateMap } from '../../../shared/engine/migrate'
+import { SCHEMA_VERSION } from '../../../shared/engine/types'
+import { typedNodes } from '../../../shared/sceneTreeMigrate'
 import type { RefMap } from '../../../shared/engine/index'
 import type { EditorMap, TilesetInfo } from '../../../shared/mapTypes'
 
-// Maps stored as a tree of nodes (schema 6): validation, export and the reference scans.
+// Maps stored as a tree of nodes (schema 6 fixtures, typed to schema 7 on load): validation, export and the reference scans.
 
 const tilesets: TilesetInfo[] = [
   { name: 'grass', fileName: 'grass.png', width: 64, height: 64 },
@@ -58,7 +60,7 @@ describe('validateEditorMap: nodes', () => {
         expect.stringContaining('visible must be a boolean'),
         expect.stringContaining('locked must be a boolean'),
         expect.stringContaining('collapsed must be a boolean'),
-        expect.stringContaining('ySort must be a boolean'),
+        expect.stringContaining('ySort must be a boolean'), // a boolean one becomes a YSort; anything else stays to be reported
         expect.stringContaining('z must be a finite number'),
         expect.stringContaining('children must be an array'),
       ])
@@ -71,11 +73,12 @@ describe('validateEditorMap: nodes', () => {
       expect.arrayContaining([
         expect.stringContaining('a picture node cannot sit at the top of the map'),
         expect.stringContaining('a collisionShape node cannot sit in a group node'),
-        expect.stringContaining('a entity node cannot sit in a image node'),
         expect.stringContaining('a tile node cannot sit in a collision node'),
+        expect.stringContaining('a tile node cannot sit in a tile node'), // a TileMap holds only a Look
       ])
     )
-    expect(warningsOf(tree([tile('leaf', { children: [tile('inner')] })]))).toEqual(expect.arrayContaining([expect.stringContaining('holds no children')]))
+    expect(errorsOf(tree([group('g', [pic('p', { children: [pic('q')] })])]))).toEqual([expect.stringContaining('a picture node cannot sit in a picture node')])
+    expect(warningsOf(tree([{ id: 't', type: 'terrain', name: 't', children: [tile('inner')] }]))).toEqual(expect.arrayContaining([expect.stringContaining('holds no children')]))
   })
 
   it('validates what each type holds: cells, pictures, shapes and entities', () => {
@@ -96,7 +99,7 @@ describe('validateEditorMap: nodes', () => {
         expect.stringContaining('needs exactly one of assetId'),
         expect.stringContaining('crop must be whole numbers'),
         expect.stringContaining('scale must be a positive number'),
-        expect.stringContaining('ySort must be true or false'),
+        expect.stringContaining('ySort must be a boolean'),
         expect.stringContaining('closed must be a boolean'),
         expect.stringContaining('point 0: x and y must be finite numbers'),
         expect.stringContaining('unknown component type "Nope"'),
@@ -117,7 +120,7 @@ describe('validateEditorMap: nodes', () => {
     expect(warnings).toEqual(
       expect.arrayContaining([
         expect.stringContaining('too few points'),
-        expect.stringContaining('only tile and image layers and pictures have a look'),
+        expect.stringContaining('only a TileMap, Sprite2D, Node2D or YSort takes a look'),
         '2 terrain layers; a map has one',
         '2 layers will be exported with the same name "same"',
       ])
@@ -153,16 +156,28 @@ describe('convertEditorMapToTiled: trees', () => {
       ], { ySort: true }),
       image('none', [pic('g')]),
     ])
-    const sorted = (layer: string) =>
-      convertEditorMapToTiled(m, tilesets).layers.find((l) => l.name === layer)!.objects!.map((o) => [o.name, o.properties!.some((p) => p.name === 'ySort')])
-    expect(sorted('layer')).toEqual([['a.png', true], ['b.png', false], ['c.png', true], ['d.png', false], ['e.png', true]])
-    expect(sorted('own')).toEqual([['f.png', false]])
-    expect(sorted('none')).toEqual([['g.png', false]])
+    // (schema 6 y-sort values: the migration keeps every opt-out, making YSorts only where nothing below opts out)
+    const sorted = Object.fromEntries(
+      convertEditorMapToTiled(m, tilesets).layers.flatMap((l) => l.objects ?? []).map((o) => [o.name, o.properties!.some((p) => p.name === 'ySort')])
+    )
+    expect(sorted).toEqual({ 'a.png': true, 'b.png': false, 'c.png': true, 'd.png': false, 'e.png': true, 'f.png': false, 'g.png': false })
   })
 
-  it('writes the pictures of an image layer in z order, ties in tree order, groups looked into', () => {
-    const m = tree([image('i', [pic('a', { z: 2 }), group('g', [pic('b', { z: 1 }), pic('c', { z: 2 })]), pic('d', { z: 1 })])])
-    expect(convertEditorMapToTiled(m, tilesets).layers[0].objects!.map((o) => o.name)).toEqual(['b.png', 'd.png', 'a.png', 'c.png'])
+  it('writes each run of sprites as an object group (named after its host), its sprites in z order, ties in tree order', () => {
+    // A Node2D that only organises sprites stays in its parent's run (one object group, as a picture group in an image layer).
+    const m = tree([image('i', [pic('a', { z: 2 }), pic('b', { z: 1 }), group('g', [pic('c', { z: 2 }), pic('d', { z: 1 })]), pic('e')])])
+    const names = (map: any) => convertEditorMapToTiled(map, tilesets).layers.map((l) => [l.name, l.objects!.map((o) => o.name)]) // top first
+    expect(names(m)).toEqual([['i', ['e.png', 'b.png', 'd.png', 'a.png', 'c.png']]])
+    // One with a z (or a Look) of its own is its own object group.
+    const withZ = tree([image('i', [pic('a', { z: 2 }), pic('b', { z: 1 }), group('g', [pic('c', { z: 2 }), pic('d', { z: 1 })], { z: 5 }), pic('e')])])
+    expect(names(withZ)).toEqual([
+      ['i', ['e.png']],
+      ['g', ['d.png', 'c.png']],
+      ['i', ['b.png', 'a.png']],
+    ])
+    // A Node2D holding no sprites itself is like a folder: each branch in it is its own object group.
+    const folder = tree([group('f', [image('one', [pic('a')]), image('two', [pic('b')])])])
+    expect(names(folder)).toEqual([['two', ['b.png']], ['one', ['a.png']]])
   })
 
   it('exports the entities of the whole tree, without the node-only fields', () => {
@@ -172,7 +187,9 @@ describe('convertEditorMapToTiled: trees', () => {
     expect(out.entities[1]).not.toHaveProperty('type')
     expect(out.entities[1]).not.toHaveProperty('locked')
     expect((out.entities[1] as any).visible).toBe(false)
-    expect(out.schemaVersion).toBe(6)
+    expect(out.schemaVersion).toBe(SCHEMA_VERSION)
+    expect(out.entities[0]).not.toHaveProperty('children')
+    expect(Object.keys(out.entities[0].components)).toEqual(['Transform', 'Sprite']) // the AnimatedSprite2D child is its Sprite
   })
 
   it('migrates legacy entities inside a tree on export', () => {
@@ -207,7 +224,8 @@ describe('reference scans: trees', () => {
     group('town', [image('sky', [pic('p1'), group('g', [pic('p2', { graphicId: undefined, assetId: 'objects/chest' })])], { name: 'Sky' }), ent('npc')]),
     { id: 'c', type: 'collision', name: 'walls', children: [] },
   ]
-  const asTree = (): RefMap => ({ fileName: 'town.json', name: 'Town', nodes: nodes as any })
+  // (typed: the rewrites hand back the untouched nodes of a schema 7 tree as they are)
+  const asTree = (): RefMap => ({ fileName: 'town.json', name: 'Town', nodes: typedNodes(nodes) as any })
 
   it('finds tilesets, pictures, sprites and entities in a tree like it does in layers', () => {
     const index = buildReferenceIndex({ maps: [asTree()], characters: [] })

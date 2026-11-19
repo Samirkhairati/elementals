@@ -27,9 +27,10 @@
 //   of a map that is not a tree yet), which stops at the schema 5 shape.
 
 import { migrateCollisionLayers } from '../collisionLayers.ts';
-import { FLAT_SCHEMA_VERSION, hasNodeTree, migrateToNodeTree } from '../sceneTreeMigrate.ts';
+import { FLAT_SCHEMA_VERSION, hasNodeTree, migrateToNodeTree, typedNodes } from '../sceneTreeMigrate.ts';
 import { mapTree } from '../sceneTree.ts';
-import type { SceneNode } from '../sceneTree.ts';
+import type { EntityNode } from '../sceneTree.ts';
+import { engineEntityOf, entityWithComponents } from '../sceneEntity.ts';
 import type { Command, EngineEntity, EventState, LegacyComponentType } from './types.ts';
 import { SCHEMA_VERSION } from './types.ts';
 import { createCommand } from './commands.ts';
@@ -306,7 +307,7 @@ export function migrateFlatMap<T extends object>(map: T): MigrateResult<T> {
 }
 
 /**
- * Migrates a map to the current schema (6): every entity becomes canonical, old `polygons` layers become collision layers,
+ * Migrates a map to the current schema (7: typed nodes, see sceneTreeMigrate.ts `typedNodes`): every entity becomes canonical, old `polygons` layers become collision layers,
  * and `layers`, `entities`, `entityFolders` and `entitiesIndex` become the node tree `nodes` (`migrateToNodeTree`).
  * A map that already is a tree only has the entities in it migrated and its `schemaVersion` stamped (maps at a newer
  * version keep theirs). Idempotent; returns the same object when nothing changed.
@@ -317,10 +318,13 @@ export function migrateMap<T extends object>(map: T): MigrateResult<T> {
 
   const out: Record<string, unknown> = { ...map };
   let changed = false;
-  const nodes = mapTree(map.nodes as SceneNode[], (node) => {
+  // Schema 6 -> 7 (typed nodes), then every entity migrated as the game sees it (its whole bag of components).
+  const nodes = mapTree(typedNodes(map.nodes as unknown[]), (node) => {
     if (node.type !== 'entity') return node;
-    const r = migrateEntity(node as unknown as EntityLike);
-    return r.changed ? (r.value as unknown as SceneNode) : node;
+    const r = migrateEntity(engineEntityOf(node) as unknown as EntityLike);
+    if (!r.changed) return node;
+    const { components, ...fields } = r.value as unknown as { components: Record<string, Record<string, unknown> | undefined> } & Record<string, unknown>;
+    return entityWithComponents({ ...node, ...fields, type: 'entity', children: node.children } as EntityNode, components);
   });
   if (nodes !== map.nodes) {
     out.nodes = nodes;

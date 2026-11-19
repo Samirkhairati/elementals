@@ -120,12 +120,14 @@ describe('image layers: groups (editor view only)', () => {
   const grouped = (groups: unknown, images: NonNullable<EditorMap['layers']>[number]['images']) =>
     validateEditorMap(map([{ ...imageLayer, groups: groups as never, images }]))
 
-  it('accepts groups and pictures that belong to them, and the export ignores both', () => {
+  it('accepts groups and pictures that belong to them; the export writes the same sprites (a group is its own object group)', () => {
     const layer = { ...imageLayer, groups: [{ id: 'g1', name: 'Wall', locked: true }], images: [{ id: 'a', assetId: 'rock', x: 16, y: 32, groupId: 'g1' }] }
     expect(validateEditorMap(map([layer])).errors).toEqual([])
-    const withGroups = JSON.stringify(convertEditorMapToTiled(map([layer]), []))
-    const without = JSON.stringify(convertEditorMapToTiled(map([{ ...layer, groups: undefined, images: [{ id: 'a', assetId: 'rock', x: 16, y: 32 }] }]), []))
-    expect(withGroups).toBe(without)
+    const sprites = (m: EditorMap) => convertEditorMapToTiled(m, []).layers.map((l) => ({ objects: l.objects, properties: l.properties, visible: l.visible }))
+    const withGroups = sprites(map([layer]))
+    const without = sprites(map([{ ...layer, groups: undefined, images: [{ id: 'a', assetId: 'rock', x: 16, y: 32 }] }]))
+    expect(withGroups).toEqual(without)
+    expect(convertEditorMapToTiled(map([layer]), []).layers[0].name).toBe('Wall')
   })
 
   it('reports malformed groups', () => {

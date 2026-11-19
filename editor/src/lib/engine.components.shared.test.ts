@@ -25,8 +25,8 @@ import type { ComponentType, EngineEntity } from '../../../shared/engine/index'
 afterEach(() => setIdGenerator(null))
 
 describe('COMPONENT_TYPES / schemas', () => {
-  it('lists the six components and a schema for each', () => {
-    expect([...COMPONENT_TYPES]).toEqual(['Transform', 'Sprite', 'Collider', 'Movement', 'Event', 'Tag'])
+  it('lists the seven components and a schema for each', () => {
+    expect([...COMPONENT_TYPES]).toEqual(['Transform', 'Sprite', 'Collider', 'Area', 'Movement', 'Event', 'Tag'])
     for (const type of COMPONENT_TYPES) {
       const s = COMPONENT_SCHEMAS[type]
       expect(s.type).toBe(type)
@@ -310,5 +310,5 @@ describe('cloneEntity', () => {
 })
 
 // compile-time: the schema record is keyed by every component type
-const _all: Record<ComponentType, true> = { Transform: true, Sprite: true, Collider: true, Movement: true, Event: true, Tag: true }
+const _all: Record<ComponentType, true> = { Transform: true, Sprite: true, Collider: true, Movement: true, Event: true, Tag: true, Area: true }
 void _all

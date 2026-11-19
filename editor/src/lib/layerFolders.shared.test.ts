@@ -7,7 +7,7 @@ const map = (layers: EditorMap['layers']): EditorMap => ({ name: 'm', width: 2, 
 const layers: EditorMap['layers'] = [
   { id: 'F', name: 'Scenery', type: 'folder', visible: true, collapsed: true },
   { id: 'a', name: 'Ground', type: 'tile', visible: true, folderId: 'F', data: {} },
-  { id: 'b', name: 'Trees', type: 'image', visible: false, folderId: 'F', images: [] },
+  { id: 'b', name: 'Trees', type: 'image', visible: false, folderId: 'F', images: [{ id: 'p', graphicId: 'tree.png', x: 16, y: 32 }] },
 ]
 
 describe('layer folders in maps', () => {

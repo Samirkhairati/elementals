@@ -11,8 +11,8 @@ import type { ComponentType, LayerType } from '@/types/editor'
 // Compile-time guard: the shared lists must stay identical to the editor's unions.
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false
 const componentTypesInSync: Equal<(typeof COMPONENT_TYPES)[number], ComponentType> = true
-// `folder` is a schema 5 layer type only: it migrates to a group node.
-const layerTypesInSync: Equal<Exclude<(typeof LAYER_TYPES)[number], 'folder'>, LayerType> = true
+// `folder` and `image` are old layer types only: they migrate to Node2D / YSort nodes.
+const layerTypesInSync: Equal<Exclude<(typeof LAYER_TYPES)[number], 'folder' | 'image'>, LayerType> = true
 
 const TILESETS = [
   { name: 'grass', fileName: 'grass.png', width: 64, height: 64 },

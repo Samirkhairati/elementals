@@ -11,7 +11,7 @@
 export type Facing = 'down' | 'up' | 'left' | 'right';
 
 /** Component names used in maps (`entity.components[<name>]`). */
-export type ComponentType = 'Transform' | 'Sprite' | 'Collider' | 'Movement' | 'Event' | 'Tag';
+export type ComponentType = 'Transform' | 'Sprite' | 'Collider' | 'Area' | 'Movement' | 'Event' | 'Tag';
 
 /** Names that existed before schemaVersion 2; accepted on load and converted by `migrateEntity`. */
 export type LegacyComponentType =
@@ -23,8 +23,11 @@ export type LegacyComponentType =
   | 'AIWander'
   | 'Interactable';
 
-/** Version written to `map.schemaVersion`. Maps without it are legacy (1). 6 = one tree of nodes (`map.nodes`, shared/sceneTree.ts). */
-export const SCHEMA_VERSION = 6;
+/**
+ * Version written to `map.schemaVersion`. Maps without it are legacy (1). 6 = one tree of nodes (`map.nodes`,
+ * shared/sceneTree.ts); 7 = typed nodes (Node2D, YSort, Sprite2D, Look, StaticBody2D, Area2D; entity components as nodes).
+ */
+export const SCHEMA_VERSION = 7;
 
 // ── Component props ─────────────────────────────────────────────────────────────────────────────
 // Positions are pixels in map space. A tile is 32px. The Transform position is the entity's
@@ -86,6 +89,17 @@ export interface ColliderProps {
   points?: { x: number; y: number }[];
   /** Polygon colliders: closed (a solid area) or open (a line that cannot be crossed). */
   closed?: boolean;
+}
+
+/**
+ * Where the entity's events trigger when that is not its Collider (an entity with a solid body and a trigger area of its
+ * own, the Area2D of its node). A box bottom-centred on the anchor, then shifted, as the Collider box is.
+ */
+export interface AreaProps {
+  width: number;
+  height: number;
+  offsetX: number;
+  offsetY: number;
 }
 
 export type Controller = 'none' | 'player' | 'wander';
@@ -570,6 +584,7 @@ export interface EntityComponents {
   Transform?: TransformProps;
   Sprite?: SpriteProps;
   Collider?: ColliderProps;
+  Area?: AreaProps;
   Movement?: MovementProps;
   Event?: EventProps;
   Tag?: TagProps;

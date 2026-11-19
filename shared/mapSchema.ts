@@ -10,7 +10,9 @@ import { validateEntity } from './engine/validate.ts'
 import { isRecord } from './engine/util.ts'
 import { minPoints } from './collisionShapes.ts'
 import { NODE_TYPES, canHold } from './sceneTree.ts'
-import type { SceneNode, SceneNodeType } from './sceneTree.ts'
+import type { EntityNode, SceneNode, SceneNodeType } from './sceneTree.ts'
+import { typedNodes } from './sceneTreeMigrate.ts'
+import { engineEntityOf } from './sceneEntity.ts'
 
 /** Mirrors `LayerType` in editor/src/types/editor.ts (checked at compile time by the editor tests). */
 export const LAYER_TYPES = ['tile', 'collision', 'terrain', 'objects', 'encounters', 'image', 'folder'] as const
@@ -339,7 +341,7 @@ function validateShapeNode(node: Rec, label: string, errors: string[], warnings:
 }
 
 /**
- * The `nodes` of a schema 6 map: every node has a unique id, a name and a known type, sits where the placement rules allow
+ * The `nodes` of a schema 7 map: every node has a unique id, a name and a known type, sits where the placement rules allow
  * (`canHold` in shared/sceneTree.ts) and has the fields of its type in the right shape.
  */
 function validateNodes(nodes: unknown[], cellCtx: CellContext, options: ValidateEditorMapOptions, errors: string[], warnings: string[]): void {
@@ -369,18 +371,18 @@ function validateNodes(nodes: unknown[], cellCtx: CellContext, options: Validate
       if (node.visible !== undefined && typeof node.visible !== 'boolean') errors.push(`${label}: visible must be a boolean`)
       if (node.locked !== undefined && typeof node.locked !== 'boolean') errors.push(`${label}: locked must be a boolean`)
       if (node.collapsed !== undefined && typeof node.collapsed !== 'boolean') errors.push(`${label}: collapsed must be a boolean`)
-      if (node.ySort !== undefined && typeof node.ySort !== 'boolean') errors.push(`${label}: ySort must be a boolean`)
       if (node.z !== undefined && !isFiniteNumber(node.z)) errors.push(`${label}: z must be a finite number`)
-      if (!canHold(path, type)) {
+      // (a boolean y-sort became the YSort node type when the map was typed; anything else is left for this report)
+      if (node.ySort !== undefined) errors.push(`${label}: ySort must be a boolean`)
+      if (!canHold(path, type, undefined, node.id as string)) {
         const parent = path[path.length - 1]
         errors.push(`${label}: a ${type} node cannot sit ${parent ? `in a ${parent.type} node` : 'at the top of the map'}`)
       }
 
-      if (node.look !== undefined) {
-        if (!isRecord(node.look)) errors.push(`${label}: look must be an object`)
-        else if (type !== 'tile' && type !== 'image' && type !== 'picture') warnings.push(`${label}: only tile and image layers and pictures have a look; it is dropped on export`)
-      }
-      if (type === 'tile' || type === 'terrain' || type === 'encounters' || type === 'objects' || type === 'image') {
+      if (type === 'look' && !isRecord(node.look)) errors.push(`${label}: look must be an object`)
+      if (type !== 'look' && node.look !== undefined) warnings.push(`${label}: only a TileMap, Sprite2D, Node2D or YSort takes a look (a Look node inside it); it is dropped on export`)
+      if ((type === 'animatedSprite' || type === 'wander' || type === 'playerController' || type === 'mover' || type === 'event') && !isRecord(node.props)) errors.push(`${label}: props must be an object`)
+      if (type === 'tile' || type === 'terrain' || type === 'encounters' || type === 'objects') {
         const name = typeof node.name === 'string' ? node.name : ''
         exportedNames.set(name, (exportedNames.get(name) ?? 0) + 1)
       }
@@ -390,8 +392,9 @@ function validateNodes(nodes: unknown[], cellCtx: CellContext, options: Validate
         validateCells(node.data, true, label, cellCtx, errors, warnings)
       }
       if (type === 'picture') validatePicture(node, label, errors, warnings)
-      if (type === 'collisionShape') validateShapeNode(node, label, errors, warnings)
-      if (type === 'entity') validateEntityRecord(node, label, new Set(), options, errors, warnings)
+      if (type === 'collisionShape' && !isRecord(node.box)) validateShapeNode(node, label, errors, warnings)
+      // An entity is checked as the game gets it: its own fields and its whole bag of components (its child nodes').
+      if (type === 'entity') validateEntityRecord(Array.isArray(node.children) ? engineEntityOf(node as unknown as EntityNode) : node, label, new Set(), options, errors, warnings)
 
       if (NODE_TYPES[type].container) {
         if (!Array.isArray(node.children)) errors.push(`${label}: children must be an array`)
@@ -448,7 +451,8 @@ export function validateEditorMap(data: unknown, options: ValidateEditorMapOptio
 
   // ── layers ──
   if (Array.isArray(data.nodes)) {
-    validateNodes(data.nodes, cellCtx, options, errors, warnings)
+    // A schema 6 tree is checked as the schema 7 tree it loads as (the editor and the exporter both type it first).
+    validateNodes(typedNodes(data.nodes), cellCtx, options, errors, warnings)
   } else if (!Array.isArray(data.layers)) {
     errors.push('map.layers must be an array')
   } else {

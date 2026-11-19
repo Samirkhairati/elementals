@@ -10,9 +10,11 @@ import { mapPixelSize } from './mapSize.ts'
 import { isUsableShape } from './collisionShapes.ts'
 import { cleanLookSet } from './look/schema.ts'
 import type { LookSet } from './look/types.ts'
-import type { CollisionLayerNode, EntityNode, ImageLayerNode, LayerNode, PictureNode, SceneNode } from './sceneTree.ts'
-import { allEntities, collisionShapeNodes, effectiveOpacity, effectiveYSort, isCellLayer, isLayerNode, isVisible, walk, walkPanel } from './sceneTree.ts'
+import type { CollisionLayerNode, LayerNode } from './sceneTree.ts'
+import { allEntities, collisionShapeNodes, effectiveLook, effectiveOpacity, effectiveYSort, inheritedZ, isCellLayer, isVisible, ownLook, walkPanel } from './sceneTree.ts'
 import { nodesOfMap } from './sceneTreeMigrate.ts'
+import { engineEntityOf } from './sceneEntity.ts'
+import { runDrawOrder, sceneLayers, type SpriteRun } from './sceneLayers.ts'
 
 export const TILE_SIZE = 32
 export const COLLISION_TILESET_ID = '__collision__'
@@ -40,7 +42,7 @@ export function collectUsedTilesetIds(map: Pick<EditorMap, 'layers' | 'nodes'>):
 }
 
 function tiledLayerType(layer: LayerNode): TiledLayer['type'] {
-  return layer.type === 'objects' || layer.type === 'image' ? 'objectgroup' : 'tilelayer'
+  return layer.type === 'objects' ? 'objectgroup' : 'tilelayer'
 }
 
 /** A collision layer's usable shapes as Tiled objects: x / y = the first point, `polygon` (closed) or `polyline` (open) relative to it. */
@@ -64,17 +66,13 @@ function shapeObjects(layer: CollisionLayerNode, nextId: () => number): TiledObj
 }
 
 /**
- * The pictures of an image layer as Tiled objects (x/y = the sprite anchor); `nextId` hands out map-unique object ids.
- * Groups are editor-only, so what they pass down (y-sort) is resolved here, one flag per picture.
+ * A run of sprites as Tiled objects (x/y = the sprite anchor); `nextId` hands out map-unique object ids. Hidden sprites
+ * are left out. What the tree passes down (opacity, y-sort) is resolved here, one value per sprite.
  */
-function imageObjects(layer: ImageLayerNode, above: readonly SceneNode[], nextId: () => number): TiledObject[] {
-  const path = [...above, layer]
-  const items = walk(layer.children, path)
-    .filter((e): e is typeof e & { node: PictureNode } => e.node.type === 'picture')
-    .map((e, index) => ({ item: e.node, ancestors: e.ancestors, index }))
-  // Draw order inside the layer: z first, tree order for ties.
-  items.sort((a, b) => (a.item.z ?? 0) - (b.item.z ?? 0) || a.index - b.index)
-  return items.map(({ item, ancestors }) => {
+function imageObjects(run: SpriteRun, nextId: () => number): TiledObject[] {
+  // A hidden host hides the whole group (its `visible`); a sprite hidden itself, or by a Node2D below the host, is left out.
+  const below = run.hostAncestors.length + (run.host ? 1 : 0)
+  return runDrawOrder(run).filter(({ node, ancestors }) => isVisible(node, ancestors.slice(below))).map(({ node: item, ancestors }) => {
     const properties: TiledProperty[] = [item.graphicId ? { name: 'graphic', type: 'string', value: item.graphicId } : { name: 'sprite', type: 'string', value: item.assetId ?? '' }]
     if (item.graphicId && item.crop) {
       // One region of the picture's file; the game draws that sub-rectangle of the one texture.
@@ -88,7 +86,7 @@ function imageObjects(layer: ImageLayerNode, above: readonly SceneNode[], nextId
     const opacity = effectiveOpacity(item, ancestors)
     if (opacity !== 1) properties.push({ name: 'opacity', type: 'float', value: opacity })
     if (effectiveYSort(item, ancestors)) properties.push({ name: 'ySort', type: 'bool', value: true })
-    properties.push(...lookProperty(item.look))
+    properties.push(...lookProperty(ownLook(item)))
     return {
       id: nextId(),
       name: item.name || item.graphicId || item.assetId || '',
@@ -106,8 +104,10 @@ function imageObjects(layer: ImageLayerNode, above: readonly SceneNode[], nextId
 
 /**
  * Converts an editor map (schema 6, or any older one: it is migrated first) to a Tiled-format map object.
- * The tree is walked in the order of the layer list (top first), each layer with what its ancestors pass down: a hidden
- * group hides the layers below it and y-sort is resolved per picture. The Tiled output is the same as before the tree.
+ * The tree's layers (`sceneLayers`: layer nodes and runs of sprites, each run one image object group) are written top
+ * first, each with what its ancestors pass down: a hidden node hides what is below it, the z and look of a Node2D or
+ * YSort go to the sprites below it, y-sort and opacity are resolved per sprite. Entities are flattened into the game's
+ * entities (their child nodes become their components, shared/sceneEntity.ts).
  * `tilesets` must contain size info for every tileset the map uses; tilesets that are unknown or
  * have a zero size are skipped (their tiles become empty), exactly like the historic export hook.
  * Run validateEditorMap first to turn those cases into explicit errors.
@@ -117,8 +117,9 @@ export function convertEditorMapToTiled(map: EditorMap, tilesets: TilesetInfo[])
   // canonical components; the exported map is always stamped with the schema version.
   const migrated = migrateMap(map).value
   const nodes = migrated.nodes ?? []
-  // Groups only organise the editor's list; the game gets the layers themselves.
-  const layers = walkPanel(nodes).filter((e): e is typeof e & { node: LayerNode } => isLayerNode(e.node))
+  // Node2Ds only organise the tree; the game gets the layers themselves, top first.
+  const sceneTop = sceneLayers(nodes).reverse()
+  const layers = sceneTop.filter((l): l is Extract<typeof l, { kind: 'layer' }> => l.kind === 'layer')
   const collisionLayers = layers.filter((e): e is typeof e & { node: CollisionLayerNode } => e.node.type === 'collision')
   // The game reads one tile layer named `collision`: the cells of every collision layer, written where the first
   // collision layer with painted cells is (with none painted, where the first one holding no shapes either is, as an
@@ -178,7 +179,28 @@ export function convertEditorMapToTiled(map: EditorMap, tilesets: TilesetInfo[])
   const nextObjectId = () => objectId++
 
   let layerId = 0
-  const exportLayers: TiledLayer[] = layers.flatMap(({ node: layer, ancestors }): TiledLayer[] => {
+  const exportLayers: TiledLayer[] = sceneTop.flatMap((entry): TiledLayer[] => {
+    if (entry.kind === 'sprites') {
+      const { host, hostAncestors } = entry
+      const imageLayer: TiledLayer = {
+        id: ++layerId,
+        name: host?.name ?? 'sprites',
+        objects: imageObjects(entry, nextObjectId),
+        opacity: 1,
+        type: 'objectgroup',
+        visible: host ? isVisible(host, hostAncestors) : true,
+        width: map.width,
+        height: map.height,
+        x: 0,
+        y: 0,
+        properties: [{ name: 'kind', type: 'string', value: 'image' }],
+      }
+      const z = inheritedZ(host, hostAncestors)
+      if (z !== undefined) imageLayer.properties!.push({ name: 'z', type: 'int', value: Number(z) })
+      imageLayer.properties!.push(...lookProperty(effectiveLook(host, hostAncestors)))
+      return [imageLayer]
+    }
+    const { node: layer, ancestors } = entry
     const visible = isVisible(layer, ancestors)
     if (layer.type === 'collision') {
       const out: TiledLayer[] = []
@@ -217,25 +239,6 @@ export function convertEditorMapToTiled(map: EditorMap, tilesets: TilesetInfo[])
       }
       return out
     }
-    if (layer.type === 'image') {
-      const imageLayer: TiledLayer = {
-        id: ++layerId,
-        name: layer.name,
-        objects: imageObjects(layer, ancestors, nextObjectId),
-        opacity: 1,
-        type: 'objectgroup',
-        visible,
-        width: map.width,
-        height: map.height,
-        x: 0,
-        y: 0,
-        properties: [{ name: 'kind', type: 'string', value: 'image' }],
-      }
-      if (layer.z !== undefined) imageLayer.properties!.push({ name: 'z', type: 'int', value: Number(layer.z) })
-      imageLayer.properties!.push(...lookProperty(layer.look))
-      return [imageLayer]
-    }
-
     const data: number[] = new Array(map.width * map.height).fill(0)
 
     for (const [indexStr, tile] of Object.entries(layer.data || {})) {
@@ -265,7 +268,7 @@ export function convertEditorMapToTiled(map: EditorMap, tilesets: TilesetInfo[])
     if (layer.z !== undefined) {
       props.push({ name: 'z', type: 'int', value: Number(layer.z) })
     }
-    if (layer.type === 'tile') props.push(...lookProperty(layer.look))
+    if (layer.type === 'tile') props.push(...lookProperty(effectiveLook(layer, ancestors)))
     if (props.length > 0) {
       exportLayer.properties = props
     }
@@ -300,14 +303,8 @@ export function convertEditorMapToTiled(map: EditorMap, tilesets: TilesetInfo[])
     version: '1.10',
     width: map.width,
     schemaVersion: typeof migrated.schemaVersion === 'number' ? migrated.schemaVersion : SCHEMA_VERSION,
-    entities: allEntities(nodes).map(exportEntity),
+    entities: allEntities(nodes).map((node) => engineEntityOf(node) as unknown as EngineEntity),
   }
-}
-
-/** An entity node as the game's entity: the node-only fields (`type`, `locked`) are left out. */
-function exportEntity(node: EntityNode): EngineEntity {
-  const { type: _type, locked: _locked, ...entity } = node
-  return entity as unknown as EngineEntity
 }
 
 /** The one true serialization (2-space JSON, no trailing newline) used by the editor and the CLI. */

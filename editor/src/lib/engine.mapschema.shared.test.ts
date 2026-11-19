@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { COMPONENT_TYPES, LEGACY_COMPONENT_TYPES, validateEditorMap } from '../../../shared/mapSchema'
 import { convertEditorMapToTiled, serializeTiledMap } from '../../../shared/mapExport'
 import { commandsToGraph, createCommand, createDefaultComponent } from '../../../shared/engine/index'
+import { SCHEMA_VERSION } from '../../../shared/engine/types'
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
 
@@ -16,7 +17,7 @@ const entity = (components: Record<string, any>, extra: Record<string, any> = {}
 
 describe('validateEditorMap + engine validation', () => {
   it('shared lists', () => {
-    expect([...COMPONENT_TYPES]).toEqual(['Transform', 'Sprite', 'Collider', 'Movement', 'Event', 'Tag'])
+    expect([...COMPONENT_TYPES]).toEqual(['Transform', 'Sprite', 'Collider', 'Area', 'Movement', 'Event', 'Tag'])
     expect([...LEGACY_COMPONENT_TYPES]).toContain('Interactable')
   })
 
@@ -84,7 +85,7 @@ describe('export always carries canonical entities', () => {
   it('migrates legacy maps and the result validates and re-exports identically', () => {
     const legacy = map([entity({ SpriteView: { texture: 'player-walk' }, Interactable: { type: 'on_step', targetMap: 'city.json', targetX: 3, targetY: 4 } })])
     const first = convertEditorMapToTiled(legacy, [])
-    expect(first.schemaVersion).toBe(6)
+    expect(first.schemaVersion).toBe(SCHEMA_VERSION)
     expect(Object.keys(first.entities[0].components)).toEqual(['Transform', 'Sprite', 'Event'])
     expect(validateEditorMap({ ...legacy, entities: first.entities }).warnings).toEqual([])
     expect(serializeTiledMap(convertEditorMapToTiled({ ...legacy, entities: first.entities } as any, []))).toBe(serializeTiledMap(first))
@@ -102,6 +103,6 @@ describe('plain Node (no bundler)', () => {
       console.log(JSON.stringify({ v: t.schemaVersion, c: Object.keys(t.entities[0].components), ok: validateEditorMap(m).ok, p: PREFABS.length, issues: validateEntity(t.entities[0]).length, changed: migrateMap(m).changed }));
     `
     const out = execFileSync(process.execPath, ['--input-type=module', '-e', script], { cwd: REPO, encoding: 'utf8' })
-    expect(JSON.parse(out.trim())).toEqual({ v: 6, c: ['Transform', 'Event'], ok: true, p: 7, issues: 0, changed: true })
+    expect(JSON.parse(out.trim())).toEqual({ v: SCHEMA_VERSION, c: ['Transform', 'Event'], ok: true, p: 7, issues: 0, changed: true })
   })
 })

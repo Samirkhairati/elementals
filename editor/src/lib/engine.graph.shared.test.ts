@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- loose fixtures on purpose */
 import { describe, it, expect } from 'vitest'
+import { componentsOfEntity } from '../../../shared/sceneEntity'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -601,7 +602,7 @@ describe('real project maps', () => {
     for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.json'))) {
       const map = migrateMap(JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'))).value as any
       for (const entity of allEntities(map.nodes) as any[]) {
-        for (const state of entity.components?.Event?.states ?? []) {
+        for (const state of (componentsOfEntity(entity).Event as any)?.states ?? []) {
           states++
           const graph = state.graph
           expect(validateGraph(graph).filter((i) => i.severity === 'error'), `${file}/${entity.id}`).toEqual([])

@@ -20,7 +20,7 @@ import { deterministicId, newId } from './ids.ts';
 import { cloneJson, isRecord } from './util.ts';
 import { cleanPoints, minPoints } from '../collisionShapes.ts';
 
-export const COMPONENT_TYPES = ['Transform', 'Sprite', 'Collider', 'Movement', 'Event', 'Tag'] as const satisfies readonly ComponentType[];
+export const COMPONENT_TYPES = ['Transform', 'Sprite', 'Collider', 'Area', 'Movement', 'Event', 'Tag'] as const satisfies readonly ComponentType[];
 
 export function isComponentType(value: unknown): value is ComponentType {
   return typeof value === 'string' && (COMPONENT_TYPES as readonly string[]).includes(value);
@@ -120,6 +120,22 @@ export const COMPONENT_SCHEMAS: Record<ComponentType, ComponentSchema> = {
       { key: 'offsetX', label: 'Offset X', kind: 'number', unit: 'px', step: 0.5, help: 'The box is bottom-centred on the anchor, then shifted.' },
       { key: 'offsetY', label: 'Offset Y', kind: 'number', unit: 'px', step: 1 },
       { key: 'isSolid', label: 'Solid', kind: 'boolean', help: 'Solid colliders block movement; non-solid ones only trigger events.' },
+    ],
+  },
+  Area: {
+    type: 'Area',
+    label: 'Trigger area',
+    description: 'Where the entity\'s events trigger, when that is not its solid Collider.',
+    icon: 'scan',
+    accent: 'emerald',
+    category: 'physics',
+    singleton: true,
+    defaultProps: { width: 32, height: 32, offsetX: 0, offsetY: 0 },
+    fields: [
+      { key: 'width', label: 'Width', kind: 'number', unit: 'px', min: 1, max: 4096, step: 1 },
+      { key: 'height', label: 'Height', kind: 'number', unit: 'px', min: 1, max: 4096, step: 1 },
+      { key: 'offsetX', label: 'Offset X', kind: 'number', unit: 'px', step: 0.5, help: 'The box is bottom-centred on the anchor, then shifted.' },
+      { key: 'offsetY', label: 'Offset Y', kind: 'number', unit: 'px', step: 1 },
     ],
   },
   Movement: {
