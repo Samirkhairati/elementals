@@ -12,6 +12,7 @@ import { isMapPanelId } from './dockview/types';
 import { sceneIndex } from '@/lib/sceneIndex';
 import { useLookView } from '@/lib/look/lookView';
 import { EditorTopToolbar } from './EditorTopToolbar';
+import { usePicturePickerOpen } from '@/lib/picturePickerEvent';
 
 const TabHeaderComponent = (props: IDockviewPanelHeaderProps) => {
   const isMap = isMapPanelId(props.api.id);
@@ -29,13 +30,15 @@ const selectDockInputs = (c: EditorContextValue) => {
     // The Properties panel alone: an entity (its components) or a Look (the look editor).
     entityFocus: !!c.selectedEntityId || primary?.type === 'look',
     nothingSelected: !primary,
-    imageFocus: c.activeLayerType === 'group' || c.activeLayerType === 'ySort',
+    // The Graphics panel: only while a sprite is picked or one is being placed (or chosen, below).
+    imageFocus: primary?.type === 'picture' || !!c.pendingImage,
     collisionFocus: c.activeLayerType === 'collision',
   };
 };
 
 export function EditorDockview() {
   const parentCtx = useEditorSelector(selectDockInputs);
+  const pickerOpen = usePicturePickerOpen();
   // The map's look is open (its Look row in the Scene panel) while no node is selected.
   const mapLookOpen = useLookView().pinned?.kind === 'map' && parentCtx.nothingSelected;
   const {
@@ -54,7 +57,7 @@ export function EditorDockview() {
     onSelectMap: parentCtx.onSelectMap,
     onClearActiveMap: parentCtx.onClearActiveMap,
     entityFocus: parentCtx.entityFocus || mapLookOpen,
-    imageFocus: parentCtx.imageFocus,
+    imageFocus: parentCtx.imageFocus || pickerOpen,
     collisionFocus: parentCtx.collisionFocus,
   });
 

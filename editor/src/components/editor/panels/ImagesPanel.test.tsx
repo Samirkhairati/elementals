@@ -161,9 +161,9 @@ describe('ImagesPanel', () => {
     expect(f.placeMultiple).toHaveBeenCalledWith('i1', 'b')
   })
 
-  it('asks for a Node when the active node is another kind', () => {
+  it('says to pick a sprite when the active node is another kind', () => {
     renderWithEditor(<ImagesPanel />, { layers: [{ id: 't', name: 'Ground', type: 'tile', visible: true, locked: false }], activeLayerId: 't' } as any)
-    expect(screen.getByText(/Select a Node/)).toBeInTheDocument()
+    expect(screen.getByText(/Select a sprite/)).toBeInTheDocument()
   })
 
   describe('Resize and the Crop / Resize shortcuts', () => {

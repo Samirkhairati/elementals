@@ -38,7 +38,7 @@ interface UseDockviewLayoutOptions {
   onClearActiveMap?: () => void;
   /** A node without a panel of its own is selected (an entity, a Look...): the properties panel fills the right sidebar. */
   entityFocus?: boolean;
-  /** An image layer is active (and no entity selected): the images panel replaces the tileset panels instead. */
+  /** A sprite is picked, placed or chosen (and no entity selected): the Graphics panel replaces the tileset panels instead. */
   imageFocus?: boolean;
   /** A collision layer is active (and no entity selected): the collision panel (its items) replaces them. */
   collisionFocus?: boolean;
@@ -54,7 +54,7 @@ const FOCUS_PANELS = ['images', 'collision'];
  */
 const RETIRED_PANELS = ['entities', 'properties', 'look'];
 /** Panels whose title changed: a saved layout keeps the old one. */
-const RENAMED_PANELS: Record<string, string> = { layers: 'SCENE', inspector: 'PROPERTIES' };
+const RENAMED_PANELS: Record<string, string> = { layers: 'SCENE', inspector: 'PROPERTIES', images: 'GRAPHICS' };
 
 export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
   const { maps = [], activeMap = null, onSelectMap, onClearActiveMap, entityFocus = false, imageFocus = false, collisionFocus = false } = options;
@@ -184,11 +184,11 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
       position: { referencePanel: tilesetsPanel, direction: 'above' },
     });
 
-    // Images panel: the same spot, shown while an image layer is active.
+    // Graphics panel: the same spot, shown while a sprite is picked, placed or chosen.
     const imagesPanel = api.addPanel({
       id: 'images',
       component: 'images',
-      title: 'IMAGES',
+      title: 'GRAPHICS',
       position: { referencePanel: tilesetsPanel, direction: 'above' },
     });
 

@@ -1,7 +1,8 @@
-// The right-hand panel while a Node is active (it takes the place of the tileset panels). The sprites themselves (and
-// the Nodes holding them) are rows of the Scene panel, added there with Add Child Node › Sprite (which opens the picture
-// browser kept here); this panel shows the sprite waiting to be placed and the picked one: a zoomable preview with the
-// Crop button, its snap and scale. Its name, position, rotation, origin, flips, z and opacity are in the Properties panel.
+// The Graphics panel: on the right (in place of the tileset panels) only while a sprite is picked, being placed or being
+// chosen. The sprites themselves (and the Nodes holding them) are rows of the Scene panel, added there with Add Child
+// Node › Sprite (which opens the picture browser kept here); this panel shows the sprite waiting to be placed and the
+// picked one: a zoomable preview with the Crop button, its snap and scale. Its name, position, rotation, origin, flips,
+// z and opacity are in the Properties panel.
 
 import { stillGraphics } from '@/lib/characterEdit'
 import React, { useEffect, useRef, useState } from 'react'
@@ -14,7 +15,7 @@ import { useBindings } from '@/store/shortcutStore'
 import type { ImageItem } from '@/types/editor'
 import { drawOrderPictures, isBranch, type BranchNode } from '../../../../../shared/sceneTree'
 import { lockedNode, pictureLocked, sceneIndex } from '@/lib/sceneIndex'
-import { OPEN_PICTURE_PICKER_EVENT } from '@/lib/picturePickerEvent'
+import { OPEN_PICTURE_PICKER_EVENT, setPicturePickerOpen, usePicturePickerOpen } from '@/lib/picturePickerEvent'
 import { Card, EdButton, Field, IconButton } from '../ui/controls'
 import { ZoomPane } from '../ui/ZoomPane'
 import { ImageItemView } from '../sprites/ImageItemView'
@@ -60,7 +61,8 @@ export function ImagesPanel() {
   const found = index.byId.get(ctx.activeLayerId ?? '')?.node
   // The Node the sprites are added to: the active one (a sprite's own host when a sprite is picked).
   const layer = found && isBranch(found) ? found : null
-  const [pickerOpen, setPickerOpen] = useState(false)
+  const pickerOpen = usePicturePickerOpen()
+  const setPickerOpen = setPicturePickerOpen
   const [cropOpen, setCropOpen] = useState(false)
   // The shortcuts act on whatever the panel can do right now (set below, once the picked item is known).
   const actions = useRef<{ crop?: () => void; resize?: () => void; group?: () => void; ungroup?: () => void }>({})
@@ -72,7 +74,7 @@ export function ImagesPanel() {
   })
   // The Scene panel's "Add picture…" entries ask for the picker.
   useEffect(() => {
-    const open = () => setPickerOpen(true)
+    const open = () => setPicturePickerOpen(true)
     window.addEventListener(OPEN_PICTURE_PICKER_EVENT, open)
     return () => window.removeEventListener(OPEN_PICTURE_PICKER_EVENT, open)
   }, [])
@@ -102,7 +104,7 @@ export function ImagesPanel() {
   const cropKeys = describeBindings('image.crop', bindings)
   const resizeKeys = describeBindings('image.resize', bindings)
 
-  if (!layer) return <div className="ed-empty select-none">Select a Node to place sprites.</div>
+  if (!layer) return <div className="ed-empty select-none">Select a sprite to see it here.</div>
 
   // The layer (or a group above it) is locked; a locked picture is frozen too.
   const locked = lockedNode(index, layer.id) || (selected ? pictureLocked(index, selected.id) : false)

@@ -105,7 +105,7 @@ export function TilesetPreview({
     return (
       <div className="ed-empty">
         <p>{activeLayerType === 'ySort' ? 'YSort' : 'Node'}: no tiles to paint</p>
-        <p>Add a TileMap child to paint, or a Sprite from the Images panel.</p>
+        <p>Add a TileMap child to paint, or a Sprite (Add Child Node › Sprite in the Scene panel).</p>
       </div>
     )
   }
