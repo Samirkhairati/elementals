@@ -31,6 +31,8 @@ export class SpriteComponent {
   public tint?: number;
   public angle: number;
   public assetId: string;
+  /** Hidden because the entity it sits in is hidden (ParentFollowSystem); drawn only when `visible` and not this. */
+  public hiddenByParent = false;
 
   constructor(init: SpriteComponentInit) {
     this.texture = init.texture;

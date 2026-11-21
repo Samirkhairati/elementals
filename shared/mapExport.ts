@@ -10,8 +10,8 @@ import { mapPixelSize } from './mapSize.ts'
 import { isUsableShape } from './collisionShapes.ts'
 import { cleanLookSet } from './look/schema.ts'
 import type { LookSet } from './look/types.ts'
-import type { CollisionLayerNode, LayerNode } from './sceneTree.ts'
-import { allEntities, collisionShapeNodes, effectiveLook, effectiveOpacity, effectiveYSort, inheritedZ, isCellLayer, isVisible, ownLook, walkPanel } from './sceneTree.ts'
+import type { CollisionLayerNode, LayerNode, SceneNode } from './sceneTree.ts'
+import { collisionShapeNodes, owningEntity, walk, effectiveLook, effectiveOpacity, effectiveYSort, inheritedZ, isCellLayer, isVisible, ownLook, walkPanel } from './sceneTree.ts'
 import { nodesOfMap } from './sceneTreeMigrate.ts'
 import { engineEntityOf } from './sceneEntity.ts'
 import { runDrawOrder, sceneLayers, type SpriteRun } from './sceneLayers.ts'
@@ -90,6 +90,9 @@ function imageObjects(run: SpriteRun, nextId: () => number): TiledObject[] {
     if (opacity !== 1) properties.push({ name: 'opacity', type: 'float', value: opacity })
     if (effectiveYSort(item, ancestors)) properties.push({ name: 'ySort', type: 'bool', value: true })
     properties.push(...lookProperty(ownLook(item)))
+    // A sprite inside an entity travels with it in the game (moves, turns and hides with it).
+    const owner = owningEntity(ancestors)
+    if (owner) properties.push({ name: 'parent', type: 'string', value: owner.id })
     return {
       id: nextId(),
       name: item.name || item.graphicId || item.assetId || '',
@@ -307,8 +310,22 @@ export function convertEditorMapToTiled(map: EditorMap, tilesets: TilesetInfo[])
     version: '1.10',
     width: map.width,
     schemaVersion: typeof migrated.schemaVersion === 'number' ? migrated.schemaVersion : SCHEMA_VERSION,
-    entities: allEntities(nodes).map((node) => engineEntityOf(node) as unknown as EngineEntity),
+    entities: exportEntities(nodes),
   }
+}
+
+/**
+ * The game's entities: each entity node with its components, and the entity it sits in (`parent`) when it has one. The
+ * eye of an entity row (or of a Node above it) hides it in the editor only, as it always did; whether it starts shown
+ * in the game is its AnimatedSprite's eye (`Sprite.visible`).
+ */
+function exportEntities(nodes: readonly SceneNode[]): EngineEntity[] {
+  return walk(nodes).flatMap(({ node, ancestors }) => {
+    if (node.type !== 'entity') return []
+    const entity = engineEntityOf(node) as unknown as EngineEntity
+    const parent = owningEntity(ancestors)
+    return [parent ? { ...entity, parent: parent.id } : entity]
+  })
 }
 
 /** The one true serialization (2-space JSON, no trailing newline) used by the editor and the CLI. */

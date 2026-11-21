@@ -12,6 +12,7 @@ import { buildSpriteComponents } from "@/sprites/spriteState";
 import { TransformComponent } from "./components/TransformComponent";
 import { ColliderComponent } from "./components/ColliderComponent";
 import { AreaComponent } from "./components/AreaComponent";
+import { ParentComponent } from "./components/ParentComponent";
 import { GridMovementComponent } from "./components/GridMovementComponent";
 import { FreeMovementComponent } from "./components/FreeMovementComponent";
 import { PlayerControlComponent } from "./components/PlayerControlComponent";
@@ -62,6 +63,7 @@ export function expandMovement(props: MovementProps, facing: SpriteProps["facing
  *  - Movement  -> GridMovement (+ FreeMovement + PlayerControl for `player`, + AIWander for `wander`)
  *  - Event     -> EventComponent (states; the state selector applies state overrides later)
  *  - Tag       -> TagComponent
+ *  - `parent`  -> ParentComponent (it moves, turns and hides with the entity it sits in)
  *
  * An EntityInfo (editor id + name) is always added so event targets can find the entity.
  * Unknown component names are reported through `ctx.warn` and skipped. Never throws for bad props.
@@ -120,6 +122,9 @@ export function expandEntity(entity: EngineEntity, ctx: ExpandContext = defaultE
   if (components.Tag !== undefined) {
     out.push(new TagComponent(normalizeProps("Tag", components.Tag).tag || "entity"));
   }
+
+  // An entity inside an entity travels with it (ParentFollowSystem).
+  if (typeof entity.parent === "string" && entity.parent !== "") out.push(new ParentComponent(entity.parent));
 
   return out;
 }

@@ -35,6 +35,8 @@ export interface ImageObjectDef {
   opacity: number;
   /** Draws among the characters by its anchor's y instead of at the layer's depth (resolved by the exporter). */
   ySort: boolean;
+  /** Editor id of the entity it sits in: it moves, turns and hides with it (world/attachedImages.ts). */
+  parent?: string;
   /** The picture's own look and its layer's (docs/looks.md). */
   look?: LookSet;
   layerLook?: LookSet;
@@ -76,6 +78,7 @@ export function readImageObjects(raw: unknown): ImageObjectDef[] {
         flipY: p.flipY === true,
         opacity: Math.min(1, Math.max(0, num(p.opacity, 1))),
         ySort: p.ySort === true,
+        ...(typeof p.parent === "string" && p.parent !== "" ? { parent: p.parent } : {}),
         ...lookFields(parseLookProp(p.look), layerLook),
       });
     }
@@ -116,6 +119,13 @@ export interface ImageObject {
   setAlpha(alpha: number): unknown;
   setFlip(x: boolean, y: boolean): unknown;
   setAngle?(degrees: number): unknown;
+  setPosition?(x: number, y: number): unknown;
+  setVisible?(visible: boolean): unknown;
+  x?: number;
+  y?: number;
+  depth?: number;
+  visible?: boolean;
+  angle?: number;
   setDisplaySize(w: number, h: number): unknown;
   destroy(): void;
 }
@@ -194,7 +204,8 @@ export class ImageLayerRenderer {
         w = size.w;
         h = size.h;
       }
-      if (def.ySort) {
+      // A picture inside an entity draws with it (attachedImages), not at a fixed place among the characters.
+      if (def.ySort && !def.parent) {
         const left = def.x - (image.originX ?? 0.5) * w;
         const top = def.y - (image.originY ?? 1) * h;
         sorted.push({ image, def, box: { left, top, right: left + w, bottom: top + h } });

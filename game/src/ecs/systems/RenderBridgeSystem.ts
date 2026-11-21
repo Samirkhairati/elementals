@@ -65,6 +65,7 @@ export class RenderBridgeSystem extends System {
       const animator = world.getComponent(entity, AnimatorComponent);
       const flipX = spriteComp.flipX !== (animator?.flipX ?? false);
 
+      const shown = spriteComp.visible && !spriteComp.hiddenByParent;
       const x = transform.x + spriteComp.offsetX;
       const y = transform.y + spriteComp.offsetY;
 
@@ -72,7 +73,7 @@ export class RenderBridgeSystem extends System {
         sprite = this.scene.add.sprite(x, y, spriteComp.texture, spriteComp.frame);
         sprite.setOrigin(spriteComp.originX, spriteComp.originY);
         sprite.setDepth(this.ySort.entityDepth(transform.depth, transform.y, spriteBox(sprite)));
-        sprite.setVisible(spriteComp.visible);
+        sprite.setVisible(shown);
         sprite.setAlpha(spriteComp.alpha);
         sprite.setFlipX(flipX);
         sprite.setScale(spriteComp.scale);
@@ -95,7 +96,7 @@ export class RenderBridgeSystem extends System {
       if (sprite.x !== x || sprite.y !== y) sprite.setPosition(x, y);
       const depth = this.ySort.entityDepth(transform.depth, transform.y, spriteBox(sprite));
       if (sprite.depth !== depth) sprite.setDepth(depth);
-      if (sprite.visible !== spriteComp.visible) sprite.setVisible(spriteComp.visible);
+      if (sprite.visible !== shown) sprite.setVisible(shown);
       if (sprite.alpha !== spriteComp.alpha) sprite.setAlpha(spriteComp.alpha);
       if (sprite.flipX !== flipX) sprite.setFlipX(flipX);
       if (sprite.scaleX !== spriteComp.scale) sprite.setScale(spriteComp.scale);

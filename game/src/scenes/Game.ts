@@ -6,6 +6,8 @@ import { gameState } from "@/core/GameState";
 import { bootParams } from "@/core/bootParams";
 import { MapSystem } from "@/world/MapSystem";
 import { ImageLayerRenderer } from "@/world/imageLayers";
+import { AttachedImagesSystem } from "@/world/attachedImages";
+import { ParentFollowSystem } from "@/ecs/systems/ParentFollowSystem";
 import { followLerp, snapToScreenPixel } from "@/world/cameraFollow";
 import { InputManager } from "@/components/InputManager";
 import { MAPS } from "@/constants/assets";
@@ -147,9 +149,12 @@ export class Game extends Scene {
     this.world.addSystem(this.aiWanderSystem);
     this.world.addSystem(this.routeSystem);
     this.world.addSystem(this.movementSystem);
+    // Entities and pictures inside an entity travel with it (moved after movement, drawn after the bridge).
+    this.world.addSystem(new ParentFollowSystem());
     this.world.addSystem(this.triggerSystem);
     this.world.addSystem(this.animationSystem);
     this.world.addSystem(this.renderBridgeSystem);
+    this.world.addSystem(new AttachedImagesSystem({ items: () => this.imageLayers.items, spriteDepth: (e) => this.renderBridgeSystem.getSprite(e)?.depth }));
 
     // Wire up events
     this.switchMap = this.switchMap.bind(this);
