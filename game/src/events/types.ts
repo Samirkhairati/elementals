@@ -109,6 +109,8 @@ export interface EventContext {
   maps: MapService;
   /** Fires a custom EventBus event. */
   emit(event: string, payload: unknown): void;
+  /** Sends a signal from this event's entity (Emit Signal): states listening to it start on the next update. */
+  sendSignal?(name: string): void;
   warn(message: string): void;
   /** Logs `message` only the first time `key` is seen (per runtime). */
   warnOnce(key: string, message: string): void;

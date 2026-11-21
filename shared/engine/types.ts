@@ -142,7 +142,8 @@ export type EventTrigger =
   | 'onActive' // as soon as the state becomes active
   | 'timer' // every `interval` seconds while the state is active
   | 'mapEnter' // once, when the map it is on has been loaded
-  | 'mapLeave'; // once, before the player leaves its map by a warp
+  | 'mapLeave' // once, before the player leaves its map by a warp
+  | 'signal'; // a signal (`signal`) is emitted, by `signalFrom` or by anyone (see signals.ts)
 
 /** The trigger names of schemaVersion 4 and earlier; migrated on load (see `upgradeLegacyTrigger`). */
 export type LegacyEventTrigger = 'action' | 'playerTouch' | 'eventTouch' | 'autorun' | 'parallel';
@@ -262,6 +263,13 @@ export interface EventState {
   lineOfSight?: boolean;
   /** `timer`: seconds between two runs (default 1). */
   interval?: number;
+  /** `signal`: the name of the signal that starts it (a built-in one such as `body_entered`, or one an Emit Signal sends). */
+  signal?: string;
+  /**
+   * `signal`: who must send it: 'self' (this entity), an entity's editor id, or absent / '' for anyone. Built-in signals
+   * come from the entity whose Area was entered; an Emit Signal from the entity whose event ran it.
+   */
+  signalFrom?: string;
   /** When several events could start from the same input the highest wins, then the nearest, then entity order. Default 0. */
   priority?: number;
   /**
@@ -297,6 +305,7 @@ export type FieldKind =
   | 'variable' // global variable picker
   | 'stage' // global stage picker
   | 'commonEvent' // common event picker
+  | 'signal' // a signal name (built-in or sent by an Emit Signal somewhere)
   | 'lookProfile' // a look profile of project/looks.json (time of day, ...)
   | 'stageValue' // a value of the stage chosen in the param named by `stageKey`
   | 'target' // CommandTarget picker
@@ -600,6 +609,11 @@ export interface EngineEntity {
   folder?: string | null;
   /** Degrees, clockwise, that the entity's sprite is turned around its anchor (the node's rotation in the editor). */
   rotation?: number;
+  /**
+   * Editor id of the entity this one sits in (its nearest entity ancestor in the scene tree), set by the export. The
+   * game moves, turns and hides it with that entity, keeping the offset it had when the map loaded.
+   */
+  parent?: string;
   components: EntityComponents;
 }
 

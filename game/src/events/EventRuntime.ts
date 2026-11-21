@@ -19,6 +19,8 @@ import { WorldEntityOps } from "./WorldEntityOps";
 import { EventInterpreter, type RunResult } from "./EventInterpreter";
 import type { EventContext, EventUI, MapService } from "./types";
 
+const NO_SIGNALS: SentSignal[] = [];
+
 /** A step this far along (share of a tile, about 3 px) still counts as "about to move" and is taken back. */
 const FRESH_STEP = 0.1;
 
@@ -45,6 +47,14 @@ export interface StartOptions {
   blocking?: boolean;
   /** `interact` triggers: the entity turns towards this entity when the state asks for it (faceOnInteract). */
   faceTarget?: Entity;
+}
+
+/** A signal on its way to the states listening to it. */
+export interface SentSignal {
+  name: string;
+  sender: Entity;
+  /** Editor id of the sender (what a state's `signalFrom` names). */
+  senderId: string;
 }
 
 export interface RunningEvent {
@@ -90,6 +100,8 @@ export class EventRuntime {
   private readonly running = new Map<Entity, RunningEvent>();
   private readonly releases = new Map<RunningEvent, () => void>();
   private blockingRun: RunningEvent | null = null;
+  /** Signals sent since the TriggerSystem last took them (Emit Signal, an Area's body_entered / body_exited). */
+  private signals: SentSignal[] = [];
   private dirty = true;
   private readonly finishListeners = new Set<(run: RunningEvent, result: RunResult) => void>();
   private readonly disposers: Array<() => void> = [];
@@ -146,6 +158,26 @@ export class EventRuntime {
 
   public get runningCount(): number {
     return this.running.size;
+  }
+
+  /** Editor id of an entity (the id a map gives it), or a stand-in for one the map did not place. */
+  public editorIdOf(entity: Entity): string {
+    return this.world.getComponent(entity, EntityInfoComponent)?.editorId ?? `entity#${entity}`;
+  }
+
+  /** Queues a signal sent by `sender`; the TriggerSystem starts the states that listen to it. */
+  public sendSignal(sender: Entity, name: string): void {
+    const clean = name.trim();
+    if (!clean) return;
+    this.signals.push({ name: clean, sender, senderId: this.editorIdOf(sender) });
+  }
+
+  /** The signals sent since the last call (the queue is emptied). */
+  public takeSignals(): SentSignal[] {
+    if (this.signals.length === 0) return NO_SIGNALS;
+    const out = this.signals;
+    this.signals = [];
+    return out;
   }
 
   public onFinished(listener: (run: RunningEvent, result: RunResult) => void): () => void {
@@ -228,7 +260,7 @@ export class EventRuntime {
     const stepping = this.isStepping(entity);
     if (!stepping) faceNow();
 
-    const entityId = this.world.getComponent(entity, EntityInfoComponent)?.editorId ?? `entity#${entity}`;
+    const entityId = this.editorIdOf(entity);
     const ctx = this.createContext(entity, entityId);
     const interpreter = new EventInterpreter(state.graph, ctx);
 
@@ -291,6 +323,7 @@ export class EventRuntime {
   }
 
   public cancelAll(): void {
+    this.signals = [];
     for (const run of [...this.running.values()]) {
       run.interpreter.cancel();
       this.finish(run, "cancelled");
@@ -336,6 +369,7 @@ export class EventRuntime {
       ops: this.ops,
       maps: this.maps,
       emit: (event, payload) => this.emitEvent(event, payload),
+      sendSignal: (name) => this.sendSignal(entity, name),
       warn: (m) => this.warn(m),
       warnOnce: (key, m) => this.warnOnce(key, m),
       random: this.random,

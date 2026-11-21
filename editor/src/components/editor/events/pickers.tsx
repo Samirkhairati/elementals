@@ -5,6 +5,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ChevronsUpDown, Plus, Search, X } from 'lucide-react'
 import type { CommandTarget, Facing } from '../../../../../shared/engine/types'
 import { previewFrame } from '../../../../../shared/engine/sprites'
+import { BUILT_IN_SIGNALS, SIGNAL_FROM_ANY, SIGNAL_FROM_SELF, cleanSignalName } from '../../../../../shared/engine/signals'
 import { cn } from '@/lib/utils'
 import { useEventEnv } from './eventEnv'
 import { Select } from '../ui/fields'
@@ -695,5 +696,86 @@ export function FacingPicker({ value, onChange, id }: { value: string; onChange:
         </button>
       ))}
     </div>
+  )
+}
+
+// ── signals ─────────────────────────────────────────────────────────────────────────────────────
+
+/** A signal name: the built-in ones and those sent or heard on this map, or a new name typed in the search. */
+export function SignalPicker({ value, onChange, id }: { value: string; onChange: (name: string) => void; id?: string }) {
+  const env = useEventEnv()
+  const items = useMemo<PickerItem[]>(() => {
+    const known = env.signals ?? BUILT_IN_SIGNALS.map((s) => s.name)
+    return known.map((name) => {
+      const builtIn = BUILT_IN_SIGNALS.find((s) => s.name === name)
+      return builtIn
+        ? { id: name, label: name, sub: builtIn.label, description: builtIn.help, group: 'builtIn' }
+        : { id: name, label: name, sub: 'on this map', group: 'custom' }
+    })
+  }, [env.signals])
+  return (
+    <PickerField
+      id={id}
+      label="Choose a signal"
+      items={items}
+      value={value}
+      onSelect={onChange}
+      placeholder="Choose or type a signal…"
+      emptyText="No signal matches. Use the name typed below."
+      groups={[
+        { id: 'builtIn', label: 'Built in (from an Area)' },
+        { id: 'custom', label: 'Sent by Emit Signal' },
+      ]}
+      display={value || undefined}
+      footer={({ query, close }) => {
+        const name = cleanSignalName(query)
+        if (!name || items.some((i) => i.id === name)) return null
+        return (
+          <button
+            type="button"
+            onClick={() => {
+              onChange(name)
+              close()
+            }}
+            className="flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-xs text-primary hover:bg-accent"
+          >
+            <Plus className="h-3 w-3" aria-hidden />
+            Use “{name}”
+          </button>
+        )
+      }}
+    />
+  )
+}
+
+/** Who must send a signal: anyone, this entity, or one entity of the map ('' / 'self' / an editor id). */
+export function SignalSenderPicker({ value, onChange, id }: { value: string; onChange: (from: string) => void; id?: string }) {
+  const env = useEventEnv()
+  const items = useMemo<PickerItem[]>(
+    () => [
+      { id: SIGNAL_FROM_ANY, label: 'Anyone', description: 'Any entity on this map that sends it.', group: 'special' },
+      { id: SIGNAL_FROM_SELF, label: 'This entity', description: 'Only when this entity sends it (its own Area, its own Emit Signal).', group: 'special' },
+      ...env.entities.filter((e) => e.id !== env.entityId).map((e) => ({ id: e.id, label: e.name || e.id, sub: 'on this map', group: 'entities' })),
+    ],
+    [env.entities, env.entityId],
+  )
+  const missing = value !== SIGNAL_FROM_ANY && value !== SIGNAL_FROM_SELF && !env.entities.some((e) => e.id === value)
+  const display = value === SIGNAL_FROM_ANY ? 'Anyone' : value === SIGNAL_FROM_SELF ? 'This entity' : missing ? `Missing: ${value}` : env.entities.find((e) => e.id === value)?.name || value
+  return (
+    <PickerField
+      id={id}
+      label="Choose who sends it"
+      items={items}
+      value={value}
+      onSelect={onChange}
+      placeholder="Anyone"
+      groups={[
+        { id: 'special', label: 'Special' },
+        { id: 'entities', label: 'Entities on this map' },
+      ]}
+      display={display}
+      invalid={missing}
+      title={missing ? 'That entity is no longer on this map' : undefined}
+    />
   )
 }

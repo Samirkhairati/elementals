@@ -7,10 +7,11 @@ import { Plus, Trash2, X } from 'lucide-react'
 import type { ChoiceOption, Command, CommandTarget, Condition, FieldDef, RouteStep } from '../../../../../shared/engine/types'
 import { getCommandDef, isFieldVisible } from '../../../../../shared/engine/commands'
 import { anchorToTile, tileToAnchor } from '../../../../../shared/engine/constants'
+import { cleanSignalName } from '../../../../../shared/engine/signals'
 import { ConditionsEditor } from './ConditionsEditor'
 import { ChoicesEditor, RouteEditor } from './RouteChoicesEditors'
 import { WarpTilePicker } from './WarpTilePicker'
-import { ClipPicker, CommonEventPicker, FacingPicker, characterOfTarget, MapPicker, SpritePicker, StagePicker, StageValuePicker, SwitchPicker, TargetPicker, VariablePicker } from './pickers'
+import { ClipPicker, CommonEventPicker, FacingPicker, characterOfTarget, MapPicker, SpritePicker, SignalPicker, StagePicker, StageValuePicker, SwitchPicker, TargetPicker, VariablePicker } from './pickers'
 import { CheckRow, DraftNumber, DraftText, DraftTextarea, FieldRow, IconButton, SmallButton, inputClass } from './primitives'
 import { useEventEnv } from './eventEnv'
 import { useLookLibrary } from '@/lib/look/lookLibrary'
@@ -172,6 +173,8 @@ function FieldControl({ field, command, params, onPatch, id }: FieldControlProps
       return <MapPicker id={id} value={asString(raw)} onChange={set} />
     case 'commonEvent':
       return <CommonEventPicker id={id} value={asString(raw)} onChange={set} />
+    case 'signal':
+      return <SignalPicker id={id} value={asString(raw)} onChange={(v) => set(cleanSignalName(v))} />
     case 'switch':
       return <SwitchPicker id={id} value={asString(raw)} onChange={set} />
     case 'variable':

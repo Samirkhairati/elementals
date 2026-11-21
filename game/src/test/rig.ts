@@ -133,6 +133,8 @@ export interface EntityOptions {
   row?: number;
   sprite?: Record<string, unknown> | false;
   collider?: Record<string, unknown> | false;
+  /** An Area (where its events trigger and its body_entered / body_exited signals come from). */
+  area?: Record<string, unknown>;
   movement?: Record<string, unknown>;
   states?: EventState[];
   tag?: string;
@@ -146,6 +148,7 @@ export function makeEntityDef(o: EntityOptions = {}): EngineEntity {
   };
   if (o.sprite !== false) components.Sprite = createDefaultComponent("Sprite", { asset: "characters/npc", ...(o.sprite ?? {}) });
   if (o.collider !== false) components.Collider = createDefaultComponent("Collider", o.collider ?? {});
+  if (o.area) components.Area = createDefaultComponent("Area", o.area);
   if (o.movement) components.Movement = createDefaultComponent("Movement", o.movement);
   if (o.states) components.Event = { states: o.states };
   if (o.tag) components.Tag = { tag: o.tag };

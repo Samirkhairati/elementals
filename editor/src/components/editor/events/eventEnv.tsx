@@ -6,6 +6,7 @@ import React, { createContext, useContext, useMemo } from 'react'
 import type { SpriteAssetInfo, SpriteKind, StageDef, SwitchDef, VariableDef } from '../../../../../shared/engine/types'
 import type { MapData, TilesetData } from '@/types/editor'
 import { useEditorSelector, type EditorContextValue } from '../layout/EditorContext'
+import { knownSignals } from '../../../../../shared/engine/signals'
 
 export interface EventEnv {
   /** Editor id of the entity that owns the event ("this event"). */
@@ -20,6 +21,8 @@ export interface EventEnv {
   sprites: { id: string; name: string; kind: SpriteKind }[]
   /** Common events of the project (`callCommonEvent` targets). */
   commonEvents?: { id: string; name: string }[]
+  /** Signal names known on the active map (built-in, sent and heard); without it the pickers offer the built-in ones. */
+  signals?: string[]
   /** Entities of the active map (the owner included; pickers leave it out). */
   entities: { id: string; name: string }[]
   /** Creates a global switch / variable and returns its id ('' when the database is not loaded yet). */
@@ -102,6 +105,7 @@ function ContextBackedEnv({ entityId, children }: { entityId: string; children: 
       mapPreview: { getMap: (id) => c.maps.find((m) => mapIdOf(m.fileName) === id), tilesets: c.tilesets, spriteAssets: c.spriteAssets },
       sprites: c.spriteList.map((s) => ({ id: s.id, name: s.meta.name || s.id, kind: s.meta.kind })),
       entities: c.entities.map((e) => ({ id: e.id, name: e.name })),
+      signals: knownSignals(c.entities),
       commonEvents: (c.commonEvents ?? []).map((e) => ({ id: e.id, name: e.name })),
       addSwitch: (name) => c.addSwitch(name),
       addVariable: (name) => c.addVariable(name),

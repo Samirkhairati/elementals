@@ -6,6 +6,8 @@ import { renderWithScene } from '@/test/sceneHarness'
 import { makeEntity, makeGroup, makeLayer, makeMap, makePicture } from '@/test/helpers'
 import { findNode, type SceneNode } from '../../../../../shared/sceneTree'
 import { createDefaultEventProps } from '../../../../../shared/engine/components'
+import { vi } from 'vitest'
+import * as eventEditor from '@/lib/openEventEditor'
 
 /** The panel on a real scene tree, with `select` picking a node as the Scene panel would. */
 function setup(nodes: SceneNode[], selected?: string) {
@@ -136,5 +138,29 @@ describe('PropertiesPanel', () => {
     expect(node('g').opacity).toBe(0.5)
     commit('Node opacity', '1')
     expect(node('g').opacity).toBeUndefined()
+  })
+
+  it('Signals: an entity with an Area sends body_entered / body_exited; Connect adds a listening state to the chosen entity', async () => {
+    const open = vi.spyOn(eventEditor, 'openEventEditor').mockImplementation(() => {})
+    const pad = makeEntity('pad', { name: 'Pad', x: 80, y: 128, components: { Transform: { x: 80, y: 128 }, Collider: { width: 32, height: 32, isSolid: false } } })
+    const lamp = makeEntity('lamp', { name: 'Lamp', x: 16, y: 32, components: { Transform: { x: 16, y: 32 } } })
+    const { node } = setup([pad, lamp], 'pad')
+    const card = screen.getByTestId('signals-card')
+    expect(within(card).getByTestId('signal-body_entered')).toBeInTheDocument()
+    expect(within(card).getByTestId('signal-body_exited')).toBeInTheDocument()
+
+    fireEvent.pointerDown(within(card).getByRole('button', { name: 'Connect body_entered' }), { button: 0, ctrlKey: false })
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Lamp' }))
+    const states = (node('lamp').children as SceneNode[]).find((c) => c.type === 'event') as any
+    expect(states.props.states.at(-1)).toMatchObject({ trigger: 'signal', signal: 'body_entered', signalFrom: 'pad' })
+    expect(open).toHaveBeenCalledWith('lamp', 60)
+    // the connection is listed under the signal
+    expect(within(screen.getByTestId('signal-body_entered')).getByText(/Lamp ›/)).toBeInTheDocument()
+    open.mockRestore()
+  })
+
+  it('Signals: an entity without an Area or Emit Signal says how to send one', () => {
+    setup([elder()], 'e1')
+    expect(within(screen.getByTestId('signals-card')).getByText(/Sends no signals/)).toBeInTheDocument()
   })
 })

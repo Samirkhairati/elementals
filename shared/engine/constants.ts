@@ -22,6 +22,7 @@ export const EVENT_TRIGGERS: readonly EventTrigger[] = [
   'timer',
   'mapEnter',
   'mapLeave',
+  'signal',
 ];
 
 /** The editor's groups of start kinds (the order of the "When" picker). */
@@ -29,6 +30,7 @@ export const TRIGGER_GROUPS: readonly { label: string; triggers: readonly EventT
   { label: 'Player', triggers: ['interact', 'playerEnter', 'playerLeave', 'playerNear'] },
   { label: 'Other characters', triggers: ['eventEnter', 'eventLeave'] },
   { label: 'Time and map', triggers: ['onActive', 'timer', 'mapEnter', 'mapLeave'] },
+  { label: 'Signals', triggers: ['signal'] },
 ];
 
 /** Whether a start kind blocks the player unless the state says otherwise. */
@@ -43,6 +45,7 @@ export const TRIGGER_BLOCKS_BY_DEFAULT: Record<EventTrigger, boolean> = {
   timer: false,
   mapEnter: true,
   mapLeave: true,
+  signal: true,
 };
 
 export const DEFAULT_INTERACT_RANGE = 1;
@@ -75,6 +78,7 @@ export const TRIGGER_LABELS: Record<EventTrigger, string> = {
   timer: 'Every few seconds',
   mapEnter: 'Map is entered',
   mapLeave: 'Map is left',
+  signal: 'Signal is received',
 };
 
 const FACING_LABELS: Record<Facing, string> = { down: 'Down', left: 'Left', right: 'Right', up: 'Up' };

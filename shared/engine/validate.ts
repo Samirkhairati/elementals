@@ -143,6 +143,9 @@ function validateEvent(
     if (!isEventTrigger(state.trigger) && !isLegacyTrigger(state.trigger)) {
       add('error', 'bad-trigger', `State ${i + 1}: unknown trigger "${String(state.trigger)}"`, `${pp}.trigger`);
     }
+    if (state.trigger === 'signal' && (typeof state.signal !== 'string' || !state.signal.trim())) {
+      add('warning', 'missing-signal', `State ${i + 1}: choose the signal it starts on`, `${pp}.signal`);
+    }
     if (state.blocks !== undefined && typeof state.blocks !== 'boolean') {
       add('error', 'bad-state', `State ${i + 1}: blocks must be true or false`, `${pp}.blocks`);
     }

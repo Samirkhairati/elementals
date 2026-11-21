@@ -1,6 +1,7 @@
 // The Properties panel (dock panel `inspector`, the top of the right sidebar): everything about the selected node. One
 // layout for every node, like Godot's inspector: the node (name, type, visible, locked), its tag, its transform (anchor,
-// rotation, origin), how it draws (z, opacity), then what only some nodes have (an entity's components). A Look node
+// rotation, origin), how it draws (z, opacity), then what only some nodes have (an entity's components and the signals
+// it sends). A Look node
 // shows the look editor instead; the map's look while its Look row in the Scene panel is open.
 
 import React, { useEffect } from 'react'
@@ -22,6 +23,7 @@ import { entityIconName, summarizeEntity } from '@/lib/entityVisuals'
 import { OVERLAY_COLORS } from '@/hooks/editor/canvas/canvasView'
 import { getLookView, setLookView, useLookView, type LookSubjectRef } from '@/lib/look/lookView'
 import { ComponentCard } from './entity/ComponentCard'
+import { SignalsCard } from './entity/SignalsCard'
 import { Badge, Card, EdButton, EyeButton, Field, IconButton, NumberField, TextField, Toggle } from '../ui/controls'
 import { accentVar, NamedIcon } from '../ui/icons'
 import { Slider } from '../ui/fields'
@@ -392,6 +394,9 @@ export function PropertiesPanel() {
           ))}
         </div>
       )}
+
+      {/* signals: what it sends and who reacts */}
+      {entity && <SignalsCard entity={entity} entities={ctx.entities} disabled={locked} updateComponentProps={ctx.updateComponentProps} />}
     </div>
   )
 }

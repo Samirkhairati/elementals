@@ -7,9 +7,10 @@ import type { EventState, EventTrigger, StateAppearance } from '../../../../../s
 import { EVENT_TRIGGERS, MAX_TRIGGER_RANGE, TRIGGER_GROUPS, TRIGGER_LABELS } from '../../../../../shared/engine/constants'
 import { defaultBlocks, normalizeRange, stateInterval, statePriority, stateRange } from '../../../../../shared/engine/triggers'
 import { ConditionsEditor } from './ConditionsEditor'
-import { FacingPicker, SpritePicker } from './pickers'
+import { FacingPicker, SignalPicker, SignalSenderPicker, SpritePicker } from './pickers'
 import { CheckRow, DraftNumber, DraftText, FieldRow, Group } from './primitives'
 import { useEventEnv } from './eventEnv'
+import { cleanSignalName } from '../../../../../shared/engine/signals'
 import { InfoTip } from '../ui/controls'
 
 export const TRIGGER_HELP: Record<EventTrigger, string> = {
@@ -23,6 +24,7 @@ export const TRIGGER_HELP: Record<EventTrigger, string> = {
   timer: 'Runs every few seconds for as long as this state is active. The count starts again whenever the state changes.',
   mapEnter: 'Runs once when the map has been loaded and the player has arrived. For intro scenes and for setting up the map.',
   mapLeave: 'Runs once just before the player leaves the map through a warp, and the warp waits until it has finished. For saving progress or a goodbye.',
+  signal: 'Runs when a signal is sent: body_entered / body_exited when a character steps into or out of an entity\'s Area, or any name an Emit Signal command sends. Choose who must send it (anyone, this entity or one entity), so a lever can open a door elsewhere.',
 }
 
 /** What each start kind does, with the chosen one first and in bold. */
@@ -50,6 +52,16 @@ function WhenFields({ state, onChange }: { state: EventState; onChange: (patch: 
       <FieldRow label="When" help={<TriggerHelp current={t} />}>
         {(id) => <Select id={id} value={t} options={WHEN_OPTIONS} onChange={(v) => onChange({ trigger: v as EventTrigger, blocks: defaultBlocks(v as EventTrigger) })} />}
       </FieldRow>
+      {t === 'signal' && (
+        <>
+          <FieldRow label="Signal" help="The name of the signal. body_entered and body_exited come from an entity's Area by themselves; other names are sent by an Emit Signal command (in any event of this map).">
+            {(id) => <SignalPicker id={id} value={state.signal ?? ''} onChange={(signal) => onChange({ signal: cleanSignalName(signal) || undefined })} />}
+          </FieldRow>
+          <FieldRow label="From" help="Who must send it. Anyone, this entity (its own Area or Emit Signal), or one entity of this map.">
+            {(id) => <SignalSenderPicker id={id} value={state.signalFrom ?? ''} onChange={(from) => onChange({ signalFrom: from || undefined })} />}
+          </FieldRow>
+        </>
+      )}
       {(t === 'interact' || t === 'playerNear') && (
         <FieldRow
           label={t === 'interact' ? 'Reach (tiles)' : 'Distance (tiles)'}

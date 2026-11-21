@@ -282,6 +282,17 @@ export const COMMAND_CATALOG: Record<string, CommandDef> = {
     status: 'implemented',
     summarize: (p, ctx) => `Call common event ${named(ctx?.commonEventName, str(p.id)) || '(none)'}`,
   }),
+  emitSignal: def({
+    type: 'emitSignal',
+    label: 'Emit Signal',
+    category: 'flow',
+    description: 'Send a signal from this entity: events that start on "Signal is received" with this name (from this entity or from anyone) start.',
+    icon: 'radio-tower',
+    params: [{ key: 'name', label: 'Signal', kind: 'signal', required: true, placeholder: 'e.g. door_opened', help: 'Any name. Events on this map that listen to it start; give the same name in their "Signal is received" start.' }],
+    defaultParams: { name: '' },
+    status: 'implemented',
+    summarize: (p) => `Emit signal "${str(p.name) || '(none)'}"`,
+  }),
 
   // State
   setSwitch: def({

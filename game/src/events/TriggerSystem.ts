@@ -1,4 +1,4 @@
-import { MAX_TRIGGER_RANGE, stateInterval, statePriority, stateRange, type EventState, type EventTrigger, type Facing } from "@shared/engine/index.ts";
+import { MAX_TRIGGER_RANGE, stateHearsSignal, stateInterval, statePriority, stateRange, type EventState, type EventTrigger, type Facing } from "@shared/engine/index.ts";
 import { System } from "@/ecs/System";
 import type { World } from "@/ecs/World";
 import type { Entity } from "@/ecs/Entity";
@@ -8,6 +8,7 @@ import { EventComponent } from "@/ecs/components/EventComponent";
 import { GridMovementComponent } from "@/ecs/components/GridMovementComponent";
 import { FreeMovementComponent } from "@/ecs/components/FreeMovementComponent";
 import { PlayerControlComponent } from "@/ecs/components/PlayerControlComponent";
+import { AreaComponent } from "@/ecs/components/AreaComponent";
 import { MoveRouteComponent } from "@/ecs/components/MoveRouteComponent";
 import { settingsStore } from "@/core/SettingsStore";
 import { gameState } from "@/core/GameState";
@@ -54,7 +55,11 @@ interface Match {
  *  - `onActive`: once when the state becomes active (again and again while it stays active when it was
  *    migrated from autorun / parallel and carries `repeat`); a background run stops when the state ends;
  *  - `timer`: every `interval` seconds while the state is active;
- *  - `mapEnter`: once, when the map has been loaded; `mapLeave` runs from EventRuntime.runMapLeave.
+ *  - `mapEnter`: once, when the map has been loaded; `mapLeave` runs from EventRuntime.runMapLeave;
+ *  - `signal`: a signal of that name was sent (by the state's `signalFrom`, or by anyone): an entity with an Area
+ *    sends `body_entered` / `body_exited` when the player or another character steps into / out of it, and an
+ *    Emit Signal command sends its own. A blocking listener waits for the running cutscene; one already running
+ *    misses it.
  */
 export class TriggerSystem extends System {
   public priority = 350;
@@ -71,6 +76,8 @@ export class TriggerSystem extends System {
   private readonly near = new Map<Entity, { state: EventState; inside: boolean }>();
   private readonly repeatRestarts = new Map<Entity, number>();
   private mapEnterPending: Array<{ entity: Entity; state: EventState }> = [];
+  /** Listeners of a signal that were blocked by a running cutscene: they start once it ends (if still active). */
+  private signalPending: Array<{ entity: Entity; state: EventState }> = [];
   /** Tells whether a tile hides things from sight (a solid thing stands on it). Without it nothing does. */
   private sightBlocked: ((col: number, row: number, ignore: Entity) => boolean) | null = null;
   /**
@@ -136,6 +143,8 @@ export class TriggerSystem extends System {
     this.near.clear();
     this.repeatRestarts.clear();
     this.mapEnterPending = [];
+    this.signalPending = [];
+    this.runtime.takeSignals(); // signals of the old map are not heard here
     for (const [entity, ev] of world.view(EventComponent)) {
       const state = ev.activeState >= 0 ? ev.states[ev.activeState] : undefined;
       if (state?.trigger === "mapEnter") this.mapEnterPending.push({ entity, state });
@@ -149,6 +158,7 @@ export class TriggerSystem extends System {
     this.timers.delete(entity);
     this.near.delete(entity);
     this.repeatRestarts.delete(entity);
+    this.signalPending = this.signalPending.filter((p) => p.entity !== entity);
   }
 
   public update(world: World, delta: number): void {
@@ -164,6 +174,7 @@ export class TriggerSystem extends System {
     this.checkPlayerTile(world, player);
     this.checkPlayerNear(world, player);
     this.checkMovers(world, player);
+    this.startSignals(world);
 
     if (this.actionQueued) {
       this.actionQueued = false;
@@ -341,6 +352,7 @@ export class TriggerSystem extends System {
     if (!last || last.col !== tile.col || last.row !== tile.row) {
       if (this.runtime.isBlocking) return; // retried once the running event ended
       this.lastPlayerTile = tile;
+      if (last) this.sendBodySignals(world, player, last, tile);
       if (last) this.startAll(this.leaving(world, last, tile, "playerLeave"));
       if (this.runtime.isBlocking) this.pendingEnter = tile; // a leave event is running: enter after it
       else this.startAll(this.findAt(world, tile, "playerEnter"));
@@ -427,12 +439,77 @@ export class TriggerSystem extends System {
       const prev = this.moverTiles.get(entity);
       if (prev && prev.col === tile.col && prev.row === tile.row) continue;
       this.moverTiles.set(entity, tile);
+      if (prev) this.sendBodySignals(world, entity, prev, tile);
       if (!prev || (enterers.length === 0 && leavers.length === 0) || this.runtime.isBlocking) continue;
       if (leavers.length > 0) this.startAll(this.leaving(world, prev, tile, "eventLeave", entity));
       if (enterers.length > 0 && !this.runtime.isBlocking) {
         this.startAll(this.findAt(world, tile, "eventEnter").filter((m) => m.entity !== entity));
       }
     }
+  }
+
+  // ── signals ───────────────────────────────────────────────────────────────────────────────────
+
+  /** Names that active `signal` states listen to right now (empty: nothing listens, nothing to look for). */
+  private listenedSignals(world: World): Set<string> {
+    const out = new Set<string>();
+    for (const [, ev] of world.view(EventComponent)) {
+      const state = ev.activeState >= 0 ? ev.states[ev.activeState] : undefined;
+      if (state?.trigger === "signal" && state.signal) out.add(state.signal);
+    }
+    return out;
+  }
+
+  /**
+   * A body (the player or another character) moved from tile `from` to `to`: every other entity with an Area whose
+   * box covers one of them and not the other sends `body_entered` / `body_exited`. Only looked at while something listens.
+   */
+  private sendBodySignals(world: World, body: Entity, from: Tile, to: Tile): void {
+    const listened = this.listenedSignals(world);
+    if (!listened.has("body_entered") && !listened.has("body_exited")) return;
+    for (const [entity, transform] of world.view(TransformComponent)) {
+      if (entity === body || !this.hasArea(world, entity)) continue;
+      const box = footprint(transform, triggerArea(world, entity), this.tileSize);
+      const was = coversTile(box, from);
+      const is = coversTile(box, to);
+      if (is && !was) this.runtime.sendSignal(entity, "body_entered");
+      else if (was && !is) this.runtime.sendSignal(entity, "body_exited");
+    }
+  }
+
+  /** An Area, or a Collider that is not solid (what an Area node alone exports as): where body signals come from. */
+  private hasArea(world: World, entity: Entity): boolean {
+    if (world.hasComponent(entity, AreaComponent)) return true;
+    const collider = world.getComponent(entity, ColliderComponent);
+    return !!collider && !collider.isSolid;
+  }
+
+  /** Starts the states that hear the signals sent since the last update, then the ones that were waiting. */
+  private startSignals(world: World): void {
+    const sent = this.runtime.takeSignals();
+    if (sent.length === 0 && this.signalPending.length === 0) return;
+    const waiting: Array<{ entity: Entity; state: EventState }> = [];
+    const tryStart = (entity: Entity, state: EventState, index: number) => {
+      if (this.runtime.isRunning(entity)) return; // already busy: it misses this one
+      if (state.blocks && this.runtime.isBlocking) {
+        if (!waiting.some((w) => w.entity === entity && w.state === state)) waiting.push({ entity, state });
+        return;
+      }
+      this.runtime.start(entity, index, { blocking: state.blocks });
+    };
+    for (const p of this.signalPending) {
+      const ev = world.getComponent(p.entity, EventComponent);
+      if (ev && ev.activeState >= 0 && ev.states[ev.activeState] === p.state) tryStart(p.entity, p.state, ev.activeState);
+    }
+    for (const signal of sent) {
+      const hearers: Match[] = [];
+      for (const [entity, ev] of world.view(EventComponent)) {
+        const state = ev.activeState >= 0 ? ev.states[ev.activeState] : undefined;
+        if (state && stateHearsSignal(state, signal.name, signal.senderId, this.runtime.editorIdOf(entity))) hearers.push({ entity, index: ev.activeState, state, dist: 0 });
+      }
+      for (const m of this.byPriority(hearers)) tryStart(m.entity, m.state, m.index);
+    }
+    this.signalPending = waiting;
   }
 
   // ── player position helpers ───────────────────────────────────────────────────────────────────

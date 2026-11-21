@@ -33,3 +33,11 @@ registerCommandHandler("wait", async (cmd, rt) => {
 });
 
 registerCommandHandler("comment", () => {});
+
+/** emitSignal: sends a signal from this event's entity; the states listening to it start on the next update. */
+registerCommandHandler("emitSignal", (cmd, rt) => {
+  const name = typeof cmd.params.name === "string" ? cmd.params.name.trim() : "";
+  if (!name) return rt.ctx.warnOnce(`emitSignal:empty:${rt.ctx.entityId}`, `[Event] ${rt.ctx.entityId}: Emit Signal has no signal name`);
+  if (!rt.ctx.sendSignal) return rt.ctx.warnOnce("emitSignal:unsupported", "[Event] Emit Signal: signals are not available here");
+  rt.ctx.sendSignal(name);
+});

@@ -876,3 +876,100 @@ describe('legacy Tiled interactables and legacy entities run identically', () =>
     expect(rig.maps.warps).toEqual([{ map: 'market', x: 3, y: 4, facing: undefined, fade: true }]);
   });
 });
+
+describe('signals', () => {
+  const hear = (signal: string, from: string | undefined, commands = [cmd('setVariable', { id: 'v1', op: 'add', operand: 'const', value: 1 })], extra = {}) =>
+    state(commands, { trigger: 'signal', signal, signalFrom: from, blocks: false, ...extra });
+
+  it("an Area sends body_entered / body_exited when the player steps in and out; a listener elsewhere starts", async () => {
+    const player = rig.addPlayer(5, 5);
+    rig.add({ id: 'pad', col: 6, row: 5, sprite: false, collider: false, area: { width: 32, height: 32 } });
+    rig.add({ id: 'lamp', col: 1, row: 1, states: [hear('body_entered', 'pad')] });
+    rig.add({ id: 'bell', col: 2, row: 1, states: [hear('body_exited', 'pad', [cmd('setSwitch', { id: 's1', value: true })])] });
+    triggers.resetTouchState(rig.world);
+    await step();
+    expect(rig.runtime.flags.getVariable('v1')).toBe(0);
+
+    place(player, 6, 5);
+    await step();
+    await step();
+    expect(rig.runtime.flags.getVariable('v1')).toBe(1);
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(false);
+
+    place(player, 7, 5);
+    await step();
+    await step();
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(true);
+    expect(rig.runtime.flags.getVariable('v1')).toBe(1);
+  });
+
+  it('a listener can ask for one sender only, or for itself ("self")', async () => {
+    const player = rig.addPlayer(5, 5);
+    rig.add({ id: 'padA', col: 6, row: 5, sprite: false, collider: { isSolid: false } }); // an Area node alone exports as this
+    rig.add({ id: 'padB', col: 8, row: 5, sprite: false, collider: false, area: {}, states: [hear('body_entered', 'self', [cmd('setSwitch', { id: 's1', value: true })])] });
+    rig.add({ id: 'onlyB', col: 1, row: 1, states: [hear('body_entered', 'padB')] });
+    triggers.resetTouchState(rig.world);
+    place(player, 6, 5);
+    await step();
+    await step();
+    expect(rig.runtime.flags.getVariable('v1')).toBe(0);
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(false);
+    expect(rig.world.query(ColliderComponent).length).toBeGreaterThan(0);
+    place(player, 8, 5);
+    await step();
+    await step();
+    expect(rig.runtime.flags.getVariable('v1')).toBe(1);
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(true);
+  });
+
+  it('Emit Signal starts the states listening to that name, from anyone or from that entity', async () => {
+    rig.addPlayer(5, 5, 'down');
+    rig.add({ id: 'lever', col: 5, row: 6, states: [state([cmd('emitSignal', { name: 'gate_open' })], { blocks: false })] });
+    rig.add({ id: 'gate', col: 1, row: 1, states: [hear('gate_open', 'lever')] });
+    rig.add({ id: 'crowd', col: 2, row: 1, states: [hear('gate_open', undefined, [cmd('setSwitch', { id: 's1', value: true })])] });
+    rig.add({ id: 'deaf', col: 3, row: 1, states: [hear('gate_open', 'someoneElse', [cmd('setVariable', { id: 'v1', op: 'add', operand: 'const', value: 100 })])] });
+    triggers.resetTouchState(rig.world);
+    triggers.requestAction();
+    await step();
+    await step();
+    await step();
+    expect(rig.runtime.flags.getVariable('v1')).toBe(1);
+    expect(rig.runtime.flags.getSwitch('s1')).toBe(true);
+  });
+
+  it('a blocking listener waits for the running cutscene to end, then starts', async () => {
+    rig.addPlayer(5, 5, 'down');
+    rig.add({ id: 'lever', col: 5, row: 6, states: [state([cmd('emitSignal', { name: 'boom' }), say('pulled')])] });
+    rig.add({ id: 'gate', col: 1, row: 1, states: [hear('boom', undefined, [say('gate opens')], { blocks: true })] });
+    triggers.resetTouchState(rig.world);
+    triggers.requestAction();
+    await step();
+    await step();
+    expect(rig.ui.texts.map((t) => t.text)).toEqual(['pulled']);
+    rig.ui.dismiss();
+    await step();
+    await step();
+    await step();
+    expect(rig.ui.texts.map((t) => t.text)).toEqual(['pulled', 'gate opens']);
+  });
+
+  it('a solid body sends no body signals (only Areas do)', async () => {
+    const player = rig.addPlayer(5, 5);
+    rig.add({ id: 'rock', col: 6, row: 5, sprite: false, collider: { isSolid: true } });
+    rig.add({ id: 'ear', col: 1, row: 1, states: [hear('body_entered', undefined)] });
+    triggers.resetTouchState(rig.world);
+    place(player, 6, 5);
+    await step();
+    await step();
+    expect(rig.runtime.flags.getVariable('v1')).toBe(0);
+  });
+
+  it('nothing is looked at while nobody listens, and an unnamed Emit Signal only warns', async () => {
+    rig.addPlayer(5, 5, 'down');
+    rig.add({ id: 'lever', col: 5, row: 6, states: [state([cmd('emitSignal', { name: '' })], { blocks: false })] });
+    triggers.resetTouchState(rig.world);
+    triggers.requestAction();
+    await step();
+    expect(rig.warnings.some((w) => /Emit Signal has no signal name/.test(w))).toBe(true);
+  });
+});

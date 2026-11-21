@@ -19,7 +19,7 @@ describe('ParamForm: every FieldKind has a real control', () => {
   it('covers every kind used by the catalog', () => {
     const kinds = new Set<FieldKind>()
     for (const def of Object.values(COMMAND_CATALOG)) for (const f of def.params) kinds.add(f.kind)
-    const covered: FieldKind[] = ['number', 'text', 'textarea', 'boolean', 'select', 'color', 'sprite', 'character', 'clip', 'facing', 'map', 'commonEvent', 'switch', 'variable', 'stage', 'stageValue', 'target', 'position', 'sound', 'item', 'route', 'choices', 'conditions', 'lookProfile']
+    const covered: FieldKind[] = ['number', 'text', 'textarea', 'boolean', 'select', 'color', 'sprite', 'character', 'clip', 'facing', 'map', 'commonEvent', 'switch', 'variable', 'stage', 'stageValue', 'target', 'position', 'sound', 'item', 'route', 'choices', 'conditions', 'lookProfile', 'signal']
     expect([...kinds].filter((k) => !covered.includes(k))).toEqual([])
     // and no command renders raw JSON or crashes with its defaults
     for (const def of Object.values(COMMAND_CATALOG)) {

@@ -19,7 +19,7 @@ import type { Command } from '../../../shared/engine/index'
 // The catalog of docs/engine-design.md section 3: type -> status.
 const DOC_CATALOG: Record<string, 'implemented' | 'planned'> = {
   showText: 'implemented', showChoices: 'implemented',
-  conditional: 'implemented', branchStage: 'implemented', loop: 'implemented', breakLoop: 'implemented', exitEvent: 'implemented', wait: 'implemented', comment: 'implemented', callCommonEvent: 'implemented',
+  conditional: 'implemented', branchStage: 'implemented', loop: 'implemented', breakLoop: 'implemented', exitEvent: 'implemented', wait: 'implemented', comment: 'implemented', callCommonEvent: 'implemented', emitSignal: 'implemented',
   setSwitch: 'implemented', setVariable: 'implemented', setStage: 'implemented', setSelfSwitch: 'implemented',
   setFacing: 'implemented', moveRoute: 'implemented', setVisible: 'implemented', changeSprite: 'implemented', playAnimation: 'implemented', stopAnimation: 'implemented', setAnimationSpeed: 'implemented', setMoveSpeed: 'implemented', setMovementMode: 'implemented', faceTowards: 'implemented',
   warp: 'implemented', fadeScreen: 'implemented', shakeScreen: 'implemented', setLookProfile: 'implemented', tintScreen: 'planned', setWeather: 'planned',
@@ -28,7 +28,7 @@ const DOC_CATALOG: Record<string, 'implemented' | 'planned'> = {
   emit: 'implemented', runScript: 'planned',
 }
 const DOC_CATEGORY: Record<string, string> = {
-  showText: 'dialogue', showChoices: 'dialogue', conditional: 'flow', branchStage: 'flow', loop: 'flow', breakLoop: 'flow', exitEvent: 'flow', wait: 'flow', comment: 'flow', callCommonEvent: 'flow',
+  showText: 'dialogue', showChoices: 'dialogue', conditional: 'flow', branchStage: 'flow', loop: 'flow', breakLoop: 'flow', exitEvent: 'flow', wait: 'flow', comment: 'flow', callCommonEvent: 'flow', emitSignal: 'flow',
   setSwitch: 'state', setVariable: 'state', setStage: 'state', setSelfSwitch: 'state',
   setFacing: 'character', moveRoute: 'character', setVisible: 'character', changeSprite: 'character', playAnimation: 'character', stopAnimation: 'character', setAnimationSpeed: 'character', setMoveSpeed: 'character', setMovementMode: 'character', faceTowards: 'character',
   warp: 'map', fadeScreen: 'map', shakeScreen: 'map', setLookProfile: 'map', tintScreen: 'map', setWeather: 'map',

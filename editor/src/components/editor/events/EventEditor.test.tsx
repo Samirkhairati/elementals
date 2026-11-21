@@ -163,6 +163,7 @@ describe('EventEditor: state header', () => {
       'Every few seconds',
       'Map is entered',
       'Map is left',
+      'Signal is received',
     ])
     fireEvent.click(when)
     // the explanation sits behind the "i" beside the label, and covers every start kind with the chosen one first

@@ -341,6 +341,8 @@ export function normalizeEventState(state: unknown, index = 0): EventState {
   if (typeof p.interval === 'number' && Number.isFinite(p.interval) && p.interval > 0) out.interval = p.interval;
   if (typeof p.priority === 'number' && Number.isFinite(p.priority) && p.priority !== 0) out.priority = Math.round(p.priority);
   if (p.repeat === true) out.repeat = true;
+  if (typeof p.signal === 'string' && p.signal.trim()) out.signal = p.signal.trim();
+  if (typeof p.signalFrom === 'string' && p.signalFrom) out.signalFrom = p.signalFrom;
   return out;
 }
 

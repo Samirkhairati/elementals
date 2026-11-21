@@ -23,6 +23,7 @@ import {
   PhoneCall,
   Play,
   Radio,
+  RadioTower,
   Repeat,
   Route,
   ScrollText,
@@ -81,6 +82,7 @@ const ICONS: Record<string, LucideIcon> = {
   'scroll-text': ScrollText,
   'badge-check': BadgeCheck,
   radio: Radio,
+  'radio-tower': RadioTower,
   terminal: Terminal,
 }
 
