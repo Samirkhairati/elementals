@@ -11,9 +11,16 @@ const town: MapData = { name: 'Town', fileName: 'town.json', folderPath: null, w
 
 describe('previewCellSize', () => {
   it('fits the longest side into the preview and keeps cells legible', () => {
-    expect(previewCellSize({ width: 10, height: 8 })).toBe(20)
+    expect(previewCellSize({ width: 10, height: 8 })).toBe(30)
     expect(previewCellSize({ width: 30, height: 20 })).toBe(10)
     expect(previewCellSize({ width: 200, height: 100 })).toBe(4)
+  })
+
+  it('shows tiles at whole multiples of 32 device pixels where they are not shrunk, so they stay sharp', () => {
+    expect(previewCellSize({ width: 10, height: 8 }, 2)).toBe(32)
+    expect(previewCellSize({ width: 20, height: 12 }, 2)).toBe(15)
+    expect(previewCellSize({ width: 9, height: 9 }, 1)).toBe(32)
+    expect(previewCellSize({ width: 30, height: 20 }, 2)).toBe(10)
   })
 })
 
@@ -65,7 +72,7 @@ describe('WarpTilePicker', () => {
     setup({ onPick })
     const surface = screen.getByTestId('warp-tile-picker').querySelector('.cursor-crosshair') as HTMLElement
     fireEvent.mouseMove(surface, { clientX: 45, clientY: 65 })
-    expect(screen.getByTestId('warp-hover-tile')).toHaveStyle({ left: '40px', top: '60px', width: '20px', height: '20px' })
+    expect(screen.getByTestId('warp-hover-tile')).toHaveStyle({ left: '60px', top: '90px', width: '30px', height: '30px' })
     expect(screen.getByText('Click to warp to tile (2, 3)')).toBeInTheDocument()
     fireEvent.click(surface, { clientX: 45, clientY: 65 })
     expect(onPick).toHaveBeenCalledWith(2, 3)
@@ -81,7 +88,7 @@ describe('WarpTilePicker', () => {
       </EventEnvProvider>,
     )
     const surface = screen.getByTestId('warp-tile-picker').querySelector('.cursor-crosshair') as HTMLElement
-    expect(screen.getByTestId('warp-selected-point')).toHaveStyle({ left: '20px' }) // 40 px * 20/32 = 25, minus half the 10 px ring
+    expect(screen.getByTestId('warp-selected-point')).toHaveStyle({ left: '32.5px' }) // 40 px * 30/32 = 37.5, minus half the 10 px ring
     expect(screen.queryByTestId('warp-selected-tile')).toBeNull()
     expect(screen.getByText('Warps to (40, 96) px')).toBeInTheDocument()
     fireEvent.mouseMove(surface, { clientX: 100, clientY: 80 })
@@ -102,7 +109,7 @@ describe('WarpTilePicker', () => {
 
   it('marks the current warp tile and flags one outside the map', () => {
     const { unmount } = setup({ x: 4, y: 5 })
-    expect(screen.getByTestId('warp-selected-tile')).toHaveStyle({ left: '80px', top: '100px' })
+    expect(screen.getByTestId('warp-selected-tile')).toHaveStyle({ left: '120px', top: '150px' })
     unmount()
     setup({ x: 25, y: 25 })
     expect(screen.queryByTestId('warp-selected-tile')).toBeNull()
@@ -140,19 +147,22 @@ describe('WarpTilePicker drawing', () => {
     return { canvas: screen.getByRole('img') as HTMLCanvasElement, calls, ctx }
   }
 
-  it('draws at the screen density so nothing is stretched, and draws hairlines one device pixel wide', () => {
-    const { canvas, calls, ctx } = draw(2, town) // 10x8 map -> 20px cells -> 200x160 CSS px
-    expect(canvas.style.width).toBe('200px')
-    expect(canvas.width).toBe(400)
-    expect(canvas.height).toBe(320)
+  it('draws at the screen density with tiles at whole multiples of their pixels, sharp, and hairlines one device pixel wide', () => {
+    const { canvas, calls, ctx } = draw(2, town) // 10x8 map -> 32 CSS px cells = 64 device px, twice the tile -> 320x256 CSS px
+    expect(canvas.style.width).toBe('320px')
+    expect(canvas.width).toBe(640)
+    expect(canvas.height).toBe(512)
     expect(calls).toContain('setTransform(2,0,0,2,0,0)')
     expect(ctx.lineWidth).toBe(0.5)
+    expect(ctx.imageSmoothingEnabled).toBe(false)
   })
 
-  it('smooths the shrunken tiles properly instead of dropping pixels', () => {
-    const { ctx } = draw(1, town) // a 32 px tile is shown at 20 px
+  it('shrinks the map in one filtered step instead of dropping pixels', () => {
+    const { ctx, calls } = draw(1, town) // a 32 px tile is shown at 30 px
     expect(ctx.imageSmoothingEnabled).toBe(true)
     expect(ctx.imageSmoothingQuality).toBe('high')
+    // the full-size 320x256 picture of the map, copied once into the 300x240 preview
+    expect(calls).toContain('drawImage([object HTMLCanvasElement],0,0,320,256,0,0,300,240)')
   })
 })
 

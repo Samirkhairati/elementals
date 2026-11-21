@@ -15,11 +15,23 @@ import { useEventEnv } from './eventEnv'
 /** Longest side of the preview in CSS px; a cell is at least 4px so big maps stay legible when scrolled. */
 const MAX_PREVIEW = 300
 const MIN_CELL = 4
-const MAX_CELL = 20
+const MAX_CELL = 32
+/** Longest side of the full-size picture of the map the preview is shrunk from (bigger maps are drawn smaller first). */
+const MAX_SOURCE_PX = 4096
 
-export function previewCellSize(map: Pick<MapData, 'width' | 'height'>): number {
+/**
+ * The size of one tile in the preview, CSS px. Where a tile is shown at 32 device pixels or more, a whole multiple of
+ * 32 device pixels, so the pixel art is copied pixel for pixel (sharp) instead of stretched by an odd factor.
+ */
+export function previewCellSize(map: Pick<MapData, 'width' | 'height'>, dpr = 1): number {
   const longest = Math.max(map.width, map.height, 1)
-  return Math.max(MIN_CELL, Math.min(MAX_CELL, Math.floor(MAX_PREVIEW / longest)))
+  const fit = Math.max(MIN_CELL, Math.min(MAX_CELL, Math.floor(MAX_PREVIEW / longest)))
+  const device = fit * dpr
+  if (device < TILE_SIZE) return fit
+  // The nearest whole multiple, unless that makes the preview much wider than it should be.
+  let m = Math.max(1, Math.round(device / TILE_SIZE))
+  if (m > 1 && ((m * TILE_SIZE) / dpr) * longest > MAX_PREVIEW * 1.15) m--
+  return (m * TILE_SIZE) / dpr
 }
 
 /** The tile under a pointer position inside the preview, or null when it is outside the map. */
@@ -60,44 +72,50 @@ export function WarpTilePicker({ mapId, x, y, free = false, onPick }: Props) {
   const [hover, setHover] = useState<{ col: number; row: number } | null>(null)
   const [hoverPx, setHoverPx] = useState<{ x: number; y: number } | null>(null)
 
-  const cell = map ? previewCellSize(map) : MIN_CELL
+  const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1
+  const cell = map ? previewCellSize(map, dpr) : MIN_CELL
   const width = map ? map.width * cell : 0
   const height = map ? map.height * cell : 0
 
   useEffect(() => {
     const ctx = map && canvasRef.current ? prepareCanvas(canvasRef.current, width, height) : null
     if (!map || !ctx) return
-    const dpr = window.devicePixelRatio || 1
-    const k = cell / TILE_SIZE
-    // Shrinking a 32 px tile to a few pixels: smooth it properly. Smoothing off would drop pixels and look noisy; at
-    // full size (or larger) keep the pixel art sharp.
-    ctx.imageSmoothingEnabled = cell < TILE_SIZE
-    ctx.imageSmoothingQuality = 'high'
     ctx.fillStyle = '#16181d'
     ctx.fillRect(0, 0, width, height)
 
-    // Tiles and pictures, bottom layer first, at map pixels (the same drawing as the resize preview).
-    ctx.save()
-    ctx.scale(k, k)
-    drawMapScenery(ctx, map, { tileImages: { get: (id) => images[id] }, assets: preview?.spriteAssets, smooth: cell < TILE_SIZE })
-    ctx.restore()
-
-    // Entities: their sprite, or a dot where they stand.
-    for (const entity of drawPlan(sceneIndex(map.nodes)).entities as unknown as EntityData[]) {
-      const sprite = entity.components.Sprite
-      const asset = sprite && typeof sprite.asset === 'string' && sprite.asset ? env.getSpriteAsset(sprite.asset) : undefined
-      const resolved = asset ? resolveSprite(asset, sprite ?? {}, 0) : null
-      ctx.save()
-      ctx.scale(k, k)
-      if (resolved) {
-        drawResolvedSprite(ctx, resolved, { anchorX: entity.x, anchorY: entity.y, opacity: sprite?.opacity, tint: sprite?.tint || undefined })
-      } else {
-        ctx.fillStyle = 'rgba(96,165,250,0.85)'
-        ctx.beginPath()
-        ctx.arc(entity.x, entity.y - TILE_SIZE / 2, TILE_SIZE / 4, 0, Math.PI * 2)
-        ctx.fill()
+    // The map is drawn once at full size (pixel for pixel, sharp), then copied into the preview in one step: shrunk with
+    // proper filtering, or enlarged by a whole factor with smoothing off. Scaling every tile on its own instead is what
+    // made the preview blurry (and seamed) on high-density screens.
+    const mapW = map.width * TILE_SIZE
+    const mapH = map.height * TILE_SIZE
+    const k0 = Math.min(1, MAX_SOURCE_PX / Math.max(mapW, mapH, 1))
+    const source = typeof document !== 'undefined' ? document.createElement('canvas') : null
+    const sctx = source?.getContext?.('2d') ?? null
+    if (source && sctx) {
+      source.width = Math.max(1, Math.round(mapW * k0))
+      source.height = Math.max(1, Math.round(mapH * k0))
+      sctx.imageSmoothingEnabled = k0 < 1
+      sctx.scale(k0, k0)
+      // Tiles and pictures, bottom layer first, at map pixels (the same drawing as the resize preview).
+      drawMapScenery(sctx, map, { tileImages: { get: (id) => images[id] }, assets: preview?.spriteAssets, smooth: k0 < 1 })
+      // Entities: their sprite, or a dot where they stand.
+      for (const entity of drawPlan(sceneIndex(map.nodes)).entities as unknown as EntityData[]) {
+        const sprite = entity.components.Sprite
+        const asset = sprite && typeof sprite.asset === 'string' && sprite.asset ? env.getSpriteAsset(sprite.asset) : undefined
+        const resolved = asset ? resolveSprite(asset, sprite ?? {}, 0) : null
+        if (resolved) {
+          drawResolvedSprite(sctx, resolved, { anchorX: entity.x, anchorY: entity.y, opacity: sprite?.opacity, tint: sprite?.tint || undefined, rotation: entity.rotation, smooth: k0 < 1 })
+        } else {
+          sctx.fillStyle = 'rgba(96,165,250,0.85)'
+          sctx.beginPath()
+          sctx.arc(entity.x, entity.y, TILE_SIZE / 6, 0, Math.PI * 2)
+          sctx.fill()
+        }
       }
-      ctx.restore()
+      const shrinking = width * dpr < source.width
+      ctx.imageSmoothingEnabled = shrinking
+      ctx.imageSmoothingQuality = 'high'
+      ctx.drawImage(source, 0, 0, source.width, source.height, 0, 0, width, height)
     }
 
     // Tile grid: one device pixel wide lines on the cell edges.
@@ -113,7 +131,7 @@ export function WarpTilePicker({ mapId, x, y, free = false, onPick }: Props) {
       ctx.lineTo(width, r * cell)
     }
     ctx.stroke()
-  }, [map, images, cell, width, height, env, preview, spriteVersion])
+  }, [map, images, cell, width, height, env, preview, spriteVersion, dpr])
 
   if (!preview) return null
   if (!mapId) return <p className="rounded border border-dashed border-border px-2 py-3 text-center text-[11px] text-muted-foreground">Choose a map to pick a tile on it.</p>
