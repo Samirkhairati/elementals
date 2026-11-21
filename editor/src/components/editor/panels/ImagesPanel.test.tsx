@@ -224,18 +224,17 @@ describe('ImagesPanel', () => {
     })
   })
 
-  it('says how many are picked, and edits the picked picture\'s fields', () => {
+  it("says how many are picked; the picked picture's name, position and flips are in the Properties panel, not here", () => {
     setup(items)
     expect(screen.getByTestId('images-empty').textContent).toBe('No sprite picked in Sky')
     cleanup()
     setup(items, { pickedImageIds: ['a', 'b'] })
     expect(screen.getByTestId('images-empty').textContent).toBe('2 sprites picked')
     cleanup()
-    const f = setup(items, { pickedImageIds: ['a', 'b'], selectedImageId: 'a' })
-    const name = screen.getByLabelText('Name')
-    fireEvent.change(name, { target: { value: 'Big cloud' } })
-    fireEvent.blur(name)
-    expect(f.updateImage).toHaveBeenCalledWith('i1', 'a', { name: 'Big cloud' })
+    setup(items, { pickedImageIds: ['a', 'b'], selectedImageId: 'a' })
+    expect(screen.queryByLabelText('Name')).toBeNull()
+    expect(screen.queryByLabelText('Image x')).toBeNull()
+    expect(screen.getByLabelText('Image scale')).toBeInTheDocument()
   })
 
   it('a locked sprite freezes its fields; a pick-as-one Node does not freeze them', () => {

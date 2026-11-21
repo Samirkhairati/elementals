@@ -267,14 +267,14 @@ describe('SceneTree: menus', () => {
     expect(screen.queryByTestId('add-node-picture')).toBeNull()
   })
 
-  it('an entity\'s Add Child Node lists its components, the ones it has greyed out', () => {
+  it('an entity\'s Add Child Node lists its components, the ones it has greyed out, and what any Node holds', () => {
     setup()
     menu('npc')
     fireEvent.click(item(/Add Child Node/))
     expect(screen.getByTestId('add-node-event')).toHaveAttribute('data-disabled')
     expect(screen.getByTestId('add-node-animatedSprite')).not.toHaveAttribute('data-disabled')
     expect(screen.getByTestId('add-node-area')).toBeInTheDocument()
-    expect(screen.queryByTestId('add-node-tile')).toBeNull()
+    expect(screen.getByTestId('add-node-group')).toBeInTheDocument() // it is a Node
   })
 
   it('the empty space of the panel adds nodes at the top of the map', () => {
@@ -404,11 +404,11 @@ describe('SceneTree: drag and drop', () => {
     expect(tree().map((n) => n.id)).toEqual(['deco', 'town', 'trees'])
   })
 
-  it('refuses places the rules do not allow: a sprite at the map root, a layer into an entity', () => {
+  it('refuses places the rules do not allow: a sprite at the map root, a Node into its own child', () => {
     const { tree } = setup()
     const before = JSON.stringify(tree())
     drag('oak', 'ground', 0.2)
-    drag('ground', 'npc', 0.8)
+    drag('town', 'npc', 0.8)
     expect(JSON.stringify(tree())).toBe(before)
   })
 

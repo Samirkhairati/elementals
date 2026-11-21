@@ -29,7 +29,10 @@ import { ResizeMapDialog } from '@/components/editor/dialogs/ResizeMapDialog'
 import { MapSettingsDialog } from '@/components/editor/dialogs/MapSettingsDialog'
 import type { MapSettings } from '@/types/editor'
 import type { LookSet } from '../../../shared/look/types'
-import type { LookSubjectRef } from '@/lib/look/lookView'
+import { setLookView, type LookSubjectRef } from '@/lib/look/lookView'
+import { selectedSubject } from '@/lib/look/lookEdit'
+import { lookNodeOf } from '../../../shared/sceneTree'
+import { placePrefab } from '../../../shared/prefabs'
 import { setMapLook, setNodeLook } from '@/lib/look/lookSubjects'
 import { carryView, countWithin, topLevelIds, type NewNodeType } from '@/lib/sceneOps'
 import { sceneIndex, pictureLocked } from '@/lib/sceneIndex'
@@ -134,15 +137,15 @@ export function EditorPage() {
   const entityPlacement = useEntityPlacement()
 
   const handleCommitPlacement = useStableCallback((x: number, y: number) => {
-    if (entityPlacement.pendingPlacement) {
-      entityManager.createEntity(
-        entityPlacement.pendingPlacement.name,
-        x,
-        y,
-        entityPlacement.pendingPlacement.components
-      )
-      entityPlacement.cancelPlacement()
+    const pending = entityPlacement.pendingPlacement
+    if (!pending) return
+    if (pending.prefab) {
+      const prefab = pending.prefab
+      layerManager.addPlacedNode((newId) => placePrefab(prefab, x, y, newId), pending.parentId)
+    } else {
+      entityManager.createEntity(pending.name, x, y, pending.components, pending.parentId)
     }
+    entityPlacement.cancelPlacement()
   })
 
   // ── Data Loading Coordinator ─────────────────────────────────────────────
@@ -303,6 +306,20 @@ export function EditorPage() {
     layerManager.createNode(type, anchorId)
   })
 
+  // The look of a subject shows in the Properties panel while its Look node is selected (the map's: while its Look row is).
+  const openLook = useStableCallback((subject?: LookSubjectRef) => {
+    const ref = subject ?? selectedSubject(tree.getNodes(), layerManager.activeLayerId, layerManager.selectedImageId)
+    if (ref.kind === 'map') {
+      tree.clearSelection()
+      setLookView({ pinned: { kind: 'map' } })
+      return
+    }
+    const id = ref.kind === 'layer' ? ref.layerId : ref.imageId
+    const look = lookNodeOf(tree.getIndex().byId.get(id)?.node)
+    if (look) handleSelectNode(look.id)
+    else handleCreateNode('look', id)
+  })
+
   const handleExportMap = useStableCallback((m: MapData) => {
     exportMap(m, tilesetManager.tilesets, mapManager.getActiveMap())
   })
@@ -410,6 +427,7 @@ export function EditorPage() {
     handleResizeMap,
     handleMapSettings,
     setLook,
+    openLook,
     handleMapDrop: mapManager.handleMapDrop,
     onSelectMap: mapManager.onSelectMap,
     onClearActiveMap: handleDockClearActiveMap,
@@ -443,6 +461,11 @@ export function EditorPage() {
     createNode: handleCreateNode,
     renameNode: layerManager.renameNode,
     editNode: layerManager.editNode,
+    addPlacedNode: layerManager.addPlacedNode,
+    placeNodeAt: layerManager.placeNodeAt,
+    translateNodesBy: layerManager.translateNodesBy,
+    rotateNodeTo: layerManager.rotateNodeTo,
+    setNodeTagOf: layerManager.setNodeTagOf,
     addCollisionTiles: layerManager.addCollisionTiles,
     setCollisionShapes: layerManager.setCollisionShapes,
     toggleNodeVisibility: layerManager.toggleNodeVisibility,

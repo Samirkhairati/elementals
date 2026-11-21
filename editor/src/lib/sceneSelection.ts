@@ -158,7 +158,7 @@ export function viewOf(sel: SceneSelection, index: SceneIndex): SelectionView {
   const pickedImageIds = primary && pictures.includes(primary) ? [primary, ...pictures.filter((id) => id !== primary)] : pictures
   const layerIds = ids.filter((id) => {
     const n = index.byId.get(id)?.node
-    return !!n && id !== activeLayerId && (isLayerNode(n) || (isBranch(n) && !isPictureGroup(index, id)))
+    return !!n && id !== activeLayerId && (isLayerNode(n) || (isBranch(n) && n.type !== 'entity' && !isPictureGroup(index, id)))
   })
   return {
     primaryId: primary,

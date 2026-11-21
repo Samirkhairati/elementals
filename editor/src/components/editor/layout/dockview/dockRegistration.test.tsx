@@ -57,7 +57,7 @@ function mountLayout(options: { entityFocus?: boolean; imageFocus?: boolean } = 
   return { ...fake, hook }
 }
 
-const DEFAULT_OPEN = ['empty_canvas', 'maps', 'layers', 'properties', 'tilesets', 'inspector', 'images', 'collision', 'preview', 'activeSelection']
+const DEFAULT_OPEN = ['empty_canvas', 'maps', 'layers', 'tilesets', 'inspector', 'images', 'collision', 'preview', 'activeSelection']
 
 describe('panel registry', () => {
   it('lists the Database in the right column with its shortcut', () => {
@@ -66,7 +66,7 @@ describe('panel registry', () => {
   })
 
   it('keeps the default layout unchanged: the new panels are on demand only', () => {
-    expect(DEFAULT_PANEL_IDS).toEqual(['maps', 'layers', 'properties', 'canvas', 'tilesets', 'preview', 'activeSelection'])
+    expect(DEFAULT_PANEL_IDS).toEqual(['maps', 'layers', 'canvas', 'tilesets', 'preview', 'activeSelection'])
     expect(DEFAULT_PANEL_IDS).not.toContain('database')
   })
 
@@ -113,16 +113,16 @@ describe('panel wrappers', () => {
 describe('entity focus', () => {
   const visible = (panels: Map<string, FakePanel>, id: string) => panels.get(id)!.group.api.setVisible.mock.calls.at(-1)?.[0]
 
-  it('shows the inspector instead of the tileset panels while an entity is selected, and back again', () => {
+  it('always shows the properties (inspector); it takes the whole sidebar while an entity is selected, and back again', () => {
     const { hook, panels } = mountLayout({ entityFocus: false })
-    expect(visible(panels, 'inspector')).toBe(false)
+    expect(visible(panels, 'inspector')).toBe(true)
     expect(visible(panels, 'tilesets')).toBe(true)
     hook.rerender({ entityFocus: true })
     expect(visible(panels, 'inspector')).toBe(true)
     for (const id of ['tilesets', 'preview', 'activeSelection']) expect(visible(panels, id)).toBe(false)
     expect(visible(panels, 'maps')).toBeUndefined() // the left sidebar is untouched
     hook.rerender({ entityFocus: false })
-    expect(visible(panels, 'inspector')).toBe(false)
+    expect(visible(panels, 'inspector')).toBe(true)
     expect(visible(panels, 'tilesets')).toBe(true)
   })
 })
@@ -135,7 +135,7 @@ describe('image layer focus', () => {
     expect(visible(panels, 'images')).toBe(false)
     hook.rerender({ imageFocus: true })
     expect(visible(panels, 'images')).toBe(true)
-    expect(visible(panels, 'inspector')).toBe(false)
+    expect(visible(panels, 'inspector')).toBe(true) // the properties stay above it
     for (const id of ['tilesets', 'preview', 'activeSelection']) expect(visible(panels, id)).toBe(false)
     hook.rerender({ imageFocus: false })
     expect(visible(panels, 'images')).toBe(false)

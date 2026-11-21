@@ -147,14 +147,21 @@ export interface DrawSpriteOptions {
   mirrorY?: boolean
   /** Smooth the picture when it is scaled (small previews of big pictures); the default keeps pixel art crisp. */
   smooth?: boolean
+  /** Degrees, clockwise, around the anchor (after the mirror). */
+  rotation?: number
 }
 
-/** Paints a resolved sprite pixel-perfectly (no smoothing unless `smooth`), honouring flip, opacity and tint. */
+/** Paints a resolved sprite pixel-perfectly (no smoothing unless `smooth`), honouring flip, rotation, opacity and tint. */
 export function drawResolvedSprite(ctx: CanvasRenderingContext2D, r: ResolvedSprite, opts: DrawSpriteOptions) {
   const { src, dest } = r
   const dx = opts.anchorX + dest.x
   const dy = opts.anchorY + dest.y
   ctx.save()
+  if (opts.rotation) {
+    ctx.translate(opts.anchorX, opts.anchorY)
+    ctx.rotate((opts.rotation * Math.PI) / 180)
+    ctx.translate(-opts.anchorX, -opts.anchorY)
+  }
   ctx.imageSmoothingEnabled = !!opts.smooth
   if (opts.smooth) ctx.imageSmoothingQuality = 'high'
   if (opts.opacity !== undefined && opts.opacity < 1) ctx.globalAlpha *= Math.max(0, opts.opacity)

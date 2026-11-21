@@ -8,6 +8,7 @@ import { TilesetCache } from './tilesetCache.js';
 import { syncGameAssets, type AssetSyncSummary } from './gameAssets.js';
 import * as gameSettingsStore from './gameSettingsStore.js';
 import * as lookStore from './lookStore.js';
+import * as prefabStore from './prefabStore.js';
 import * as tilesetStore from './tilesetStore.js';
 import * as graphicStore from './graphicStore.js';
 
@@ -188,6 +189,10 @@ export function createProjectChannels(
     'save-shader': async (id: string, source: string) => withAssetSync(toResult(() => lookStore.saveShader(root, id, source))),
     'delete-shader': async (id: string) => withAssetSync(toResult(() => lookStore.deleteShader(root, id))),
     'rename-shader': async (id: string, newId: string) => withAssetSync(toResult(() => lookStore.renameShader(root, id, newId))),
+
+    // ── prefabs (project/prefabs.json: saved node trees; editor-only) ──
+    'get-prefabs': () => toResult(() => prefabStore.getPrefabs(root)),
+    'save-prefabs': (prefabs: unknown) => toResult(() => prefabStore.savePrefabs(root, prefabs)),
 
     // ── common events ──
     'get-common-events': () =>

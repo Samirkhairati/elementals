@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { SpriteAssetInfo } from '../../../shared/engine/types'
-import { flippedItemBounds, itemBounds, itemSourceSize, nextImageName, snapImageAnchor } from './imageItems'
+import { flippedItemBounds, itemBounds, itemSourceSize, nextImageName, originShift, rotatedBounds, snapImageAnchor } from './imageItems'
 
 const sheet = {
   id: 'graphic:sky/sheet.png',
@@ -18,6 +18,20 @@ describe('imageItems', () => {
     const part = { graphicId: 'sky/sheet.png', crop: { x: 32, y: 0, w: 16, h: 8 }, scale: 2 }
     expect(itemSourceSize(part, assets)).toEqual({ w: 16, h: 8 })
     expect(itemBounds(part, assets)).toEqual({ x: -16, y: -16, w: 32, h: 16 })
+  })
+
+  it('the origin is the point of the picture on the anchor: the frame moves so that point sits there', () => {
+    expect(originShift({}, 64, 32)).toEqual({ x: 0, y: 0 })
+    expect(itemBounds({ graphicId: 'sky/sheet.png', originX: 0, originY: 0 }, assets)).toEqual({ x: 0, y: 0, w: 64, h: 32 })
+    expect(itemBounds({ graphicId: 'sky/sheet.png', originX: 0.5, originY: 0.5 }, assets)).toEqual({ x: -32, y: -16, w: 64, h: 32 })
+  })
+
+  it('a turned item is picked and snapped by the box around it', () => {
+    const r = rotatedBounds({ x: -32, y: -32, w: 64, h: 32 }, 90)
+    expect([r.x, r.y, r.w, r.h].map((v) => Math.round(v) + 0)).toEqual([0, -32, 32, 64])
+    expect(rotatedBounds({ x: 1, y: 2, w: 3, h: 4 }, 0)).toEqual({ x: 1, y: 2, w: 3, h: 4 })
+    const b = flippedItemBounds({ graphicId: 'sky/sheet.png', rotation: 180 }, assets)
+    expect([b.x, b.y, b.w, b.h].map((v) => Math.round(v) + 0)).toEqual([-32, 0, 64, 32])
   })
 
   it('a scaled item keeps its exact size in the editor (the game rounds)', () => {

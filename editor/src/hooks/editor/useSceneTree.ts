@@ -8,7 +8,7 @@ import { useCallback, useMemo, useRef } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 import type { MapData } from '@/types/editor'
 import type { SceneNode } from '../../../../shared/sceneTree'
-import { walkPanel } from '../../../../shared/sceneTree'
+import { promoteNodes, walkPanel } from '../../../../shared/sceneTree'
 import { sceneIndex, type SceneIndex } from '@/lib/sceneIndex'
 import {
   NO_SELECTION,
@@ -50,7 +50,8 @@ export function useSceneTree({ activeMap, getActiveMap, setActiveMap, onCommitHi
     (updater: (prev: SceneNode[]) => SceneNode[], onAfter?: (next: SceneNode[]) => void) => {
       // Computed from the live map, *outside* of any React updater: side effects below run exactly once.
       const prev = getNodes()
-      const next = updater(prev)
+      // A Node given a component becomes an entity, whatever made the change (add, paste, drop, prefab).
+      const next = promoteNodes(updater(prev))
       if (next === prev) return
       setActiveMap((m) => (m ? { ...m, nodes: next } : m))
       onCommitHistory?.(next)

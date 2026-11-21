@@ -38,7 +38,7 @@ describe('sceneIndex', () => {
     expect(hostOf(idx, 'left')?.id).toBe('wall')
     expect(hostOf(idx, 'oak')?.id).toBe('trees')
     expect(hostOf(idx, 'trees')?.id).toBe('trees')
-    expect(hostOf(idx, 'a')).toBeUndefined()
+    expect(hostOf(idx, 'a')?.id).toBe('a') // an entity is a Node: it may hold sprites
     expect(entityOf(idx, 'a')?.id).toBe('a')
     expect(layerAbove(idx, 'roofs')?.id).toBe('roofs')
     expect(layerAbove(idx, 'a')).toBeUndefined()

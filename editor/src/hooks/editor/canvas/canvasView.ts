@@ -23,7 +23,7 @@ export function overlayRgb(id: unknown): string {
 export type CanvasViewToggle = 'sprites' | 'labels' | 'badges' | 'clip' | 'lockImages'
 
 export interface CanvasViewSettings {
-  /** Draw real sprites (off = placeholder tiles only). */
+  /** Draw real sprites (off = only the nodes' anchors and areas). */
   sprites: boolean
   /** Draw collider footprints for every entity (the selected one is always shown). */
   /** Draw name labels for every entity at high zoom (hover and selection always show one). */

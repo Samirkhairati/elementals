@@ -66,7 +66,7 @@ export function drawMapScenery(ctx: CanvasRenderingContext2D, map: SceneryMap, o
           unresolved.push(it)
           continue
         }
-        drawResolvedSprite(ctx, resolved, { anchorX: it.x, anchorY: it.y, opacity: it.opacity, mirrorX: it.flipX, mirrorY: it.flipY, smooth: opts.smooth })
+        drawResolvedSprite(ctx, resolved, { anchorX: it.x, anchorY: it.y, opacity: it.opacity, mirrorX: it.flipX, mirrorY: it.flipY, rotation: it.rotation, smooth: opts.smooth })
       }
       continue
     }

@@ -14,10 +14,7 @@ import { TilesetsPanel } from '@/components/editor/panels/TilesetsPanel';
 import { TilesetPreview } from '@/components/editor/panels/TilesetPreview';
 import { ActiveSelectionPanel } from '@/components/editor/panels/ActiveSelectionPanel';
 import { DatabasePanel } from '@/components/editor/panels/DatabasePanel';
-import { LookPanel } from '@/components/editor/look/LookPanel';
 import { MapCanvas } from '@/components/editor/canvas/MapCanvas';
-
-const NO_NODES: never[] = [];
 
 // Stable no-op used as a placeholder for callbacks on inactive canvases.
 // Defined at module scope so it's the same reference every render — avoids
@@ -100,56 +97,14 @@ function RetiredPanel(_props: IDockviewPanelProps) {
   return null;
 }
 
-const selectProperties = (c: EditorContextValue) => ({
-  nodes: c.activeMap?.nodes,
-  activeLayerId: c.activeLayerId,
-  editNode: c.editNode,
-  entities: c.entities,
-  selectedEntityId: c.selectedEntityId,
-  handleRenameEntity: c.handleRenameEntity,
-  handleMoveEntity: c.handleMoveEntity,
-  handleAddComponent: c.handleAddComponent,
-  handleRemoveComponent: c.handleRemoveComponent,
-  handleUpdateComponentProp: c.handleUpdateComponentProp,
-  handleUpdateComponentProps: c.handleUpdateComponentProps,
-  handleDeleteEntity: c.handleDeleteEntity,
-  setSelectedEntityId: c.setSelectedEntityId,
-});
-
-/**
- * Layer properties live in the left sidebar; the entity inspector is its own panel in the right sidebar
- * (it replaces the tileset panels while an entity is selected, see useDockviewLayout).
- */
-function PropertiesBody({ entityMode }: { entityMode: boolean }) {
-  const ctx = useEditorSelector(selectProperties);
+/** The Properties panel: the top of the right sidebar, always shown (see useDockviewLayout). */
+export function InspectorWrapper(_props: IDockviewPanelProps) {
   return (
     // A plain block that scrolls vertically: a flex column here let the inspector shrink instead of scroll.
     <div className="h-full min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain p-2 text-xs text-muted-foreground bg-card/40" data-testid="properties-scroll">
-      <PropertiesPanel
-        nodes={ctx.nodes ?? NO_NODES}
-        activeLayerId={ctx.activeLayerId}
-        editNode={ctx.editNode}
-        entities={ctx.entities}
-        selectedEntityId={entityMode ? ctx.selectedEntityId : null}
-        renameEntity={ctx.handleRenameEntity}
-        moveEntity={ctx.handleMoveEntity}
-        addComponent={ctx.handleAddComponent}
-        removeComponent={ctx.handleRemoveComponent}
-        updateComponentProp={ctx.handleUpdateComponentProp}
-        updateComponentProps={ctx.handleUpdateComponentProps}
-        deleteEntity={ctx.handleDeleteEntity}
-        onBack={entityMode ? () => ctx.setSelectedEntityId(null) : undefined}
-      />
+      <PropertiesPanel />
     </div>
   );
-}
-
-export function PropertiesWrapper(_props: IDockviewPanelProps) {
-  return <PropertiesBody entityMode={false} />;
-}
-
-export function InspectorWrapper(_props: IDockviewPanelProps) {
-  return <PropertiesBody entityMode />;
 }
 
 /** The right sidebar while a collision layer is active (see useDockviewLayout). */
@@ -166,15 +121,6 @@ export function ImagesWrapper(_props: IDockviewPanelProps) {
   return (
     <div className="h-full min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain bg-card/40 p-2 text-xs text-muted-foreground" data-testid="images-scroll">
       <ImagesPanel />
-    </div>
-  );
-}
-
-/** The Look panel (colour grading of the map, a layer or a picture; opened on demand). */
-export function LookWrapper(_props: IDockviewPanelProps) {
-  return (
-    <div className="h-full min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain bg-card/40 p-2 text-xs" data-testid="look-scroll">
-      <LookPanel />
     </div>
   );
 }
@@ -199,7 +145,7 @@ const selectCanvas = (c: EditorContextValue) => ({
   handleCommit: c.handleCommit,
   selectedEntityId: c.selectedEntityId,
   setSelectedEntityId: c.setSelectedEntityId,
-  handleMoveEntity: c.handleMoveEntity,
+  placeNodeAt: c.placeNodeAt,
   showGrid: c.showGrid,
   snapToGrid: c.snapToGrid,
   snapEntityPos: c.snapEntityPos,
@@ -207,6 +153,7 @@ const selectCanvas = (c: EditorContextValue) => ({
   commitPlacement: c.commitPlacement,
   cancelPlacement: c.cancelPlacement,
   handleCreateEntity: c.handleCreateEntity,
+  addPlacedNode: c.addPlacedNode,
   handleDuplicateEntity: c.handleDuplicateEntity,
   handleDeleteEntity: c.handleDeleteEntity,
   handleUpdateComponentProp: c.handleUpdateComponentProp,
@@ -298,7 +245,7 @@ export function CanvasWrapper(props: IDockviewPanelProps) {
         handleCommit={isActive ? ctx.handleCommit : noop}
         selectedEntityId={isActive ? ctx.selectedEntityId : null}
         setSelectedEntityId={isActive ? ctx.setSelectedEntityId : noop}
-        moveEntity={isActive ? ctx.handleMoveEntity : noop}
+        moveEntity={isActive ? ctx.placeNodeAt : noop}
         showGrid={ctx.showGrid}
         snapToGrid={ctx.snapToGrid}
         snapEntityPos={ctx.snapEntityPos}
@@ -306,6 +253,7 @@ export function CanvasWrapper(props: IDockviewPanelProps) {
         commitPlacement={ctx.commitPlacement}
         cancelPlacement={ctx.cancelPlacement}
         createEntity={ctx.handleCreateEntity}
+        placeNode={ctx.addPlacedNode}
         duplicateEntity={ctx.handleDuplicateEntity}
         deleteEntity={ctx.handleDeleteEntity}
         updateComponentProp={ctx.handleUpdateComponentProp}
@@ -505,7 +453,7 @@ export const dockviewComponents = {
   maps: MapsWrapper,
   layers: LayersWrapper,
   entities: RetiredPanel,
-  properties: PropertiesWrapper,
+  properties: RetiredPanel,
   inspector: InspectorWrapper,
   images: ImagesWrapper,
   collision: CollisionWrapper,
@@ -515,5 +463,5 @@ export const dockviewComponents = {
   preview: PreviewWrapper,
   activeSelection: ActiveSelectionWrapper,
   database: DatabaseWrapper,
-  look: LookWrapper,
+  look: RetiredPanel,
 };

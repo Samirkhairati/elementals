@@ -81,6 +81,11 @@ export interface EditorBaseContextValue
       | 'setNodesYSort'
       | 'renameNode'
       | 'editNode'
+      | 'placeNodeAt'
+      | 'addPlacedNode'
+      | 'translateNodesBy'
+      | 'rotateNodeTo'
+      | 'setNodeTagOf'
       | 'addCollisionTiles'
       | 'setCollisionShapes'
       | 'toggleNodeVisibility'
@@ -147,6 +152,8 @@ export interface EditorBaseContextValue
   handleMapSettings: (map: MapData) => void
   /** Replaces the look of the map, a layer or a picture (`commit` false: no undo step yet, e.g. while dragging). */
   setLook: (ref: LookSubjectRef, set: LookSet | undefined, commit?: boolean) => void
+  /** Shows the look of `subject` (default: the selection's) in the Properties panel: selects its Look node, making one when it has none. */
+  openLook: (subject?: LookSubjectRef) => void
   /** Called by the dock when the last map tab closed: persists pending edits, then clears the editor state. */
   onClearActiveMap: () => void
 

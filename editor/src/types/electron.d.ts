@@ -74,6 +74,8 @@ interface ElectronAPI {
   saveGameSettings: (settings: unknown) => Promise<({ success: true; settings: unknown; assets?: { written: number; skipped?: string } }) | IpcFailure>;
   getLooks: () => Promise<({ success: true; looks: unknown | null }) | IpcFailure>;
   saveLooks: (looks: unknown) => Promise<({ success: true; looks: unknown; assets?: { written: number; skipped?: string } }) | IpcFailure>;
+  getPrefabs: () => Promise<({ success: true; prefabs: unknown | null }) | IpcFailure>;
+  savePrefabs: (prefabs: unknown) => Promise<({ success: true; prefabs: unknown }) | IpcFailure>;
   listShaders: () => Promise<({ success: true; shaders: { id: string; source: string }[] }) | IpcFailure>;
   saveShader: (id: string, source: string) => Promise<({ success: true; shader: { id: string; source: string }; assets?: { written: number; skipped?: string } }) | IpcFailure>;
   deleteShader: (id: string) => Promise<({ success: true; id: string }) | IpcFailure>;

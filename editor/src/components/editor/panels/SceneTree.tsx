@@ -39,6 +39,7 @@ import {
   Leaf,
   Lock,
   Pentagon,
+  Pencil,
   Plus,
   Stamp,
   Trash2,
@@ -64,16 +65,19 @@ import {
   type WalkEntry,
 } from '../../../../../shared/sceneTree'
 import { entityView, sceneIndex } from '@/lib/sceneIndex'
-import { SCENE_ROOT_ID, canDrop, countWithin, topLevelIds, type DropWhere } from '@/lib/sceneOps'
+import { SCENE_ROOT_ID, canDrop, countWithin, topLevelIds, type DropWhere, type NewNodeType } from '@/lib/sceneOps'
 import { useEditorClipboard } from '@/store/editorClipboard'
 import { describeBindings } from '@/lib/shortcuts'
 import { useBindings } from '@/store/shortcutStore'
 import { imagePickName } from '@/lib/graphicAssets'
-import { entityIconName, summarizeEntity } from '@/lib/entityVisuals'
+import { summarizeEntity } from '@/lib/entityVisuals'
 import { openEventEditor } from '@/lib/openEventEditor'
 import { openPicturePicker } from '@/lib/picturePickerEvent'
-import { PRESET_PREFABS } from '@/lib/componentRegistry'
+import { usePrefabLibrary } from '@/lib/prefabLibrary'
+import type { NodePrefab } from '../../../../../shared/prefabs'
+import { openPrefabDialog, PrefabDialogs } from '../dialogs/PrefabDialogs'
 import { usePolygonEdit } from '@/lib/polygonEditStore'
+import { setLookView, useLookView } from '@/lib/look/lookView'
 import { useEditorSelector, type EditorContextValue } from '../layout/EditorContext'
 import { YSortBadge } from '../ui/YSortBadge'
 import { Badge, IconButton } from '../ui/controls'
@@ -91,7 +95,6 @@ import {
   ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
-import { entityCreators, type Prefab } from './EntityMenu'
 import { CollisionItemIcon, pickCollisionItem } from './CollisionPanel'
 
 // ── what a row looks like ──────────────────────────────────────────────────────────────────────────
@@ -144,7 +147,7 @@ function EntityGlyph({ entity }: { entity: EntityData }) {
   const assets = useEditorSelector(selectSpriteAssets)
   const asset = entity.components.Sprite?.asset ? assets?.[entity.components.Sprite.asset] : undefined
   if (asset) return <SpriteThumb asset={asset} size={20} />
-  return <NamedIcon name={entityIconName(entity)} className="text-muted-foreground" />
+  return <NodeTypeIcon type="entity" />
 }
 
 function EntityBadges({ entity }: { entity: EntityData }) {
@@ -433,6 +436,9 @@ const SceneRow = memo(function SceneRow({ info, selected, multi, editing, draggi
 
 const selectMenu = (c: EditorContextValue) => ({
   nodes: c.activeMap?.nodes,
+  mapHasLook: !!c.activeMap?.look,
+  openLook: c.openLook,
+  setLook: c.setLook,
   view: c.selectionView,
   selectNode: c.selectNode,
   createNode: c.createNode,
@@ -444,24 +450,25 @@ const selectMenu = (c: EditorContextValue) => ({
   ungroupNode: c.ungroupNode,
   placeMultiple: c.placeMultiple,
   startPlacement: c.startPlacement,
-  handleCreateEntity: c.handleCreateEntity,
   setConfirmDialog: c.setConfirmDialog,
 })
 
 const NO_NODES: SceneNode[] = []
 
 const CATEGORY_LABELS: Record<NodeCategory, string> = { scene: 'Scene', drawing: 'Drawing', collision: 'Collision', entity: 'Entity', component: 'Components' }
-/** Types kept for old maps only: never offered for new nodes. */
-const LEGACY_TYPES: readonly SceneNodeType[] = ['objects']
+
+/** Types kept for old maps only, or made another way: never offered as such (an entity is a Node given a component). */
+const NOT_OFFERED: readonly SceneNodeType[] = ['objects', 'entity']
 
 /**
  * The node types that can go under `parentPath` (the map root when empty), grouped by category, each disabled when the
- * parent already has one of it (one Look, one YSort, one sprite or movement per entity, one terrain per map...). A pick
- * makes it; where an entity may go, the prefabs are offered next to it.
+ * parent already has one of it (one Look, one YSort, one sprite or movement per Node, one terrain per map...). A pick
+ * makes it; where a Node may go, the project's prefabs are offered next to it.
  */
-function AddNodeItems({ parentPath, nodes, onPick, onPrefab }: { parentPath: readonly SceneNode[]; nodes: readonly SceneNode[]; onPick: (type: SceneNodeType) => void; onPrefab: (prefab: Prefab) => void }) {
+function AddNodeItems({ parentPath, nodes, onPick, onPrefab, onManage }: { parentPath: readonly SceneNode[]; nodes: readonly SceneNode[]; onPick: (type: SceneNodeType) => void; onPrefab: (prefab: NodePrefab) => void; onManage: () => void }) {
   const bindings = useBindings()
-  const types = childTypesOf(parentPath).filter((t) => !LEGACY_TYPES.includes(t))
+  const prefabs = usePrefabLibrary().file.prefabs
+  const types = childTypesOf(parentPath).filter((t) => !NOT_OFFERED.includes(t))
   const keyOf: Partial<Record<SceneNodeType, string>> = { tile: describeBindings('layer.new', bindings), group: describeBindings('layer.newFolder', bindings) }
   const categories = (Object.keys(CATEGORY_LABELS) as NodeCategory[]).filter((c) => types.some((t) => NODE_TYPES[t].category === c))
   return (
@@ -483,19 +490,24 @@ function AddNodeItems({ parentPath, nodes, onPick, onPrefab }: { parentPath: rea
                 </ContextMenuItem>
               )
             })}
-          {category === 'entity' && (
+          {category === 'scene' && types.includes('group') && (
             <ContextMenuSub>
               <ContextMenuSubTrigger data-testid="add-prefab">
                 <Sparkles className="text-amber-400" />
-                Entity from prefab
+                Prefab
               </ContextMenuSubTrigger>
               <ContextMenuSubContent>
-                {PRESET_PREFABS.map((prefab) => (
-                  <ContextMenuItem key={prefab.id} onClick={() => onPrefab(prefab)} title={prefab.description}>
-                    <NamedIcon name={prefab.icon} className="text-muted-foreground" />
+                {prefabs.map((prefab) => (
+                  <ContextMenuItem key={prefab.id} onClick={() => onPrefab(prefab)} title={prefab.description ?? 'Click the map where its anchor goes'}>
+                    <NamedIcon name={prefab.icon ?? 'package'} className="text-muted-foreground" />
                     {prefab.name}
                   </ContextMenuItem>
                 ))}
+                {prefabs.length > 0 && <ContextMenuSeparator />}
+                <ContextMenuItem onClick={onManage} data-testid="manage-prefabs">
+                  <Pencil />
+                  Manage prefabs…
+                </ContextMenuItem>
               </ContextMenuSubContent>
             </ContextMenuSub>
           )}
@@ -505,29 +517,21 @@ function AddNodeItems({ parentPath, nodes, onPick, onPrefab }: { parentPath: rea
   )
 }
 
-/** Makes a node of `type` inside the node `parentId` (null = the map root): entities are placed on the map, sprites picked from the library first. */
+/** Makes a node of `type` inside the node `parentId` (null = the map root): sprites are picked from the library first, prefabs placed on the map. */
 function useAddNode() {
   const ctx = useEditorSelector(selectMenu)
-  const { placeNew, placePrefab } = entityCreators({ startPlacement: ctx.startPlacement, createEntity: ctx.handleCreateEntity })
   const add = (type: SceneNodeType, parentId: string | null) => {
-    if (type === 'entity') {
-      if (parentId) ctx.selectNode(parentId)
-      placeNew(parentId)
-      return
-    }
     if (type === 'picture') {
       // The picture picker places the sprite into the selected Node.
       if (parentId) ctx.selectNode(parentId)
       openPicturePicker()
       return
     }
-    ctx.createNode(type, parentId)
+    ctx.createNode(type as NewNodeType, parentId)
   }
-  const prefab = (p: Prefab, parentId: string | null) => {
-    if (parentId) ctx.selectNode(parentId)
-    placePrefab(p, parentId)
-  }
-  return { add, prefab }
+  const prefab = (p: NodePrefab, parentId: string | null) => ctx.startPlacement({ name: p.name, prefab: p, parentId })
+  const manage = (parentId: string | null) => setTimeout(() => openPrefabDialog({ mode: 'manage', parentId }), 0)
+  return { add, prefab, manage }
 }
 
 /** The right-click menu of one row, built when it opens. */
@@ -556,7 +560,7 @@ function RowMenu({ id, onRename }: { id: string; onRename: (id: string) => void 
   const component = NODE_TYPES[node.type].category === 'component'
   const path = [...ancestors, node]
   const parent = ancestors[ancestors.length - 1]
-  const canHaveChildren = childTypesOf(path).some((t) => !LEGACY_TYPES.includes(t))
+  const canHaveChildren = childTypesOf(path).some((t) => !NOT_OFFERED.includes(t))
   const host = [...ancestors].reverse().find(isBranch)
   const entity = node.type === 'entity' ? (entityView(node) as unknown as EntityData) : null
   const eventOwner = node.type === 'event' ? parent : entity?.components.Event ? node : null
@@ -600,7 +604,7 @@ function RowMenu({ id, onRename }: { id: string; onRename: (id: string) => void 
             Add Child Node
           </ContextMenuSubTrigger>
           <ContextMenuSubContent>
-            <AddNodeItems parentPath={path} nodes={nodes} onPick={(type) => addNode.add(type, id)} onPrefab={(p) => addNode.prefab(p, id)} />
+            <AddNodeItems parentPath={path} nodes={nodes} onPick={(type) => addNode.add(type, id)} onPrefab={(p) => addNode.prefab(p, id)} onManage={() => addNode.manage(id)} />
           </ContextMenuSubContent>
         </ContextMenuSub>
       )}
@@ -641,6 +645,15 @@ function RowMenu({ id, onRename }: { id: string; onRename: (id: string) => void 
           )}
         </>
       )}
+      {isBranch(node) && (
+        <>
+          <ContextMenuSeparator />
+          <ContextMenuItem onClick={() => setTimeout(() => openPrefabDialog({ mode: 'save', nodeId: id }), 0)} title="Save this node and everything inside it as a prefab to place again" data-testid="save-prefab">
+            <Sparkles className="text-amber-400" />
+            {node.prefab ? 'Save as Prefab… (update)' : 'Save as Prefab…'}
+          </ContextMenuItem>
+        </>
+      )}
       {(groupable || isBranch(node)) && <ContextMenuSeparator />}
       {groupable && (
         <ContextMenuItem disabled={tops.length === 0 || tops.some((t) => !index.byId.get(t) || ['collisionTiles', 'collisionShape', 'look', 'ySort'].includes(index.byId.get(t)!.node.type))} onClick={() => ctx.groupNodes(tops)} title="Put the selected nodes in one new Node">
@@ -678,9 +691,21 @@ function RootMenu() {
           Add Child Node
         </ContextMenuSubTrigger>
         <ContextMenuSubContent>
-          <AddNodeItems parentPath={[]} nodes={nodes} onPick={(type) => addNode.add(type, null)} onPrefab={(p) => addNode.prefab(p, null)} />
+          <AddNodeItems parentPath={[]} nodes={nodes} onPick={(type) => addNode.add(type, null)} onPrefab={(p) => addNode.prefab(p, null)} onManage={() => addNode.manage(null)} />
         </ContextMenuSubContent>
       </ContextMenuSub>
+      <ContextMenuItem
+        disabled={ctx.mapHasLook}
+        title={ctx.mapHasLook ? 'The map has a look: select its Look row' : 'Colour grading of the whole map'}
+        onClick={() => {
+          ctx.setLook({ kind: 'map' }, {}, true)
+          ctx.openLook({ kind: 'map' })
+        }}
+        data-testid="add-map-look"
+      >
+        <Palette style={{ color: NODE_TYPES.look.accent }} />
+        Add Look
+      </ContextMenuItem>
       <ContextMenuSeparator />
       <ContextMenuItem disabled={!canPaste} onClick={() => ctx.pasteNodes(null)}>
         <ClipboardPaste />
@@ -698,6 +723,8 @@ const selectPanel = (c: EditorContextValue) => ({
   hasActiveMap: !!c.activeMap,
   mapName: c.activeMap ? c.activeMap.name || c.activeMap.fileName || 'Scene' : '',
   mapHasLook: !!c.activeMap?.look,
+  openLook: c.openLook,
+  setLook: c.setLook,
   view: c.selectionView,
   selectNode: c.selectNode,
   clearSelection: c.clearSelection,
@@ -768,6 +795,28 @@ function RootRow({ name, hasLook, open, selected, hasChildren, drop, onClick, on
   )
 }
 
+/** The map's own look, shown as a Look row first under the map (it is not a node of the tree: the map holds it). */
+function MapLookRow({ selected, last, onClick, onDelete }: { selected: boolean; last: boolean; onClick: () => void; onDelete: () => void }) {
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div className="ed-row group gap-1.5" style={rowStyle(1)} data-testid="scene-map-look" data-selected={selected ? 'true' : undefined} onClick={(e) => (e.stopPropagation(), onClick())} title="The colour grading of the whole map">
+          <Guides depth={1} through={[]} last={last} hasChevron={false} />
+          <span className="shrink-0" style={{ width: SLOT }} aria-hidden />
+          <NodeTypeIcon type="look" />
+          <span className="ed-row-label">Look</span>
+        </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent onCloseAutoFocus={(e) => e.preventDefault()}>
+        <ContextMenuItem onClick={onDelete} destructive>
+          <Trash2 />
+          Delete map look
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
+  )
+}
+
 export function SceneTree() {
   const ctx = useEditorSelector(selectPanel)
   const { view } = ctx
@@ -785,6 +834,7 @@ export function SceneTree() {
     setDropAtState((cur) => (cur?.id === next?.id && cur?.where === next?.where ? cur : next))
   }
   const pickedItem = usePolygonEdit().selectedShapeId
+  const mapLookOpen = useLookView().pinned?.kind === 'map'
 
   // A layer or group that was just created opens its name for typing, so Ctrl+N then a name is all it takes.
   useEffect(() => {
@@ -885,11 +935,12 @@ export function SceneTree() {
             name={ctx.mapName}
             hasLook={ctx.mapHasLook}
             open={rootOpen}
-            selected={view.ids.length === 0}
-            hasChildren={rows.length > 0}
+            selected={view.ids.length === 0 && !mapLookOpen}
+            hasChildren={rows.length > 0 || ctx.mapHasLook}
             drop={dropAt?.id === SCENE_ROOT_ID}
             onClick={() => {
               ctx.setFocusedDomain('layers')
+              setLookView({ pinned: null })
               clearSelection()
             }}
             onToggle={() => setRootOpen((o) => !o)}
@@ -907,6 +958,20 @@ export function SceneTree() {
               endDrag()
             }}
           />
+          {rootOpen && ctx.mapHasLook && (
+            <MapLookRow
+              selected={mapLookOpen && view.ids.length === 0}
+              last={rows.length === 0}
+              onClick={() => {
+                ctx.setFocusedDomain('layers')
+                ctx.openLook({ kind: 'map' })
+              }}
+              onDelete={() => {
+                setLookView({ pinned: null })
+                ctx.setLook({ kind: 'map' }, undefined, true)
+              }}
+            />
+          )}
           {rootOpen &&
             rows.map((info) => (
               <SceneRow
@@ -922,6 +987,7 @@ export function SceneTree() {
               />
             ))}
           {rows.length === 0 && <div className="ed-empty">Nothing in this map yet: right-click the map to add a node.</div>}
+          <PrefabDialogs />
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent>

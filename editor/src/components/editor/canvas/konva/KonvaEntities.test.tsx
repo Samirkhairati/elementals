@@ -20,7 +20,7 @@ vi.mock('react-konva', () => {
   return { Group: make('Group'), Rect: make('Rect'), Shape: make('Shape') }
 })
 
-const drawn = vi.hoisted(() => ({ footprint: vi.fn(), badge: vi.fn(), label: vi.fn(), frame: vi.fn(), anchor: vi.fn(), ring: vi.fn(), hover: vi.fn(), placeholder: vi.fn() }))
+const drawn = vi.hoisted(() => ({ footprint: vi.fn(), badge: vi.fn(), label: vi.fn(), frame: vi.fn(), anchor: vi.fn(), ring: vi.fn(), hover: vi.fn() }))
 vi.mock('./entityDraw', async (orig) => ({
   ...(await orig<typeof import('./entityDraw')>()),
   drawFootprint: drawn.footprint,
@@ -30,7 +30,6 @@ vi.mock('./entityDraw', async (orig) => ({
   drawAnchorCross: drawn.anchor,
   drawWanderRing: drawn.ring,
   drawHoverFrame: drawn.hover,
-  drawPlaceholder: drawn.placeholder,
 }))
 
 import { KonvaEntities } from './KonvaEntities'
@@ -81,16 +80,21 @@ describe('KonvaEntities', () => {
     expect(nodes()).toHaveLength(0)
   })
 
-  it('always draws an area for every visible entity (its collider, else its tile), but not for hidden ones (those are not handed in)', () => {
+  it('draws an area only where there is a collider, and the anchor of every visible entity, but nothing for hidden ones (those are not handed in)', () => {
     const entities = [entity('a', 16, 32, { Collider: { width: 32, height: 32, offsetX: 0, offsetY: 0, isSolid: true } }), entity('b', 48, 32, { Collider: { width: 16, height: 8, isSolid: false } }), entity('c', 80, 32)]
     renderEntities(entities)
     runOverlay()
-    expect(drawn.footprint).toHaveBeenCalledTimes(3)
-    // (ctx, x, y, w, h, rgb, scale, strong): the collider's box, the 16x8 trigger, and the tile of the entity without a collider
+    expect(drawn.footprint).toHaveBeenCalledTimes(2)
+    // (ctx, x, y, w, h, rgb, scale, strong): the collider's box and the 16x8 trigger; the Node without a collider has no box
     expect(drawn.footprint.mock.calls.map((c) => c.slice(1, 5))).toEqual([
       [0, 0, 32, 32],
       [40, 24, 16, 8],
-      [64, 0, 32, 32],
+    ])
+    // (ctx, x, y, scale, strong): a faint cross on every anchor
+    expect(drawn.anchor.mock.calls.map((c) => [c[1], c[2], c[4]])).toEqual([
+      [16, 32, false],
+      [48, 32, false],
+      [80, 32, false],
     ])
     expect(drawn.footprint.mock.calls.every((c) => c[5] === '255,255,255' && c[7] === false)).toBe(true)
 
@@ -108,7 +112,10 @@ describe('KonvaEntities', () => {
     expect(drawn.footprint).toHaveBeenCalledTimes(2)
     expect(drawn.footprint.mock.calls.filter((c) => c[7] === true)).toHaveLength(1) // only the selected one is strong
     expect(drawn.frame).toHaveBeenCalledTimes(1)
-    expect(drawn.anchor).toHaveBeenCalledTimes(1)
+    expect(drawn.anchor.mock.calls.map((c) => [c[1], c[4]])).toEqual([
+      [48, false],
+      [16, true], // the selected one's anchor stands out
+    ])
   })
 
   it('shows the wander ring only for the selected wandering entity', () => {
@@ -167,13 +174,21 @@ describe('KonvaEntities', () => {
     expect(drawn.hover).not.toHaveBeenCalled()
   })
 
-  it('without a sprite an entity shows an icon placeholder; hidden sprites are dimmed', () => {
-    renderEntities([entity('npc', 16, 32, { Tag: { tag: 'npc' } }), entity('ghost', 48, 32, { Sprite: { asset: 'missing/asset', visible: false } })])
-    const spriteShapes = recorded.filter((r) => r.kind === 'Shape' && r.props.name === 'entity-sprite')
-    for (const s of spriteShapes) s.props.sceneFunc(fakeCtx(), { getStage: () => null, getParent: () => null })
-    expect(drawn.placeholder).toHaveBeenCalledTimes(2)
-    expect(drawn.placeholder.mock.calls[0][1]).toBe('user')
-    expect(drawn.placeholder.mock.calls.map((c) => c[3])).toEqual([1, 0.5])
+  it('without a sprite a Node draws nothing of its own (no icon, no square): only its anchor in the overlay', () => {
+    renderEntities([entity('npc', 16, 32, { Tag: { tag: 'npc' } })])
+    const calls: string[] = []
+    const ctx = { _context: new Proxy({}, { get: (_t, k: string) => (k === 'save' || k === 'restore' ? () => undefined : (...a: unknown[]) => void calls.push(`${k}(${a.join(',')})`)), set: () => true }) }
+    for (const s of recorded.filter((r) => r.kind === 'Shape' && r.props.name === 'entity-sprite')) s.props.sceneFunc(ctx, { getStage: () => null, getParent: () => null })
+    expect(calls).toEqual([])
+    runOverlay()
+    expect(drawn.footprint).not.toHaveBeenCalled()
+    expect(drawn.anchor).toHaveBeenCalledTimes(1)
+  })
+
+  it('a Node with neither sprite nor collider is grabbed by the small square around its anchor', () => {
+    renderEntities([entity('n', 50, 61)], { part: 'hits' })
+    const grab = recorded.find((r) => r.kind === 'Rect')!
+    expect([grab.props.x, grab.props.y, grab.props.width, grab.props.height]).toEqual([-8, -8, 16, 16])
   })
 
   it('entities can be dragged and receive presses', () => {
@@ -198,15 +213,22 @@ describe('KonvaEntities', () => {
     renderEntities([entity('a', 16, 32)], { moveEntity, snapToGrid: true })
     const node = nodes()[0]
     const setters: number[] = []
-    node.props.onDragEnd({ cancelBubble: false, target: { x: (v?: number) => (v === undefined ? 150 : setters.push(v)), y: (v?: number) => (v === undefined ? 70 : setters.push(v)), getStage: () => null } })
+    node.props.onDragEnd({ cancelBubble: false, evt: { altKey: false }, target: { x: (v?: number) => (v === undefined ? 150 : setters.push(v)), y: (v?: number) => (v === undefined ? 70 : setters.push(v)), getStage: () => null } })
     expect(moveEntity).toHaveBeenCalledTimes(1)
-    expect(moveEntity).toHaveBeenCalledWith('a', 144, 64)
+    expect(moveEntity).toHaveBeenCalledWith('a', 144, 64, true) // what it holds moves along
+  })
+
+  it('a drag with Alt held moves only the anchor: what the node holds stays put', () => {
+    const moveEntity = vi.fn()
+    renderEntities([entity('a', 16, 32)], { moveEntity, snapToGrid: true })
+    nodes()[0].props.onDragEnd({ cancelBubble: false, evt: { altKey: true }, target: { x: (v?: number) => (v === undefined ? 150 : undefined), y: (v?: number) => (v === undefined ? 70 : undefined), getStage: () => null } })
+    expect(moveEntity).toHaveBeenCalledWith('a', 144, 64, false)
   })
 
   it('with the magnet on, a bigger area snaps by its own edges', () => {
     const moveEntity = vi.fn()
     renderEntities([entity('big', 16, 32, { Collider: { width: 64, height: 64, offsetX: 0, offsetY: 0, isSolid: true } })], { moveEntity, snapToGrid: true })
-    nodes()[0].props.onDragEnd({ cancelBubble: false, target: { x: (v?: number) => (v === undefined ? 100 : undefined), y: (v?: number) => (v === undefined ? 100 : undefined), getStage: () => null } })
+    nodes()[0].props.onDragEnd({ cancelBubble: false, evt: { altKey: false }, target: { x: (v?: number) => (v === undefined ? 100 : undefined), y: (v?: number) => (v === undefined ? 100 : undefined), getStage: () => null } })
     const [, x, y] = moveEntity.mock.calls[0]
     expect((x - 32) % 32).toBe(0)
     expect(y % 32).toBe(0)
@@ -217,18 +239,18 @@ describe('KonvaEntities', () => {
     renderEntities([entity('f', 50, 61)], { moveEntity, snapToGrid: false })
     const drop = (x: number, y: number) => {
       const target = { x: (v?: number) => (v === undefined ? x : undefined), y: (v?: number) => (v === undefined ? y : undefined), getStage: () => null }
-      nodes()[0].props.onDragEnd({ cancelBubble: false, target })
+      nodes()[0].props.onDragEnd({ cancelBubble: false, evt: { altKey: false }, target })
     }
     drop(150.4, 70.6)
-    expect(moveEntity).toHaveBeenLastCalledWith('f', 150, 71)
+    expect(moveEntity).toHaveBeenLastCalledWith('f', 150, 71, true)
     drop(-30, 99999)
-    expect(moveEntity).toHaveBeenLastCalledWith('f', -30, 99999)
+    expect(moveEntity).toHaveBeenLastCalledWith('f', -30, 99999, true)
   })
 
-  it('an entity without a collider has its tile as area, wherever it stands', () => {
+  it('an entity without a collider has no area drawn, wherever it stands', () => {
     renderEntities([entity('f', 50, 61)])
     runOverlay()
-    expect(drawn.footprint.mock.calls.map((c) => c.slice(1, 5))).toEqual([[34, 29, 32, 32]])
+    expect(drawn.footprint).not.toHaveBeenCalled()
   })
 
   it('an entity with a collider shows exactly that box, whatever its size', () => {
@@ -250,7 +272,8 @@ describe('KonvaEntities', () => {
   })
 
   it("tints each entity's area with its Tag colour (unknown or empty = white)", () => {
-    renderEntities([entity('a', 16, 32, { Tag: { tag: 'x', color: 'mint' } }), entity('b', 48, 32, { Tag: { tag: 'x', color: 'nope' } }), entity('c', 80, 32)], { selectedEntityId: 'a' })
+    const box = { Collider: { width: 32, height: 32 } }
+    renderEntities([entity('a', 16, 32, { ...box, Tag: { tag: 'x', color: 'mint' } }), entity('b', 48, 32, { ...box, Tag: { tag: 'x', color: 'nope' } }), entity('c', 80, 32, box)], { selectedEntityId: 'a' })
     runOverlay()
     const byX = Object.fromEntries(drawn.footprint.mock.calls.map((c) => [c[1], c[5]]))
     expect(byX[0]).toBe('160,235,196')

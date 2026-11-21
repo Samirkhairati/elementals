@@ -6,8 +6,9 @@ const openOnly = (...ids: string[]) => (id: string) => ids.includes(id)
 
 describe('panelPosition', () => {
   it('uses the first anchor that is open, in its direction', () => {
-    expect(panelPosition(PANEL_PLACEMENT.layers, openOnly('maps', 'properties'), 'map:a')).toEqual({ referencePanel: 'maps', direction: 'below' })
-    expect(panelPosition(PANEL_PLACEMENT.layers, openOnly('properties'), 'map:a')).toEqual({ referencePanel: 'properties', direction: 'above' })
+    expect(panelPosition(PANEL_PLACEMENT.layers, openOnly('maps'), 'map:a')).toEqual({ referencePanel: 'maps', direction: 'below' })
+    expect(panelPosition(PANEL_PLACEMENT.preview, openOnly('activeSelection'), 'map:a')).toMatchObject({ referencePanel: 'activeSelection' })
+    expect(panelPosition(PANEL_PLACEMENT.layers, openOnly(), 'map:a')).toEqual({ referencePanel: 'map:a', direction: 'left' })
   })
 
   it('within one anchor, the first open panel of its list wins', () => {

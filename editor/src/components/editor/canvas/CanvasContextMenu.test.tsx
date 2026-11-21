@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import type { SceneNode } from '../../../../../shared/sceneTree'
 import { CanvasContextMenu } from './CanvasContextMenu'
 import { makeEntity } from '@/test/helpers'
 
@@ -60,35 +61,41 @@ describe('CanvasContextMenu over a picture', () => {
   })
 })
 
-describe('CanvasContextMenu creating entities', () => {
-  const open = (onCreateEntity: (...a: unknown[]) => void, snapToGrid: boolean, prefab = false) => {
+describe('CanvasContextMenu creating nodes', () => {
+  const open = (onPlaceNode: (...a: unknown[]) => void, snapToGrid: boolean, prefab = false) => {
     render(
       <CanvasContextMenu
         menuState={{ isOpen: true, x: 10, y: 10, target: { type: 'tile', tileX: 3, tileY: 2, worldX: 117, worldY: 83 } }}
         onClose={vi.fn()}
-        onCreateEntity={onCreateEntity as never}
+        onCreateEntity={vi.fn()}
+        onPlaceNode={onPlaceNode as never}
         snapToGrid={snapToGrid}
       />,
     )
-    fireEvent.keyDown(screen.getByRole('menuitem', { name: 'Entity' }), { key: 'ArrowRight' })
+    fireEvent.keyDown(screen.getByRole('menuitem', { name: 'Node' }), { key: 'ArrowRight' })
     if (prefab) fireEvent.keyDown(screen.getByRole('menuitem', { name: 'Prefab' }), { key: 'ArrowRight' })
   }
+  let n = 0
+  const newId = () => `n${++n}`
+  const made = (place: ReturnType<typeof vi.fn>) => (place.mock.lastCall![0] as (id: () => string) => SceneNode)(newId)
 
-  it('Entity › New lands on the clicked tile with the magnet on, and on the exact pixel with it off', () => {
-    const create = vi.fn()
-    open(create, true)
-    fireEvent.click(screen.getByRole('menuitem', { name: 'New' }))
-    expect(create).toHaveBeenLastCalledWith('New Entity', 112, 96, undefined)
+  it('Node › New Node puts an empty Node with its anchor on the clicked tile anchor (magnet on) or the exact pixel (off)', () => {
+    const place = vi.fn()
+    open(place, true)
+    fireEvent.click(screen.getByRole('menuitem', { name: 'New Node' }))
+    expect(made(place)).toMatchObject({ type: 'group', name: 'Node', x: 112, y: 96, children: [] })
     cleanup()
-    open(create, false)
-    fireEvent.click(screen.getByRole('menuitem', { name: 'New' }))
-    expect(create).toHaveBeenLastCalledWith('New Entity', 117, 83, undefined)
+    open(place, false)
+    fireEvent.click(screen.getByRole('menuitem', { name: 'New Node' }))
+    expect(made(place)).toMatchObject({ type: 'group', x: 117, y: 83 })
   })
 
-  it('Entity › Prefab creates the prefab with its components', () => {
-    const create = vi.fn()
-    open(create, true, true)
+  it('Node › Prefab places a copy of the prefab tree there, linked to the prefab', () => {
+    const place = vi.fn()
+    open(place, true, true)
     fireEvent.click(screen.getByRole('menuitem', { name: 'NPC' }))
-    expect(create).toHaveBeenLastCalledWith('NPC', 112, 96, expect.objectContaining({ Sprite: expect.anything() }))
+    const node = made(place) as SceneNode & { x: number; y: number; prefab?: string }
+    expect(node).toMatchObject({ type: 'entity', name: 'NPC', x: 112, y: 96, prefab: 'npc' })
+    expect(node.id).toMatch(/^n\d+$/)
   })
 })

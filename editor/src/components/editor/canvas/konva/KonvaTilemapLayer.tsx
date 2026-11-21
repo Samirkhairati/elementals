@@ -43,6 +43,16 @@ export function drawImageItem(ctx: CanvasRenderingContext2D, item: ImageItem, sp
   const resolved = resolveImageItem(drag && drag.id === item.id && drag.scale !== undefined ? { ...item, scale: drag.scale } : item, spriteAssets)
   if (!resolved) return
   const at = drag && drag.id === item.id ? drag : drag?.along?.ids.includes(item.id) ? { x: item.x + drag.along.dx, y: item.y + drag.along.dy } : item
+  // A turned picture: turn the context around its anchor, so the graded path draws it turned too.
+  if (item.rotation) {
+    ctx.save()
+    ctx.translate(at.x, at.y)
+    ctx.rotate((item.rotation * Math.PI) / 180)
+    ctx.translate(-at.x, -at.y)
+    drawImageItem(ctx, { ...item, rotation: 0 }, spriteAssets, drag, looks)
+    ctx.restore()
+    return
+  }
   if (looks && looks.view.enabled) {
     const own = ownLook(item)
     const shadow = shadowFor([own, looks.layer.look], looks.view.profile)

@@ -22,7 +22,7 @@ import { sampleSelection, sampledLayers } from '@/lib/layerSelection'
 import { lockedNode, shown, type SceneIndex } from '@/lib/sceneIndex'
 import { isBranch, isDataLayer, type DataLayerNode } from '../../../../../shared/sceneTree'
 import { TileCoords } from './useCanvasViewport'
-import { PendingEntityPlacement } from '@/hooks/editor/useEntityPlacement'
+import { PendingEntityPlacement, placementComponents } from '@/hooks/editor/useEntityPlacement'
 import {
   CanvasContextMenuState,
 } from '@/components/editor/canvas/CanvasContextMenu'
@@ -369,7 +369,7 @@ export function useCanvasInteraction({
           const p = stage?.getPointerPosition()
           const scale = stage?.scaleX() || 1
           const raw = p && stage ? { x: (p.x - stage.x()) / scale, y: (p.y - stage.y()) / scale } : { x: coords.rawX * 32 + 16, y: coords.rawY * 32 + 32 }
-          const area = entityAreaLocal({ components: (pendingPlacement.components ?? {}) as Record<string, PropBag> })
+          const area = entityAreaLocal({ components: placementComponents(pendingPlacement) as Record<string, PropBag> })
           const { x: posX, y: posY } = snapEntityAnchor(area, raw.x, raw.y, snapToGrid)
           commitPlacement?.(posX, posY)
           return

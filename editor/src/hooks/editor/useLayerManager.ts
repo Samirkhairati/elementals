@@ -7,6 +7,9 @@ import { snapshot, useEditorClipboard } from '@/store/editorClipboard'
 import type { TileSelection, ActiveTool, PaintMode, DebugInfo } from '@/types/editor'
 import {
   addNode,
+  addEntity,
+  withFreshEventIds,
+  syncEntityTransforms,
   copiesOf,
   deleteNodes,
   duplicateNodes,
@@ -16,6 +19,10 @@ import {
   newNodeName,
   pasteCopies,
   patchNode,
+  placeNode,
+  rotateNode,
+  setNodeTag,
+  translateNodes,
   renameNode,
   setCollapsed,
   setLocked,
@@ -29,13 +36,24 @@ import {
 } from '@/lib/sceneOps'
 import { sceneIndex } from '@/lib/sceneIndex'
 import { NO_SELECTION, pruneSelection, selectNode, type SelectMode } from '@/lib/sceneSelection'
-import { collisionLayerLike, insertNode, isBranch, isContainer, isLayerNode, updateNode, type CollisionShapeNode } from '../../../../shared/sceneTree'
+import { collisionLayerLike, insertNode, isBranch, isContainer, isLayerNode, nodeAnchor, updateNode, type CollisionShapeNode, type SceneNode } from '../../../../shared/sceneTree'
+import { getCanvasViewRect } from '@/lib/look/lookView'
 import { nextTileGroupName } from '../../../../shared/collisionLayers'
 import type { CollisionShape } from '../../../../shared/collisionShapes'
 import { useImageItems } from './useImageItems'
 import type { SceneTreeApi } from './useSceneTree'
 
 const newId = () => crypto.randomUUID()
+
+/** Where a new Node's anchor goes: its parent's anchor when the parent has one set, else the tile anchor in the middle of the view. */
+function newNodeAnchor(parent: SceneNode | undefined): { x: number; y: number } {
+  if (parent && (parent.type === 'entity' || (parent.type === 'group' && parent.x !== undefined))) return nodeAnchor(parent)!
+  const view = getCanvasViewRect()
+  if (!view) return { x: 16, y: 32 }
+  const col = Math.max(0, Math.floor((view.x + view.w / 2) / 32))
+  const row = Math.max(0, Math.floor((view.y + view.h / 2) / 32))
+  return { x: col * 32 + 16, y: (row + 1) * 32 }
+}
 
 export function useLayerManager(tree: SceneTreeApi) {
   const { commit, commitView, getNodes, getIndex, getSelection, setSelection, view, index, select, selectMany } = tree
@@ -120,7 +138,7 @@ export function useLayerManager(tree: SceneTreeApi) {
     (id: string, value: boolean) =>
       commit((prev) => {
         const node = sceneIndex(prev).byId.get(id)?.node
-        if (!node || node.type !== 'group' || (node.pickAsOne === true) === value) return prev
+        if (!node || !isBranch(node) || (node.pickAsOne === true) === value) return prev
         if (value) return patchNode(prev, id, { pickAsOne: true })
         return updateNode(prev, id, (n) => {
           const { pickAsOne: _p, ...rest } = n as typeof node
@@ -154,7 +172,10 @@ export function useLayerManager(tree: SceneTreeApi) {
           const anchor = anchorId === undefined ? home : anchorId
           const parentPath = parentPathFor(prev, type, anchor)
           const id = newId()
-          const result = addNode(prev, makeNode(type, id, newNodeName(prev, type), parentPath[parentPath.length - 1]?.type), anchor)
+          let made0 = makeNode(type, id, newNodeName(prev, type), parentPath[parentPath.length - 1]?.type)
+          // A new Node gets an anchor: its parent's, else the middle of the map view (on a tile anchor), so it is on screen.
+          if (made0.type === 'group') made0 = { ...made0, ...newNodeAnchor(parentPath[parentPath.length - 1]) }
+          const result = addNode(prev, made0, anchor)
           if (!result.node) return prev
           made = result.node.id
           return expandTo(result.nodes, result.node.id)
@@ -165,6 +186,28 @@ export function useLayerManager(tree: SceneTreeApi) {
           const id = made
           setJustCreatedLayer((prev) => ({ id, n: (prev?.n ?? 0) + 1 }))
         }
+      )
+    },
+    [commit, getSelection, select]
+  )
+
+  /**
+   * Puts a node made elsewhere on the map: a placed prefab (`placePrefab`, already at its spot) or a new plain Node,
+   * inside `anchorId` when that can hold it, else where an entity would go; the new node is selected.
+   */
+  const addPlacedNode = useCallback(
+    (make: (newId: () => string) => SceneNode, anchorId?: string | null) => {
+      let made: string | null = null
+      commit(
+        (prev) => {
+          const node = syncEntityTransforms(withFreshEventIds(make(newId)))
+          const anchor = anchorId === undefined ? getSelection().primary : anchorId
+          const next = node.type === 'entity' ? addEntity(prev, node, anchor) : addNode(prev, node, anchor).nodes
+          if (next === prev) return prev
+          made = node.id
+          return expandTo(next, node.id)
+        },
+        () => made && select(made)
       )
     },
     [commit, getSelection, select]
@@ -194,6 +237,15 @@ export function useLayerManager(tree: SceneTreeApi) {
 
   /** A patch of fields (`z`, `look`, ...) applied to a node in one undo step. */
   const editNode = useCallback((id: string, patch: Record<string, unknown>) => commit((prev) => patchNode(prev, id, patch)), [commit])
+
+  /** Puts a node's anchor at (x, y), what is below it moving along unless `carry` is false (its origin moves alone). */
+  const placeNodeAt = useCallback((id: string, x: number, y: number, carry = true) => commit((prev) => placeNode(prev, id, x, y, carry)), [commit])
+  /** Moves several nodes (and what is below them) by (dx, dy) in one undo step. */
+  const translateNodesBy = useCallback((ids: readonly string[], dx: number, dy: number) => commit((prev) => translateNodes(prev, ids, dx, dy)), [commit])
+  /** Turns a node to `degrees`; a Node turns what is below it around its anchor unless `carry` is false. */
+  const rotateNodeTo = useCallback((id: string, degrees: number, carry = true) => commit((prev) => rotateNode(prev, id, degrees, carry)), [commit])
+  /** Sets the tag (and its colour) of a Node: a plain Node becomes an entity. */
+  const setNodeTagOf = useCallback((id: string, patch: { tag?: string; color?: string }) => commit((prev) => setNodeTag(prev, id, patch)), [commit])
 
   /** Replaces the shapes of a collision layer (the shape editor on the canvas), one undo step. */
   const setCollisionShapes = useCallback(
@@ -372,6 +424,11 @@ export function useLayerManager(tree: SceneTreeApi) {
     selectImage,
     addCollisionTiles,
     editNode,
+    addPlacedNode,
+    placeNodeAt,
+    translateNodesBy,
+    rotateNodeTo,
+    setNodeTagOf,
     setCollisionShapes,
     toggleNodeVisibility,
     toggleNodeLock,

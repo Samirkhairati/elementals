@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { act, render, waitFor } from '@testing-library/react'
 import type { MapData } from '@/types/editor'
 import type { EditorContextValue } from '@/components/editor/layout/EditorContext'
-import type { TileLayerNode } from '../../../shared/sceneTree'
+import { walk, type TileLayerNode } from '../../../shared/sceneTree'
 import { sceneIndex } from '@/lib/sceneIndex'
 import { installElectronAPI, makeLayer, makeMap, uninstallElectronAPI } from '@/test/helpers'
 
@@ -132,8 +132,8 @@ describe('EditorPage wiring', () => {
     await sleep(SAVE_DELAY + 100)
     expect(saveMap).toHaveBeenCalledTimes(1)
     const payload = saveMap.mock.calls[0][2] as MapData
-    expect(payload.nodes.filter(n => n.type === 'entity')).toHaveLength(2)
-    expect(payload.nodes.filter(n => n.type === 'objects' || n.type === 'tile')).toHaveLength(2)
+    expect(walk(payload.nodes).filter((e) => e.node.type === 'entity')).toHaveLength(2) // B went inside A: A was selected
+    expect(walk(payload.nodes).filter((e) => e.node.type === 'objects' || e.node.type === 'tile')).toHaveLength(2)
   })
 
   it('opening or closing a group is saved but is not an undo step', async () => {

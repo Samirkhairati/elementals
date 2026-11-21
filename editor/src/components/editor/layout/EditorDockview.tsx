@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { DockviewReact, DockviewDefaultTab } from 'dockview-react';
 import { IDockviewPanelHeaderProps } from 'dockview';
 import 'dockview/dist/styles/dockview.css';
@@ -9,6 +9,8 @@ import { dockviewComponents } from './dockview/PanelWrappers';
 import { DefaultHeaderActions } from './dockview/HeaderActions';
 import { useDockviewLayout } from './dockview/useDockviewLayout';
 import { isMapPanelId } from './dockview/types';
+import { sceneIndex } from '@/lib/sceneIndex';
+import { useLookView } from '@/lib/look/lookView';
 import { EditorTopToolbar } from './EditorTopToolbar';
 
 const TabHeaderComponent = (props: IDockviewPanelHeaderProps) => {
@@ -16,18 +18,26 @@ const TabHeaderComponent = (props: IDockviewPanelHeaderProps) => {
   return <DockviewDefaultTab {...props} hideClose={!isMap} />;
 };
 
-const selectDockInputs = (c: EditorContextValue) => ({
-  maps: c.maps,
-  activeMap: c.activeMap,
-  onSelectMap: c.onSelectMap,
-  onClearActiveMap: c.onClearActiveMap,
-  entityFocus: !!c.selectedEntityId,
-  imageFocus: c.activeLayerType === 'group' || c.activeLayerType === 'ySort',
-  collisionFocus: c.activeLayerType === 'collision',
-});
+const selectDockInputs = (c: EditorContextValue) => {
+  const primary = c.selectionView.primaryId ? c.activeMap?.nodes && sceneIndex(c.activeMap.nodes).byId.get(c.selectionView.primaryId)?.node : undefined
+  return {
+    maps: c.maps,
+    activeMap: c.activeMap,
+    onSelectMap: c.onSelectMap,
+    onClearActiveMap: c.onClearActiveMap,
+    openLook: c.openLook,
+    // The Properties panel alone: an entity (its components) or a Look (the look editor).
+    entityFocus: !!c.selectedEntityId || primary?.type === 'look',
+    nothingSelected: !primary,
+    imageFocus: c.activeLayerType === 'group' || c.activeLayerType === 'ySort',
+    collisionFocus: c.activeLayerType === 'collision',
+  };
+};
 
 export function EditorDockview() {
   const parentCtx = useEditorSelector(selectDockInputs);
+  // The map's look is open (its Look row in the Scene panel) while no node is selected.
+  const mapLookOpen = useLookView().pinned?.kind === 'map' && parentCtx.nothingSelected;
   const {
     onReady,
     openPanels,
@@ -43,15 +53,18 @@ export function EditorDockview() {
     activeMap: parentCtx.activeMap,
     onSelectMap: parentCtx.onSelectMap,
     onClearActiveMap: parentCtx.onClearActiveMap,
-    entityFocus: parentCtx.entityFocus,
+    entityFocus: parentCtx.entityFocus || mapLookOpen,
     imageFocus: parentCtx.imageFocus,
     collisionFocus: parentCtx.collisionFocus,
   });
 
+  const { openLook } = parentCtx;
+  // The Look panel is the Properties panel showing a Look node: "open the Look panel" selects the selection's Look.
+  const openPanelOrLook = useCallback((id: string) => (id === 'look' ? openLook() : openPanel(id)), [openLook, openPanel]);
   const layoutValue = useMemo(
     () => ({
       openPanels,
-      openPanel,
+      openPanel: openPanelOrLook,
       closePanel,
       togglePanel,
       resetLayout,
@@ -59,7 +72,7 @@ export function EditorDockview() {
       closeMapTab,
       isPanelOpen,
     }),
-    [openPanels, openPanel, closePanel, togglePanel, resetLayout, openMapTab, closeMapTab, isPanelOpen]
+    [openPanels, openPanelOrLook, closePanel, togglePanel, resetLayout, openMapTab, closeMapTab, isPanelOpen]
   );
 
   return (

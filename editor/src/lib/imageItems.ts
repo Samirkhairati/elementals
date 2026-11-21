@@ -10,7 +10,37 @@ import { DEFAULT_GRID, nearestLine, type GridSpec } from './grid'
 import type { Rect } from './entityVisuals'
 import { getSpriteImage, resolveSprite, spriteBoundsFromMeta, type ResolvedSprite } from './spriteImages'
 
-type ItemLike = Pick<ImageItem, 'assetId' | 'graphicId' | 'crop' | 'scale'>
+type ItemLike = Pick<ImageItem, 'assetId' | 'graphicId' | 'crop' | 'scale' | 'originX' | 'originY'>
+
+/**
+ * How far the origin moves the frame from where it stands by default (its bottom-centre on the anchor): the origin is
+ * the point of the picture, as fractions of its size, that sits on the anchor (and that it turns around).
+ */
+export function originShift(item: Pick<ImageItem, 'originX' | 'originY'>, w: number, h: number): { x: number; y: number } {
+  return { x: (0.5 - (item.originX ?? 0.5)) * w, y: (1 - (item.originY ?? 1)) * h }
+}
+
+const shifted = (r: Rect, item: Pick<ImageItem, 'originX' | 'originY'>): Rect => {
+  const d = originShift(item, r.w, r.h)
+  return d.x || d.y ? { ...r, x: r.x + d.x, y: r.y + d.y } : r
+}
+
+/** The axis-aligned box around `r` (relative to the anchor) turned by `degrees` around the anchor. */
+export function rotatedBounds(r: Rect, degrees: number | undefined): Rect {
+  if (!degrees) return r
+  const a = (degrees * Math.PI) / 180
+  const cos = Math.cos(a)
+  const sin = Math.sin(a)
+  const xs: number[] = []
+  const ys: number[] = []
+  for (const [x, y] of [[r.x, r.y], [r.x + r.w, r.y], [r.x, r.y + r.h], [r.x + r.w, r.y + r.h]]) {
+    xs.push(x * cos - y * sin)
+    ys.push(x * sin + y * cos)
+  }
+  const x = Math.min(...xs)
+  const y = Math.min(...ys)
+  return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y }
+}
 
 /**
  * Size the game shows a picture at: whole pixels, never below 1 (`displaySize` in the game's imageLayers). The editor draws
@@ -32,26 +62,30 @@ export function itemSourceSize(item: ItemLike, assets: Record<string, SpriteAsse
   return { w: asset.meta.frameWidth, h: asset.meta.frameHeight }
 }
 
-/** Rectangle of the item relative to its anchor (bottom-centre), unflipped; known before the picture has loaded. */
+/** Rectangle of the item relative to its anchor (its origin, bottom-centre by default), unflipped and unturned; known before the picture has loaded. */
 export function itemBounds(item: ItemLike, assets: Record<string, SpriteAssetInfo>, gameSize = false): Rect {
   const asset = assets[imagePickKey(item)]
-  if (!asset) return FALLBACK
+  if (!asset) return shifted(FALLBACK, item)
   const scale = item.scale ?? 1
   if (croppedPicture(item)) {
     const { w, h } = gameSize ? shownSize(item.crop!.w, item.crop!.h, scale) : { w: item.crop!.w * scale, h: item.crop!.h * scale }
-    return { x: -w / 2, y: -h, w, h }
+    return shifted({ x: -w / 2, y: -h, w, h }, item)
   }
   if (gameSize && item.graphicId) {
     const { w, h } = shownSize(asset.meta.frameWidth, asset.meta.frameHeight, scale)
-    return { x: -w / 2, y: -h, w, h }
+    return shifted({ x: -w / 2, y: -h, w, h }, item)
   }
-  return spriteBoundsFromMeta(asset.meta, { scale })
+  return shifted(spriteBoundsFromMeta(asset.meta, { scale }), item)
 }
 
-/** Where the item stands once flips are applied (a flip mirrors the frame around the anchor). */
-export function flippedItemBounds(item: ItemLike & { flipX?: boolean; flipY?: boolean }, assets: Record<string, SpriteAssetInfo>, gameSize = false): Rect {
+/** Where the item stands once flips and its rotation are applied (a flip mirrors the frame around the anchor; a turned item gives the box around it). */
+export function flippedItemBounds(
+  item: ItemLike & { flipX?: boolean; flipY?: boolean; rotation?: number },
+  assets: Record<string, SpriteAssetInfo>,
+  gameSize = false,
+): Rect {
   const b = itemBounds(item, assets, gameSize)
-  return { ...b, x: item.flipX ? -(b.x + b.w) : b.x, y: item.flipY ? -(b.y + b.h) : b.y }
+  return rotatedBounds({ ...b, x: item.flipX ? -(b.x + b.w) : b.x, y: item.flipY ? -(b.y + b.h) : b.y }, item.rotation)
 }
 
 /**
@@ -80,11 +114,14 @@ export function resolveImageItem(item: ItemLike, assets: Record<string, SpriteAs
   const asset = assets[imagePickKey(item)]
   if (!asset) return null
   const scale = item.scale ?? 1
-  if (!croppedPicture(item)) return resolveSprite(asset, { scale })
+  if (!croppedPicture(item)) {
+    const r = resolveSprite(asset, { scale })
+    return r && { ...r, dest: shifted(r.dest, item) }
+  }
   const img = getSpriteImage(Object.values(asset.sheets)[0])
   if (!img) return null
   const src = effectiveCrop(item.crop, { width: img.naturalWidth || img.width, height: img.naturalHeight || img.height })
-  return { img, src, dest: { x: (-src.w * scale) / 2, y: -src.h * scale, w: src.w * scale, h: src.h * scale }, flipX: false }
+  return { img, src, dest: shifted({ x: (-src.w * scale) / 2, y: -src.h * scale, w: src.w * scale, h: src.h * scale }, item), flipX: false }
 }
 
 /** "Tree", "Tree 2", "Tree 3"...: the first of these not in `taken`, starting from `base` itself. */

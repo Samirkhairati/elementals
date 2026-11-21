@@ -56,20 +56,7 @@ export function roundRectPath(ctx: CanvasRenderingContext2D, x: number, y: numbe
 }
 
 /**
- * The stand-in for an entity without a (loadable) sprite: just its icon, low opacity, centred on its tile.
- * Origin = the entity anchor (bottom-centre of the tile).
- */
-export function drawPlaceholder(ctx: CanvasRenderingContext2D, iconName: string, tone: 'default' | 'event' | 'trigger', alpha = 1) {
-  ctx.save()
-  ctx.globalAlpha *= alpha * 0.6
-  const rgb = tone === 'event' ? EVENT_RGB : tone === 'trigger' ? TRIGGER_RGB : '255,255,255'
-  drawIcon(ctx, iconName, -11, -27, 22, 'rgba(0,0,0,0.55)', 3.2)
-  drawIcon(ctx, iconName, -11, -27, 22, `rgba(${rgb},1)`, 2)
-  ctx.restore()
-}
-
-/**
- * Entity area (collider box, or the tile for entities without one): a solid 1px border in the overlay tint
+ * A node's area (the box of its StaticBody / Area CollisionShape): a solid 1px border in the overlay tint
  * over an almost transparent fill of the same tint. `strong` is the selected entity's.
  */
 export function drawFootprint(
@@ -105,19 +92,30 @@ export function drawFootprint(
   ctx.stroke()
 }
 
-export function drawAnchorCross(ctx: CanvasRenderingContext2D, x: number, y: number, scale: number) {
-  const a = 5 / scale
+/**
+ * A node's anchor (its position, what it turns around), like Godot's origin cross: a small faint cross for every node, a
+ * larger amber one with a ring for the selected node. Constant size on screen.
+ */
+export function drawAnchorCross(ctx: CanvasRenderingContext2D, x: number, y: number, scale: number, strong = true) {
+  const a = (strong ? 6 : 3.5) / scale
   ctx.beginPath()
   ctx.moveTo(x - a, y)
   ctx.lineTo(x + a, y)
   ctx.moveTo(x, y - a)
   ctx.lineTo(x, y + a)
-  ctx.lineWidth = 2.5 / scale
-  ctx.strokeStyle = 'rgba(0,0,0,0.7)'
+  ctx.lineWidth = (strong ? 3 : 2.5) / scale
+  ctx.strokeStyle = strong ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.45)'
   ctx.stroke()
-  ctx.lineWidth = 1.25 / scale
-  ctx.strokeStyle = '#fbbf24'
+  ctx.lineWidth = (strong ? 1.5 : 1) / scale
+  ctx.strokeStyle = strong ? '#fbbf24' : 'rgba(255,255,255,0.7)'
   ctx.stroke()
+  if (strong) {
+    ctx.beginPath()
+    ctx.arc(x, y, 3 / scale, 0, Math.PI * 2)
+    ctx.lineWidth = 1.25 / scale
+    ctx.strokeStyle = '#fbbf24'
+    ctx.stroke()
+  }
 }
 
 /** Name pill centred on `cx`, sitting above `top` (all in map space, constant size on screen). */

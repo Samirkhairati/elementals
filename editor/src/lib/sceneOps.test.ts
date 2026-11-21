@@ -4,6 +4,10 @@ import { findNode, type CollisionLayerNode, type SceneNode } from '../../../shar
 import { ENTITIES_GROUP_ID } from '../../../shared/sceneTreeMigrate'
 import { makeEntity, makeGroup, makeImageLayer, makeLayer, makePicture } from '@/test/helpers'
 import {
+  placeNode,
+  rotateNode,
+  setNodeTag,
+  translateNodes,
   addEntity,
   addNode,
   canDrop,
@@ -84,9 +88,9 @@ describe('making nodes', () => {
     expect(makeNode('look', 'l', 'Look')).toEqual({ id: 'l', type: 'look', name: 'Look', look: {} })
   })
 
-  it('makeNode gives a body or an area a one-tile box shape, and a shape a box only inside them', () => {
+  it('makeNode gives a body or an area no shape (its box comes with a CollisionShape), and a shape a box only inside them', () => {
     const body = makeNode('body', 'b', 'StaticBody') as { children: SceneNode[] }
-    expect(body.children).toEqual([{ id: 'b:shape', type: 'collisionShape', name: '', points: [], closed: true, box: { width: 32, height: 32, offsetX: 0, offsetY: 0 } }])
+    expect(body.children).toEqual([])
     expect(makeNode('collisionShape', 's', '', 'area')).toMatchObject({ box: { width: 32, height: 32 } })
     expect(makeNode('collisionShape', 's', '', 'collision')).not.toHaveProperty('box')
     expect(makeNode('wander', 'w', 'Wander')).toMatchObject({ type: 'wander', props: expect.any(Object) })
@@ -124,7 +128,7 @@ describe('making nodes', () => {
   it('addEntity: into a selected group, after a selected entity, else into the Entities group, else on top', () => {
     const e = makeEntity('new')
     expect(kids(addEntity(town(), e, 'town'), 'town')).toEqual(['npc', 'roofs', 'new'])
-    expect(kids(addEntity(town(), e, 'npc'), 'town')).toEqual(['npc', 'new', 'roofs'])
+    expect(kids(addEntity(town(), e, 'npc'), 'npc')).toContain('new') // an entity is a Node: the new one goes inside it
     const withHome = [...town(), makeGroup(ENTITIES_GROUP_ID, [], { name: 'Entities' })]
     expect(kids(addEntity(withHome, e, 'ground'), ENTITIES_GROUP_ID)).toEqual(['new'])
     expect(ids(addEntity(town(), e, null)).at(-1)).toBe('new')
@@ -340,5 +344,48 @@ describe('pictures: draw order', () => {
     const nodes = [makeImageLayer('i', [makePicture('a', { z: 2 }), makePicture('b', { z: 7 })])]
     expect(findNode(settlePictureZ(nodes, 'b'), 'b')).toMatchObject({ z: 2 })
     expect(settlePictureZ(nodes, 'i')).toBe(nodes)
+  })
+})
+
+describe('anchors: place, move, turn, tag', () => {
+  const town = (): SceneNode[] => [
+    makeGroup('g', [makePicture('p', { x: 40, y: 40 }), makeEntity('e', { x: 48, y: 64, components: { Transform: { x: 48, y: 64, depth: 10 } } })], { x: 32, y: 32 }),
+  ]
+
+  it('placeNode moves a node and what it holds, keeping an entity\'s Transform in step; without carry only the anchor', () => {
+    const moved = placeNode(town(), 'g', 64, 32)
+    expect(findNode(moved, 'g')).toMatchObject({ x: 64, y: 32 })
+    expect(findNode(moved, 'p')).toMatchObject({ x: 72, y: 40 })
+    expect((findNode(moved, 'e') as any).x).toBe(80)
+    const anchorOnly = placeNode(town(), 'g', 0, 0, false)
+    expect(findNode(anchorOnly, 'g')).toMatchObject({ x: 0, y: 0 })
+    expect(findNode(anchorOnly, 'p')).toMatchObject({ x: 40, y: 40 })
+    const same = town()
+    expect(placeNode(same, 'g', 32, 32)).toBe(same)
+  })
+
+  it('translateNodes moves the top-level ones only once (a child picked with its Node is carried, not moved twice)', () => {
+    const moved = translateNodes(town(), ['g', 'p'], 1, 2)
+    expect(findNode(moved, 'p')).toMatchObject({ x: 41, y: 42 })
+  })
+
+  it('rotateNode turns a Node and what it holds; a sprite turns only itself; 0 drops the field', () => {
+    const turned = rotateNode(town(), 'g', 90)
+    expect(findNode(turned, 'g')).toMatchObject({ rotation: 90 })
+    expect(findNode(turned, 'p')).toMatchObject({ x: 24, y: 40, rotation: 90 })
+    const sprite = rotateNode(town(), 'p', 45)
+    expect(findNode(sprite, 'p')).toMatchObject({ x: 40, y: 40, rotation: 45 })
+    expect(findNode(rotateNode(sprite, 'p', 0), 'p')).not.toHaveProperty('rotation')
+  })
+
+  it('setNodeTag gives a plain Node a Tag (it becomes an entity), changes an entity\'s, and drops an emptied one', () => {
+    const tagged = setNodeTag(town(), 'g', { tag: 'house' })
+    expect(findNode(tagged, 'g')).toMatchObject({ type: 'entity', x: 32, y: 32, components: { Tag: { tag: 'house' } } })
+    const recoloured = setNodeTag(tagged, 'g', { color: 'mint' })
+    expect((findNode(recoloured, 'g') as any).components.Tag).toMatchObject({ tag: 'house', color: 'mint' })
+    const cleared = setNodeTag(setNodeTag(recoloured, 'g', { color: '' }), 'g', { tag: '' })
+    expect((findNode(cleared, 'g') as any).components).not.toHaveProperty('Tag')
+    const plain = town()
+    expect(setNodeTag(plain, 'g', { tag: '' })).toBe(plain)
   })
 })

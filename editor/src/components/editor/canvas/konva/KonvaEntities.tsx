@@ -1,5 +1,6 @@
-// Entities on the map canvas: real sprites (pixel-perfect), placeholders for entities without one, collider
-// footprints, badges, labels, hover and selection visuals, and the collider editor for the selected entity.
+// Entities on the map canvas: real sprites (pixel-perfect, turned by the node's rotation), the anchor of every node,
+// collider footprints (only where a StaticBody or Area holds a CollisionShape: a Node has no box of its own), badges,
+// labels, hover and selection visuals.
 //
 // Performance model (the earlier panning work must not regress):
 //  * Sprites are plain Konva shapes inside memoised nodes; they only re-render when their entity changes.
@@ -13,8 +14,8 @@ import type { EntityData, MapData } from '@/types/editor'
 import type { SpriteAssetInfo } from '../../../../../../shared/engine/types'
 import {
   entityBounds,
+  colliderLocalRect,
   entityAreaLocal,
-  entityIconName,
   normalizeCollider,
   sortByDepth,
   summarizeEntity,
@@ -32,7 +33,6 @@ import {
   drawFootprint,
   drawHoverFrame,
   drawLabel,
-  drawPlaceholder,
   drawSelectionFrame,
   drawWanderRing,
 } from './entityDraw'
@@ -46,7 +46,8 @@ interface KonvaEntitiesProps {
   entities: readonly EntityData[]
   selectedEntityId: string | null
   setSelectedEntityId: (id: string | null) => void
-  moveEntity: (id: string, x: number, y: number) => void
+  /** Moves a node's anchor; `carry` = what it holds moves along (off while Alt is held: only the anchor moves). */
+  moveEntity: (id: string, x: number, y: number, carry: boolean) => void
   activeMap: MapData
   /** The magnet: on, a dragged entity's area lands on grid lines; off, on whole pixels. */
   snapToGrid?: boolean
@@ -75,16 +76,19 @@ interface EntityInfo {
   id: string
   asset: SpriteAssetInfo | undefined
   bounds: GeoRect
-  /** The entity's area: its collider box, or the tile it stands on when it has no collider. */
+  /** What snapping keeps on the grid: the collider box, or the tile the anchor stands on. */
   foot: GeoRect
+  /** The collider box, drawn as the node's area; none without a StaticBody / Area holding a shape. */
+  area: GeoRect | null
   solid: boolean
+  /** Degrees, clockwise, around the anchor. */
+  rotation: number
   /** A polygon collider (points relative to the anchor), drawn instead of the box. */
   poly: { points: { x: number; y: number }[]; closed: boolean } | null
   hasEvent: boolean
   controller: 'none' | 'player' | 'wander' | null
   wanderRadius: number
   spriteHidden: boolean
-  icon: string
   /** `r,g,b` of the area outline (the entity's Tag colour). */
   rgb: string
 }
@@ -101,13 +105,14 @@ function buildInfo(entity: EntityData, assets: Record<string, SpriteAssetInfo>):
     asset,
     bounds: translateRect(abs, -entity.x, -entity.y),
     foot: entityAreaLocal(entity),
+    area: collider ? colliderLocalRect(collider) : null,
     solid: collider ? collider.isSolid : true,
+    rotation: typeof entity.rotation === 'number' && Number.isFinite(entity.rotation) ? entity.rotation : 0,
     poly: collider?.points ? { points: collider.points, closed: collider.closed !== false } : null,
     hasEvent: sum.hasEvent,
     controller: sum.controller,
     wanderRadius: sum.wanderRadius,
     spriteHidden: sum.spriteHidden,
-    icon: entityIconName(entity),
     rgb: overlayRgb(entity.components.Tag?.color),
   }
 }
@@ -133,7 +138,7 @@ interface KonvaEntityNodeProps {
   snapToGrid: boolean
   visuals: React.MutableRefObject<Visuals>
   setSelectedEntityId: (id: string | null) => void
-  moveEntity: (id: string, x: number, y: number) => void
+  moveEntity: (id: string, x: number, y: number, carry: boolean) => void
   onRightClickEntity?: (entity: EntityData, clientX: number, clientY: number) => void
   onOpenEvent?: (entityId: string) => void
 }
@@ -160,7 +165,6 @@ const KonvaEntityNode = React.memo(function KonvaEntityNode({
     return showSprites && sprite && info.asset ? resolveSprite(info.asset, sprite, 0) : null
   }, [showSprites, sprite, info.asset, imagesVersion])
 
-  const tone = info.hasEvent ? 'event' : info.entity.components.Collider && !info.solid ? 'trigger' : 'default'
   const dim = info.spriteHidden
 
   // Entities can be dragged past the map's edge too (off-screen spawners, things walking in).
@@ -195,7 +199,7 @@ const KonvaEntityNode = React.memo(function KonvaEntityNode({
         e.target.y(p.y)
         visuals.current.dragId = null
         setStageCursor(e.target.getStage(), 'move')
-        moveEntity(entity.id, p.x, p.y)
+        moveEntity(entity.id, p.x, p.y, !e.evt.altKey)
       }}
       onMouseEnter={(e) => {
         visuals.current.hoverId = entity.id
@@ -240,7 +244,7 @@ const KonvaEntityNode = React.memo(function KonvaEntityNode({
         e.cancelBubble = true
       }}
     >
-      {/* grab area: the sprite frame united with the tile */}
+      {/* grab area: the sprite frame united with the collider, or the square around the anchor */}
       {mode !== 'draw' && <Rect x={bounds.x} y={bounds.y} width={bounds.w} height={bounds.h} fill="rgba(0,0,0,0.001)" />}
 
       {mode !== 'hit' && <Shape
@@ -272,14 +276,13 @@ const KonvaEntityNode = React.memo(function KonvaEntityNode({
             }
           }
           if (resolved) {
+            if (info.rotation) ctx.rotate((info.rotation * Math.PI) / 180)
             drawResolvedSprite(ctx, resolved, {
               anchorX: 0,
               anchorY: 0,
               opacity: dim ? Math.min(0.35, sprite?.opacity ?? 1) : sprite?.opacity,
               tint: sprite?.tint || undefined,
             })
-          } else {
-            drawPlaceholder(ctx, info.icon, tone, dim ? 0.5 : 1)
           }
           ctx.restore()
         }}
@@ -354,15 +357,17 @@ export const KonvaEntities = React.memo(function KonvaEntities({
           const bottom = stage ? top + stage.height() / s : mapHeightPx
           const v = visuals.current
 
-          // 1) the area of every visible entity (hidden entities and folders are not in `infos`)
+          // 1) the area of every visible entity that has one (a collider), and the anchor of every one
           for (let i = 0; i < infos.length; i++) {
             const info = infos[i]
             if (info.id === selectedEntityId) continue
             const ax = info.id === v.dragId ? v.dragX : info.entity.x
             const ay = info.id === v.dragId ? v.dragY : info.entity.y
-            const f = info.foot
-            if (ax + f.x + f.w < left || ax + f.x > right || ay + f.y + f.h < top || ay + f.y > bottom) continue
-            drawFootprint(ctx, ax + f.x, ay + f.y, f.w, f.h, info.rgb, s, false, info.poly && { ...info.poly, ax, ay })
+            const f = info.area
+            if (f && !(ax + f.x + f.w < left || ax + f.x > right || ay + f.y + f.h < top || ay + f.y > bottom)) {
+              drawFootprint(ctx, ax + f.x, ay + f.y, f.w, f.h, info.rgb, s, false, info.poly && { ...info.poly, ax, ay })
+            }
+            if (ax >= left && ax <= right && ay >= top && ay <= bottom) drawAnchorCross(ctx, ax, ay, s, false)
           }
 
           // 2) hover
@@ -377,8 +382,9 @@ export const KonvaEntities = React.memo(function KonvaEntities({
             const ay = v.dragId === selected.id ? v.dragY : selected.entity.y
             if (selected.controller === 'wander') drawWanderRing(ctx, ax, ay, selected.wanderRadius, s)
             drawSelectionFrame(ctx, translateRect(selected.bounds, ax, ay), s)
-            drawFootprint(ctx, ax + selected.foot.x, ay + selected.foot.y, selected.foot.w, selected.foot.h, selected.rgb, s, true, selected.poly && { ...selected.poly, ax, ay })
-            drawAnchorCross(ctx, ax, ay, s)
+            const f = selected.area
+            if (f) drawFootprint(ctx, ax + f.x, ay + f.y, f.w, f.h, selected.rgb, s, true, selected.poly && { ...selected.poly, ax, ay })
+            drawAnchorCross(ctx, ax, ay, s, true)
           }
 
           // 4) badges (event for everyone, movement for the selected entity)

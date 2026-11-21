@@ -229,12 +229,11 @@ describe('useEntityManager on the scene tree (StrictMode)', () => {
       expect((result.current.tree.nodes[2] as GroupNode).children.map((n) => n.name)).toEqual(['b', 'New'])
     })
 
-    it('right after the selected entity', () => {
+    it('inside the selected entity: it is a Node, so the new one becomes its child (as in Godot)', () => {
       const { result } = setup(mapOf(...tree()))
       act(() => result.current.manager.setSelectedEntityId('b'))
       act(() => result.current.manager.createEntity('New', 0, 0))
-      expect(parentOf(result, newest(result).id)).toBe('G')
-      expect((result.current.tree.nodes[2] as GroupNode).children.map((n) => n.name)).toEqual(['b', 'New'])
+      expect(parentOf(result, newest(result).id)).toBe('b')
     })
 
     it('else in the Entities group when the map has one', () => {

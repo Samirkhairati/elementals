@@ -197,12 +197,14 @@ describe('entity summaries', () => {
     expect(list.map((e) => e.id)).toEqual(['a', 'b', 'c', 'd'])
   })
 
-  it('bounds cover the tile and the sprite frame; hit-testing finds the topmost entity', () => {
+  it('bounds cover the sprite frame and the collider, else the anchor; hit-testing finds the topmost entity', () => {
     const e = { id: 'e', x: 80, y: 128, components: { Sprite: { asset: 'x' } } }
-    expect(entityBounds(e, undefined)).toEqual({ x: 64, y: 96, w: 32, h: 32 })
+    expect(entityBounds(e, undefined)).toEqual({ x: 72, y: 120, w: 16, h: 16 })
     expect(entityBounds(e, meta as any)).toEqual({ x: 64, y: 80, w: 32, h: 48 })
+    const boxed = { id: 'b', x: 80, y: 128, components: { Collider: { width: 64, height: 16 } } }
+    expect(entityBounds(boxed, undefined)).toEqual({ x: 48, y: 112, w: 64, h: 16 })
     const other = { id: 'o', x: 80, y: 128, components: {} }
-    expect(hitTestEntities([e, other], { x: 80, y: 110 }, (x) => (x === e ? (meta as any) : undefined))?.id).toBe('o')
+    expect(hitTestEntities([e, other], { x: 80, y: 125 }, (x) => (x === e ? (meta as any) : undefined))?.id).toBe('o')
     expect(hitTestEntities([e, other], { x: 80, y: 85 }, (x) => (x === e ? (meta as any) : undefined))?.id).toBe('e')
     expect(hitTestEntities([e], { x: 0, y: 0 }, () => undefined)).toBeNull()
   })

@@ -5,6 +5,7 @@
 
 import {
   isBranch,
+  isComponentNode,
   isLayerNode,
   isLocked,
   isVisible,
@@ -121,12 +122,16 @@ export function hostOf(index: SceneIndex, id: string | null | undefined): Branch
   return undefined
 }
 
-/** The entity a node belongs to: the entity itself, or the entity above a component node. */
+/** The entity a node belongs to: the entity itself, or the entity of a component node (or of its body's or area's shape). */
 export function entityOf(index: SceneIndex, id: string | null | undefined): EntityNode | undefined {
   const entry = id ? index.byId.get(id) : undefined
   if (!entry) return undefined
   if (entry.node.type === 'entity') return entry.node
-  return entry.ancestors.find((a): a is EntityNode => a.type === 'entity')
+  const parent = entry.ancestors[entry.ancestors.length - 1]
+  if (isComponentNode(entry.node)) return parent?.type === 'entity' ? parent : undefined
+  const owner = entry.ancestors[entry.ancestors.length - 2]
+  if (entry.node.type === 'collisionShape' && (parent?.type === 'body' || parent?.type === 'area')) return owner?.type === 'entity' ? owner : undefined
+  return undefined
 }
 
 /** Locked for editing a sprite: it or a node above it is locked. */

@@ -2,7 +2,7 @@
 // its Look child; the map's own look while the Scene panel's root row is selected), plus its drop shadow. The profile picked here is what the panel edits and what the canvas shows (the top
 // toolbar's Look menu is the same switch). See docs/looks.md.
 
-import { Aperture, Check, Clipboard, Copy, Map as MapIcon, MoreHorizontal, Pencil, Pin, PinOff, Plus, RotateCcw, Save, Sparkles, SlidersHorizontal, Trash2, Wand2 } from 'lucide-react'
+import { Aperture, Check, Clipboard, Copy, Map as MapIcon, MoreHorizontal, Pencil, Plus, RotateCcw, Save, Sparkles, SlidersHorizontal, Trash2, Wand2 } from 'lucide-react'
 import React, { useEffect, useState } from 'react'
 import { applyPreset, LOOK_PRESETS, PRESET_GROUPS } from '../../../../../shared/look/presets'
 import { lookId, resolveLook } from '../../../../../shared/look/schema'
@@ -215,7 +215,8 @@ function MaskFollowsSubject({ subject }: { subject: string | null }) {
   return null
 }
 
-export function LookPanel() {
+/** `subject`: whose look to edit (the Properties panel passes the owner of the selected Look node); default: the selection's. */
+export function LookPanel({ subject: given }: { subject?: LookSubjectRef } = {}) {
   const ctx = useEditorSelector(selectLook)
   const view = useLookView()
   const lib = useLookLibrary()
@@ -227,14 +228,14 @@ export function LookPanel() {
   const nodes = ctx.nodes ?? []
   const followed = selectedSubject(nodes, ctx.activeLayerId, ctx.selectedImageId)
   const active = ctx.activeLayerId ? sceneIndex(nodes).byId.get(ctx.activeLayerId)?.node : undefined
-  if (!view.pinned && active && followed.kind === 'map') {
+  if (!given && !view.pinned && active && followed.kind === 'map') {
     return (
       <div className="ed-empty">
         <MaskFollowsSubject subject={null} />A {NODE_TYPES[active.type].label} has no look. Select a Node, TileMap or Sprite, or the map (the Scene panel&apos;s top row).
       </div>
     )
   }
-  const ref: LookSubjectRef = view.pinned && subjectExists(nodes, view.pinned) ? view.pinned : followed
+  const ref: LookSubjectRef = given ?? (view.pinned && subjectExists(nodes, view.pinned) ? view.pinned : followed)
   const subject = subjectKey(ref)
   const layer = ref.kind !== 'map' ? sceneIndex(nodes).byId.get(ref.layerId)?.node : undefined
   const picture = findPicture(nodes, ref)
@@ -272,14 +273,6 @@ export function LookPanel() {
           <>
             {inherited ? <Badge title={`No ${profileName} look yet: showing Default. Any change makes one.`}>= Default</Badge> : null}
             <EyeButton name="this look" visible={enabled} disabled={!look} onToggle={() => edit((l) => ({ ...l, enabled: enabled ? false : undefined }), true)} />
-            <IconButton
-              aria-label={view.pinned ? 'Unpin: follow the selection' : 'Pin this subject'}
-              title={view.pinned ? 'Pinned: click to follow the selection again' : 'Keep editing this one when the selection changes'}
-              active={!!view.pinned}
-              onClick={() => setLookView({ pinned: view.pinned ? null : ref })}
-            >
-              {view.pinned ? <Pin /> : <PinOff />}
-            </IconButton>
           </>
         }
       >

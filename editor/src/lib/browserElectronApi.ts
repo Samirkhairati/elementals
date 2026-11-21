@@ -178,6 +178,8 @@ export function createBrowserElectronApi(): ElectronAPI {
     saveGameSettings: (settings: unknown) => c('save-game-settings', settings),
     getLooks: () => c('get-looks'),
     saveLooks: (looks: unknown) => c('save-looks', looks),
+    getPrefabs: () => c('get-prefabs'),
+    savePrefabs: (prefabs: unknown) => c('save-prefabs', prefabs),
     listShaders: () => c('list-shaders'),
     saveShader: (id: string, source: string) => c('save-shader', id, source),
     deleteShader: (id: string) => c('delete-shader', id),

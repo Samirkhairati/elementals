@@ -1,7 +1,7 @@
 // The right-hand panel while a Node is active (it takes the place of the tileset panels). The sprites themselves (and
 // the Nodes holding them) are rows of the Scene panel, added there with Add Child Node › Sprite (which opens the picture
 // browser kept here); this panel shows the sprite waiting to be placed and the picked one: a zoomable preview with the
-// Crop button, and its properties. The Node's own name, z and opacity are in the Properties panel on the left.
+// Crop button, its snap and scale. Its name, position, rotation, origin, flips, z and opacity are in the Properties panel.
 
 import { stillGraphics } from '@/lib/characterEdit'
 import React, { useEffect, useRef, useState } from 'react'
@@ -15,7 +15,7 @@ import type { ImageItem } from '@/types/editor'
 import { drawOrderPictures, isBranch, type BranchNode } from '../../../../../shared/sceneTree'
 import { lockedNode, pictureLocked, sceneIndex } from '@/lib/sceneIndex'
 import { OPEN_PICTURE_PICKER_EVENT } from '@/lib/picturePickerEvent'
-import { Card, EdButton, Field, IconButton, NumberField, TextField, Toggle } from '../ui/controls'
+import { Card, EdButton, Field, IconButton } from '../ui/controls'
 import { ZoomPane } from '../ui/ZoomPane'
 import { ImageItemView } from '../sprites/ImageItemView'
 import { ScaleField } from './ScaleField'
@@ -235,15 +235,6 @@ export function ImagesPanel() {
               </ZoomPane>
             </div>
           )}
-          <Field label="Name" hint="Shown in the list. Defaults to the picture's id.">
-            <TextField value={nameOf(selected)} aria-label="Name" disabled={locked} onCommit={(name) => name.trim() && ctx.updateImage(layer.id, selected.id, { name: name.trim() })} />
-          </Field>
-          <Field label="Position" hint="Pixels on the map: where the picture's bottom-centre stands.">
-            <div className="grid grid-cols-2 gap-1">
-              <NumberField value={selected.x} unit="x" integer aria-label="Image x" disabled={locked} onCommit={(x) => ctx.updateImage(layer.id, selected.id, { x })} />
-              <NumberField value={selected.y} unit="y" integer aria-label="Image y" disabled={locked} onCommit={(y) => ctx.updateImage(layer.id, selected.id, { y })} />
-            </div>
-          </Field>
           <Field label="Snap" hint="Move this image onto the tile grid.">
             <EdButton
               size="sm"
@@ -256,9 +247,6 @@ export function ImagesPanel() {
               Snap to tile
             </EdButton>
           </Field>
-          <Field label="Z-index" hint="Draw order inside this layer; higher draws on top.">
-            <NumberField value={selected.z ?? 0} integer aria-label="Image z-index" disabled={locked} onCommit={(z) => ctx.updateImage(layer.id, selected.id, { z })} />
-          </Field>
           <Field label="Scale" stack hint="How big the picture is drawn on the map. Nearest neighbour; the game rounds to whole pixels.">
             <ScaleField
               key={selected.id}
@@ -268,15 +256,6 @@ export function ImagesPanel() {
               onApply={(scale) => ctx.updateImage(layer.id, selected.id, { scale })}
               onDraft={(scale) => setScaleDraft(scale === null ? null : { id: selected.id, scale })}
             />
-          </Field>
-          <Field label="Opacity">
-            <NumberField value={selected.opacity ?? 1} min={0} max={1} step={0.05} aria-label="Image opacity" disabled={locked} onCommit={(opacity) => ctx.updateImage(layer.id, selected.id, { opacity })} />
-          </Field>
-          <Field label="Flip horizontally">
-            <Toggle checked={!!selected.flipX} onChange={(flipX) => ctx.updateImage(layer.id, selected.id, { flipX })} disabled={locked} aria-label="Flip image horizontally" />
-          </Field>
-          <Field label="Flip vertically">
-            <Toggle checked={!!selected.flipY} onChange={(flipY) => ctx.updateImage(layer.id, selected.id, { flipY })} disabled={locked} aria-label="Flip image vertically" />
           </Field>
           {graphic && (
             <CropImageDialog

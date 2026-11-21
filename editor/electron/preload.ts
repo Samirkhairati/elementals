@@ -56,6 +56,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveGameSettings: (settings: unknown) => ipcRenderer.invoke('save-game-settings', settings),
   getLooks: () => ipcRenderer.invoke('get-looks'),
   saveLooks: (looks: unknown) => ipcRenderer.invoke('save-looks', looks),
+  getPrefabs: () => ipcRenderer.invoke('get-prefabs'),
+  savePrefabs: (prefabs: unknown) => ipcRenderer.invoke('save-prefabs', prefabs),
   listShaders: () => ipcRenderer.invoke('list-shaders'),
   saveShader: (id: string, source: string) => ipcRenderer.invoke('save-shader', id, source),
   deleteShader: (id: string) => ipcRenderer.invoke('delete-shader', id),

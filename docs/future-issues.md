@@ -107,3 +107,15 @@ Left for later:
 - **The y-sort migration can wrap single sprites**: a y-sorted picture in an image layer that was not sorted becomes a YSort holding only
   that sprite (`<id>:ysort`). It exports and draws the same, but the tree shows one extra row per such sprite; a "Merge into YSort" action
   could gather neighbouring ones.
+
+## One kind of Node
+
+- **Turned pictures are picked, snapped and resized by the box around them** (`rotatedBounds`): the Resize handles and
+  the look masks of a turned picture do not follow its rotation yet.
+- **flipY differs between the editor and the game**: the editor mirrors a picture around its anchor (it hangs below it),
+  Phaser flips it in place. Older than rotation and origin; matters only for vertically flipped pictures.
+- **The placement ghost of a prefab shows only its root's sprite and collider**, not the sprites of the nodes inside it.
+- **Adding a node with an entity selected puts it inside that entity** (as Godot does). Nested entities export as
+  separate entities with absolute positions; the game does not move a child with its parent.
+- **A plain Node's anchor has a drag handle only while it is the active node**; entities can always be grabbed.
+

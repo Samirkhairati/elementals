@@ -15,16 +15,8 @@ export interface PanelPlacement {
 }
 
 export const PANEL_PLACEMENT: Record<string, PanelPlacement> = {
-  maps: { title: 'MAPS', anchors: [[['layers', 'properties'], 'above']], mapSide: 'left' },
-  layers: {
-    title: 'SCENE',
-    anchors: [
-      [['maps'], 'below'],
-      [['properties'], 'above'],
-    ],
-    mapSide: 'left',
-  },
-  properties: { title: 'PROPERTIES', anchors: [[['layers', 'maps'], 'below']], mapSide: 'left' },
+  maps: { title: 'MAPS', anchors: [[['layers'], 'above']], mapSide: 'left' },
+  layers: { title: 'SCENE', anchors: [[['maps'], 'below']], mapSide: 'left' },
   tilesets: { title: 'TILESET BROWSER', anchors: [[['preview', 'activeSelection'], 'above']], mapSide: 'right' },
   preview: {
     title: 'TILESET',
@@ -37,8 +29,6 @@ export const PANEL_PLACEMENT: Record<string, PanelPlacement> = {
   activeSelection: { title: 'ACTIVE SELECTION', anchors: [[['preview', 'tilesets'], 'below']], mapSide: 'right' },
   // On-demand panel: a tab next to the Tileset Browser (right column).
   database: { title: 'DATABASE', anchors: [[['tilesets', 'preview', 'activeSelection'], 'within']], mapSide: 'right' },
-  // On-demand panel: its own full-height column at the right edge (the right sidebar swaps panels with the selection).
-  look: { title: 'LOOK', anchors: [], mapSide: 'right', edge: 'right' },
 }
 
 /**

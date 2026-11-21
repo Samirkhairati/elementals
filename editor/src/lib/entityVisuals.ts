@@ -416,16 +416,21 @@ export function entityAreaLocal(entity: Pick<EntityLike, 'components'>): Rect {
   return collider ? colliderLocalRect(normalizeCollider(collider)) : TILE_RECT_LOCAL
 }
 
+/** The small square around an anchor that picks a node with neither a sprite nor a collider (it has nothing else to grab). */
+export const ANCHOR_RECT_LOCAL: Rect = { x: -8, y: -8, w: 16, h: 16 }
+
 /**
- * Bounds used for hover/selection frames: the sprite frame (when there is one) united with the area the entity
- * stands on (its collider box, or its tile without one), in map space.
+ * Bounds used for hover/selection frames and picking: the sprite frame united with the collider box, in map space. A
+ * node with neither is picked by the small square around its anchor: a Node has no box of its own until it gets a
+ * StaticBody or Area with a CollisionShape.
  */
 export function entityBounds(entity: EntityLike, meta: SpriteAssetMeta | undefined): Rect {
-  const tile = translateRect(entityAreaLocal(entity), entity.x, entity.y)
+  const collider = entity.components.Collider
+  const area = collider ? translateRect(colliderLocalRect(normalizeCollider(collider)), entity.x, entity.y) : null
   const sprite = entity.components.Sprite
-  if (!sprite || !meta) return tile
-  const local = spriteLocalRect(meta, sprite as Partial<SpriteLike>)
-  return unionRect(tile, translateRect(local, entity.x, entity.y))
+  const pic = sprite && meta ? translateRect(spriteLocalRect(meta, sprite as Partial<SpriteLike>), entity.x, entity.y) : null
+  if (area && pic) return unionRect(area, pic)
+  return area ?? pic ?? translateRect(ANCHOR_RECT_LOCAL, entity.x, entity.y)
 }
 
 /** Topmost entity whose bounds contain `p` (later in `sorted` = on top). */

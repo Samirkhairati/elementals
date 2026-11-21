@@ -12,10 +12,12 @@ import {
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu'
 import { DropShadowDropdownItem } from '../look/DropShadowMenuItem'
-import { Plus, Sparkles, Copy, CopyPlus, Trash2, Pipette, Palette, Users } from 'lucide-react'
+import { Plus, Sparkles, Copy, CopyPlus, Trash2, Pipette, Palette, CircleDot } from 'lucide-react'
 import { NamedIcon } from '../ui/icons'
 import { OVERLAY_COLORS } from '@/hooks/editor/canvas/canvasView'
-import { PRESET_PREFABS } from '@/lib/componentRegistry'
+import { usePrefabLibrary } from '@/lib/prefabLibrary'
+import { placePrefab } from '../../../../../shared/prefabs'
+import type { SceneNode } from '../../../../../shared/sceneTree'
 import { EntityData, ComponentType, type PropBag } from '@/types/editor'
 
 export interface CanvasContextMenuTarget {
@@ -40,6 +42,8 @@ export interface CanvasContextMenuState {
 interface CanvasContextMenuProps {
   menuState: CanvasContextMenuState
   onClose: () => void
+  /** Puts a new node on the map (a plain Node or a placed prefab, made with fresh ids). */
+  onPlaceNode?: (make: (newId: () => string) => SceneNode) => void
   onCreateEntity: (
     name: string,
     x: number,
@@ -65,6 +69,7 @@ export function CanvasContextMenu({
   menuState,
   onClose,
   onCreateEntity,
+  onPlaceNode,
   onDuplicateEntity,
   onDeleteEntity,
   onSetAreaColor,
@@ -74,6 +79,7 @@ export function CanvasContextMenu({
   placeMultipleKeys,
   snapToGrid = true,
 }: CanvasContextMenuProps) {
+  const prefabs = usePrefabLibrary().file.prefabs
   const { isOpen, x, y, target } = menuState
   const tileX = target?.tileX ?? 0
   const tileY = target?.tileY ?? 0
@@ -197,18 +203,20 @@ export function CanvasContextMenu({
               return (
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger>
-                    <Users className="text-sky-400" />
-                    Entity
+                    <CircleDot className="text-sky-400" />
+                    Node
                   </DropdownMenuSubTrigger>
                   <DropdownMenuSubContent>
                     <DropdownMenuItem
+                      title="An empty Node with its anchor here: add an AnimatedSprite, an Area or a StaticBody with a CollisionShape, an Event..."
                       onClick={() => {
-                        onCreateEntity('New Entity', at.x, at.y, undefined)
+                        if (onPlaceNode) onPlaceNode((newId) => ({ id: newId(), type: 'group', name: 'Node', x: at.x, y: at.y, children: [] }))
+                        else onCreateEntity('New Entity', at.x, at.y, undefined)
                         onClose()
                       }}
                     >
                       <Plus className="text-primary" />
-                      New
+                      New Node
                     </DropdownMenuItem>
                     <DropdownMenuSub>
                       <DropdownMenuSubTrigger>
@@ -216,19 +224,20 @@ export function CanvasContextMenu({
                         Prefab
                       </DropdownMenuSubTrigger>
                       <DropdownMenuSubContent>
-                        {PRESET_PREFABS.map((prefab) => (
+                        {prefabs.map((prefab) => (
                           <DropdownMenuItem
-                            key={prefab.name}
+                            key={prefab.id}
                             title={prefab.description}
                             onClick={() => {
-                              onCreateEntity(prefab.name, at.x, at.y, prefab.components)
+                              if (onPlaceNode) onPlaceNode((newId) => placePrefab(prefab, at.x, at.y, newId))
                               onClose()
                             }}
                           >
-                            <NamedIcon name={prefab.icon} className="text-muted-foreground" />
+                            <NamedIcon name={prefab.icon ?? 'package'} className="text-muted-foreground" />
                             {prefab.name}
                           </DropdownMenuItem>
                         ))}
+                        {prefabs.length === 0 && <DropdownMenuItem disabled>No prefabs yet</DropdownMenuItem>}
                       </DropdownMenuSubContent>
                     </DropdownMenuSub>
                   </DropdownMenuSubContent>

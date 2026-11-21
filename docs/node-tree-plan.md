@@ -296,3 +296,33 @@ its feet among the characters; hiding it turns y-sort off. Read it with `sortsBe
   offered), Place more copies (Sprite), Rename / Copy / Paste / Duplicate, Group / Ungroup, Delete. Pick as one, z and
   opacity of a Node are in the Properties panel.
 
+## One kind of Node (no schema change)
+
+Nodes and entities are one kind of node in the editor, like Godot's Node2D. Stored maps keep schema 8: a plain Node is
+still a `group` and a Node with components is still an `entity`, so the export and the game read them as before.
+
+* **Every Node has a placeable anchor.** A `group` may carry `x` / `y` / `rotation` (`TransformFields`; a Node without
+  them is at the map's origin), an entity has `x` / `y` and an optional `rotation`, a Sprite has `x` / `y`, `rotation`
+  and its `originX` / `originY` (the point of the picture on the anchor, default 0.5, 1). `nodeAnchor(node)` reads it.
+* **Moving or turning carries what is inside** (`translateSubtree`, `rotateSubtree` in `shared/sceneTree.ts`; editor
+  `placeNode` / `translateNodes` / `rotateNode` in `lib/sceneOps.ts`, which also keep each entity's Transform in step).
+  Positions stay absolute in storage, so nothing downstream changes. Unlinking "Children follow" in Properties, or
+  holding Alt while dragging on the map, moves only the anchor.
+* **Promotion.** Any Node may hold component nodes (AnimatedSprite, StaticBody, Area, movement, Event); a `group` that
+  gets one becomes an `entity` on the next commit (`promoteNodes`, run by `useSceneTree.commit`). A tag on a plain Node
+  does the same (`setNodeTag`). An entity may hold what a Node holds (TileMaps, Sprites, Nodes, other entities): the layer
+  walk draws and exports what is inside it.
+* **No premade box.** A Node has no box or icon on the map: it shows its anchor (a faint cross; amber with a ring when
+  selected; a plain Node's anchor is a drag handle, `KonvaNodeAnchor`). A box appears only where a StaticBody or Area
+  holds a CollisionShape: a new StaticBody or Area is empty, and only a body or area with a shape counts as the
+  entity's Collider / Area (`componentsOfEntity`).
+* **Prefabs** (`shared/prefabs.ts`, `project/prefabs.json` through the `get-prefabs` / `save-prefabs` channels,
+  `lib/prefabLibrary.ts`): a prefab is a saved node tree with its anchor at (0, 0). Right-click a Node › Save as
+  Prefab… (saving under an existing name, or from a node placed from it, updates it); Add Child Node › Prefab and the
+  canvas menu › Node › Prefab place one (`placePrefab`: new ids, linked through `prefab`). A project without the file
+  shows the built-in prefabs (`shared/engine/prefabs.ts` as node trees) and writes them out on the first change.
+* **Properties** (dock panel `inspector`, titled PROPERTIES) is always at the top of the right sidebar: the node (name,
+  type, eye, lock, tag), Transform (position, rotation, a Sprite's origin and flips), Drawing (depth, z, opacity, pick
+  as one) and an entity's components. A Look node shows the look editor there; the map's look opens from its Look row
+  in the Scene panel. The old left `properties` and right `look` panels are retired (`RETIRED_PANELS`).
+

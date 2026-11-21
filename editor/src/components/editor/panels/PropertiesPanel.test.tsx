@@ -1,168 +1,140 @@
-/* eslint-disable @typescript-eslint/no-explicit-any -- tests build partial editor contexts and entity props */
-import React from 'react'
-import { describe, expect, it, vi } from 'vitest'
-import { fireEvent, screen, within } from '@testing-library/react'
+/* eslint-disable @typescript-eslint/no-explicit-any -- tests read nodes of a partial tree */
+import { describe, expect, it } from 'vitest'
+import { act, fireEvent, screen, within } from '@testing-library/react'
 import { PropertiesPanel } from './PropertiesPanel'
-import { renderWithEditor } from '@/test/editorContext'
-import { makeEntity } from '@/test/helpers'
-import { entityView } from '@/lib/sceneIndex'
+import { renderWithScene } from '@/test/sceneHarness'
+import { makeEntity, makeGroup, makeLayer, makeMap, makePicture } from '@/test/helpers'
+import { findNode, type SceneNode } from '../../../../../shared/sceneTree'
 import { createDefaultEventProps } from '../../../../../shared/engine/components'
 
-function setup(components: Record<string, any>, x = 80, y = 128) {
-  const entity = makeEntity('e1', { name: 'Elder', x, y, components: { Transform: { x, y, depth: 10 }, ...components } })
-  const props = {
-    nodes: [entity],
-    activeLayerId: null,
-    editNode: vi.fn(),
-    entities: [entityView(entity)],
-    selectedEntityId: 'e1',
-    renameEntity: vi.fn(),
-    moveEntity: vi.fn(),
-    addComponent: vi.fn(),
-    removeComponent: vi.fn(),
-    updateComponentProp: vi.fn(),
-    updateComponentProps: vi.fn(),
-  }
-  renderWithEditor(<PropertiesPanel {...props} />, { activeMap: { width: 10, height: 8 } as any })
-  return props
+/** The panel on a real scene tree, with `select` picking a node as the Scene panel would. */
+function setup(nodes: SceneNode[], selected?: string) {
+  const r = renderWithScene(<PropertiesPanel />, makeMap({ width: 10, height: 8, nodes }))
+  const select = (id: string) => act(() => r.harness().tree.select(id))
+  if (selected) select(selected)
+  const node = (id: string) => findNode(r.map().nodes, id) as any
+  return { ...r, select, node }
 }
 
-describe('PropertiesPanel entity inspector', () => {
-  it('shows the position in pixels and as a tile', () => {
-    setup({})
-    expect(screen.getAllByLabelText('Tile column')[0]).toHaveValue('2')
-    expect(screen.getAllByLabelText('Tile row')[0]).toHaveValue('3')
-    expect(screen.getAllByLabelText('Position X')[0]).toHaveValue('80')
-    expect(screen.getAllByLabelText('Position Y')[0]).toHaveValue('128')
+const commit = (label: string, value: string) => {
+  const input = screen.getByLabelText(label)
+  fireEvent.change(input, { target: { value } })
+  fireEvent.keyDown(input, { key: 'Enter' })
+}
+
+const elder = (components: Record<string, unknown> = {}, extra: Record<string, unknown> = {}) =>
+  makeEntity('e1', { name: 'Elder', x: 80, y: 128, components: { Transform: { x: 80, y: 128, depth: 10 }, ...components }, ...extra })
+
+describe('PropertiesPanel', () => {
+  it('says what to do while nothing is selected', () => {
+    setup([makeLayer('ground', { name: 'Ground' })])
+    expect(screen.getByText(/Select a node in the Scene panel/)).toBeInTheDocument()
   })
 
-  it('moving by tile snaps to the tile anchor and clamps to the map', () => {
-    const p = setup({})
-    const col = screen.getAllByLabelText('Tile column')[0]
-    fireEvent.change(col, { target: { value: '5' } })
-    fireEvent.keyDown(col, { key: 'Enter' })
-    expect(p.moveEntity).toHaveBeenCalledWith('e1', 176, 128)
-    const row = screen.getAllByLabelText('Tile row')[0]
-    fireEvent.change(row, { target: { value: '99' } })
-    fireEvent.keyDown(row, { key: 'Enter' })
-    expect(p.moveEntity).toHaveBeenLastCalledWith('e1', 80, 256) // row 7 of 8
+  it('shows any node the same way: name, type, its fields; a TileMap has no transform', () => {
+    setup([makeLayer('ground', { name: 'Ground', z: 2 })], 'ground')
+    expect(screen.getByLabelText('Node name')).toHaveValue('Ground')
+    expect(screen.getByText('TileMap')).toBeInTheDocument()
+    expect(screen.getByLabelText('Layer z-index')).toHaveValue('2')
+    expect(screen.queryByLabelText('Position X')).toBeNull()
   })
 
-  it('renames on Enter/blur, not on every keystroke, and ignores an empty name', () => {
-    const p = setup({})
-    const name = screen.getByLabelText('Entity name')
-    fireEvent.change(name, { target: { value: 'Mayor' } })
-    expect(p.renameEntity).not.toHaveBeenCalled()
+  it('renames on Enter / blur and ignores an empty name', () => {
+    const { node } = setup([makeGroup('g', [], { name: 'Houses', x: 32, y: 64 })], 'g')
+    const name = screen.getByLabelText('Node name')
+    fireEvent.change(name, { target: { value: 'Shops' } })
+    expect(node('g').name).toBe('Houses')
     fireEvent.blur(name)
-    expect(p.renameEntity).toHaveBeenCalledWith('e1', 'Mayor')
-    fireEvent.change(name, { target: { value: '  ' } })
-    fireEvent.blur(name)
-    expect(p.renameEntity).toHaveBeenCalledTimes(1)
+    expect(node('g').name).toBe('Shops')
+    fireEvent.change(screen.getByLabelText('Node name'), { target: { value: '  ' } })
+    fireEvent.blur(screen.getByLabelText('Node name'))
+    expect(node('g').name).toBe('Shops')
   })
 
-  it('shows badges for what the entity has', () => {
-    setup({ Event: createDefaultEventProps(), Movement: { controller: 'wander' }, Collider: { isSolid: false } })
-    const inspector = screen.getByTestId('entity-inspector')
+  it("moving a Node carries what it holds; unlinked, only its anchor (its origin) moves", () => {
+    const tree = [makeGroup('g', [makePicture('p', { x: 40, y: 70 }), elder()], { name: 'Town', x: 32, y: 64 })]
+    const { node } = setup(tree, 'g')
+    expect(screen.getByLabelText('Position X')).toHaveValue('32')
+    commit('Position X', '42')
+    expect(node('g')).toMatchObject({ x: 42, y: 64 })
+    expect(node('p')).toMatchObject({ x: 50, y: 70 })
+    expect(node('e1')).toMatchObject({ x: 90, y: 128 })
+    expect(node('e1').components.Transform).toMatchObject({ x: 90, y: 128 })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Children follow' }))
+    expect(screen.getByText('Origin')).toBeInTheDocument()
+    commit('Position Y', '0')
+    expect(node('g')).toMatchObject({ x: 42, y: 0 })
+    expect(node('p')).toMatchObject({ x: 50, y: 70 }) // stayed
+  })
+
+  it('turns a Node and what it holds around its anchor', () => {
+    const { node } = setup([makeGroup('g', [makePicture('p', { x: 32, y: 0 })], { x: 0, y: 0 })], 'g')
+    commit('Rotation', '90')
+    expect(node('g').rotation).toBe(90)
+    expect(node('p')).toMatchObject({ x: 0, y: 32, rotation: 90 })
+    expect(screen.getByRole('slider', { name: 'Rotation slider' })).toBeInTheDocument()
+  })
+
+  it("a sprite has its origin (3×3 picker and fields), flips, z and opacity here", () => {
+    const { node } = setup([makeGroup('g', [makePicture('p', { name: 'Oak', x: 40, y: 70 })])], 'p')
+    expect(screen.getByRole('radio', { name: 'Origin 0.5, 1' })).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(screen.getByRole('radio', { name: 'Origin 0.5, 0.5' }))
+    expect(node('p').originY).toBe(0.5)
+    expect(node('p').originX).toBeUndefined() // the default is not stored
+    fireEvent.click(screen.getByRole('switch', { name: 'Flip horizontally' }))
+    expect(node('p').flipX).toBe(true)
+    commit('Sprite z-index', '4')
+    expect(node('p').z).toBe(4)
+    commit('Sprite opacity', '1')
+    expect(node('p').opacity).toBeUndefined()
+  })
+
+  it('a tag on a plain Node makes it an entity with a Tag; on an entity it edits the Tag, with a colour', () => {
+    const { node } = setup([makeGroup('g', [], { name: 'Sign', x: 16, y: 32 })], 'g')
+    commit('Tag', 'sign')
+    expect(node('g').type).toBe('entity')
+    expect(node('g').components.Tag).toMatchObject({ tag: 'sign' })
+    fireEvent.click(screen.getByRole('radio', { name: 'Mint' }))
+    expect(node('g').components.Tag).toMatchObject({ tag: 'sign', color: 'mint' })
+  })
+
+  it('an entity lists its components (not Transform or Tag: those are the fields above) and its depth', () => {
+    setup([elder({ Event: createDefaultEventProps(), Movement: { controller: 'wander' }, Tag: { tag: 'npc' } })], 'e1')
+    const cards = screen.getAllByTestId(/^component-card-/).map((c) => c.dataset.testid)
+    expect(cards).toEqual(['component-card-Movement', 'component-card-Event'])
+    const inspector = screen.getByTestId('node-inspector')
     expect(within(inspector).getAllByText('Event').length).toBeGreaterThan(0)
     expect(within(inspector).getAllByText('wander').length).toBeGreaterThan(0)
-    expect(within(inspector).getAllByText('trigger').length).toBeGreaterThan(0)
+    expect(screen.getByLabelText('Depth')).toHaveValue('10')
+    expect(screen.getByLabelText('Tag')).toHaveValue('npc')
   })
 
-  it('renders one card per component in schema order with accent headers; Transform cannot be removed', () => {
-    setup({ Movement: { controller: 'none' }, Sprite: { asset: '' }, Collider: {} })
-    const cards = screen.getAllByTestId(/^component-card-/).map((c) => c.dataset.testid)
-    expect(cards).toEqual(['component-card-Transform', 'component-card-Sprite', 'component-card-Collider', 'component-card-Movement'])
-    expect(screen.getByTestId('component-card-Sprite').style.getPropertyValue('--card-accent')).toBe('var(--accent-violet)')
-    expect(within(screen.getByTestId('component-card-Transform')).queryByRole('button', { name: /Remove/ })).toBeNull()
-    expect(within(screen.getByTestId('component-card-Collider')).getByRole('button', { name: 'Remove Collider' })).toBeInTheDocument()
+  it('a component node shows the entity it belongs to', () => {
+    const tree = [elder({ Event: createDefaultEventProps() })]
+    const { select, map } = setup(tree)
+    const event = (map().nodes[0] as any).children.find((c: SceneNode) => c.type === 'event')
+    select(event.id)
+    expect(screen.getByLabelText('Node name')).toHaveValue('Elder')
   })
 
-  it('cards collapse and expand', () => {
-    setup({ Tag: { tag: 'npc' } })
-    const card = screen.getByTestId('component-card-Tag')
-    expect(within(card).getByLabelText('Tag')).toBeInTheDocument()
-    fireEvent.click(within(card).getByRole('button', { name: /^Tag/ }))
-    expect(within(card).queryByLabelText('Tag')).toBeNull()
-  })
-
-  it('Add component lists each missing component with icon and description, and hides present ones', async () => {
-    const p = setup({ Sprite: { asset: '' } })
+  it('Add component lists what the entity lacks and adds it', async () => {
+    const { node } = setup([elder()], 'e1')
     fireEvent.pointerDown(screen.getByRole('button', { name: 'Add component' }), { button: 0, ctrlKey: false })
-    expect(await screen.findByRole('menuitem', { name: 'Add Collider' })).toHaveTextContent(/space the entity occupies/i)
-    expect(screen.getByRole('menuitem', { name: 'Add Movement' })).toBeInTheDocument()
-    expect(screen.queryByRole('menuitem', { name: 'Add Sprite' })).toBeNull()
+    expect(await screen.findByRole('menuitem', { name: 'Add Collider' })).toBeInTheDocument()
     expect(screen.queryByRole('menuitem', { name: 'Add Transform' })).toBeNull()
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Add Collider' }))
-    expect(p.addComponent).toHaveBeenCalledWith('e1', 'Collider')
+    expect(screen.queryByRole('menuitem', { name: 'Add Tag' })).toBeNull()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Add Event' }))
+    expect(node('e1').children.some((c: SceneNode) => c.type === 'event')).toBe(true)
   })
 
-  it('Transform card: pixel fields with a tile read-out and depth', () => {
-    const p = setup({})
-    const card = screen.getByTestId('component-card-Transform')
-    fireEvent.change(within(card).getByLabelText('Position X'), { target: { value: '112' } })
-    fireEvent.keyDown(within(card).getByLabelText('Position X'), { key: 'Enter' })
-    expect(p.updateComponentProp).toHaveBeenCalledWith('e1', 'Transform', 'x', 112)
-    fireEvent.change(within(card).getByLabelText('Tile column'), { target: { value: '4' } })
-    fireEvent.keyDown(within(card).getByLabelText('Tile column'), { key: 'Enter' })
-    expect(p.updateComponentProps).toHaveBeenCalledWith('e1', 'Transform', { x: 144, y: 128 })
-    fireEvent.change(within(card).getByLabelText('Depth'), { target: { value: '20' } })
-    fireEvent.keyDown(within(card).getByLabelText('Depth'), { key: 'Enter' })
-    expect(p.updateComponentProp).toHaveBeenCalledWith('e1', 'Transform', 'depth', 20)
-  })
-
-  it('the Event card still opens its editor from the window event while collapsed', async () => {
-    setup({ Event: createDefaultEventProps() })
-    const card = screen.getByTestId('component-card-Event')
-    fireEvent.click(within(card).getByRole('button', { name: /^Event/ }))
-    expect(within(card).getByRole('button', { name: /^Event/ })).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.queryByRole('dialog')).toBeNull()
-    window.dispatchEvent(new CustomEvent('editor:open-event-editor', { detail: 'e1' }))
-    expect(await screen.findByRole('dialog')).toBeInTheDocument()
-  })
-
-  it('falls back to the layer view and then to the empty hint', () => {
-    renderWithEditor(
-      <PropertiesPanel nodes={[{ id: 'l', name: 'Ground', type: 'tile', children: [] }]} activeLayerId="l" editNode={vi.fn()} />,
-      { activeMap: null as any },
-    )
-    expect(screen.getByLabelText('Node name')).toHaveValue('Ground')
-    expect(screen.getByText('TileMap')).toBeTruthy()
-  })
-})
-
-describe('PropertiesPanel Node', () => {
-  it('edits the Node\'s own fields (z, opacity, pick as one); the sprites live in the Scene and Images panels', () => {
-    const layer = { id: 'i1', name: 'Sky', type: 'group', children: [{ id: 'a', type: 'picture', name: 'a', graphicId: 'sky/cloud.png', x: 4, y: 5 }] }
-    const editNode = vi.fn()
-    renderWithEditor(<PropertiesPanel nodes={[layer] as any} activeLayerId="i1" editNode={editNode} />, {} as any)
-    expect(screen.getByLabelText('Node name')).toHaveValue('Sky')
-    expect(screen.queryByTestId('image-list')).toBeNull()
+  it("a Node's drawing fields: opacity 1 is the default and is not stored, pick as one", () => {
+    const { node } = setup([makeGroup('g', [makePicture('p')], { name: 'Sky' })], 'g')
     fireEvent.click(screen.getByRole('switch', { name: 'Pick sprites as one' }))
-    expect(editNode).toHaveBeenLastCalledWith('i1', { pickAsOne: true })
-    const opacity = screen.getByLabelText('Node opacity')
-    fireEvent.change(opacity, { target: { value: '1' } })
-    fireEvent.keyDown(opacity, { key: 'Enter' })
-    expect(editNode).toHaveBeenCalledTimes(1) // fully opaque is the default: nothing to store
-  })
-})
-
-describe('PropertiesPanel position', () => {
-  it('shows the pixel position and the tile, with no placement switch', () => {
-    setup({})
-    expect(screen.queryByRole('radiogroup', { name: 'Placement' })).toBeNull()
-    expect(screen.getAllByLabelText('Tile column').length).toBeGreaterThan(0)
-    expect(screen.getAllByLabelText('Position X').length).toBeGreaterThan(0)
-  })
-
-  it('takes any pixel', () => {
-    const p = setup({}, 83, 137)
-    const x = screen.getAllByLabelText('Position X')[0]
-    fireEvent.change(x, { target: { value: '90' } })
-    fireEvent.keyDown(x, { key: 'Enter' })
-    expect(p.moveEntity).toHaveBeenLastCalledWith('e1', 90, 137)
-    const y = screen.getAllByLabelText('Position Y')[0]
-    fireEvent.change(y, { target: { value: '141' } })
-    fireEvent.keyDown(y, { key: 'Enter' })
-    expect(p.moveEntity).toHaveBeenLastCalledWith('e1', 83, 141)
+    expect(node('g').pickAsOne).toBe(true)
+    commit('Node opacity', '0.5')
+    expect(node('g').opacity).toBe(0.5)
+    commit('Node opacity', '1')
+    expect(node('g').opacity).toBeUndefined()
   })
 })

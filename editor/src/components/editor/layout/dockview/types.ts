@@ -1,13 +1,11 @@
 export type PanelId =
   | 'maps'
   | 'layers'
-  | 'properties'
   | 'canvas'
   | 'tilesets'
   | 'preview'
   | 'activeSelection'
-  | 'database'
-  | 'look';
+  | 'database';
 
 export interface PanelInfo {
   id: PanelId;
@@ -19,18 +17,16 @@ export interface PanelInfo {
 export const ALL_PANELS: PanelInfo[] = [
   { id: 'maps', title: 'Maps', column: 'left', shortcut: 'Alt+M' },
   { id: 'layers', title: 'Scene', column: 'left', shortcut: 'Alt+L' },
-  { id: 'properties', title: 'Properties', column: 'left', shortcut: 'Alt+P' },
   { id: 'canvas', title: 'Canvas', column: 'center', shortcut: 'Alt+C' },
   { id: 'tilesets', title: 'Tileset Browser', column: 'right', shortcut: 'Alt+T' },
   { id: 'preview', title: 'Tileset Preview', column: 'right' },
   { id: 'activeSelection', title: 'Active Selection', column: 'right' },
   // Opened on demand (menu / shortcut), not part of the default layout.
   { id: 'database', title: 'Database', column: 'right', shortcut: 'Alt+D' },
-  { id: 'look', title: 'Look (colour grading)', column: 'right', shortcut: 'Alt+G' },
 ];
 
 /** Panels that exist in the default layout; the others are opened on demand. */
-export const DEFAULT_PANEL_IDS: PanelId[] = ['maps', 'layers', 'properties', 'canvas', 'tilesets', 'preview', 'activeSelection'];
+export const DEFAULT_PANEL_IDS: PanelId[] = ['maps', 'layers', 'canvas', 'tilesets', 'preview', 'activeSelection'];
 
 export function getMapPanelId(folderPath: string | null, fileName: string): string {
   const folder = folderPath ? encodeURIComponent(folderPath) : '__root__';

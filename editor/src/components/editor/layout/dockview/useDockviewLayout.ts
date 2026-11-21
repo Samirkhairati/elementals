@@ -36,7 +36,7 @@ interface UseDockviewLayoutOptions {
   activeMap?: MapData | null;
   onSelectMap?: (m: MapData) => void;
   onClearActiveMap?: () => void;
-  /** An entity is selected: the inspector replaces the tileset panels of the right sidebar. */
+  /** A node without a panel of its own is selected (an entity, a Look...): the properties panel fills the right sidebar. */
   entityFocus?: boolean;
   /** An image layer is active (and no entity selected): the images panel replaces the tileset panels instead. */
   imageFocus?: boolean;
@@ -44,13 +44,17 @@ interface UseDockviewLayoutOptions {
   collisionFocus?: boolean;
 }
 
+/** What the right sidebar shows under the properties panel (`inspector`, always shown): `inspector` = nothing else. */
 type RightFocus = 'tiles' | 'inspector' | 'images' | 'collision';
 const TILE_PANELS = ['tilesets', 'preview', 'activeSelection'];
-const FOCUS_PANELS = ['inspector', 'images', 'collision'];
-/** Panels of older layouts that no longer exist (the entity list is part of the Layers panel now). */
-const RETIRED_PANELS = ['entities'];
+const FOCUS_PANELS = ['images', 'collision'];
+/**
+ * Panels of older layouts that no longer exist: the entity list is part of the Scene panel, the left Properties panel and
+ * the Look column are the right sidebar's properties panel now.
+ */
+const RETIRED_PANELS = ['entities', 'properties', 'look'];
 /** Panels whose title changed: a saved layout keeps the old one. */
-const RENAMED_PANELS: Record<string, string> = { layers: 'SCENE' };
+const RENAMED_PANELS: Record<string, string> = { layers: 'SCENE', inspector: 'PROPERTIES' };
 
 export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
   const { maps = [], activeMap = null, onSelectMap, onClearActiveMap, entityFocus = false, imageFocus = false, collisionFocus = false } = options;
@@ -67,7 +71,7 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
   const lastFocus = useRef<RightFocus | null>(null);
   const tileHeights = useRef<Record<string, number> | null>(null);
   const [openPanels, setOpenPanels] = useState<string[]>([
-    'maps', 'layers', 'properties', 'tilesets', 'preview', 'activeSelection'
+    'maps', 'layers', 'inspector', 'tilesets', 'preview', 'activeSelection'
   ]);
 
   const updateOpenPanels = useCallback(() => {
@@ -98,6 +102,17 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
       if (panel && !focusGroups.includes(panel.group)) panel.group.api.setVisible(focus === 'tiles');
     }
     for (const id of FOCUS_PANELS) api.getPanel(id)?.group.api.setVisible(id === focus);
+    // The properties panel is always shown; alone, it fills the column, else it takes the upper part.
+    const inspector = api.getPanel('inspector');
+    if (inspector) {
+      inspector.group.api.setVisible(true);
+      const total = api.height;
+      if (focus !== 'inspector' && total > 0 && prev !== focus) {
+        const fit = () => inspector.api.setSize({ height: Math.round(total * 0.38) });
+        fit();
+        if (typeof requestAnimationFrame !== 'undefined') requestAnimationFrame(fit);
+      }
+    }
     lastFocus.current = focus;
     if (focus !== 'tiles' || prev === 'tiles') return;
     // Showing the groups again leaves them squeezed: give back the heights they had, or split 40 / 40 / 20 the first time.
@@ -153,13 +168,6 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
       position: { referencePanel: mapsPanel, direction: 'below' },
     });
 
-    const propsPanel = api.addPanel({
-      id: 'properties',
-      component: 'properties',
-      title: 'PROPERTIES',
-      position: { referencePanel: layersPanel, direction: 'below' },
-    });
-
     // Add Right Sidebar panels (Column 3)
     const tilesetsPanel = api.addPanel({
       id: 'tilesets',
@@ -168,7 +176,7 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
       position: { referencePanel: centerPanel, direction: 'right' },
     });
 
-    // Entity inspector: shares the right column with the tileset panels and replaces them while an entity is selected.
+    // Properties of the selected node: always at the top of the right column; the panels below follow the selection.
     const inspectorPanel = api.addPanel({
       id: 'inspector',
       component: 'inspector',
@@ -213,7 +221,6 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
 
     mapsPanel.api.setSize({ width: sideWidth });
     layersPanel.api.setSize({ width: sideWidth });
-    propsPanel.api.setSize({ width: sideWidth });
     inspectorPanel.api.setSize({ width: sideWidth });
     imagesPanel.api.setSize({ width: sideWidth });
     collisionPanel.api.setSize({ width: sideWidth });
@@ -235,7 +242,6 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
 
     const maps = api.getPanel('maps');
     const layers = api.getPanel('layers');
-    const props = api.getPanel('properties');
     const inspector = api.getPanel('inspector');
     const tilesets = api.getPanel('tilesets');
     const preview = api.getPanel('preview');
@@ -244,7 +250,6 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
 
     if (maps) maps.api.setSize({ width: sideWidth });
     if (layers) layers.api.setSize({ width: sideWidth });
-    if (props) props.api.setSize({ width: sideWidth });
     if (inspector) inspector.api.setSize({ width: sideWidth });
     api.getPanel('images')?.api.setSize({ width: sideWidth });
     api.getPanel('collision')?.api.setSize({ width: sideWidth });
@@ -303,7 +308,6 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
         api.getPanel('preview') ||
         api.getPanel('activeSelection');
       const leftRef =
-        api.getPanel('properties') ||
         api.getPanel('layers') ||
         api.getPanel('maps');
 
@@ -351,7 +355,6 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
       api.getPanel('preview') ||
       api.getPanel('activeSelection');
     const leftRef =
-      api.getPanel('properties') ||
       api.getPanel('layers') ||
       api.getPanel('maps');
 
@@ -391,6 +394,9 @@ export function useDockviewLayout(options: UseDockviewLayoutOptions = {}) {
     if (restored) {
       if (!api.panels.some((p) => isMapPanelId(p.id) || p.id === 'empty_canvas')) ensureEmptyCanvasRef.current?.(api);
       for (const id of RETIRED_PANELS) api.getPanel(id)?.api.close();
+      // A layout saved before the properties panel moved to the right column gets it there.
+      const right = api.getPanel('images') ?? api.getPanel('collision') ?? api.getPanel('tilesets');
+      if (!api.getPanel('inspector') && right) api.addPanel({ id: 'inspector', component: 'inspector', title: 'PROPERTIES', position: { referencePanel: right, direction: 'above' } });
       // Panels renamed since the layout was saved show their current title.
       for (const [id, title] of Object.entries(RENAMED_PANELS)) api.getPanel(id)?.api.setTitle(title);
       // A layout saved before the collision panel existed gets it in the right column, like the images panel.

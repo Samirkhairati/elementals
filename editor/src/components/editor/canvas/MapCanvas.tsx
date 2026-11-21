@@ -26,6 +26,7 @@ import { KonvaOverlays } from './konva/KonvaOverlays'
 import { KonvaEntities, type Visuals } from './konva/KonvaEntities'
 import { KonvaGhostEntity } from './konva/KonvaGhostEntity'
 import { KonvaEntityResize } from './konva/KonvaEntityResize'
+import { KonvaNodeAnchor } from './konva/KonvaNodeAnchor'
 import { COMPONENT_SCHEMAS } from '../../../../../shared/engine/components'
 import type { ColliderPatch } from '@/lib/entityVisuals'
 import { useDrawPlan } from '@/hooks/editor/canvas/useDrawPlan'
@@ -36,8 +37,8 @@ import { CanvasContextMenu } from './CanvasContextMenu'
 import { CanvasNavigator, type ViewportHandle } from './CanvasNavigator'
 import { PendingEntityPlacement } from '@/hooks/editor/useEntityPlacement'
 import { useCanvasView } from '@/hooks/editor/canvas/canvasView'
-import { isBranch, ownLook, type BranchNode } from '../../../../../shared/sceneTree'
-import { entityView, type SceneIndex } from '@/lib/sceneIndex'
+import { isBranch, ownLook, type BranchNode, type SceneNode } from '../../../../../shared/sceneTree'
+import { entityView, lockedNode, type SceneIndex } from '@/lib/sceneIndex'
 import { mapPixelSize } from '../../../../../shared/mapSize'
 import { useEditorSelector, type EditorContextValue } from '@/components/editor/layout/EditorContext'
 import { useDropShadow } from '@/components/editor/look/DropShadowMenuItem'
@@ -68,7 +69,8 @@ interface MapCanvasProps {
   handleCommit: () => void
   selectedEntityId?: string | null
   setSelectedEntityId?: (id: string | null) => void
-  moveEntity?: (id: string, x: number, y: number) => void
+  /** Moves a node's anchor; `carry` = what it holds moves along. */
+  moveEntity?: (id: string, x: number, y: number, carry: boolean) => void
   showGrid?: boolean
   snapToGrid?: boolean
   /** Unused: entities snap with the magnet (`snapToGrid`) like pictures. */
@@ -77,6 +79,8 @@ interface MapCanvasProps {
   commitPlacement?: (x: number, y: number) => void
   cancelPlacement?: () => void
   createEntity?: (name: string, x?: number, y?: number, initialComponents?: Partial<Record<ComponentType, PropBag>>) => void
+  /** Puts a new node (a plain Node, a placed prefab) on the map. */
+  placeNode?: (make: (newId: () => string) => SceneNode) => void
   duplicateEntity?: (id: string) => void
   deleteEntity?: (id: string) => void
   updateComponentProp?: (entityId: string, type: ComponentType, key: string, value: unknown) => void
@@ -142,6 +146,7 @@ export function MapCanvas({
   commitPlacement,
   cancelPlacement,
   createEntity,
+  placeNode,
   duplicateEntity,
   deleteEntity,
   updateComponentProp,
@@ -266,12 +271,12 @@ export function MapCanvas({
     [view.lockImages, placingAnything, activeLayer, isImageLayerActive, index]
   )
 
-  // The selected entity's area gets resize handles (see KonvaEntityResize); an entity without a Collider gets one with the new box.
-  // Without a Collider the game neither blocks nor touches anything beyond the entity's own tile, so the added one is not solid.
+  // The selected node's area gets resize handles (see KonvaEntityResize) once it has one: a StaticBody or Area holding a
+  // CollisionShape. A Node without either has only its anchor.
   const resizableEntity = useMemo(() => {
     const entity = !placingAnything ? entities.find((e) => e.id === selectedEntityId) : undefined
     // Entities listed here are the shown ones (the node and every group above it are visible).
-    return entity ?? null
+    return entity?.components.Collider ? entity : null
   }, [placingAnything, entities, selectedEntityId])
   const handleResizeEntity = useCallback(
     (entityId: string, patch: ColliderPatch) => {
@@ -430,6 +435,14 @@ export function MapCanvas({
                 onOpenEvent={openEventEditor}
               />
 
+              {/* The anchor of the active plain Node: drag it to move the Node (Alt: the anchor only) */}
+              <KonvaNodeAnchor
+                node={!placingAnything && activeLayer?.type === 'group' ? activeLayer : null}
+                locked={!!activeLayer && lockedNode(index, activeLayer.id)}
+                snapToGrid={snapToGrid}
+                moveNode={moveEntity || (() => {})}
+              />
+
               {/* The selected entity's area with its resize handles (above the entities' own handles, so a handle wins) */}
               <KonvaEntityResize entity={resizableEntity} snapToGrid={snapToGrid} onResize={handleResizeEntity} />
 
@@ -504,6 +517,7 @@ export function MapCanvas({
         menuState={contextMenuState}
         onClose={closeContextMenu}
         onCreateEntity={(name, x, y, comps) => createEntity?.(name, x, y, comps)}
+        onPlaceNode={placeNode}
         onDuplicateEntity={duplicateEntity}
         onDeleteEntity={deleteEntity}
         onSetAreaColor={(id, color) => {

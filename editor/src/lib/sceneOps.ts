@@ -22,6 +22,9 @@ import {
   walk,
   collisionLayerLike,
   mapTree,
+  nodeAnchor,
+  rotateSubtree,
+  translateSubtree,
   type CollisionLayerNode,
   type ContainerNode,
   type EntityNode,
@@ -34,6 +37,7 @@ import { assignNewCells, hasNewCells, nextTileGroupName } from '../../../shared/
 import { cloneEntity, createDefaultComponent, createDefaultEventProps } from '../../../shared/engine/components'
 import { engineEntityOf, entityWithComponents, type ComponentBag } from '../../../shared/sceneEntity'
 import { withDerivedFree } from '../../../shared/engine/placement'
+import { isRecord } from '../../../shared/engine/util'
 import type { EngineEntity } from '../../../shared/engine/types'
 import { imagePickName } from './graphicAssets'
 import { nextImageName } from './imageItems'
@@ -103,7 +107,8 @@ function movementProps(): Record<string, unknown> {
 
 /**
  * An empty node of a type (no id clash is checked here). `parentType` is the type of the node it goes into: a
- * CollisionShape of an entity's body or area is a one-tile box, one of the map's StaticBody a polygon to draw.
+ * CollisionShape of an entity's body or area is a one-tile box, one of the map's StaticBody a polygon to draw. A new
+ * StaticBody or Area holds nothing: its box comes with the CollisionShape added to it.
  */
 export function makeNode(type: NewNodeType, id: string, name: string, parentType?: SceneNodeType): SceneNode {
   switch (type) {
@@ -124,7 +129,8 @@ export function makeNode(type: NewNodeType, id: string, name: string, parentType
         : { id, type, name: '', points: [], closed: true }
     case 'body':
     case 'area':
-      return { id, type, name, children: [{ id: `${id}:shape`, type: 'collisionShape', name: '', points: [], closed: true, box: { width: 32, height: 32, offsetX: 0, offsetY: 0 } }] }
+      // Empty, like Godot's: the node has no box until a CollisionShape is added to it.
+      return { id, type, name, children: [] }
     case 'animatedSprite': {
       const { visible: _v, ...props } = createDefaultComponent('Sprite') as unknown as Record<string, unknown>
       return { id, type, name, props }
@@ -273,6 +279,75 @@ export function patchNode(nodes: SceneNode[], id: string, patch: Record<string, 
   })
 }
 
+// ── transforms (one kind of Node: moving or turning one carries what is below it) ───────────────────
+
+// An entity whose anchor changed keeps its Transform component in step (and its derived `free`).
+export function syncEntityTransforms(node: SceneNode): SceneNode {
+  return mapTree([node], (n) => {
+    if (n.type !== 'entity') return n
+    const t = isRecord(n.components?.Transform) ? n.components.Transform : undefined
+    const synced = t && (t.x !== n.x || t.y !== n.y) ? { ...n, components: { ...n.components, Transform: { ...t, x: n.x, y: n.y } } } : n
+    return withDerivedFree(synced)
+  })[0]
+}
+
+/**
+ * The node `id` with its anchor at (x, y). With `carry` (the default) what is below it moves along, like a Godot
+ * Node2D; without it only the anchor moves (setting a Node's origin). Sprites, Nodes and entities have anchors; the same
+ * array comes back for anything else or no move.
+ */
+export function placeNode(nodes: SceneNode[], id: string, x: number, y: number, carry = true): SceneNode[] {
+  return updateNode(nodes, id, (n) => {
+    const at = nodeAnchor(n)
+    if (!at || (at.x === x && at.y === y)) return n
+    const moved = carry ? translateSubtree(n, x - at.x, y - at.y) : ({ ...n, x, y } as SceneNode)
+    return syncEntityTransforms(moved)
+  })
+}
+
+/** Moves every node of `ids` (the top-level ones: a node carries what is below it) by (dx, dy). */
+export function translateNodes(nodes: SceneNode[], ids: readonly string[], dx: number, dy: number): SceneNode[] {
+  if (dx === 0 && dy === 0) return nodes
+  return topLevelIds(nodes, ids).reduce((tree, id) => updateNode(tree, id, (n) => (nodeAnchor(n) ? syncEntityTransforms(translateSubtree(n, dx, dy)) : n)), nodes)
+}
+
+/**
+ * The node `id` turned to `degrees` (absolute, clockwise). With `carry` (the default) the anchors of what is below it
+ * turn around its anchor and their rotations follow; a sprite only turns itself.
+ */
+export function rotateNode(nodes: SceneNode[], id: string, degrees: number, carry = true): SceneNode[] {
+  return updateNode(nodes, id, (n) => {
+    if (n.type !== 'group' && n.type !== 'entity' && n.type !== 'picture') return n
+    const current = n.rotation ?? 0
+    if (current === degrees) return n
+    if (carry && n.type !== 'picture') return syncEntityTransforms(rotateSubtree(n, degrees - current))
+    const next = { ...n, rotation: degrees } as typeof n
+    if (!degrees) delete next.rotation
+    return next
+  })
+}
+
+/**
+ * The Tag of a Node set (`tag`, `color`): a plain Node becomes an entity with a Tag component, an entity's Tag is
+ * changed (and dropped when both are empty). The same array comes back when nothing changed.
+ */
+export function setNodeTag(nodes: SceneNode[], id: string, patch: { tag?: string; color?: string }): SceneNode[] {
+  return updateNode(nodes, id, (n) => {
+    if (n.type !== 'group' && n.type !== 'entity') return n
+    const before = n.type === 'entity' && isRecord(n.components?.Tag) ? n.components.Tag : undefined
+    const next: Record<string, unknown> = { ...(createDefaultComponent('Tag') as unknown as Record<string, unknown>), ...(before ?? {}), ...patch }
+    const empty = !next.tag && !next.color && !next.icon
+    if (n.type === 'group') {
+      if (empty) return n
+      const { type: _t, x, y, ...rest } = n
+      return { ...rest, type: 'entity', x: x ?? 0, y: y ?? 0, components: { Tag: next } } as EntityNode
+    }
+    if (before && Object.keys(patch).every((k) => before[k] === next[k])) return n
+    const { Tag: _old, ...others } = n.components ?? {}
+    return { ...n, components: empty ? others : { ...others, Tag: next } }
+  })
+}
+
 // ── locks ──────────────────────────────────────────────────────────────────────────────────────────
 
 /** Whether a place (the path from the root to a container) is locked: it, or something above it, has its lock on. */
@@ -351,21 +426,18 @@ export function copiesOf(nodes: readonly SceneNode[], ids: readonly string[]): S
 
 const COPY_OFFSET = 32
 
-/** A copy with every entity in it given fresh event ids and its position moved. */
+/** A copy of a subtree with every entity in it given fresh event ids (states and commands). */
+export function withFreshEventIds(node: SceneNode): SceneNode {
+  return mapTree([node], (n) => {
+    if (n.type !== 'entity') return n
+    const cloned = cloneEntity(engineEntityOf(n) as unknown as EngineEntity, true) as unknown as { components: ComponentBag }
+    return entityWithComponents(n, { ...cloned.components })
+  })[0]
+}
+
+/** A copy with every entity in it given fresh event ids and the whole subtree moved (Nodes, sprites, shapes of the map's StaticBody). */
 function movedCopy(node: SceneNode, dx: number, dy: number): SceneNode {
-  const shift = (n: SceneNode): SceneNode => {
-    if (n.type === 'entity') {
-      // Fresh event ids, the position moved; the components go back into the (already copied) component nodes.
-      const cloned = cloneEntity(engineEntityOf(n) as unknown as EngineEntity, true) as unknown as { components: ComponentBag }
-      const components: ComponentBag = { ...cloned.components }
-      if (components.Transform) components.Transform = { ...components.Transform, x: n.x + dx, y: n.y + dy }
-      return withDerivedFree(entityWithComponents({ ...n, x: n.x + dx, y: n.y + dy }, components))
-    }
-    if (n.type === 'picture') return { ...n, x: n.x + dx, y: n.y + dy }
-    if (n.type === 'collisionShape') return { ...n, points: n.points.map((p) => ({ ...p, x: p.x + dx, y: p.y + dy })) }
-    return n
-  }
-  return mapTree([node], shift)[0]
+  return syncEntityTransforms(translateSubtree(withFreshEventIds(node), dx, dy))
 }
 
 /** Where `node` goes when put next to `targetId`: inside it (a container that can hold it) or beside it (below layers / groups, above the rest). */

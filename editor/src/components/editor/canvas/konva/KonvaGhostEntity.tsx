@@ -2,11 +2,11 @@ import React, { useMemo } from 'react'
 import { Shape } from 'react-konva'
 import type { SpriteAssetInfo } from '../../../../../../shared/engine/types'
 import type { PropBag } from '@/types/editor'
-import { PendingEntityPlacement } from '@/hooks/editor/useEntityPlacement'
-import { colliderLocalRect, entityAreaLocal, entityBounds, entityIconName, normalizeCollider } from '@/lib/entityVisuals'
+import { PendingEntityPlacement, placementComponents } from '@/hooks/editor/useEntityPlacement'
+import { colliderLocalRect, entityAreaLocal, entityBounds, normalizeCollider } from '@/lib/entityVisuals'
 import { snapEntityAnchor } from '@/lib/entitySnap'
 import { drawResolvedSprite, resolveSprite, useSpriteImagesVersion } from '@/lib/spriteImages'
-import { drawAnchorCross, drawFootprint, drawLabel, drawPlaceholder } from './entityDraw'
+import { drawAnchorCross, drawFootprint, drawLabel } from './entityDraw'
 
 interface KonvaGhostEntityProps {
   pendingPlacement: PendingEntityPlacement | null
@@ -18,7 +18,7 @@ interface KonvaGhostEntityProps {
 
 const EMPTY: Record<string, SpriteAssetInfo> = {}
 
-/** Placement preview: the prefab's real sprite and footprint, snapped to the grid, semi-transparent. */
+/** Placement preview: the node's real sprite, its collider (if it has one) and its anchor, snapped like the click, semi-transparent. */
 export const KonvaGhostEntity = React.memo(function KonvaGhostEntity({
   pendingPlacement,
   pointerPos,
@@ -26,7 +26,9 @@ export const KonvaGhostEntity = React.memo(function KonvaGhostEntity({
   spriteAssets = EMPTY,
 }: KonvaGhostEntityProps) {
   const imagesVersion = useSpriteImagesVersion()
-  const components = pendingPlacement?.components
+  // A prefab's root node gives the components (its child nodes'); a Node without any has only its anchor.
+  const prefabNode = pendingPlacement?.prefab?.node
+  const components = useMemo(() => (pendingPlacement ? (placementComponents(pendingPlacement) as Record<string, PropBag>) : undefined), [pendingPlacement])
   const sprite = components?.Sprite
   const asset = sprite?.asset ? spriteAssets[sprite.asset] : undefined
 
@@ -42,10 +44,9 @@ export const KonvaGhostEntity = React.memo(function KonvaGhostEntity({
       foot: collider ? colliderLocalRect(collider) : null,
       solid: collider ? collider.isSolid : true,
       resolved: sprite && asset ? resolveSprite(asset, sprite, 0) : null,
-      icon: entityIconName(entity),
-      hasEvent: !!components?.Event,
+      rotation: prefabNode && 'rotation' in prefabNode && typeof prefabNode.rotation === 'number' ? prefabNode.rotation : 0,
     }
-  }, [pendingPlacement, components, sprite, asset, imagesVersion])
+  }, [pendingPlacement, components, sprite, asset, imagesVersion, prefabNode])
 
   if (!pendingPlacement || !pointerPos || !model) return null
 
@@ -61,27 +62,13 @@ export const KonvaGhostEntity = React.memo(function KonvaGhostEntity({
       sceneFunc={(context, shape) => {
         const ctx = context._context as CanvasRenderingContext2D
         const s = shape.getStage()?.scaleX() || 1
-        if (!model.foot) {
-          // the tile it will occupy
-          ctx.beginPath()
-          ctx.rect(model.area.x, model.area.y, model.area.w, model.area.h)
-          ctx.fillStyle = 'rgba(96,165,250,0.12)'
-          ctx.fill()
-          ctx.lineWidth = 1 / s
-          ctx.strokeStyle = 'rgba(96,165,250,0.8)'
-          ctx.setLineDash([4 / s, 3 / s])
-          ctx.stroke()
-          ctx.setLineDash([])
-        }
-
-        ctx.save()
-        ctx.globalAlpha = 0.7
         if (model.resolved) {
+          ctx.save()
+          ctx.globalAlpha = 0.7
+          if (model.rotation) ctx.rotate((model.rotation * Math.PI) / 180)
           drawResolvedSprite(ctx, model.resolved, { anchorX: 0, anchorY: 0, opacity: sprite?.opacity, tint: sprite?.tint || undefined })
-        } else {
-          drawPlaceholder(ctx, model.icon, model.hasEvent ? 'event' : 'default')
+          ctx.restore()
         }
-        ctx.restore()
 
         if (model.foot) drawFootprint(ctx, model.foot.x, model.foot.y, model.foot.w, model.foot.h, '255,255,255', s, true)
         drawAnchorCross(ctx, 0, 0, s)

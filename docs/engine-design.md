@@ -40,6 +40,12 @@ the exporter, the database) or `entityView` (the editor's entity code); writes g
   to drive movement. Now there is one **Movement** with a `controller`: `none | player | wander`.
 * *Interactable*: a hard-coded message/warp. Now it is an **Event** with states and commands.
 
+### Nodes in the editor
+
+In the editor an entity is a Node with components, and a plain Node gets components (and becomes an entity) by adding
+component nodes; every Node has an anchor, and moving or turning one carries what it holds. See docs/node-tree-plan.md
+"One kind of Node".
+
 ### Coordinates
 * Pixels in map space, tile = 32px. `Transform` is the **anchor**: bottom-centre of the entity's tile
   (`x = col*32 + 16`, `y = (row+1)*32`). Placing on the grid snaps to this.
