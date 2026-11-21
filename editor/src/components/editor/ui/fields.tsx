@@ -395,13 +395,21 @@ export function Slider({ value, onChange, min, max, step = 1, disabled, classNam
         else if (next !== current) change(next)
       }}
     >
-      <SliderPrimitive.Track className="relative h-1 grow overflow-visible rounded-full bg-input" style={track ? { background: track } : undefined}>
-        {from > 0 && from < 1 && <span className="absolute top-1/2 h-2 w-px -translate-y-1/2 bg-muted-foreground/60" style={{ left: `${from * 100}%` }} />}
-        {!track && <span className="absolute inset-y-0 rounded-full bg-primary" style={{ left: `${Math.min(from, ratio) * 100}%`, width: `${Math.abs(ratio - from) * 100}%` }} />}
+      <SliderPrimitive.Track
+        className="relative h-1.5 grow overflow-visible rounded-full bg-black/35 shadow-[inset_0_1px_1px_rgba(0,0,0,0.45)] ring-1 ring-inset ring-white/[0.06]"
+        style={track ? { background: track } : undefined}
+      >
+        {from > 0 && from < 1 && <span className="absolute top-1/2 h-2.5 w-px -translate-y-1/2 rounded-full bg-muted-foreground/70" style={{ left: `${from * 100}%` }} />}
+        {!track && (
+          <span
+            className="absolute inset-y-0 rounded-full bg-gradient-to-r from-foreground/45 to-foreground/85"
+            style={{ left: `${Math.min(from, ratio) * 100}%`, width: `${Math.abs(ratio - from) * 100}%` }}
+          />
+        )}
       </SliderPrimitive.Track>
       <SliderPrimitive.Thumb
         aria-label={rest['aria-label']}
-        className="block size-3 cursor-grab rounded-full bg-foreground shadow ring-1 ring-black/30 transition-[box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing"
+        className="block size-3.5 cursor-grab rounded-full border border-black/50 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.6)] transition-[transform,box-shadow] duration-100 hover:scale-110 hover:shadow-[0_0_0_4px_rgba(255,255,255,0.14),0_1px_3px_rgba(0,0,0,0.6)] focus-visible:outline-none focus-visible:shadow-[0_0_0_4px_rgba(255,255,255,0.22),0_1px_3px_rgba(0,0,0,0.6)] active:scale-110 active:cursor-grabbing"
       />
     </SliderPrimitive.Root>
   )
