@@ -112,10 +112,14 @@ Left for later:
 
 - **Turned pictures are picked, snapped and resized by the box around them** (`rotatedBounds`): the Resize handles and
   the look masks of a turned picture do not follow its rotation yet.
-- **flipY differs between the editor and the game**: the editor mirrors a picture around its anchor (it hangs below it),
-  Phaser flips it in place. Older than rotation and origin; matters only for vertically flipped pictures.
 - **The placement ghost of a prefab shows only its root's sprite and collider**, not the sprites of the nodes inside it.
-- **Adding a node with an entity selected puts it inside that entity** (as Godot does). Nested entities export as
-  separate entities with absolute positions; the game does not move a child with its parent.
+- **Adding a node with an entity selected puts it inside that entity** (as Godot does); the game now carries it along
+  (`ParentFollowSystem`), but the editor's drag of a child entity does not show the parent's later moves until export.
+- **Pictures attached to one entity across several image layers** draw above it in file order (layers are exported top
+  first), not strictly in the tree's draw order; rare (one entity's sprites are normally one run).
+- **Signals have no payload yet**: a listener cannot target "the body that entered" or "the sender" (needs a new
+  `CommandTarget`), and signals do not cross maps.
+- **An entity row's eye is editor-only** (as before schema 6), while a hidden Node hides its sprites in the game too;
+  to start an entity hidden, turn off its AnimatedSprite's eye. Worth unifying once maps rely on it.
 - **A plain Node's anchor has a drag handle only while it is the active node**; entities can always be grabbed.
 

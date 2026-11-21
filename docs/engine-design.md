@@ -168,6 +168,7 @@ logs and skips it until the system exists)
 * ● `branchStage` {id, cases: valueId[]} — one branch per listed value of the stage, plus `default`.
 * ○ legacy tree commands `loop` / `breakLoop` / `exitEvent`: only exist in old command trees and are converted by `commandsToGraph` (a wire back, a wire out of the cycle, an `end` node); graphs cannot contain them.
 * ● `wait` {ms}; ● `comment` {text}.
+* ● `emitSignal` {name} — sends a signal from this event's entity; states of the map whose start is `signal` with that name (from this entity or from anyone) start on the next update (see "Signals" below).
 * ● `callCommonEvent` {id} — runs a common event (`project/common/<id>.json`, `{ version: 1, id, name, folder?, graph }`) with the same self and local flags; its `end` returns to the caller; nesting is limited to 16 and call cycles are validation errors (`common-cycle`). The sync writes them to `data/common.json`.
 
 **State**
@@ -251,3 +252,26 @@ entity simply has no graphic until one is picked. `instantiatePrefab(prefab, { x
 * `game/src/ecs/*` — runtime; `expand.ts` expands editor components into runtime components (see [game-runtime.md](game-runtime.md)).
 * `game/src/events/*` — event runtime (interpreter, state selection, state, triggers).
 * `scripts/sync-assets.mjs`, `scripts/export-maps.mjs` — project → game pipelines.
+
+## Signals (`shared/engine/signals.ts`)
+
+Godot-style signals connect what happens to one entity with events of another. A state whose start (`trigger`) is
+`signal` names the signal (`signal`) and who must send it (`signalFrom`: `'self'`, an entity's editor id, or absent for
+anyone). Two signals are built in: an entity with an Area (an Area node with a CollisionShape; alone it exports as a
+Collider that is not solid, which counts too, `hasSignalArea`) sends `body_entered` / `body_exited` when the player or
+another character steps into / out of it. Any other name is sent by the `emitSignal` command. In the editor the
+**Signals** card of the Properties panel lists what an entity sends, the states connected to each signal (click to open
+the event), and **Connect** adds a `signal` state to the entity chosen to react. The "When" picker offers
+**Signal is received** with a signal picker (built-in names, names sent or heard on the map, or a new one) and a sender
+picker. In the game the TriggerSystem dispatches them (docs/game-runtime.md). Not there yet: the sender as a command
+target ("the body that entered"), and signals across maps.
+
+## Entities inside entities
+
+An entity can hold sprites and other entities (any node the placement rules allow). The export marks each with the
+entity it sits in (`EngineEntity.parent`, the image object property `parent`), and the game keeps their offset from it:
+they move by however much it moves, turn around its anchor when its sprite turns and hide while it is hidden
+(`ParentFollowSystem`, `world/attachedImages.ts`). A child entity still moves on its own on top of that. Plain Nodes
+stay baked into the scenery (their visibility, z, opacity and look fold into the sprites inside them); give a Node a tag
+(or any component) and it becomes an entity whose contents travel with it. The eye of an entity row hides it in the
+editor only; whether it starts shown in the game is its AnimatedSprite's eye.

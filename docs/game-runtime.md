@@ -26,6 +26,7 @@ How the game (`game/src`) runs the data the editor writes. The data contract is 
 | Movement | `GridMovement`; `player` adds `FreeMovement` + `PlayerControl{canRun}`; `wander` adds `AIWander` |
 | Event | `EventComponent` (states, authored sprite/solid for state overrides) |
 | Tag | `TagComponent` |
+| `parent` (set by the export for an entity inside an entity) | `ParentComponent`: the `ParentFollowSystem` moves it by its parent's moves, turns it with the parent's sprite and sets `SpriteComponent.hiddenByParent` while the parent is hidden |
 
 Legacy Tiled `interactables` object layers become entities with an `Interactable` and are migrated like any legacy entity
 (`ecs/legacyInteractables.ts`). `createComponentFromData` still accepts every name (`COMPONENT_TYPES` + legacy) and returns the primary component.
@@ -40,7 +41,9 @@ StateSelector     active state = last state whose conditions hold; applies appea
 EventInterpreter  async, cancellable event-graph runner (one cursor along the node wires; `callCommonEvent` recurses into `ctx.getCommonEvent(id)`, depth 16); handlers in commands/*.ts.
                   runs `state.graph` (stored as a graph since schemaVersion 4)
 EventRuntime      owns state, clock, state selector, running interpreters, the `event` input lock
-TriggerSystem     ECS system (priority 350): decides when events start
+TriggerSystem     ECS system (priority 350): decides when events start; dispatches signals
+ParentFollowSystem ECS system (priority 320): entities inside entities move, turn and hide with their parent (`ParentComponent`)
+AttachedImagesSystem ECS system (priority 1010, world/attachedImages.ts): pictures inside an entity follow it and draw just above its sprite
 RouteSystem       ECS system (priority 260): runs moveRoute steps through GridMovement.pendingDirection
 BusEventUI        EventUI over the EventBus -> DialogueHUD / ChoiceMenuHUD (UIScene); CameraEffects does fade/shake
 ```
@@ -59,6 +62,11 @@ BusEventUI        EventUI over the EventBus -> DialogueHUD / ChoiceMenuHUD (UISc
   while the state is active; the count restarts when the state changes. `mapEnter`: once after the map was loaded (`TriggerSystem.onMapEntered`).
   `mapLeave`: before a warp to another map (not a same-map warp) `Game.warpPlayer` awaits `EventRuntime.runMapLeave()`, which runs the active
   `mapLeave` states with input locked, before the fade-out. Repeating is done in the graph (wire the last node back; a loop needs a wait).
+  `signal`: `EventRuntime.sendSignal(sender, name)` queues a signal (the `emitSignal` command, or an entity with an Area or a non-solid
+  Collider sending `body_entered` / `body_exited` when the player or another character's settled tile enters / leaves its box; only looked
+  at while some active state listens to them). Each update the TriggerSystem starts the active `signal` states that hear it
+  (`stateHearsSignal`: the name, and `signalFrom` = anyone / `self` / an editor id), by priority; a listener already running misses it, a
+  blocking one waits for the running cutscene to end. Signals of a map are dropped when another one loads.
 * **Inactive events.** No active state = hidden and not solid (RPG Maker behaviour).
 * **Movement routes.** Steps use the normal movement intent (collision applies, blocked steps are skipped). `back` turns the character
   around (the movement system sets the facing from the intent). `speed` persists. Routed entities ignore the input lock, wander AI and player input
