@@ -142,7 +142,7 @@ export interface DrawSpriteOptions {
   anchorY: number
   opacity?: number
   tint?: string
-  /** Mirror the whole sprite around the anchor, horizontally and/or vertically (use with a sprite resolved without `flipX`). */
+  /** Mirror the sprite in place (inside its own box, as Phaser and Godot flip), horizontally and/or vertically (use with a sprite resolved without `flipX`). */
   mirrorX?: boolean
   mirrorY?: boolean
   /** Smooth the picture when it is scaled (small previews of big pictures); the default keeps pixel art crisp. */
@@ -169,9 +169,9 @@ export function drawResolvedSprite(ctx: CanvasRenderingContext2D, r: ResolvedSpr
   const sx = source === r.img ? src.x : 0
   const sy = source === r.img ? src.y : 0
   if (opts.mirrorX || opts.mirrorY) {
-    ctx.translate(opts.anchorX, opts.anchorY)
+    ctx.translate(dx + (opts.mirrorX ? dest.w : 0), dy + (opts.mirrorY ? dest.h : 0))
     ctx.scale(opts.mirrorX ? -1 : 1, opts.mirrorY ? -1 : 1)
-    ctx.drawImage(source, sx, sy, src.w, src.h, dest.x, dest.y, dest.w, dest.h)
+    ctx.drawImage(source, sx, sy, src.w, src.h, 0, 0, dest.w, dest.h)
   } else if (r.flipX) {
     ctx.translate(dx + dest.w, dy)
     ctx.scale(-1, 1)

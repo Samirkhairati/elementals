@@ -78,14 +78,13 @@ export function itemBounds(item: ItemLike, assets: Record<string, SpriteAssetInf
   return shifted(spriteBoundsFromMeta(asset.meta, { scale }), item)
 }
 
-/** Where the item stands once flips and its rotation are applied (a flip mirrors the frame around the anchor; a turned item gives the box around it). */
+/** Where the item stands once flips and its rotation are applied (a flip mirrors it in place, so only a turn changes the box: the box around it). */
 export function flippedItemBounds(
   item: ItemLike & { flipX?: boolean; flipY?: boolean; rotation?: number },
   assets: Record<string, SpriteAssetInfo>,
   gameSize = false,
 ): Rect {
-  const b = itemBounds(item, assets, gameSize)
-  return rotatedBounds({ ...b, x: item.flipX ? -(b.x + b.w) : b.x, y: item.flipY ? -(b.y + b.h) : b.y }, item.rotation)
+  return rotatedBounds(itemBounds(item, assets, gameSize), item.rotation)
 }
 
 /**

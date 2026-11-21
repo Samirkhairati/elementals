@@ -61,11 +61,19 @@ describe('imageItems', () => {
     // a one-tile picture keeps the old behaviour: anchor at the tile's bottom-centre
     const tile = { x: -16, y: -32, w: 32, h: 32 }
     expect(snapImageAnchor(tile, 40, 50)).toEqual({ x: 48, y: 64 })
-    // flipping mirrors the frame around the anchor, and an edge still lands on a line
+    // flipping mirrors the picture in place (its box does not move), and an edge still lands on a line
     const flipped = flippedItemBounds({ graphicId: 'sky/sheet.png', crop: { x: 0, y: 0, w: 48, h: 32 }, flipX: true }, assets)
     const at = snapImageAnchor(flipped, 70, 64)
     const left = at.x + flipped.x
     expect(left % 32 === 0 || (left + flipped.w) % 32 === 0).toBe(true)
+  })
+
+  it('a flip mirrors the picture in place, as the game does: the box stays where it is, also with its own origin', () => {
+    const item = { graphicId: 'sky/sheet.png', originX: 0, originY: 0.5 }
+    const plain = flippedItemBounds(item, assets)
+    expect(flippedItemBounds({ ...item, flipX: true }, assets)).toEqual(plain)
+    expect(flippedItemBounds({ ...item, flipY: true }, assets)).toEqual(plain)
+    expect(flippedItemBounds({ graphicId: 'sky/sheet.png', flipY: true }, assets).y).toBeLessThan(0) // above the anchor, not hanging below it
   })
 
   describe('corner snapping', () => {

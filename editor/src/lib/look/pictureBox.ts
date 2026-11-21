@@ -18,12 +18,7 @@ export function pictureBox(item: Pick<ImageItem, 'flipX' | 'flipY'>, resolved: P
   const { dest, src } = resolved
   const mirrorX = !!item.flipX !== resolved.flipX
   const mirrorY = !!item.flipY
-  // mirrored around the anchor, as drawResolvedSprite does
-  const box = {
-    x: item.flipX ? at.x - dest.x - dest.w : at.x + dest.x,
-    y: item.flipY ? at.y - dest.y - dest.h : at.y + dest.y,
-    w: dest.w,
-    h: dest.h,
-  }
+  // A flip mirrors the picture in place (inside this box), as drawResolvedSprite and the game do.
+  const box = { x: at.x + dest.x, y: at.y + dest.y, w: dest.w, h: dest.h }
   return { box, mirrorX, mirrorY, subject: pictureSubject(box, { w: src.w, h: src.h }, mirrorX, mirrorY) }
 }
