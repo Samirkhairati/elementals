@@ -103,14 +103,14 @@ describe('sceneLayers', () => {
     expect(first.kind === 'sprites' && first.host?.id).toBe('g')
   })
 
-  it('skips entities and everything below them, and hidden nodes with shownOnly', () => {
+  it('draws what an entity holds (it is a Node), and skips hidden nodes with shownOnly', () => {
     const entity = { ...blank(), children: [pic('inside')] } as SceneNode
     const tree = [entity, group('g', [pic('a'), pic('hidden', undefined)]), tile('off')]
     ;(tree[1] as { children: SceneNode[] }).children[1].visible = false
     tree[2].visible = false
-    expect(sceneLayers(tree).map((l) => l.key)).toEqual(['s:a', 'l:off'])
+    expect(sceneLayers(tree).map((l) => l.key)).toEqual(['s:inside', 's:a', 'l:off'])
     const shown = sceneLayers(tree, { shownOnly: true })
-    expect(shown.map((l) => l.key)).toEqual(['s:a'])
+    expect(shown.map((l) => l.key)).toEqual(['s:inside', 's:a'])
     expect(shown[0].kind === 'sprites' && shown[0].sprites).toHaveLength(1)
   })
 

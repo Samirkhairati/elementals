@@ -87,6 +87,8 @@ export function expandEntity(entity: EngineEntity, ctx: ExpandContext = defaultE
     if (spriteProps.asset !== "") {
       const built = buildSpriteComponents(spriteProps, ctx.sprites);
       if (built.ok) {
+        // The node's rotation turns its sprite around the anchor.
+        if (typeof entity.rotation === "number" && Number.isFinite(entity.rotation)) built.value.sprite.angle = entity.rotation;
         out.push(built.value.sprite);
         out.push(built.value.animator);
       } else {

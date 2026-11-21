@@ -116,14 +116,15 @@ describe('NODE_TYPES', () => {
 
   it('says which common sections apply', () => {
     expect(NODE_TYPES.picture.sections).toEqual({ node: true, drawing: true, look: true })
-    expect(NODE_TYPES.entity.sections.look).toBe(false)
+    expect(NODE_TYPES.entity.sections.look).toBe(true) // an entity is a Node with components
     expect(NODE_TYPES.group.sections.look).toBe(true)
     expect(NODE_TYPES.event.sections).toEqual({ node: true, drawing: false, look: false })
   })
 
   it('names the nodes the Godot way, with an icon each and no two alike', () => {
     expect([NODE_TYPES.group.label, NODE_TYPES.picture.label, NODE_TYPES.animatedSprite.label, NODE_TYPES.area.label]).toEqual(['Node', 'Sprite', 'AnimatedSprite', 'Area'])
-    const menu = NODE_TYPE_LIST.filter((t) => t !== 'body' && t !== 'collision') // both StaticBody: the map's and an entity's
+    expect(NODE_TYPES.entity.label).toBe('Node') // a Node with components is still a Node
+    const menu = NODE_TYPE_LIST.filter((t) => t !== 'body' && t !== 'collision' && t !== 'entity') // both StaticBody: the map's and an entity's
     expect(new Set(menu.map((t) => NODE_TYPES[t].label)).size).toBe(menu.length)
   })
 })
@@ -180,8 +181,9 @@ describe('canHold', () => {
     expect(holds([]).sort()).toEqual(['collision', 'encounters', 'entity', 'group', 'objects', 'terrain', 'tile'])
   })
 
-  it('lets a Node hold the scene nodes, Sprites, a Look and a YSort, at any depth', () => {
-    const branch = ['collision', 'encounters', 'entity', 'group', 'look', 'objects', 'picture', 'terrain', 'tile', 'ySort'].sort()
+  it('lets a Node hold the scene nodes, Sprites, a Look, a YSort and components, at any depth', () => {
+    const components = ['animatedSprite', 'area', 'body', 'event', 'mover', 'playerController', 'wander']
+    const branch = ['collision', 'encounters', 'entity', 'group', 'look', 'objects', 'picture', 'terrain', 'tile', 'ySort', ...components].sort()
     expect(holds([group('g')]).sort()).toEqual(branch)
     expect(holds([group('outer'), image('i'), group('g'), group('h')]).sort()).toEqual(branch)
     // a YSort is a modifier: it holds nothing, and a Node holds one
@@ -202,8 +204,8 @@ describe('canHold', () => {
     for (const leaf of [terrain('x'), tilesItem('w'), shape('s')]) expect(holds([leaf])).toEqual([])
   })
 
-  it('lets an entity hold its components, one of each and one movement node; a body or area one shape', () => {
-    expect(holds([entity('e')]).sort()).toEqual(['animatedSprite', 'area', 'body', 'event', 'mover', 'playerController', 'wander'])
+  it('lets an entity hold what a Node holds, its components one of each and one movement node; a body or area one shape', () => {
+    expect(holds([entity('e')]).sort()).toEqual(holds([group('g')]).sort())
     const e = entity('e', { children: [{ id: 's', type: 'animatedSprite', name: 'AnimatedSprite', props: {} }, { id: 'w', type: 'wander', name: 'Wander', props: {} }] })
     expect(canHold([e], 'animatedSprite')).toBe(false)
     expect(canHold([e], 'mover')).toBe(false) // one movement node
@@ -212,7 +214,7 @@ describe('canHold', () => {
     const body: SceneNode = { id: 'b', type: 'body', name: 'b', children: [] }
     expect(holds([e, body])).toEqual(['collisionShape'])
     expect(canHold([e, { ...body, children: [shape('s1')] } as SceneNode], 'collisionShape')).toBe(false)
-    expect(canHold([group('g')], 'animatedSprite')).toBe(false) // components only live in an entity
+    expect(canHold([group('g')], 'animatedSprite')).toBe(true) // a Node that gets a component becomes an entity (promoteNodes)
   })
 
   it('holds one Look per node', () => {
@@ -274,7 +276,6 @@ describe('insertNode', () => {
     expect(insertNode(tree, 'cloud', picture('p'))).toBe(tree) // no sprite inside a sprite
     expect(insertNode(tree, 'ground', tile('t'))).toBe(tree)
     expect(insertNode(tree, 'walls', tile('t'))).toBe(tree)
-    expect(insertNode(tree, 'oak', tile('t'))).toBe(tree) // an entity holds its components only
     expect(insertNode(tree, 'nope', tile('t'))).toBe(tree)
     expect(insertNode(tree, null, tile('ground'))).toBe(tree) // the id is taken
     expect(insertNode(tree, null, terrain('t2'))).toBe(tree) // one terrain per map
@@ -362,7 +363,6 @@ describe('moveNode', () => {
     const tree = sample()
     expect(moveNode(tree, 'cloud', null)).toBe(tree) // a sprite lives in a Node
     expect(moveNode(tree, 'cloud', 'b1')).toBe(tree) // not in another sprite
-    expect(moveNode(tree, 'oak', 'npc')).toBe(tree) // an entity holds no entity
     expect(moveNode(tree, 'ground', 'walls')).toBe(tree)
     expect(moveNode(tree, 'ground', 'houses')).toBe(tree) // a leaf holds nothing
     expect(moveNode(tree, 'nope', null)).toBe(tree)

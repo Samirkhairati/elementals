@@ -11,6 +11,8 @@ export interface SpriteComponentInit {
   alpha?: number;
   flipX?: boolean;
   tint?: number;
+  /** Degrees, clockwise, around the origin (the entity's rotation). */
+  angle?: number;
   /** Character this graphic comes from (`characters/player`); '' for legacy raw textures. Animations live on the AnimatorComponent. */
   assetId?: string;
 }
@@ -27,6 +29,7 @@ export class SpriteComponent {
   public alpha: number;
   public flipX: boolean;
   public tint?: number;
+  public angle: number;
   public assetId: string;
 
   constructor(init: SpriteComponentInit) {
@@ -41,6 +44,7 @@ export class SpriteComponent {
     this.alpha = init.alpha ?? 1.0;
     this.flipX = init.flipX ?? false;
     this.tint = init.tint;
+    this.angle = init.angle ?? 0;
     this.assetId = init.assetId ?? "";
   }
 }

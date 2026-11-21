@@ -598,6 +598,8 @@ export interface EngineEntity {
   y: number;
   visible?: boolean;
   folder?: string | null;
+  /** Degrees, clockwise, that the entity's sprite is turned around its anchor (the node's rotation in the editor). */
+  rotation?: number;
   components: EntityComponents;
 }
 

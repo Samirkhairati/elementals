@@ -27,14 +27,15 @@ export interface SpriteRun {
 export type SceneLayer = ({ kind: 'layer'; key: string } & PlacedNode<LayerNode>) | SpriteRun
 
 /**
- * The layers of a tree in draw order. Nothing below an entity is a layer. With `shownOnly`, hidden nodes (or nodes below
+ * The layers of a tree in draw order (an entity draws its own sprite apart, see the editor's drawPlan). With `shownOnly`, hidden nodes (or nodes below
  * a hidden one) are left out, and a run is made of the shown sprites only.
  */
 export function sceneLayers(nodes: readonly SceneNode[], options: { shownOnly?: boolean } = {}): SceneLayer[] {
   const out: SceneLayer[] = []
   let run: SpriteRun | null = null
   for (const { node, ancestors } of walk(nodes)) {
-    if (ancestors.some((a) => a.type === 'entity' || a.type === 'picture') || node.type === 'entity') continue
+    // An entity is a Node with components: what sits inside it draws like inside a Node; its own sprite is not a layer.
+    if (ancestors.some((a) => a.type === 'picture' || a.type === 'body' || a.type === 'area')) continue
     if (options.shownOnly && !isVisible(node, ancestors)) continue
     if (node.type === 'picture') {
       const at = hostIndex(ancestors)

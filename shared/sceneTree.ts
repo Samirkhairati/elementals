@@ -77,8 +77,26 @@ interface CanvasFields {
   pickAsOne?: boolean
 }
 
-/** Node: holds any scene node (the folders, picture groups, image layers and entity folders of old maps). */
-export interface GroupNode extends NodeBase, ContainerFields, CanvasFields {
+/**
+ * The transform of a Node, like Godot's Node2D: its anchor (`x`, `y`, map pixels; absent = the map's origin) and its
+ * rotation in degrees. Children are stored at their own map positions; moving or rotating a Node in the editor carries
+ * what is below it along (`translateSubtree`, `rotateSubtree`).
+ */
+interface TransformFields {
+  x?: number
+  y?: number
+  /** Degrees, clockwise (absent = 0). */
+  rotation?: number
+  /** The id of the prefab it was placed from (Save as Prefab offers to update that one). */
+  prefab?: string
+}
+
+/**
+ * Node: holds any scene node (the folders, picture groups, image layers and entity folders of old maps). A Node that is
+ * given a component (AnimatedSprite, StaticBody, Area, a movement node, Event) becomes an Entity (`promoteNodes`): the
+ * editor shows both as one kind of node.
+ */
+export interface GroupNode extends NodeBase, ContainerFields, CanvasFields, TransformFields {
   type: 'group'
 }
 
@@ -114,6 +132,11 @@ export interface PictureNode extends NodeBase, ContainerFields {
   flipX?: boolean
   flipY?: boolean
   opacity?: number
+  /** Degrees, clockwise, around the origin (absent = 0). */
+  rotation?: number
+  /** Where the anchor sits on the picture, as fractions of its size (absent = 0.5, 1: the bottom centre). */
+  originX?: number
+  originY?: number
 }
 
 /** Look: the colour grading (and drop shadow) of its parent and, for a Node, of what is below it. */
@@ -155,11 +178,18 @@ export interface CollisionShapeNode extends NodeBase {
   box?: ShapeBox
 }
 
-/** An entity: the node id is the entity id. Its own `components` are Transform and Tag; the others are its children. */
-export interface EntityNode extends NodeBase, ContainerFields {
+/**
+ * An entity: a Node with components (shown as a Node in the editor). The node id is the entity id. Its own `components`
+ * are Transform and Tag; the others are its children, next to any scene node a Node may hold.
+ */
+export interface EntityNode extends NodeBase, ContainerFields, CanvasFields {
   type: 'entity'
   x: number
   y: number
+  /** Degrees, clockwise: turns its AnimatedSprite (absent = 0). */
+  rotation?: number
+  /** The id of the prefab it was placed from. */
+  prefab?: string
   components: Record<string, Record<string, unknown> | undefined>
 }
 
@@ -230,8 +260,8 @@ export interface ObjectsLayerNode extends NodeBase {
 }
 
 export type ContainerNode = GroupNode | TileLayerNode | PictureNode | CollisionLayerNode | EntityNode | BodyNode | AreaNode
-/** Node: what holds scene nodes (and the map root). */
-export type BranchNode = GroupNode
+/** Node: what holds scene nodes (and the map root): a plain Node or one with components (an entity). */
+export type BranchNode = GroupNode | EntityNode
 /** The nodes that are layers of the exported map: a tile layer, the map's static body or one of the gameplay layers. */
 export type LayerNode = TileLayerNode | CollisionLayerNode | TerrainNode | EncountersNode | ObjectsLayerNode
 /** Layers that hold painted cells of a tileset (everything but the static body). */
@@ -276,7 +306,7 @@ const info = (type: SceneNodeType, label: string, description: string, icon: str
 
 /** One entry per node type; data only. */
 export const NODE_TYPES: Record<SceneNodeType, NodeTypeInfo> = {
-  group: info('group', 'Node', 'Holds other nodes; its z, opacity, look and y-sort pass down to what is inside', 'circle-dot', '#60a5fa', true, 'scene', true, true),
+  group: info('group', 'Node', 'An anchor you place on the map; holds other nodes and components (add an Area with a CollisionShape to make it trigger events). Its z, opacity, look and y-sort pass down to what is inside', 'circle-dot', '#60a5fa', true, 'scene', true, true),
   ySort: info('ySort', 'YSort', 'Makes the sprites inside its Node draw sorted by their feet among the characters (hide it to switch it off)', 'arrow-down-wide-narrow', '#38bdf8', false, 'drawing'),
   tile: info('tile', 'TileMap', 'Tiles painted from a tileset', 'grid-2x2', '#cbd5e1', true, 'drawing', true, true),
   terrain: info('terrain', 'Terrain', 'Water, ice and other ground kinds the game reads (one per map)', 'droplet', '#60a5fa', false, 'drawing', true),
@@ -287,7 +317,7 @@ export const NODE_TYPES: Record<SceneNodeType, NodeTypeInfo> = {
   collision: info('collision', 'StaticBody', 'The map\'s collision: painted tiles and shapes the player cannot cross', 'brick-wall', '#f87171', true, 'collision', true),
   collisionTiles: info('collisionTiles', 'Collision Tiles', 'A named set of the painted collision tiles', 'grid-3x3', '#fca5a5', false, 'collision'),
   collisionShape: info('collisionShape', 'CollisionShape', 'A polygon, a line or a box', 'pentagon', '#fca5a5', false, 'collision'),
-  entity: info('entity', 'Entity', 'A character, object or trigger; its components are the nodes inside it', 'user', '#38bdf8', true, 'entity'),
+  entity: info('entity', 'Node', 'A Node with components: a character, object or trigger', 'circle-dot', '#60a5fa', true, 'entity', true, true),
   animatedSprite: info('animatedSprite', 'AnimatedSprite', 'What the entity looks like: a sprite asset and its animations', 'clapperboard', '#c084fc', false, 'component'),
   body: info('body', 'StaticBody', 'Makes the entity solid: nothing walks through its shape', 'brick-wall', '#f87171', true, 'component'),
   area: info('area', 'Area', 'Where the entity\'s events trigger (stepping on it, touching it)', 'scan', '#34d399', true, 'component'),
@@ -327,7 +357,9 @@ const MOVEMENT_TYPES: readonly SceneNodeType[] = ['wander', 'playerController', 
 const COMPONENT_TYPES: readonly SceneNodeType[] = ['animatedSprite', 'body', 'area', ...MOVEMENT_TYPES, 'event']
 
 export const isContainer = (node: SceneNode): node is ContainerNode => CONTAINER_TYPES.has(node.type)
-export const isBranch = (node: SceneNode): node is BranchNode => node.type === 'group'
+export const isBranch = (node: SceneNode): node is BranchNode => node.type === 'group' || node.type === 'entity'
+/** A Node of the scene (with or without components): what the editor shows as "Node". */
+export const isSceneNode = isBranch
 export const isLayerNode = (node: SceneNode): node is LayerNode =>
   node.type === 'tile' || node.type === 'collision' || node.type === 'terrain' || node.type === 'encounters' || node.type === 'objects'
 export const isDataLayer = (node: SceneNode): node is DataLayerNode => isCellLayer(node) || node.type === 'collision'
@@ -457,13 +489,13 @@ export function nodeIds(nodes: readonly SceneNode[]): Set<string> {
 // ── placement rules ────────────────────────────────────────────────────────────────────────────────
 
 const ROOT_CHILDREN: readonly SceneNodeType[] = ['group', 'tile', 'terrain', 'encounters', 'objects', 'collision', 'entity']
-const BRANCH_CHILDREN: readonly SceneNodeType[] = [...ROOT_CHILDREN, 'picture', 'look', 'ySort']
+const BRANCH_CHILDREN: readonly SceneNodeType[] = [...ROOT_CHILDREN, 'picture', 'look', 'ySort', ...COMPONENT_TYPES]
 const HOLDS: Partial<Record<SceneNodeType, readonly SceneNodeType[]>> = {
   group: BRANCH_CHILDREN,
   tile: ['look'],
   picture: ['look'],
   collision: ['collisionTiles', 'collisionShape'],
-  entity: COMPONENT_TYPES,
+  entity: BRANCH_CHILDREN,
   body: ['collisionShape'],
   area: ['collisionShape'],
 }
@@ -473,7 +505,7 @@ const SINGLETON_TYPES: readonly SceneNodeType[] = ['terrain', 'encounters']
 function slotOf(parent: SceneNode | undefined, type: SceneNodeType): string | null {
   if (type === 'look' || type === 'ySort') return type
   if (!parent) return null
-  if (parent.type === 'entity') return isMovementType(type) ? 'movement' : type
+  if (isBranch(parent) && COMPONENT_TYPES.includes(type)) return isMovementType(type) ? 'movement' : type
   if ((parent.type === 'body' || parent.type === 'area') && type === 'collisionShape') return 'shape'
   return null
 }
@@ -495,7 +527,8 @@ export function childTypesOf(parentPath: readonly SceneNode[]): SceneNodeType[] 
  *    from there) and a Look;
  *  - a TileMap and a Sprite hold only a Look (a sprite inside a sprite makes no sense);
  *  - the map's StaticBody holds collision tiles and shapes;
- *  - an Entity holds its components: AnimatedSprite, StaticBody, Area, one movement node and Event;
+ *  - a Node (with or without components) also holds components: AnimatedSprite, StaticBody, Area, one movement
+ *    node and Event (a Node given one becomes an entity, see `promoteNodes`);
  *  - an entity's StaticBody and Area hold a CollisionShape;
  *  - every other node holds nothing.
  *
@@ -955,4 +988,88 @@ const zOf = (node: SceneNode): number | undefined => (isBranch(node) ? node.z : 
 /** The game depth of the sprites directly under `parent` (path `ancestors` above it): the nearest z of a Node. */
 export function inheritedZ(parent: SceneNode | undefined, ancestors: readonly SceneNode[]): number | undefined {
   return inheritedValue(parent, ancestors, zOf)
+}
+
+// ── one kind of Node: promotion and transforms ─────────────────────────────────────────────────────
+
+/**
+ * The tree with every plain Node that holds a component node turned into an entity (same id, name, children, anchor;
+ * empty own components), so a Node given an AnimatedSprite, StaticBody, Area, movement node or Event is an entity of the
+ * game. The same array comes back when there is nothing to promote. Pure and idempotent; the editor runs it on every
+ * change of the tree.
+ */
+export function promoteNodes(nodes: SceneNode[]): SceneNode[] {
+  return mapTree(nodes, (node) => {
+    if (node.type !== 'group' || !kids(node).some(isComponentNode)) return node
+    const { type: _t, x, y, rotation, ...rest } = node
+    const entity: EntityNode = { ...rest, type: 'entity', x: x ?? 0, y: y ?? 0, components: {} }
+    if (rotation) entity.rotation = rotation
+    return entity
+  })
+}
+
+/** Where a node's anchor is: a Node's or entity's position (a Node without one is at the map's origin), a sprite's anchor. */
+export function nodeAnchor(node: SceneNode): { x: number; y: number } | null {
+  if (node.type === 'entity' || node.type === 'picture') return { x: node.x, y: node.y }
+  if (node.type === 'group') return { x: node.x ?? 0, y: node.y ?? 0 }
+  return null
+}
+
+/** Whether a node has an anchor that can be placed (a Node, an entity, a sprite). */
+export const hasAnchor = (node: SceneNode): boolean => nodeAnchor(node) !== null
+
+const round3 = (v: number) => Math.round(v * 1000) / 1000
+
+/**
+ * A node and everything below it moved by (dx, dy): Nodes, entities and sprites move their anchors, the shapes of the
+ * map's StaticBody their points; painted layers stay on their grid and an entity's own shapes are already relative to
+ * it. The same node comes back for a zero move.
+ */
+export function translateSubtree<T extends SceneNode>(node: T, dx: number, dy: number): T {
+  if (dx === 0 && dy === 0) return node
+  const go = (n: SceneNode, inBody: boolean): SceneNode => {
+    let out: SceneNode = n
+    if (n.type === 'entity' || n.type === 'picture') out = { ...n, x: round3(n.x + dx), y: round3(n.y + dy) }
+    else if (n.type === 'group') out = { ...n, x: round3((n.x ?? 0) + dx), y: round3((n.y ?? 0) + dy) }
+    else if (n.type === 'collisionShape' && !inBody) out = { ...n, points: n.points.map((p) => ({ ...p, x: round3(p.x + dx), y: round3(p.y + dy) })) }
+    if (!isContainer(out)) return out
+    const body = inBody || n.type === 'body' || n.type === 'area'
+    const children = kids(out).map((c) => go(c, body))
+    return children.some((c, i) => c !== kids(out as ContainerNode)[i]) ? withChildren(out as ContainerNode, children) : out
+  }
+  return go(node, false) as T
+}
+
+/**
+ * A Node (or entity) and everything below it turned by `degrees` around its anchor: the anchors of what is below it
+ * turn around it and every Node, entity and sprite adds the angle to its own rotation. Painted layers and shapes stay
+ * as they are. The same node comes back for a zero turn.
+ */
+export function rotateSubtree<T extends SceneNode>(node: T, degrees: number): T {
+  const anchor = nodeAnchor(node)
+  if (!anchor || !degrees) return node
+  const rad = (degrees * Math.PI) / 180
+  const cos = Math.cos(rad)
+  const sin = Math.sin(rad)
+  const turnPoint = (x: number, y: number) => ({ x: round3(anchor.x + (x - anchor.x) * cos - (y - anchor.y) * sin), y: round3(anchor.y + (x - anchor.x) * sin + (y - anchor.y) * cos) })
+  const angle = (r: number | undefined) => {
+    const v = round3((((r ?? 0) + degrees) % 360 + 360) % 360)
+    return v === 0 ? undefined : v > 180 ? round3(v - 360) : v
+  }
+  const go = (n: SceneNode, top: boolean): SceneNode => {
+    let out: SceneNode = n
+    if (n.type === 'entity' || n.type === 'picture' || n.type === 'group') {
+      const a = nodeAnchor(n)!
+      const p = top ? a : turnPoint(a.x, a.y)
+      const r = angle(n.rotation)
+      const next = { ...n, x: p.x, y: p.y } as typeof n
+      if (r === undefined) delete next.rotation
+      else next.rotation = r
+      out = next
+    }
+    if (!isContainer(out) || out.type === 'body' || out.type === 'area' || out.type === 'collision' || out.type === 'tile') return out
+    const children = kids(out).map((c) => go(c, false))
+    return children.some((c, i) => c !== kids(out as ContainerNode)[i]) ? withChildren(out as ContainerNode, children) : out
+  }
+  return go(node, true) as T
 }

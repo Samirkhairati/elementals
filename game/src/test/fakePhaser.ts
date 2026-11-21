@@ -56,6 +56,7 @@ export class FakeSprite extends EventEmitter {
   public alpha = 1;
   public flipX = false;
   public scaleX = 1;
+  public angle = 0;
   public originX = 0.5;
   public originY = 1;
   public isTinted = false;
@@ -83,6 +84,7 @@ export class FakeSprite extends EventEmitter {
   setAlpha(a: number) { this.alpha = a; return this; }
   setFlipX(f: boolean) { this.flipX = f; return this; }
   setScale(s: number) { this.scaleX = s; return this; }
+  setAngle(a: number) { this.angle = a; return this; }
   setTint(t: number) { this.isTinted = true; this.tintTopLeft = t; return this; }
   clearTint() { this.isTinted = false; return this; }
   setPosition(x: number, y: number) { this.x = x; this.y = y; return this; }

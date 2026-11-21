@@ -56,6 +56,8 @@ class FakeImage implements ImageObject {
   setDepth(d: number) { this.depth = d; }
   setAlpha(a: number) { this.alpha = a; }
   setFlip(x: boolean, y: boolean) { this.flip = [x, y]; }
+  angle = 0;
+  setAngle(a: number) { this.angle = a; }
   setDisplaySize(w: number, h: number) { this.display = [w, h]; }
   destroy() { this.destroyed = true; }
 }
@@ -162,6 +164,20 @@ describe("ImageLayerRenderer", () => {
     r.show(exported([{ id: "a", graphicId: "images/sky.png", x: 40, y: 64, flipX: true, opacity: 0.5 }]));
     expect(added).toHaveLength(1);
     expect(added[0]).toMatchObject({ x: 40, y: 64, texture: key, frame: "__BASE", origin: [0.5, 1], depth: 5, alpha: 0.5, flip: [true, false], display: null });
+  });
+
+  it("a picture turned and with its own origin: the origin sits on the anchor and it turns around it, as in the editor", () => {
+    const { scene, added } = fakeScene({ [key]: sky });
+    const r = new ImageLayerRenderer(scene, realSprites);
+    // A schema 8 tree (old image layers have no rotation or origin to migrate).
+    const map = {
+      name: "town", width: 4, height: 4, schemaVersion: 8,
+      nodes: [{ id: "g", type: "group", name: "Sky", children: [{ id: "a", type: "picture", name: "a", graphicId: "images/sky.png", x: 40, y: 64, rotation: 30, originX: 0, originY: 0.5, children: [] }] }],
+    };
+    r.show(JSON.parse(JSON.stringify(convertEditorMapToTiled(map as never, []))));
+    expect(added[0]).toMatchObject({ x: 40, y: 64, origin: [0, 0.5], angle: 30 });
+    const [def] = readImageObjects(exported([{ id: "b", graphicId: "images/sky.png", x: 1, y: 2 }]));
+    expect(def).toMatchObject({ originX: 0.5, originY: 1, rotation: 0 });
   });
 
   it("a y-sorted picture (in a YSort) draws among the characters by its anchor's y, the others at the layer's depth", () => {

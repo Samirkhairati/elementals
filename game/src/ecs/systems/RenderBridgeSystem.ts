@@ -76,6 +76,7 @@ export class RenderBridgeSystem extends System {
         sprite.setAlpha(spriteComp.alpha);
         sprite.setFlipX(flipX);
         sprite.setScale(spriteComp.scale);
+        if (spriteComp.angle) sprite.setAngle(spriteComp.angle);
         if (spriteComp.tint !== undefined) sprite.setTint(spriteComp.tint);
         this.spriteMap.set(entity, sprite);
         sprite.on(ANIMATION_COMPLETE, (animation: { key: string }) => this.onAnimationComplete(entity, animation.key));
@@ -98,6 +99,7 @@ export class RenderBridgeSystem extends System {
       if (sprite.alpha !== spriteComp.alpha) sprite.setAlpha(spriteComp.alpha);
       if (sprite.flipX !== flipX) sprite.setFlipX(flipX);
       if (sprite.scaleX !== spriteComp.scale) sprite.setScale(spriteComp.scale);
+      if (sprite.angle !== spriteComp.angle) sprite.setAngle(spriteComp.angle);
       if (sprite.originX !== spriteComp.originX || sprite.originY !== spriteComp.originY) {
         sprite.setOrigin(spriteComp.originX, spriteComp.originY);
       }

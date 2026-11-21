@@ -83,6 +83,9 @@ function imageObjects(run: SpriteRun, nextId: () => number): TiledObject[] {
     if (item.scale !== undefined && item.scale !== 1) properties.push({ name: 'scale', type: 'float', value: item.scale })
     if (item.flipX) properties.push({ name: 'flipX', type: 'bool', value: true })
     if (item.flipY) properties.push({ name: 'flipY', type: 'bool', value: true })
+    // The origin: the point of the picture (fractions of its size) that sits on the anchor and that it turns around.
+    if (item.originX !== undefined && item.originX !== 0.5) properties.push({ name: 'originX', type: 'float', value: item.originX })
+    if (item.originY !== undefined && item.originY !== 1) properties.push({ name: 'originY', type: 'float', value: item.originY })
     const opacity = effectiveOpacity(item, ancestors)
     if (opacity !== 1) properties.push({ name: 'opacity', type: 'float', value: opacity })
     if (effectiveYSort(item, ancestors)) properties.push({ name: 'ySort', type: 'bool', value: true })
@@ -95,7 +98,8 @@ function imageObjects(run: SpriteRun, nextId: () => number): TiledObject[] {
       y: item.y,
       width: 0,
       height: 0,
-      rotation: 0,
+      // Degrees clockwise around the origin, like Tiled.
+      rotation: item.rotation ?? 0,
       visible: true,
       properties,
     }

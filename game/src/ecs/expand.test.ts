@@ -70,6 +70,12 @@ describe('expandEntity', () => {
     expect(Object.keys(find(AnimatorComponent)!.def!.clips)).toEqual(['idle', 'walk', 'run']);
   });
 
+  it("the node's rotation turns its sprite", () => {
+    const list = expandEntity({ ...entity({ Sprite: createDefaultComponent('Sprite', { asset: 'characters/player' }) }), rotation: -45 }, ctx);
+    expect((list.find((c) => c instanceof SpriteComponent) as SpriteComponent).angle).toBe(-45);
+    expect(expand({ Sprite: createDefaultComponent('Sprite', { asset: 'characters/player' }) }).find(SpriteComponent)!.angle).toBe(0);
+  });
+
   it('character Sprite with a forced animation name and an asset without run sheet', () => {
     const { find } = expand({ Sprite: createDefaultComponent('Sprite', { asset: 'characters/npc', animation: 'walk' }) });
     expect(find(AnimatorComponent)).toMatchObject({ explicitClip: 'walk' });

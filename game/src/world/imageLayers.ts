@@ -21,9 +21,14 @@ export interface ImageObjectDef {
   graphic?: string;
   /** The part of the picture to show (picture pixels). */
   crop?: { x: number; y: number; w: number; h: number };
-  /** The anchor: bottom-centre of the image. */
+  /** The anchor: where the origin point of the image sits (default its bottom-centre). */
   x: number;
   y: number;
+  /** The point of the image on the anchor, as fractions of its size; also what it turns around. */
+  originX: number;
+  originY: number;
+  /** Degrees, clockwise, around the origin. */
+  rotation: number;
   scale: number;
   flipX: boolean;
   flipY: boolean;
@@ -63,6 +68,9 @@ export function readImageObjects(raw: unknown): ImageObjectDef[] {
         crop,
         x: num(obj.x, 0),
         y: num(obj.y, 0),
+        originX: num(p.originX, 0.5),
+        originY: num(p.originY, 1),
+        rotation: num(obj.rotation, 0),
         scale: Math.max(0.01, num(p.scale, 1)),
         flipX: p.flipX === true,
         flipY: p.flipY === true,
@@ -107,6 +115,7 @@ export interface ImageObject {
   setDepth(depth: number): unknown;
   setAlpha(alpha: number): unknown;
   setFlip(x: boolean, y: boolean): unknown;
+  setAngle?(degrees: number): unknown;
   setDisplaySize(w: number, h: number): unknown;
   destroy(): void;
 }
@@ -176,6 +185,7 @@ export class ImageLayerRenderer {
       image.setDepth(def.depth);
       image.setAlpha(def.opacity);
       image.setFlip(def.flipX, def.flipY);
+      if (def.rotation) image.setAngle?.(def.rotation);
       let w = image.width;
       let h = image.height;
       if (def.scale !== 1) {
@@ -221,7 +231,7 @@ export class ImageLayerRenderer {
       }
     }
     const image = this.scene.add.image(def.x, def.y, key, frame);
-    image.setOrigin(0.5, 1);
+    image.setOrigin(def.originX, def.originY);
     return image;
   }
 

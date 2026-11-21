@@ -2,8 +2,8 @@
 // Transform and Tag (and any component this file does not know, untouched), and its children are the rest:
 //
 //   AnimatedSprite (`animatedSprite`)  -> Sprite      (props; `visible` is the node's eye)
-//   StaticBody (`body`) + its shape    -> Collider    (solid; a one-tile box without a shape)
-//   Area (`area`) + its shape          -> Area        (where its events trigger), or the Collider (not solid) when the
+//   StaticBody (`body`) + its shape    -> Collider    (solid; nothing without a shape)
+//   Area (`area`) + its shape          -> Area        (where its events trigger; nothing without a shape), or the Collider (not solid) when the
 //                                                        entity has no body
 //   Wander / PlayerController / Mover    -> Movement    (controller wander / player / none)
 //   Event (`event`)                      -> Event
@@ -68,8 +68,9 @@ export function componentsOfEntity(node: EntityNode): ComponentBag {
   const out: ComponentBag = { ...(isRecord(node.components) ? node.components : {}) }
   const children = childrenOf(node)
   const sprite = firstOf<AnimatedSpriteNode>(children, (c) => c.type === 'animatedSprite')
-  const body = firstOf<BodyNode>(children, (c) => c.type === 'body')
-  const area = firstOf<AreaNode>(children, (c) => c.type === 'area')
+  // A StaticBody or Area without a CollisionShape does nothing (as in Godot): it needs a shape to collide or trigger.
+  const body = firstOf<BodyNode>(children, (c) => c.type === 'body' && shapeIn(c) !== undefined)
+  const area = firstOf<AreaNode>(children, (c) => c.type === 'area' && shapeIn(c) !== undefined)
   const movement = firstOf<MovementNode>(children, (c) => c.type === 'wander' || c.type === 'playerController' || c.type === 'mover')
   const event = firstOf<EventNode>(children, (c) => c.type === 'event')
   if (sprite) out.Sprite = { ...sprite.props, visible: sprite.visible !== false }
@@ -137,9 +138,10 @@ function spriteChild(existing: SceneNode | undefined, props: Bag | undefined, id
 
 // A body or area child holding one shape with `geometry`; kept as it is when its shape already gives that geometry.
 function shapedChild(type: 'body' | 'area', existing: SceneNode | undefined, geometry: Bag | undefined, compare: (g: Bag) => Bag, idFor: IdFor): SceneNode | null {
-  if (!geometry) return null
   const node = existing?.type === type ? existing : undefined
   const shape = shapeIn(node)
+  // A body or area still waiting for its shape stands for no component: it stays until it is given one or deleted.
+  if (!geometry) return node && !shape ? node : null
   if (node && deepEqual(compare(shapeGeometry(shape)), compare(geometry))) return node
   const base = node ?? ({ id: idFor(type), type, name: NODE_TYPES[type].label, children: [] } as BodyNode | AreaNode)
   const fields = geometryToShape(geometry)
@@ -211,6 +213,6 @@ export function entityNodeFrom(fields: { id: string; name: string; x: number; y:
 
 /** An entity node as the game's entity (`EngineEntity`): its fields and its whole bag of components; no node-only fields. */
 export function engineEntityOf(node: EntityNode): Record<string, unknown> & { id: string; name: string; components: ComponentBag } {
-  const { type: _type, locked: _locked, children: _children, collapsed: _collapsed, ...entity } = node
+  const { type: _type, locked: _locked, children: _children, collapsed: _collapsed, prefab: _prefab, z: _z, opacity: _opacity, pickAsOne: _pick, ...entity } = node
   return { ...entity, components: componentsOfEntity(node) }
 }
