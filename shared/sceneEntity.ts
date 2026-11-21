@@ -14,6 +14,7 @@
 import type { AnimatedSpriteNode, AreaNode, BodyNode, CollisionShapeNode, EntityNode, EventNode, MovementNode, SceneNode, ShapeBox } from './sceneTree.ts'
 import { NODE_TYPES, childrenOf } from './sceneTree.ts'
 import { cloneJson, deepEqual, isRecord } from './engine/util.ts'
+import { isOffGrid } from './engine/placement.ts'
 
 type Bag = Record<string, unknown>
 /** Component name -> props, as `EngineEntity.components`. */
@@ -214,5 +215,11 @@ export function entityNodeFrom(fields: { id: string; name: string; x: number; y:
 /** An entity node as the game's entity (`EngineEntity`): its fields and its whole bag of components; no node-only fields. */
 export function engineEntityOf(node: EntityNode): Record<string, unknown> & { id: string; name: string; components: ComponentBag } {
   const { type: _type, locked: _locked, children: _children, collapsed: _collapsed, prefab: _prefab, z: _z, opacity: _opacity, pickAsOne: _pick, ...entity } = node
-  return { ...entity, components: componentsOfEntity(node) }
+  const components = componentsOfEntity(node)
+  // An entity made from a Node before promotion gave it a Transform stands at its anchor (what the game reads).
+  if (!components.Transform) {
+    const free = isOffGrid(node.x, node.y)
+    return { ...entity, components: { Transform: { x: node.x, y: node.y, depth: 20, ...(free ? { free } : {}) }, ...components } }
+  }
+  return { ...entity, components }
 }

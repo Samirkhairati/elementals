@@ -15,6 +15,7 @@ import type { EditorImageCrop, EditorTile } from './mapTypes.ts'
 import { cellGroupId, collisionItems } from './collisionLayers.ts'
 import type { CollisionItem, CollisionLayerLike } from './collisionLayers.ts'
 import { cloneJson } from './engine/util.ts'
+import { isOffGrid } from './engine/placement.ts'
 
 // ── node types ─────────────────────────────────────────────────────────────────────────────────────
 //
@@ -862,6 +863,12 @@ export function duplicateNode(nodes: SceneNode[], id: string, newId: () => strin
 // ── flat views ─────────────────────────────────────────────────────────────────────────────────────
 
 /** Every entity, in tree order (draw order: the first one draws first among the entities). */
+/** The entity a node sits in (its nearest entity ancestor), or undefined. What the game attaches it to. */
+export function owningEntity(ancestors: readonly SceneNode[]): EntityNode | undefined {
+  for (let i = ancestors.length - 1; i >= 0; i--) if (ancestors[i].type === 'entity') return ancestors[i] as EntityNode
+  return undefined
+}
+
 export function allEntities(nodes: readonly SceneNode[]): EntityNode[] {
   return walk(nodes).filter((e): e is WalkEntry & { node: EntityNode } => e.node.type === 'entity').map((e) => e.node)
 }
@@ -1002,7 +1009,9 @@ export function promoteNodes(nodes: SceneNode[]): SceneNode[] {
   return mapTree(nodes, (node) => {
     if (node.type !== 'group' || !kids(node).some(isComponentNode)) return node
     const { type: _t, x, y, rotation, ...rest } = node
-    const entity: EntityNode = { ...rest, type: 'entity', x: x ?? 0, y: y ?? 0, components: {} }
+    // Its anchor is where the entity stands: the Transform says so (depth: the default one).
+    const at = { x: x ?? 0, y: y ?? 0 }
+    const entity: EntityNode = { ...rest, type: 'entity', ...at, components: { Transform: { ...at, depth: 20, ...(isOffGrid(at.x, at.y) ? { free: true } : {}) } } }
     if (rotation) entity.rotation = rotation
     return entity
   })

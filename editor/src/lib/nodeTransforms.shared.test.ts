@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- loose node fixtures */
 import { describe, expect, it } from 'vitest'
+import { engineEntityOf } from '../../../shared/sceneEntity'
 import { nodeAnchor, promoteNodes, rotateSubtree, translateSubtree, type SceneNode } from '../../../shared/sceneTree'
 
 const pic = (id: string, x: number, y: number, extra: Record<string, unknown> = {}): SceneNode => ({ id, type: 'picture', name: id, x, y, children: [], ...extra }) as any
@@ -10,9 +11,19 @@ describe('one kind of Node', () => {
     expect(promoteNodes(plain)).toBe(plain)
     const withEvent = [{ id: 'g', type: 'group', name: 'G', x: 16, y: 32, rotation: 45, children: [{ id: 'e', type: 'event', name: 'Event', props: {} }] }] as SceneNode[]
     const [out] = promoteNodes(withEvent) as any[]
-    expect(out).toMatchObject({ id: 'g', type: 'entity', x: 16, y: 32, rotation: 45, components: {} })
+    // It gets a Transform at its anchor (what the game places it by); 16, 32 is a tile anchor.
+    expect(out).toMatchObject({ id: 'g', type: 'entity', x: 16, y: 32, rotation: 45, components: { Transform: { x: 16, y: 32, depth: 20 } } })
+    const offGrid = promoteNodes([{ ...withEvent[0], x: 50, y: 70 } as SceneNode]) as any[]
+    expect(offGrid[0].components.Transform).toEqual({ x: 50, y: 70, depth: 20, free: true })
     expect(out.children[0].type).toBe('event')
     expect(promoteNodes(promoteNodes(withEvent))).toEqual(promoteNodes(withEvent))
+  })
+
+  it("an entity without a stored Transform (made before promotion gave it one) exports at its anchor", () => {
+    const old = { id: 'e', type: 'entity', name: 'E', x: 790, y: 639, components: {}, children: [{ id: 'ev', type: 'event', name: 'Event', props: {} }] } as any
+    expect(engineEntityOf(old).components.Transform).toEqual({ x: 790, y: 639, depth: 20, free: true })
+    const kept = { ...old, components: { Transform: { x: 790, y: 639, depth: 3, free: true } } }
+    expect(engineEntityOf(kept).components.Transform).toMatchObject({ depth: 3 })
   })
 
   it('every Node, entity and sprite has an anchor; a Node without a position is at the origin', () => {
